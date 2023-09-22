@@ -1,0 +1,47 @@
+<!-- ko if: isAvailable() -->
+<div id="iwd_opc_reward"
+     data-bind="mageInit: {'collapsible':{'openedState': 'iwd_opc_collapsible_opened', 'active': isApplied()}}">
+    <div class="iwd_opc_universal_wrapper" data-role="title">
+        <button class="iwd_opc_button with_angle active" data-role="trigger">
+            <!-- ko i18n: 'Reward Points'--><!-- /ko -->
+            -&nbsp;<!-- ko text: formatBalance() --><!-- /ko -->
+        </button>
+    </div>
+    <div class="iwd_opc_reward" data-role="content">
+        <!-- ko if: isApplied() -->
+        <div class="iwd_opc_additional_payment_info iwd_opc_universal_wrapper">
+            <div class="iwd_opc_additional_payment_label">
+                <!-- ko i18n: 'Previous Reward Balance'--><!-- /ko -->:
+            </div>
+            <div class="iwd_opc_additional_payment_value">
+                <!-- ko text: formatBalance() --><!-- /ko -->
+            </div>
+            <br/>
+            <div class="iwd_opc_additional_payment_label">
+                <!-- ko i18n: 'New Reward Balance'--><!-- /ko -->:
+            </div>
+            <div class="iwd_opc_additional_payment_value">
+                <!-- ko text: formatBalanceUsed() --><!-- /ko -->
+            </div>
+        </div>
+        <div class="iwd_opc_universal_wrapper">
+            <button class="iwd_opc_button" data-bind="'title': $t('Remove'), click: remove">
+                <!-- ko i18n: 'Remove'--><!-- /ko -->
+            </button>
+        </div>
+        <!-- /ko -->
+        <!-- ko ifnot: isApplied() -->
+        <div class="iwd_opc_small_button_container iwd_opc_universal_wrapper">
+            <button class="iwd_opc_small_button active"
+                    data-bind="'title': $t('Apply'), click: useRewardPoints">
+                <!-- ko i18n: 'Apply'--><!-- /ko -->
+            </button>
+            <button class="iwd_opc_small_button"
+                    data-bind="'title': $t('Cancel'), click: cancel">
+                <!-- ko i18n: 'Cancel'--><!-- /ko -->
+            </button>
+        </div>
+        <!-- /ko -->
+    </div>
+</div>
+<!-- /ko -->

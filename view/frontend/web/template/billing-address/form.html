@@ -1,0 +1,14 @@
+<div class="billing-address-form" data-bind="fadeVisible: isAddressFormVisible">
+    <div class="iwd_opc_universal_wrapper iwd_opc_column_name billing-address-title" data-bind="i18n: 'Billing Address'" data-role="title"></div>
+
+    <!-- ko template: 'IWD_Opc/billing-address/list' --><!-- /ko -->
+
+    <!-- ko foreach: getRegion('before-fields') -->
+    <!-- ko template: getTemplate() --><!-- /ko -->
+    <!--/ko-->
+    <fieldset id="billing-new-address-form" class="fieldset address">
+        <!-- ko foreach: getRegion('additional-fieldsets') -->
+        <!-- ko template: getTemplate() --><!-- /ko -->
+        <!--/ko-->
+    </fieldset>
+</div>

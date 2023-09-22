@@ -1,0 +1,20 @@
+<!-- ko if: config.isEnabled -->
+<div class="field">
+    <div id="iwd_opc_shipping_policy"
+            data-bind="mageInit: {'collapsible':{'openedState': 'iwd_opc_collapsible_opened'}}"
+            class="iwd_opc_shipping_policy_block iwd_opc_collapsible_container">
+        <div class="iwd_opc_universal_wrapper" data-role="title">
+            <button class="iwd_opc_button with_angle active" data-role="trigger">
+            <!-- ko i18n: 'See our Shipping Policy' --><!-- /ko -->
+            </button>
+        </div>
+        <div class="iwd_opc_universal_wrapper iwd_opc_collapsible_content"
+             data-role="content"
+        >
+            <div class="iwd_opc_collapsible_content_scrollable" data-bind="html: config.shippingPolicyContent, afterRender: appendScrollbar">
+
+            </div>
+        </div>
+    </div>
+</div>
+<!-- /ko !-->

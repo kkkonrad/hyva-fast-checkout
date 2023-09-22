@@ -1,0 +1,120 @@
+<div class="payment-method" data-bind="css: {'_active': (getCode() == isChecked())}">
+    <div class="payment-method-title field choice">
+        <input type="radio" name="payment[method]" class="radio"
+               data-bind="attr: {'id': getCode()}, value: getCode(), checked: isChecked, click: selectPaymentMethod, visible: isRadioButtonVisible()"/>
+        <label data-bind="attr: {'for': getCode()}" class="label"><span data-bind="text: getTitle()"></span></label>
+    </div>
+    <div class="payment-method-content">
+        <!-- ko foreach: getRegion('messages') -->
+        <!-- ko template: getTemplate() --><!-- /ko -->
+        <!--/ko-->
+        <form class="form" data-bind="attr: {'id': getCode() + '-form'}">
+            <div data-bind="attr: {class: 'fieldset payment items ccard ' + getCode(), id: 'payment_form_' + getCode()}">
+                <div class="field number required">
+                    <div class="control iwd_opc_cc_wrapper"
+                         data-bind="attr:{'data-https': isCurrentlySecure? '1':'0'}">
+                        <input type="number" name="payment[cc_number]" class="input-text"
+                               id="opg_square_cc_number_json"
+                               value=""
+                               data-bind="attr: {
+                                    autocomplete: off,
+                                    id: getCode() + '_cc_number_json',
+                                    title: $t('Credit Card Number'),
+                                    'data-container': getCode() + '-cc-number-json',
+                                    'data-validate': JSON.stringify({'required-number':true,
+                                    'validate-card-type':getCcAvailableTypesValues(), 'validate-card-number':'#' + getCode() + '_cc_type', 'validate-cc-type':'#' + getCode() + '_cc_type'})},
+                              enable: isActive($parents),
+                              value: creditCardNumber,
+                              valueUpdate: 'keyup' "/>
+                        <!--ko if: isCurrentlySecure -->
+                        <div data-icon="&#xf023" class="iwd_opc_field_tooltip iwd_opc_cc_tooltip">
+                            <div class="iwd_opc_field_tooltip_content"
+                                 data-bind="text: $t('We don\'t store or transfer your data, we rely on industry-leading third party partners to keep your information safe.')">
+                            </div>
+                        </div>
+                        <!--/ko-->
+                    </div>
+                </div>
+                <div class="field required">
+                    <div class="control">
+                        <input type="number"
+                               autocomplete="off"
+                               class="input-text date number"
+                               id="opg_square_cc_date_json"
+                               name="payment[cc_date]"
+                               value=""
+                               data-bind="attr: {id: getCode() + '_cc_date_json',
+                        title: $t('Expiration Date'),
+                        placeholder: $t('Expiration Date'),
+                        'data-container': getCode() + '-cc-date-json',
+                        'data-validate': JSON.stringify({'required-number':true})},
+                        enable: isActive($parents)" />
+
+                    </div>
+                </div>
+                <div class="field zip required" data-bind="attr: {id: getCode() + '_cc_type_zip_div'}">
+                    <div class="control">
+                        <input type="number"
+                               autocomplete="off"
+                               id="opg_square_cc_zip_json"
+                               class="input-text zip number"
+                               name="payment[cc_zip]"
+                               value=""
+                               data-bind="attr: {id: getCode() + '_cc_zip_json',
+                        title: $t('Zip'),
+                        placeholder: $t('Zip'),
+                        'data-container': getCode() + '-cc-zip-json',
+                        'data-validate': JSON.stringify({'required-number':true})},
+                        enable: isActive($parents)" />
+
+                    </div>
+                </div>
+                <div class="field cvv required" data-bind="attr: {id: getCode() + '_cc_type_cvv_div2'}">
+                    <div class="control">
+                        <div class="iwd_opc_universal_wrapper">
+                            <input type="number"
+                                   autocomplete="off"
+                                   class="input-text cvv"
+                                   name="payment[cc_cid]"
+                                   id="opg_square_cc_cid2_json"
+                                   value=""
+                                   data-bind="attr: {id: getCode() + '_cc_cid2_json',
+                        title: $t('Card Verification Number'),
+                        placeholder: $t('CVV')+' *',
+                        'data-container': getCode() + '-cc-cvv',
+                        'data-validate': JSON.stringify({'required-number':true, 'validate-card-cvv':'#' + getCode() + '_cc_type'})},
+                        enable: isActive($parents),
+                        value: creditCardVerificationNumber"/>
+                            <div data-icon="&#xf059" class="iwd_opc_field_tooltip iwd_opc_cvv_tooltip">
+                                <div class="iwd_opc_field_tooltip_content">
+                                    <!-- ko i18n: 'The 3-4 digit number typically found on the back of your card' -->
+                                    <!-- /ko -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </form>
+        <div class="payment-method-billing-address">
+            <!-- ko foreach: $parent.getRegion(getBillingAddressFormName()) -->
+            <!-- ko template: getTemplate() --><!-- /ko -->
+            <!--/ko-->
+        </div>
+        <div class="actions-toolbar">
+            <div class="primary">
+                <button class="action primary checkout"
+                        type="submit"
+                        data-bind="
+                        click: requestCardNonce,
+                        attr: {title: $t('Place Order')},
+                        css: {disabled: !isPlaceOrderActionAllowed()},
+                        enable: (getCode() == isChecked())
+                        "
+                        disabled>
+                    <span data-bind="text: $t('Place Order')"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

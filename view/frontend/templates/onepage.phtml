@@ -1,0 +1,128 @@
+<?php
+/**
+ * @var $block IWD\Opc\Block\Onepage
+ */
+?>
+
+<?php
+$isVirtual = $block->checkoutSession->getQuote()->isVirtual() ?>
+
+<?php echo $block->renderPayPalInContextBlock();?>
+
+<div class="iwd_opc_clear"></div>
+<div id="checkout-loader" data-role="checkout-loader" class="loading-mask" data-mage-init='{"checkoutLoader": {}}'>
+    <div class="loader"></div>
+</div>
+
+<div id="iwd_opc_iframe_container" class="iwd_main_wrapper iwd_opc_wrapper " style="display: none;">
+    <div class="iwd_opc_alternative_wrapper">
+        <div class="iwd_opc_column iwd_opc_iframe_payment_column">
+            <div class="iwd_opc_alternative_column">
+                <div class="iwd_opc_universal_wrapper iwd_opc_column_name">
+                    <?php echo __('Choose a Different Payment Method'); ?>
+                </div>
+                <div class="iwd_opc_column_content"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="checkout" data-bind="scope:'checkout'" class="iwd_opc_wrapper iwd_main_wrapper">
+    <div class="iwd_opc_alternative_wrapper">
+        <?php if ($isVirtual) : ?>
+            <div class="iwd_opc_two_column_wrapper">
+                <!-- ko template: getTemplate() --><!-- /ko -->
+            </div>
+        <?php else : ?>
+            <!-- ko template: getTemplate() --><!-- /ko -->
+        <?php endif; ?>
+
+
+        <script type="text/x-magento-init">
+        {
+            "#checkout": {
+                "Magento_Ui/js/core/app": <?php /* @escapeNotVerified */ echo $block->getJsLayout(); ?>
+            }
+        }
+        </script>
+
+        <script>
+            window.checkoutConfig = <?php /* @escapeNotVerified */
+            echo \Laminas\Json\Json::encode($block->getCheckoutConfig()); ?>;
+            // Create aliases for customer.js model from customer module
+            window.isCustomerLoggedIn = window.checkoutConfig.isCustomerLoggedIn;
+            window.customerData = window.checkoutConfig.customerData;
+        </script>
+
+        <?php if (!$isVirtual) { ?>
+            <?php echo $block->getChildHtml('checkout.gift_options', false) ?>
+        <?php } ?>
+
+        <script>
+            require([
+                'mage/url',
+                'IWD_Opc/js/block-loader'
+            ], function (url, iwdBlockLoader) {
+                iwdBlockLoader();
+                return url.setBaseUrl('<?php /* @escapeNotVerified */ echo $block->getBaseUrl();?>');
+            });
+        </script>
+    </div>
+</div>
+
+<script>
+    require([
+        "jquery",
+        "jquery/ui"
+    ], function($) {
+        $.extend(true, $, {
+            calendarConfig: {
+                dayNames: ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"],
+                dayNamesMin: ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"],
+                monthNames: ["January","February","March","April","May","June","July","August","September","October","November","December"],
+                monthNamesShort: ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],
+                infoTitle: "<?= __('About the calendar') ?>",
+                firstDay: 0,
+                closeText: "<?= __('Close') ?>",
+                currentText: "<?=  __('Go Today') ?>",
+                prevText: "<?= __('Previous') ?>",
+                nextText: "<?= __('Next') ?>",
+                weekHeader: "<?= __('WK') ?>",
+                timeText: "<?= __('Time') ?>",
+                hourText: "<?= __('Hour') ?>",
+                minuteText: "<?= __('Minute') ?>",
+                dateFormat: $.datepicker.RFC_2822,
+                showOn: "button",
+                showAnim: "",
+                changeMonth: true,
+                changeYear: true,
+                buttonImageOnly: null,
+                buttonImage: null,
+                showButtonPanel: true,
+                showOtherMonths: true,
+                showWeek: false,
+                timeFormat: '',
+                showTime: false,
+                showHour: false,
+                showMinute: false,
+                serverTimezoneSeconds: 1521082614,
+                serverTimezoneOffset: 0,
+                yearRange: '1918:2118'
+            }
+        });
+        enUS = {"m":{"wide":["January","February","March","April","May","June","July","August","September","October","November","December"],"abbr":["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]}}; // en_US locale reference
+    });
+
+</script>
+<script>
+    require([
+        'IWD_Opc/js/paypal/button',
+        'jquery'
+    ], function (button, $) {
+        if (typeof window.checkoutData !== 'object') {
+            window.checkoutData = {};
+        }
+        window.checkoutData.paypal = button;
+    })
+</script>
+<div class="iwd_opc_clear"></div>

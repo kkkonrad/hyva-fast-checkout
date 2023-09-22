@@ -1,0 +1,21 @@
+<!--
+/*
+
+ * 
+ *
+*/
+-->
+<div class="choice field labelcustomlavel">
+    <section>
+        <!-- ko foreach:  { data: options, as: 'item' }-->
+        <p>
+            <input type="radio" class="radio" data-bind="checked: $parent.value, attr: { id: $parent.uid + '_' + value, disabled: $parent.disabled, name: $parent.inputName, value: value }, hasFocus: $parent.focused">
+            <label class="labelcustomlavel" data-bind="text: $parent.description || label, attr: { for: $parent.uid + '_' + value }"></label>
+        </p>
+        <!-- /ko -->
+        <!-- ko if: notice -->
+        <div class="note" data-bind="attr: {id: $parent.noticeId}"><span data-bind="text: $parent.notice"></span></div>
+        <!-- /ko -->
+    </section>
+
+</div>

@@ -1,0 +1,25 @@
+<!-- ko if: isPriceExclTaxDisplayed() && !getRegion('row_excl_tax') -->
+<div class="iwd_opc_review_item_subtotal"
+     data-bind ="text: getValueExclTax($parents[1])">
+</div>
+<!-- /ko -->
+
+<!-- ko if: isPriceExclTaxDisplayed() && getRegion('row_excl_tax') -->
+
+<!-- ko foreach: getRegion('row_excl_tax') -->
+<!-- ko template: getTemplate() --><!-- /ko -->
+<!-- /ko -->
+
+<!-- /ko -->
+
+<!-- ko if: isPriceInclTaxDisplayed() && !getRegion('row_incl_tax') -->
+<div class="iwd_opc_review_item_subtotal"
+      data-bind ="text: getValueInclTax($parents[1])">
+</div>
+<!-- /ko -->
+
+<!-- ko if: isPriceInclTaxDisplayed() && getRegion('row_incl_tax') -->
+    <!-- ko foreach: getRegion('row_incl_tax') -->
+        <!-- ko template: getTemplate() --><!-- /ko -->
+    <!-- /ko -->
+<!-- /ko -->

@@ -1,0 +1,15 @@
+
+<textarea
+        rows="1"
+        data-bind="
+    value: value,
+    valueUpdate: valueUpdate,
+    hasFocus: focused,
+    afterRender: textareaAutoSize,
+    attr: {
+        name: inputName,
+        'aria-describedby': noticeId,
+        placeholder: placeholder,
+        id: uid,
+        disabled: disabled
+    }"></textarea>

@@ -1,0 +1,48 @@
+<div data-role="checkout-agreements" class="fieldset" data-bind="visible: isVisible">
+    <form id="co-agreements-form">
+        <!-- ko foreach: agreements -->
+        <!-- ko if: ($parent.isAgreementRequired($data)) -->
+        <div
+                data-bind="mageInit: {'collapsible':{'openedState': 'iwd_opc_collapsible_opened'}}"
+                class="field choice checkout-agreement iwd_opc_collapsible_container">
+            <input type="checkbox" class="required-entry"
+                   data-bind="attr: {
+                                        'id': 'agreement_' + agreementId,
+                                        'name': 'agreement[' + agreementId + ']',
+                                        'value': agreementId
+                                        }"
+                   data-validate="{required:true}"/>
+            <label data-bind="attr: {'for': 'agreement_' + agreementId}" data-role="title">
+                <span class="iwd_opc_universal_wrapper iwd_opc_collapsible_title" data-role="trigger"
+                      data-bind="html: checkboxText"></span>
+            </label>
+            <div class="iwd_opc_universal_wrapper iwd_opc_collapsible_content"
+                 data-role="content"
+            >
+                <div class="iwd_opc_collapsible_content_scrollable"
+                     data-bind="html: content, afterRender: $parent.appendScrollbar">
+
+                </div>
+            </div>
+        </div>
+        <!-- /ko -->
+        <!-- ko ifnot: ($parent.isAgreementRequired($data)) -->
+        <div
+                data-bind="mageInit: {'collapsible':{'openedState': 'iwd_opc_collapsible_opened'}}"
+                class="field checkout-agreement iwd_opc_collapsible_container">
+            <div class="iwd_opc_universal_wrapper iwd_opc_collapsible_title" data-role="title"
+                 data-bind="html: checkboxText">
+            </div>
+            <div class="iwd_opc_universal_wrapper iwd_opc_collapsible_content"
+                 data-role="content"
+            >
+                <div class="iwd_opc_collapsible_content_scrollable"
+                     data-bind="html: content, afterRender: $parent.appendScrollbar">
+
+                </div>
+            </div>
+        </div>
+        <!-- /ko -->
+        <!-- /ko -->
+    </form>
+</div>

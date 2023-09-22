@@ -1,0 +1,75 @@
+<div class="iwd_opc_alternative_step address" data-bind="fadeVisible: AddressStep">
+        <div class="iwd_opc_alternative_column">
+            <!-- ko template: 'IWD_Opc/shipping-address/customer-data' --><!-- /ko -->
+
+            <!-- ko if: (isShippingFormFirst()) -->
+            <div tabindex="-1" class="shipping iwd_opc_column_content" data-bind="attr:{'class': isCustomerLoggedIn() ? 'shipping iwd_opc_column_content customerLoggedIn' : 'shipping iwd_opc_column_content'}">
+                <!-- ko if: (!quoteIsVirtual) -->
+                <!-- ko foreach: getRegion('customer-email') -->
+                <!-- ko template: getTemplate() --><!-- /ko -->
+                <!--/ko-->
+                <!--/ko-->
+
+                <!-- ko foreach: getRegion('address-list-additional-addresses') -->
+                <!-- ko template: getTemplate() --><!-- /ko -->
+                <!--/ko-->
+
+                <!-- ko foreach: getRegion('before-form') -->
+                <!-- ko template: getTemplate() --><!-- /ko -->
+                <!--/ko-->
+
+                <div class="iwd_opc_universal_wrapper iwd_opc_column_name" data-bind="i18n: 'Shipping Address'"></div>
+                <!-- ko template: 'IWD_Opc/shipping-address/list' --><!-- /ko -->
+                <!-- ko template: 'IWD_Opc/shipping/new-shipping-address' --><!-- /ko -->
+            </div>
+            <div tabindex="-1" class="billing iwd_opc_column_content" data-bind="attr:{'class': isCustomerLoggedIn() ? 'billing iwd_opc_column_content customerLoggedIn secondary' : 'billing iwd_opc_column_content secondary'}">
+                <!-- Inline Billing address form -->
+                <!-- ko foreach: getRegion('billing-address') -->
+                <!-- ko template: getTemplate() --><!-- /ko -->
+                <!-- /ko -->
+                <!-- ko if: (decorateBillingSelect()) -->
+                <!-- /ko -->
+            </div>
+            <!-- /ko -->
+
+            <!-- ko if: (isBillingFormFirst()) -->
+            <div tabindex="-1" class="billing iwd_opc_column_content" data-bind="attr:{'class': isCustomerLoggedIn() ? 'billing iwd_opc_column_content customerLoggedIn' : 'billing iwd_opc_column_content'}">
+                <!-- ko if: (!quoteIsVirtual) -->
+                <!-- ko foreach: getRegion('customer-email') -->
+                <!-- ko template: getTemplate() --><!-- /ko -->
+                <!--/ko-->
+                <!--/ko-->
+
+                <!-- Inline Billing address form -->
+                <!-- ko foreach: getRegion('billing-address') -->
+                <!-- ko template: getTemplate() --><!-- /ko -->
+                <!-- /ko -->
+
+                <!-- ko if: (decorateBillingSelect()) -->
+                <!-- /ko -->
+            </div>
+            <div class="shipping-address-same-as-billing-block field choice" data-bind="
+            attr: {'class' : (isAddressSameAsBilling()) ? 'shipping-address-same-as-billing-block field choice' : 'shipping-address-same-as-billing-block field choice checked'}">
+                <input type="checkbox" name="shipping-address-same-as-billing"
+                       data-bind="checked: isAddressSameAsBilling, click: useBillingAddress, attr: {id: 'shipping-address-same-as-billing'}"/>
+                <label data-bind="attr: {for: 'shipping-address-same-as-billing'}">
+                    <span data-bind="i18n: 'My shipping address is different'"></span>
+                </label>
+            </div>
+            <div tabindex="-1" class="shipping iwd_opc_column_content" data-bind="fadeVisible: isAddressShippingFormVisible, attr:{'class': isCustomerLoggedIn() ? 'shipping iwd_opc_column_content customerLoggedIn secondary' : 'shipping iwd_opc_column_content secondary'}">
+                <!-- ko foreach: getRegion('address-list-additional-addresses') -->
+                <!-- ko template: getTemplate() --><!-- /ko -->
+                <!--/ko-->
+
+                <!-- ko foreach: getRegion('before-form') -->
+                <!-- ko template: getTemplate() --><!-- /ko -->
+                <!--/ko-->
+
+                <div class="iwd_opc_universal_wrapper iwd_opc_column_name" data-bind="i18n: 'Shipping Address'"></div>
+                <!-- ko template: 'IWD_Opc/shipping-address/list' --><!-- /ko -->
+                <!-- ko template: 'IWD_Opc/shipping/new-shipping-address' --><!-- /ko -->
+            </div>
+            <!-- /ko -->
+
+    </div>
+</div>

@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      layout="1column"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <head>
+        <css src="//fonts.googleapis.com/css?family=Open+Sans:400,400italic,700italic,700" src_type="url" />
+        <css src="//maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" src_type="url"/>
+    </head>
+    <body>
+        <referenceBlock name="page.main.title" remove="true" />
+        <referenceBlock name="checkout.registration" remove="true" />
+    </body>
+</page>

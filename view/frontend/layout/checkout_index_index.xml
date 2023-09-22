@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"  xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <referenceContainer name="after.body.start">
+            <block class="Magento\Framework\View\Element\Template" name="opc.require.js" template="IWD_Opc::page/js/require_js.phtml" before="-">
+                <block class="Magento\GiftMessage\Block\Cart\GiftOptions"
+                       name="checkout.gift_options"
+                       template="IWD_Opc::gift_options.phtml"
+                       cacheable="false">
+                </block>
+            </block>
+            <block class="IWD\Opc\Block\Ga\Ab" name="iwd_opc_ga_ab" template="IWD_Opc::ga_ab.phtml"/>
+            <block class="Magento\Framework\View\Element\Template" name="iwd.opc.gm.autocomplete" template="IWD_Opc::gm_autocomplete.phtml" ifconfig="iwd_opc/extended/gm_autocomplete"/>
+        </referenceContainer>
+        <referenceBlock name="checkout.root" template="Magento_Checkout::onepage.phtml"/>
+    </body>
+</page>

@@ -1,0 +1,8 @@
+<!-- ko if: isAvailable() -->
+    <!-- ko foreach: getAppliedGiftCards() -->
+    <div class="iwd_opc_review_total">
+        <div class="iwd_opc_review_total_cell" data-bind="text: $parent.title + ' (' + c + ')' "></div>
+        <div class="iwd_opc_review_total_cell" data-bind="text: '-' + $parent.getAmount(a)"></div>
+    </div>
+    <!-- /ko -->
+<!-- /ko -->

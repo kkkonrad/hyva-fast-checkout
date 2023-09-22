@@ -1,0 +1,23 @@
+<div class="iwd_opc_column">
+    <div class="iwd_opc_alternative_column">
+
+        <!-- ko if: isShowLoginButton -->
+        <!-- ko if: isCustomerLoggedIn -->
+        <a
+                data-bind="i18n: 'Log Out', attr: { href: logoutUrl,title: $t('Log Out') }"
+                class="iwd_opc_button active">
+
+        </a>
+        <!-- /ko -->
+        <!-- ko ifnot: isCustomerLoggedIn -->
+        <button
+                data-bind="i18n: 'Log In', attr: { title: $t('Log In') }"
+                type="button"
+                id="iwd_opc_top_login_button"
+                class="iwd_opc_button active">
+        </button>
+        <!-- /ko -->
+        <!-- /ko -->
+    </div>
+</div>
+

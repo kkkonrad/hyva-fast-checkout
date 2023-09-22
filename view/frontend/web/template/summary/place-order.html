@@ -1,0 +1,12 @@
+<!-- ko if: (isVisible()) -->
+<div class="actions-toolbar-trigger place_button_wrapper" id="place-order-trigger-wrapper">
+    <button type="button" class="button action primary iwd_opc_button iwd_opc_place_order_button" id="place-order-trigger" value="Place Order" >
+        <span>Place Order</span>
+    </button>
+</div>
+<div role="alert"
+     if="errorValidationMessage().length"
+     class="message notice">
+    <span text="errorValidationMessage()" > </span>
+</div>
+<!-- /ko -->

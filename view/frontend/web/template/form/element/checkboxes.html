@@ -1,0 +1,23 @@
+<!--
+/*
+
+ * 
+ *
+*/
+-->
+<!-- ko foreach:  { data: options, as: 'item' }-->
+    <p>
+        <input type="checkbox" class="checkbox" data-bind="
+        checked: $parent.value,
+        checkedValue: value,
+        attr: { id: $parent.uid + '-' + value,
+            disabled: $parent.disabled,
+            name: $parent.inputName
+        },
+        hasFocus: $parent.focused">
+        <label class="label" data-bind="text: $parent.description || item.label, attr: { for: $parent.uid + '-' + item.value }"></label>
+    </p>
+<!-- /ko -->
+<!-- ko if: notice -->
+<div class="admin__field-note" data-bind="attr: {id: noticeId}"><span data-bind="text: notice"></span></div>
+<!-- /ko -->

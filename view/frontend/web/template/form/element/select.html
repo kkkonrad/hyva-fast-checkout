@@ -1,0 +1,21 @@
+<select class="select" data-bind="
+    attr: {
+        name: inputName,
+        id: uid,
+        disabled: disabled,
+        'aria-describedby': noticeId,
+        autocomplete: inputName == 'country_id' ? 'country' : 'address-level1'
+    },
+    hasFocus: focused,
+    optgroup: options,
+    value: value,
+    optionsCaption: caption,
+    optionsValue: 'value',
+    optionsText: 'label',
+    optionsAfterRender:
+    function(option, item) {
+        decorateSelect(uid);
+        if (item && item.disabled) {
+            ko.applyBindingsToNode(option, {attr: {disabled: true}}, item);
+        }
+    }"></select>

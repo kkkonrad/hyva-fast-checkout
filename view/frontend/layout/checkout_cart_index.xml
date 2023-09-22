@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" layout="1column"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <head>
+        <css src="//fonts.googleapis.com/css?family=Open+Sans:400,400italic,700italic,700"
+             src_type="url"/>
+    </head>
+    <body>
+        <referenceBlock name="page.main.title" remove="true" />
+        <referenceBlock name="checkout.cart.empty">
+            <action method="setTemplate" ifconfig="iwd_opc/general/enable">
+                <argument name="template" xsi:type="string">IWD_Opc::cart/empty.phtml</argument>
+            </action>
+        </referenceBlock>
+    </body>
+</page>

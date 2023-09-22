@@ -1,0 +1,173 @@
+<?php
+/**
+ * *
+ *  * Copyright © 2017 Zinit Solutions Gmbh e.V. - All rights reserved.
+ *  * See LICENSE.txt bundled with this module for license details.
+ *
+ */
+
+/** @var IWD\Opc\Helper\Data $helper */
+$helper = $this->helper('IWD\Opc\Helper\Data');
+if ($helper->isEnable() && $helper->isModuleOutputEnabled('IWD_Opc') &&
+    $helper->isGmAutocompleteEnabled() && !empty($helper->getGmApikey())) : ?>
+    <script type="text/javascript"
+            src="https://maps.googleapis.com/maps/api/js?key=<?php echo $helper->getGmApikey() ?>&libraries=places&language=en"
+            async defer></script>
+
+    <script>
+        require(['jquery', 'underscore', 'ko'], function ($, _, ko) {
+            var autocomplete,
+                currentFormClass,
+                formClasses = {
+                    billing: '.billing-address-form',
+                    shipping: '.form-shipping-address'
+                },
+                componentForm = {
+                    route: 'long_name',
+                    street_number: 'short_name',
+                    locality: 'long_name',
+                    postal_town: 'long_name',
+                    administrative_area_level_1: 'long_name',
+                    country: 'short_name',
+                    postal_code: 'short_name'
+                },
+                addressFieldsMap = {
+                    route: 'street[0]',
+                    street_number: 'street[0]',
+                    locality: 'city',
+                    postal_town: 'city',
+                    administrative_area_level_1: 'region_id',
+                    country: 'country_id',
+                    postal_code: 'postcode'
+                };
+
+            function initAutocomplete(elem) {
+                if (elem) {
+                    var billingForm = $(elem).closest(formClasses['billing']).length;
+                    currentFormClass = billingForm ? formClasses['billing'] : formClasses['shipping'];
+                    autocomplete = new google.maps.places.Autocomplete(
+                        (elem),
+                        {types: ['geocode']});
+                    autocomplete.addListener('place_changed', fillInAddress);
+                }
+            }
+
+            function fillInAddress() {
+                var place = autocomplete.getPlace();
+                if (!place) {
+                    return false;
+                }
+
+                $.each(addressFieldsMap, function () {
+                    $(currentFormClass + " [name='" + this + "']").val('').change();
+                });
+
+                // Get each component of the address from the place details
+                // and fill the corresponding field on the form.
+                let country = {}, region = {};
+
+                for (var i = 0; i < place.address_components.length; i++) {
+                    var addressType = place.address_components[i].types[0],
+                        selector = currentFormClass + " [name='" + addressFieldsMap[addressType] + "']";
+
+                    if (componentForm[addressType]) {
+                        var val = place.address_components[i][componentForm[addressType]];
+
+                        if(addressType == 'administrative_area_level_1') {
+                            region.val = val;
+                            region.selector = selector;
+                        } else if(addressType == 'country') {
+                            country.val = val;
+                            country.selector = selector;
+                        } else {
+                            setValue(val, selector);
+                        }
+                    }
+                }
+
+                setValue(country.val, country.selector);
+                setValue(region.val, region.selector);
+            }
+
+            function setValue(value, selector) {
+                if(selector == ".form-shipping-address [name='region_id']" || selector == ".billing-address-form [name='region_id']") {
+                    let options = $(selector).data('selectize').options;
+
+                    var option = _.find(options, function (option) {
+                        return option.text === value;
+                    });
+
+                    if(option) {
+                        $(selector).data('selectize').setValue(option.value);
+                    }
+                } else if (selector == ".form-shipping-address [name='country_id']" || selector == ".billing-address-form [name='country_id']") {
+                    let options = $(selector).data('selectize').options;
+
+                    var option = _.find(options, function (option) {
+                        return option.value === value;
+                    });
+
+                    if(option) {
+                        $(selector).data('selectize').setValue(option.value);
+                    }
+                } else {
+                    var el = $(selector);
+                    if (el.is("select")) {
+                        var opt = _.find(el.find('option'), function (option) {
+                            return option.text === value;
+                        });
+                        if(opt) {
+                            value = opt.value;
+                        }
+                    }
+                    // if input text with exist value
+                    else if(el.val()) {
+                        value = el.val() + ' ' + value;
+                    }
+
+                    el.focus();
+                    el.val(value).trigger('change');
+                    el.blur();
+                }
+            }
+
+            function geolocate() {
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(function (position) {
+                        var geolocation = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude
+                        };
+                        var circle = new google.maps.Circle({
+                            center: geolocation,
+                            radius: position.coords.accuracy
+                        });
+
+                        try {
+                            autocomplete.setBounds(circle.getBounds());
+                        } catch (e) {
+                            //Do nothing
+                        }
+                    });
+                }
+
+            }
+
+            $(document).on('focus', "[name='street[0]']", function () {
+                initAutocomplete(this);
+                $(this).closest('.control').addClass('focus');
+                $(this).removeAttr('placeholder');
+            });
+
+            $(document).on('change', "[name='street[0]']", function () {
+                if (this.value.length >= 3) {
+                    geolocate();
+                }
+            });
+
+            $(document).on('focus focusout blur', "[name='street[0]']", function () {
+                $(this).removeAttr('placeholder');
+            });
+        });
+    </script>
+<?php endif; ?>

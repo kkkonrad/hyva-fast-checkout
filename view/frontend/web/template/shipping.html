@@ -1,0 +1,40 @@
+<!-- ko if: (!quoteIsVirtual) -->
+    <!-- ko template: 'IWD_Opc/header' --><!-- /ko -->
+
+    <div class="iwd_opc_column iwd_opc_address_column" data-bind="visible: !quoteIsVirtual">
+
+        <!-- ko template: 'IWD_Opc/shipping/base-address-form' --><!-- /ko -->
+        <!-- ko template: 'IWD_Opc/shipping/delivery-method' --><!-- /ko -->
+        <!-- ko template: 'IWD_Opc/shipping/comment' --><!-- /ko -->
+        <!-- ko template: 'IWD_Opc/shipping/gift-message' --><!-- /ko -->
+
+
+        <!-- ko if: (isMultiStepResolution()) -->
+            <!-- ko if: (AddressStep()) -->
+                <div class="iwd_opc_universal_wrapper multistep">
+                    <button type="button" class="iwd_opc_button primary"
+                            data-bind="i18n: 'Continue to  delivery Method',click: goToDeliveryStep">
+                    </button>
+                    <div class="step-back" data-bind="click: goToShoppingCart">
+                        <!-- ko i18n: 'Back to edit shopping cart' --><!-- /ko -->
+                    </div>
+                </div>
+            <!-- /ko -->
+
+            <!-- ko if : (DeliveryStep()) -->
+                <div class="iwd_opc_universal_wrapper multistep">
+                    <button type="button" class="iwd_opc_button primary"
+                            data-bind="i18n: 'Continue to  payment',click: goToPaymentStep">
+                    </button>
+                    <div class="step-back" data-bind="click: goToAddressStep">
+                        <!-- ko i18n: 'Back to edit address' --><!-- /ko -->
+                    </div>
+                </div>
+            <!-- /ko -->
+        <!-- /ko -->
+
+    </div>
+
+    <!-- ko if: (setDesignResolution()) -->
+    <!-- /ko -->
+<!-- /ko -->

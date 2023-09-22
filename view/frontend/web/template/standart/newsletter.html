@@ -1,0 +1,15 @@
+<!-- ko if: isShowSubscribe -->
+<div class="fieldset">
+    <div class="field choice">
+        <input type="checkbox" name="subscribe"
+               data-bind="
+                       checked: isSubscribe,
+                       attr: {
+                            id: 'subscribe'
+                       }"/>
+        <label data-bind="attr: {for: 'subscribe'}">
+            <span data-bind="i18n: 'Sign Up For Newsletter'"></span>
+        </label>
+    </div>
+</div>
+<!-- /ko -->

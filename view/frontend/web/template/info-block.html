@@ -1,0 +1,50 @@
+<!-- ko if: (isVisible()) -->
+    <div class="info-block">
+        <!-- ko if: (isVisibleCustomerEmail()) -->
+            <div class="info-item">
+                <div class="title">
+                    <!-- ko i18n: 'Email' --><!-- /ko -->
+                   <!-- <div data-bind="i18n:'Edit',attr:{'class':'edit-address'}"></div>-->
+                </div>
+                <div class="content">
+                    <span data-bind="i18n: customerEmail"></span>
+                </div>
+            </div>
+        <!-- /ko -->
+        <!-- ko if: (isVisibleShipBillAddress()) -->
+            <!-- ko foreach: address -->
+                <div class="info-item">
+                    <div class="title">
+                        <!-- ko i18n: title --><!-- /ko -->
+                       <!-- <div data-bind="i18n:'Edit',attr:{'class':'edit-address'}"></div>-->
+                    </div>
+                    <div class="content">
+                        <span data-bind="i18n: fullName"></span>
+                        <span data-bind="i18n: street"></span>
+                        <span data-bind="i18n: city"></span>
+                    </div>
+                </div>
+            <!-- /ko -->
+        <!-- /ko -->
+        <!-- ko if: (isVisibleShippingMethod()) -->
+            <div class="info-item">
+                <div class="title">
+                    <!-- ko i18n: 'Method' --><!-- /ko -->
+                    <!--<div data-bind="i18n:'Edit',attr:{'class':'edit-method'}"></div>-->
+                </div>
+                <div class="content">
+                    <span data-bind="i18n: shippingMethodTitle"></span>
+                    <span data-bind="i18n: shippingMethodAmount"></span>
+                </div>
+            </div>
+        <!-- /ko -->
+    </div>
+<!-- /ko -->
+
+<!-- ko if: (isVisibleShoppingCartLink()) -->
+    <div class="iwd-edit-cart">
+        <a href="/checkout/cart/">
+            <!-- ko i18n: 'Back to edit shopping cart'--><!-- /ko -->
+        </a>
+    </div>
+<!-- /ko -->

@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
+    <preference for="IWD\Opc\Api\BalanceManagementInterface" type="IWD\Opc\Model\BalanceManagement"/>
+    <preference for="IWD\Opc\Api\RewardManagementInterface" type="IWD\Opc\Model\RewardManagement" />
+    <preference for="Magento\Downloadable\Observer\IsAllowedGuestCheckoutObserver" type="IWD\Opc\Observer\Downloadable\IsAllowedGuestCheckoutObserver"/>
+    <preference for="Magento\Checkout\Helper\Data" type="IWD\Opc\Helper\Checkout\Data"/>
+    <preference for="Magento\Customer\Model\AccountManagement" type="IWD\Opc\Model\Customer\AccountManagement" />
+    <preference for="Temando\Shipping\Model\Shipping\Carrier" type="IWD\Opc\Model\Shipping\Carrier" />
+    <type name="Magento\GiftCardAccount\Model\Giftcardaccount">
+        <plugin name="iwd_opc_giftcardaccount_plugin" type="IWD\Opc\Plugin\GiftCardAccount" />
+    </type>
+    <type name="Magento\Checkout\Api\PaymentInformationManagementInterface">
+        <plugin name="iwd_opc_save_comment_subscribe" type="IWD\Opc\Plugin\Checkout\PaymentInformationManagement"/>
+    </type>
+    <type name="Magento\Checkout\Api\GuestPaymentInformationManagementInterface">
+        <plugin name="iwd_opc_save_comment_subscribe" type="IWD\Opc\Plugin\Checkout\GuestPaymentInformationManagement"/>
+    </type>
+    <type name="Magento\Quote\Api\PaymentMethodManagementInterface">
+        <plugin name="iwd_opc_save_comment_subscribe" type="IWD\Opc\Plugin\Checkout\PaymentMethodManagement"/>
+    </type>
+    <type name="Magento\Paypal\Model\AbstractConfig">
+        <plugin name="iwd_opc_paypal_config" type="IWD\Opc\Plugin\Payments\Paypal\Config"/>
+    </type>
+    <type name="Magento\Customer\Model\Address\AbstractAddress">
+        <plugin name="iwd_opc_customer_address" type="IWD\Opc\Plugin\Customer\Model\Address\AbstractAddress"/>
+    </type>
+    <type name="Magento\Payment\Model\InfoInterface">
+        <plugin name="iwd_opc_unset_extension_attributes" type="IWD\Opc\Plugin\Payments\Info"/>
+    </type>
+
+    <type name="\Magento\Checkout\Block\Checkout\AttributeMerger">
+        <plugin name="customAttributeMerger" type="IWD\Opc\Plugin\AttributeMergerPlugin"/>
+    </type>
+
+    <type name="Magento\Checkout\Block\Checkout\LayoutProcessor">
+        <plugin name="iwd_modified_checkout_layout_processor" type="IWD\Opc\Plugin\Block\LayoutProcessor" sortOrder="1"/>
+    </type>
+</config>

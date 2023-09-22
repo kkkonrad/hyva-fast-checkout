@@ -1,0 +1,24 @@
+<!-- ko if: quoteIsVirtual == 0 && isCalculated() -->
+<!-- ko if: isBothPricesDisplayed() -->
+<div class="iwd_opc_review_total">
+    <div class="iwd_opc_review_total_cell" data-bind="text: title + ' ' + excludingTaxMessage"></div>
+    <div class="iwd_opc_review_total_cell" data-bind="text: getExcludingValue()"></div>
+</div>
+<div class="iwd_opc_review_total iwd_opc_review_total_tax">
+    <div class="iwd_opc_review_total_cell" data-bind="text: title + ' ' + includingTaxMessage"></div>
+    <div class="iwd_opc_review_total_cell" data-bind="text: getIncludingValue()"></div>
+</div>
+<!-- /ko -->
+<!-- ko if: isExcludingDisplayed() -->
+<div class="iwd_opc_review_total">
+    <div class="iwd_opc_review_total_cell" data-bind="i18n: title"></div>
+    <div class="iwd_opc_review_total_cell" data-bind="text: getValue()"></div>
+</div>
+<!-- /ko -->
+<!-- ko if: isIncludingDisplayed() -->
+<div class="iwd_opc_review_total iwd_opc_review_total_tax">
+    <div class="iwd_opc_review_total_cell" data-bind="i18n: title"></div>
+    <div class="iwd_opc_review_total_cell" data-bind="text: getIncludingValue()"></div>
+</div>
+<!-- /ko -->
+<!-- /ko -->

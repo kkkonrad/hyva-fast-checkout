@@ -1,0 +1,22 @@
+<!-- ko if: isShowComment -->
+<div tabindex="-1" class="comment iwd_opc_column_content" data-bind="fadeVisible: DeliveryStep">
+    <div class="iwd_opc_column_title" data-bind="i18n: 'Delivery Comments', click: manageDeliveryComment, mageInit: {'collapsible':{'openedState': '_active'}}"></div>
+    <div class="fieldset" data-bind="fadeVisible: isCommentVisible">
+        <div class="field">
+            <div class="control">
+                <textarea
+                        rows="1"
+                        data-bind="
+                        value: commentValue,
+                        afterRender: textareaAutoSize,
+                        attr: {
+                            title: $t('Enter Your Comment'),
+                            placeholder: $t('Enter Your Comment'),
+                            id: 'comment',
+                            name: 'comment'
+                        }"></textarea>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- /ko -->

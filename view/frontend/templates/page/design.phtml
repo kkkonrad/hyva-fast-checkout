@@ -1,0 +1,79 @@
+<link href="https://fonts.googleapis.com/css?family=<?php echo $block->getFontFamily();?>" rel="stylesheet" type="text/css">
+<style>
+    body,.opc-wrapper{
+        background: #<?php echo $block->getMainBackground() ?>;
+    }
+    .opc-block-summary{
+        background: #<?php echo $block->getSummaryBackground() ?>;
+    }
+    .iwd_main_wrapper .iwd_opc_alternative_wrapper .iwd_opc_alternative_column .iwd_opc_column_name,
+    .opc-block-summary span.title{
+        color: #<?php echo $block->getHeadingColor() ?>;
+    }
+    body,
+    .opc-wrapper,
+    .opc-block-summary{
+        color: #<?php echo $block->getMainColor() ?>;
+        font-family: <?php echo $block->getFontFamily();?>;
+    }
+    a,
+    .iwd-edit-cart,
+    .iwd-edit-cart-mobile,
+    #iwd_opc_top_login_button,
+    .step-back,
+    .title .edit-address,
+    .title .edit-method{
+        color: #<?php echo $block->getLinkColor() ?> !important;
+    }
+    input:focus,
+    select:focus,
+    textarea:focus{
+        border: none;
+        outline: none;
+        box-shadow: inset 0 0 0 1px #<?php echo $block->getHighlightColor() ?> !important;
+    }
+    .iwd_main_wrapper button.iwd_opc_button.primary{
+        color: #<?php echo $block->getPrimaryButtonTextColor() ?> !important;
+        background: #<?php echo $block->getPrimaryButtonBackground() ?> !important;
+        border: none;
+    }
+    .iwd_opc_button.secondary{
+        color: #<?php echo $block->getSecondaryButtonTextColor() ?> !important;
+        background: #<?php echo $block->getSecondaryButtonBackground() ?> !important;
+        border: none;
+    }
+    .iwd_main_wrapper button.iwd_opc_button:hover{
+        opacity: 0.85;
+    }
+
+    .selectize-control input:focus,
+    .selectize-control select:focus,
+    .selectize-control textarea:focus{
+        box-shadow: none !important;
+    }
+    .selectize-control.single .selectize-input.input-active.focus.dropdown-active,
+    .selectize-input.input-active.focus.dropdown-active + .selectize-dropdown,
+    .selectize-control.single .selectize-input.input-active,
+    .selectize-input.input-active + .selectize-dropdown{
+        border-color: #<?php echo $block->getHighlightColor() ?>;
+    }
+</style>
+
+<script>
+    if(typeof window.checkoutData == 'undefined'){
+        window.checkoutData = {};
+    }
+    window.checkoutData.customerData = {};
+
+    window.checkoutData.layout = {};
+    window.checkoutData.layout.desktop = '<?php echo $block->getDesktopResolution(); ?>';
+    window.checkoutData.layout.tablet = '<?php echo $block->getTabletResolution(); ?>';
+    window.checkoutData.layout.mobile = '<?php echo $block->getMobileResolution(); ?>';
+
+    window.checkoutData.address = {};
+    window.checkoutData.address_type_order = '<?php echo $block->getAddressTypeOrder(); ?>';
+
+    window.checkoutData.default = {};
+    window.checkoutData.default.shipping = '<?php echo $block->getDefaultShipping(); ?>';
+    window.checkoutData.default.payment = '<?php echo $block->getDefaultPayment(); ?>';
+</script>

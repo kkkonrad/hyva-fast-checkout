@@ -1,0 +1,55 @@
+<?php
+/**  @var $block \Magento\Checkout\Block\Cart */
+?>
+<?php echo $block->getChildHtml('checkout_cart_empty_widget'); ?>
+<div class="iwd_empty_cart_wrapper iwd_main_wrapper">
+    <div class="iwd_opc_alternative_wrapper">
+        <div class="iwd_opc_column iwd_opc_empty_cart_column">
+            <div class="iwd_opc_alternative_column">
+                <div class="iwd_opc_universal_wrapper iwd_opc_column_name">
+                    <?php echo __('Empty Cart'); ?>
+                </div>
+                <div class="iwd_opc_column_content">
+                    <div class="iwd_opc_universal_wrapper iwd_opc_empty_cart_info">
+                        <?php echo $block->escapeHtml(
+                            __('Looks like there\'s nothing here yet. Add something to your shopping cart to get started.')
+                        ); ?>
+                    </div>
+                    <div class="iwd_opc_universal_wrapper">
+                        <a class="iwd_opc_button active"
+                           href="<?php echo $block->getUrl(); ?>"
+                           title="<?php echo $block->escapeHtml(__('Continue Shopping')); ?>">
+                            <?php echo $block->escapeHtml(__('Continue Shopping')); ?>
+                        </a>
+                    </div>
+                    <?php if ($block->getQuote()->getCustomer()->getId()) { ?>
+                        <div class="iwd_opc_universal_wrapper">
+                            <a class="iwd_opc_button"
+                               href="<?php echo $block->getUrl('customer/account'); ?>"
+                               title="<?php echo $block->escapeHtml(__('My Account')); ?>">
+                                <?php echo $block->escapeHtml(__('My Account')); ?>
+                            </a>
+                        </div>
+                    <?php } else { ?>
+                        <div class="iwd_opc_universal_wrapper">
+                            <a class="iwd_opc_button"
+                               href="<?php echo $block->getUrl('customer/account/login'); ?>"
+                               title="<?php echo $block->escapeHtml(__('Log In')); ?>">
+                                <?php echo $block->escapeHtml(__('Log In')); ?>
+                            </a>
+                        </div>
+                    <?php } ?>
+                    <div class="iwd_opc_universal_wrapper iwd_empty_cart_powered_by">
+                        <a title="<?php echo $block->escapeHtml(__('Checkout by Dominate Open Source')); ?>"
+                           target="_blank"
+                           rel="nofollow"
+                           href="https://www.iwdagency.com/extensions/one-step-page-checkout.html">
+                            <?php echo $block->escapeHtml(__('Checkout by Dominate Open Source')); ?>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<?php echo $block->getChildHtml('shopping.cart.table.after'); ?>

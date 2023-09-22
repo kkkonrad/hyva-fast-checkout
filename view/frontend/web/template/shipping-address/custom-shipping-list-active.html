@@ -1,0 +1,32 @@
+<!-- Initialize collapsible binding -->
+<tbody data-bind="attr: {class:'_active'}">
+<tr class="row">
+    <td class="col">
+        <div class="shipping-type">
+            <label attr="'for': method.method_code + '_' + method.carrier_code"></label>
+            <input type="radio"
+                   class="radio"
+                   click="element.selectShippingMethod"
+                   ifnot="method.error_message"
+                   ko-checked="element.isSelected"
+                   ko-value="method.carrier_code + '_' + method.method_code"
+                   attr="'id': method.method_code + '_' + method.carrier_code, 'aria-labelledby': 'label_method_' + method.method_code + '_' + method.carrier_code + ' ' + 'label_carrier_' + method.method_code + '_' + method.carrier_code,
+                            'checked': element.rates().length == 1 || element.isSelected" />
+        </div>
+        <div class="shipping-method">
+                <span class="col col-method"
+                      attr="'id': 'label_method_' + method.method_code + '_' + method.carrier_code"
+                      text="method.method_title" >
+                </span>
+            <span class="col col-carrier"
+                  attr="'id': 'label_carrier_' + method.method_code + '_' + method.carrier_code"
+                  text="method.carrier_title" >
+            </span>
+        </div>
+        <div class="shipping-price">
+            <each args="element.getRegion('price')" render="" >
+            </each>
+        </div>
+    </td>
+</tr>
+</tbody>

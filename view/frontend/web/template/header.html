@@ -1,0 +1,24 @@
+<div class="iwd_opc_column header">
+    <div class="iwd_opc_alternative_step">
+        <div class="iwd_opc_alternative_column">
+            <div class="secure">
+                <!-- ko if: (isMultiStepResolution()) -->
+                    <ul class="breadcrumbs">
+                        <li class="address breadcrumbs__item active" data-bind="i18n: 'Address',click: goToAddressStep"></li>
+                        <li class="delivery breadcrumbs__item" data-bind="i18n: 'Delivery',click: goToDeliveryStep"></li>
+                        <li class="pay breadcrumbs__item" data-bind="i18n: 'Pay & Review',click: goToPaymentStep"></li>
+                    </ul>
+                <!--/ko-->
+                <div class="secured-checkout">
+                    <!-- ko i18n: 'Secured Checkout' --><!--/ko-->
+                </div>
+            </div>
+            <div class="iwd_opc_universal_wrapper iwd_opc_column_name secure-title">
+                <!-- ko i18n: 'Secure Checkout' --><!--/ko-->
+                <!-- ko foreach: getRegion('payment-buttons') -->
+                <!-- ko template: getTemplate() --><!-- /ko -->
+                <!--/ko-->
+            </div>
+        </div>
+    </div>
+</div>

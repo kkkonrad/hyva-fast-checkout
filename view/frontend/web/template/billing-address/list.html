@@ -1,0 +1,16 @@
+<!-- ko if: (customerHasAddresses)-->
+<div class="field field-select-billing">
+    <div class="control">
+        <select class="select" name="billing_address_id" id="billing_address_id" data-bind="
+                options: addressOptions,
+                optionsText: addressOptionsText,
+                value: selectedAddress,
+                optionsValue: function(address){
+                    return address.customerAddressId;
+                },
+                afterRender: customerAddressesDecorateSelect('billing_address_id'),
+                event: {change: onAddressChange(selectedAddress())};
+            "></select>
+    </div>
+</div>
+<!-- /ko -->

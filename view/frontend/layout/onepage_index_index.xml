@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      layout="checkout"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <update handle="checkout_index_index"/>
+    <head>
+        <css src="//fonts.googleapis.com/css?family=Open+Sans:400,400italic,700italic,700" src_type="url"/>
+        <css src="//maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" src_type="url"/>
+        <script src="IWD_Opc::js/dominate.js"/>
+    </head>
+    <body>
+        <referenceBlock name="page.main.title" remove="true"/>
+        <referenceBlock name="iwd_opc_ga_ab" remove="true"/>
+        <referenceBlock name="checkout.root">
+            <action method="setTemplate">
+                <argument name="template" xsi:type="string">IWD_Opc::onepage.phtml</argument>
+            </action>
+            <block class="Magento\GiftMessage\Block\Cart\GiftOptions"
+                   name="checkout.gift_options"
+                   template="IWD_Opc::gift_options.phtml"
+                   cacheable="false">
+            </block>
+        </referenceBlock>
+        <referenceContainer name="before.body.end">
+            <block class="Magento\Framework\View\Element\Template"
+                   name="iwd.opc.popup"
+                   template="IWD_Opc::popup.phtml">
+            </block>
+        </referenceContainer>
+        <referenceContainer name="after.body.start">
+            <block class="IWD\Opc\Block\Checkout\Design" name="custom_style" template="IWD_Opc::page/design.phtml"/>
+        </referenceContainer>
+    </body>
+</page>

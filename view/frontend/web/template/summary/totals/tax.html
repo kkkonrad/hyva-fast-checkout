@@ -1,0 +1,27 @@
+<!-- ko if: ifShowValue() -->
+<!-- ko if: !ifShowDetails() -->
+<div class="iwd_opc_review_total">
+    <div data-bind="text: title" class="iwd_opc_review_total_cell"></div>
+    <div class="iwd_opc_review_total_cell" data-bind="text: getValue()"></div>
+</div>
+<!-- /ko -->
+<!-- ko if: ifShowDetails() -->
+<div class="iwd_opc_review_total">
+    <div data-bind="text: title" class="iwd_opc_review_total_cell"></div>
+    <div class="iwd_opc_review_total_cell" data-bind="text: getValue()"></div>
+</div>
+<!-- ko foreach: getDetails() -->
+<!-- ko foreach: rates -->
+<div class="iwd_opc_review_total iwd_opc_review_total_tax">
+    <!-- ko if: percent -->
+    <div class="iwd_opc_review_total_cell" data-bind="text: title + ' (' + percent + '%)'"></div>
+    <!-- /ko -->
+    <!-- ko if: !percent -->
+    <div class="iwd_opc_review_total_cell" data-bind="text: title"></div>
+    <!-- /ko -->
+    <div class="iwd_opc_review_total_cell" data-bind="text: $parents[1].formatPrice($parents[0].amount)"></div>
+</div>
+<!-- /ko -->
+<!-- /ko -->
+<!-- /ko -->
+<!-- /ko -->

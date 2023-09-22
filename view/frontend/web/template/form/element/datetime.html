@@ -1,0 +1,21 @@
+<!--
+/*
+
+ * 
+ *
+*/
+--><div class="choice field labelcustomlavel">
+<input class="input-text" type="text" data-bind="
+    datepicker: { storage: value,
+        options: options,
+        showsTime: true,
+        timeFormat: 'hh:mm'
+    },
+    attr: {
+        value: value,
+        name: inputName,
+        placeholder: label,
+        'aria-describedby': noticeId,
+        disabled: disabled
+    }" />
+ <label class="labelcustomlavel" data-bind="text: $parent.description || label, attr: { for: $parent.uid + '_' + value }"></label></div>

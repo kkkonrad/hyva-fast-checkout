@@ -1,0 +1,18 @@
+<!-- ko if: (customerHasAddresses && isShippingFormFirst())-->
+<div class="fieldset address-list">
+    <div class="field field-select-shipping">
+        <div class="control">
+            <select class="select" name="shipping_address_id" id="shipping_address_id" data-bind="
+                options: addressOptions,
+                optionsText: addressOptionsText,
+                value: selectedAddress,
+                optionsValue: function(address){
+                    return address.customerAddressId;
+                },
+                afterRender: customerAddressesDecorateSelect('shipping_address_id'),
+                event: {change: onAddressChange(selectedAddress())};
+            "></select>
+        </div>
+    </div>
+</div>
+<!-- /ko -->

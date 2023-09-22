@@ -1,0 +1,102 @@
+<div data-bind="attr: {class: 'fieldset payment items ccard ' + getCode(), id: 'payment_form_' + getCode()}">
+    <input type="hidden"
+           name="payment[cc_type]"
+           class="input-text"
+           value=""
+           data-bind="attr: {id: getCode() + '_cc_type', 'data-container': getCode() + '-cc-type'},
+                   value: creditCardType
+                   ">
+    <div class="field number required">
+        <div class="control iwd_opc_cc_wrapper"
+             data-bind="attr:{'data-https': isCurrentlySecure? '1':'0', 'data-cc-type': selectedCardType}">
+            <input type="text" class="input-text iwd_opc_cc_input"
+                   value=""
+                   name="iwd_opc_formatter_cc_number"
+                   data-bind="attr : {
+                           id: getCode() + '_iwd_cc_number',
+                            title: $t('Credit Card Number'),
+                            'data-validate': JSON.stringify({'required-number':true, 'validate-card-type':getCcAvailableTypesValues(), 'validate-card-number':'#' + getCode() + '_cc_type', 'validate-cc-type':'#' + getCode() + '_cc_type'}),
+                            placeholder: $t('Credit Card Number')+' *'},
+                            enable: isActive($parents)" />
+            <input type="hidden" name="payment[cc_number]" class="input-text iwd_opc_cc_real_input"
+                   value=""
+                   data-bind="attr: {
+                                    id: getCode() + '_cc_number',
+                                    title: $t('Credit Card Number'),
+                                    placeholder: $t('Credit Card Number')+' *',
+                                    'data-container': getCode() + '-cc-number'},
+                              enable: isActive($parents),
+                              value: creditCardNumber,
+                              valueUpdate: 'keyup' "/>
+            <!--ko if: isCurrentlySecure -->
+            <div data-icon="&#xf023" class="iwd_opc_field_tooltip iwd_opc_cc_tooltip">
+                <div class="iwd_opc_field_tooltip_content"
+                     data-bind="text: $t('We don\'t store or transfer your data, we rely on industry-leading third party partners to keep your information safe.')">
+                </div>
+            </div>
+            <!--/ko-->
+        </div>
+    </div>
+    <div class="field required">
+        <div class="control" data-bind="css: hasVerification()?'iwd_opc_short_fields':''">
+            <div class="iwd_opc_universal_wrapper">
+                <input type="text"
+                       autocomplete="off"
+                       class="input-text iwd_opc_cc_exp"
+                       data-bind="attr: {
+                       id: getCode() + '_iwd_exp_date',
+                        title: $t('MM/YYYY'),
+                        placeholder: $t('MM/YYYY')+' *',
+                        'data-validate': JSON.stringify({'required-entry':true, 'validate-iwd-opc-cc-exp': true})},
+                        enable: isActive($parents)"/>
+                <div class="iwd_opc_field" style="display: none">
+                    <select name="payment[cc_exp_month]"
+                            class="select select-month"
+                            tabindex="-1"
+                            data-bind="attr: {id: getCode() + '_expiration', 'data-container': getCode() + '-cc-month', 'data-validate': JSON.stringify({required:true, 'validate-cc-exp':'#' + getCode() + '_expiration_yr'})},
+                                            enable: isActive($parents),
+                                            options: getCcMonthsValues(),
+                                            optionsValue: 'value',
+                                            optionsText: 'month',
+                                            optionsCaption: $t('Month'),
+                                            value: creditCardExpMonth">
+                    </select>
+                    <select name="payment[cc_exp_year]"
+                            class="select select-year"
+                            tabindex="-1"
+                            data-bind="attr: {id: getCode() + '_expiration_yr', 'data-container': getCode() + '-cc-year', 'data-validate': JSON.stringify({required:true})},
+                                           enable: isActive($parents),
+                                           options: getCcYearsValues(),
+                                           optionsValue: 'value',
+                                           optionsText: 'year',
+                                           optionsCaption: $t('Year'),
+                                           value: creditCardExpYear">
+                    </select>
+                </div>
+            </div>
+            <!-- ko if: (hasVerification())-->
+            <div class="iwd_opc_universal_wrapper">
+                <input type="number"
+                       autocomplete="off"
+                       class="input-text cvv"
+                       name="payment[cc_cid]"
+                       value=""
+                       data-bind="attr: {id: getCode() + '_cc_cid',
+                        title: $t('Card Verification Number'),
+                        placeholder: $t('CVV')+' *',
+                        'data-container': getCode() + '-cc-cvv',
+                        'data-validate': JSON.stringify({'required-number':true, 'validate-card-cvv':'#' + getCode() + '_cc_type'})},
+                        enable: isActive($parents),
+                        value: creditCardVerificationNumber"/>
+                <div data-icon="&#xf059" class="iwd_opc_field_tooltip iwd_opc_cvv_tooltip">
+                    <div class="iwd_opc_field_tooltip_content">
+                        <!-- ko i18n: 'The 3-4 digit number typically found on the back of your card' -->
+                        <!-- /ko -->
+                    </div>
+                </div>
+            </div>
+            <!-- /ko -->
+        </div>
+    </div>
+
+</div>

@@ -1,0 +1,21 @@
+<!-- ko if: isShowComment -->
+<div class="step-content fieldset">
+    <div class="field">
+        <label class="label" for="comment">
+            <span data-bind="i18n: 'Comment'"></span>
+        </label>
+        <div class="control">
+            <textarea
+                    class="input-text"
+                    data-bind="
+                    value: commentValue,
+                    attr: {
+                        title: $t('Comment'),
+                        id: 'comment',
+                        name: 'comment'
+                    }">
+            </textarea>
+        </div>
+    </div>
+</div>
+<!-- /ko -->

@@ -1,0 +1,75 @@
+<!-- ko ifnot: isCustomerLoggedIn -->
+<!-- ko foreach: getRegion('before-login-form') -->
+<!-- ko template: getTemplate() --><!-- /ko -->
+<!-- /ko -->
+<div id="iwd_opc_login_here">
+    <span id="iwd_opc_top_login_button">Log in</span>
+    <span>to your account or continue as a guest and create one after order is placed.</span>
+</div>
+<div id="iwd_opc_login">
+    <form
+            data-role="email-with-possible-login"
+            data-bind="submit:login, iwdBlockLoader: isLoading"
+            method="post">
+        <div class="iwd_opc_universal_wrapper control" data-bind="attr: {'class': getInputFieldEmailValue() ? 'iwd_opc_universal_wrapper control focus' : 'iwd_opc_universal_wrapper control'}" >
+            <span class="floating-span">Email Address *</span>
+            <input
+                    data-bind="
+                            attr:{
+                                title: placeholder
+                            },
+                            textInput: email,
+                            hasFocus: emailFocused,
+                            event: {change: onCustomerEmailChange()};"
+                    class="iwd_opc_input iwd_opc_field"
+                    type="email"
+                    name="username"
+                    data-validate="{required:true, 'validate-email':true}"/>
+        </div>
+        <div
+                data-bind="visible: isPasswordVisible"
+                id="iwd_opc_login_password" class="iwd_opc_universal_wrapper">
+            <input name="context" type="hidden" value="checkout"/>
+            <input
+                    data-bind="attr:{
+                                'type': passwordType,
+                                placeholder: passwordPlaceholder,
+                                title: passwordPlaceholder,
+                            },
+                            hasFocus: passwordFocused"
+                    class="iwd_opc_input iwd_opc_field"
+                    name="password"
+                    data-validate="{required:true}"
+                    autocomplete="off"/>
+            <span data-bind="
+            css: {
+                'active': passwordType() === 'password'
+            },
+            click: toggleShowHidePassword,
+            attr:{title:$t('Show/Hide password')}"
+                  class="iwd_opc_show_hide_password"></span>
+        </div>
+        <div data-bind="visible: isPasswordVisible">
+            <!-- ko foreach: getRegion('additional-login-form-fields') -->
+            <!-- ko template: getTemplate() --><!-- /ko -->
+            <!-- /ko -->
+        </div>
+        <div
+                data-bind="visible: isPasswordVisible"
+                id="iwd_opc_login_buttons" class="iwd_opc_universal_wrapper iwd_opc_small_button_container">
+            <button
+                    data-bind="i18n: 'Log In', attr:{title:$t('Log In')}"
+                    type="submit" id="iwd_opc_login_button" class="iwd_opc_small_button active iwd_opc_button secondary">
+            </button>
+            <button
+                    data-bind="i18n: 'Reset', attr:{title:$t('Reset')}, click: reset"
+                    type="button" id="iwd_opc_reset_password_button" class="iwd_opc_small_button iwd_opc_button secondary">
+            </button>
+        </div>
+        <!-- ko foreach: getRegion('errors') -->
+        <!-- ko template: getTemplate() --><!-- /ko -->
+        <!--/ko-->
+    </form>
+</div>
+<div class="iwd_opc_section_delimiter"></div>
+<!-- /ko -->

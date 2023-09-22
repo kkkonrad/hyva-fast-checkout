@@ -1,0 +1,112 @@
+<div class="iwd_opc_alternative_step payment" data-bind="fadeVisible: PaymentStep">
+    <div class="iwd_opc_column iwd_opc_payment_column">
+        <div class="iwd_opc_alternative_column">
+            <div class="iwd_opc_universal_wrapper iwd_opc_column_name" data-bind="i18n: 'Payment Method'"></div>
+            <div class="iwd_opc_column_content" tabindex="-1" data-bind="iwdBlockLoader: isLoading">
+                <!-- ko if: (quoteIsVirtual) -->
+                <!-- ko foreach: getRegion('customer-email') -->
+                <!-- ko template: getTemplate() --><!-- /ko -->
+                <!--/ko-->
+                <!--/ko-->
+                <form id="co-payment-form" class="form payments" novalidate="novalidate">
+                    <input data-bind='attr: {value: getFormKey()}' type="hidden" name="form_key"/>
+                    <div class="fieldset">
+                        <!-- ko foreach: getRegion('beforeMethods') -->
+                        <!-- ko template: getTemplate() --><!-- /ko -->
+                        <!-- /ko -->
+
+                        <!-- ko if: isPaymentMethodsAvailable()  -->
+                        <div id="checkout-payment-method-load" class="opc-payment">
+                            <!-- ko foreach: getRegion('payment-methods-list') -->
+                            <!-- ko template: getTemplate() --><!-- /ko -->
+                            <!-- /ko -->
+                        </div>
+                        <!-- /ko -->
+                        <div role="alert"
+                             if="errorValidationMessage().length"
+                             class="message notice">
+                            <span text="errorValidationMessage()" > </span>
+                        </div>
+
+                        <!-- ko ifnot: isPaymentMethodsAvailable()  -->
+                        <div class="field">
+                            <div class="control">
+                                <input readonly="readonly"
+                                       type="text"
+                                       tabindex="-1"
+                                       class="input-text"
+                                       data-bind="attr: {value: $t('Options Unavailable'), title: $t('Options Unavailable')}"/>
+                                <div class="iwd_opc_field_tooltip"
+                                     data-icon="&#xf059"
+                                     data-bind="css: quoteIsVirtual?'iwd_opc_payment_method_tooltip_virtual':'iwd_opc_payment_method_tooltip'">
+                                    <div class="iwd_opc_field_tooltip_content">
+                                        <!-- ko if: !quoteIsVirtual -->
+                                        <!-- ko i18n: 'Make sure your shipping address is completed, and a shipping method has been selected.' -->
+                                        <!-- /ko -->
+                                        <!-- /ko -->
+                                        <!-- ko if: quoteIsVirtual -->
+                                        <!-- ko i18n: 'No Payment Methods.' --><!-- /ko -->
+                                        <!-- /ko -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- /ko -->
+                        <!-- ko foreach: getRegion('billing-address-form') -->
+                        <!-- ko template: getTemplate() --><!-- /ko -->
+                        <!-- /ko -->
+                        <div class="iwd_opc_section_delimiter"></div>
+                        <!-- ko foreach: getRegion('afterMethods') -->
+                        <!-- ko template: getTemplate() --><!-- /ko -->
+                        <!-- /ko -->
+                        <!-- ko if: getRegion('afterMethods') -->
+                        <div class="iwd_opc_section_delimiter"></div>
+                        <!-- /ko -->
+                    </div>
+                </form>
+                <div class="iwd_opc_universal_wrapper place_button_wrapper">
+                    <div id="braintree_paypal_placeholder" style="display: none;"></div>
+                    <button type="button"
+                            data-bind="attr :{'title': $t('Place Order')}, click: placeOrder, enable: isPlaceOrderActionAllowed"
+                            class="iwd_opc_button active primary iwd_opc_place_order_button">
+                        <!-- ko i18n: 'Place Order' --><!-- /ko -->
+                    </button>
+                </div>
+                <!-- ko if: isShowSubscribe -->
+                <div class="subscribe" data-bind="attr : {'class': (isSubscribe()) ? 'subscribe checked' : 'subscribe'}">
+                    <div class="fieldset">
+                        <div class="field choice">
+                            <input type="checkbox" name="subscribe"
+                                   data-bind="
+                       checked: isSubscribe,
+                       attr: {
+                            id: 'subscribe'
+                       }"/>
+                            <label data-bind="attr: {for: 'subscribe'}">
+                                <span data-bind="i18n: 'Sign Up For Newsletter'"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <!-- /ko -->
+                <!-- ko foreach: getRegion('before-place-order') -->
+                <!-- ko template: getTemplate() --><!-- /ko -->
+                <!-- /ko -->
+            </div>
+        </div>
+    </div>
+    <!-- ko if: (isMultiStepResolution() && quoteIsVirtual) -->
+        <div class="iwd_opc_universal_wrapper multistep">
+            <div class="step-back" data-bind="click: goToBillingVirtualStep">
+                <!-- ko i18n: 'Back to edit address' --><!-- /ko -->
+            </div>
+        </div>
+    <!-- /ko -->
+    <!-- ko if: (isMultiStepResolution() && !quoteIsVirtual) -->
+        <div class="iwd_opc_universal_wrapper multistep">
+            <div class="step-back" data-bind="click: goToDeliveryStep">
+                <!-- ko i18n: 'Back to edit delivery method' --><!-- /ko -->
+            </div>
+        </div>
+    <!-- /ko -->
+</div>

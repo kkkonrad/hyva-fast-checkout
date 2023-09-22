@@ -1,0 +1,79 @@
+<div id="iwd_opc_gift_card"
+     data-bind="mageInit: {'collapsible':{'openedState': 'iwd_opc_collapsible_opened', 'active': isGiftCardsUsed}}">
+    <div class="iwd_opc_universal_wrapper" data-role="title">
+        <button class="iwd_opc_button with_angle active" data-role="trigger">
+            <!-- ko i18n: 'Gift Code'--><!-- /ko -->
+            <!-- ko if: giftCards().length -->
+             -&nbsp;<!-- ko text: giftCardsCodes() --><!-- /ko -->
+            <!-- /ko -->
+        </button>
+    </div>
+    <form class="form form-giftcard-account" id="giftcard-form" data-role="content">
+        <!-- ko foreach: getRegion('messages') -->
+        <!-- ko template: getTemplate() --><!-- /ko -->
+        <!--/ko-->
+        <!-- ko if: giftCards().length -->
+            <!--ko foreach: { data: giftCards(), as: 'card'}-->
+                <div class="iwd_opc_universal_wrapper iwd_opc_additional_payment_info">
+                    <div class="iwd_opc_additional_payment_label">
+                        <!-- ko i18n: 'Status'--><!-- /ko -->:
+                    </div>
+                    <div class="iwd_opc_additional_payment_value">
+                        <!-- ko i18n: 'Active' --><!-- /ko -->
+                    </div>
+                    <br/>
+                    <div class="iwd_opc_additional_payment_label">
+                        <!-- ko i18n: 'Previous Gift Balance'--><!-- /ko -->:
+                    </div>
+                    <div class="iwd_opc_additional_payment_value">
+                        <!-- ko text: $parent.getCardBalance(card) --><!-- /ko -->
+                    </div>
+                    <br/>
+                    <div class="iwd_opc_additional_payment_label">
+                        <!-- ko i18n: 'New Gift Balance'--><!-- /ko -->:
+                    </div>
+                    <div class="iwd_opc_additional_payment_value">
+                        <!-- ko text: $parent.getNewCardBalance(card) --><!-- /ko -->
+                    </div>
+                </div>
+                <div class="iwd_opc_universal_wrapper"
+                     data-bind="css: {'iwd_opc_small_button_container': !$parent.isShowGiftCardForm() && ($index() === ($parent.giftCards().length - 1)) }"
+                >
+                    <!-- ko if: !$parent.isShowGiftCardForm() && ($index() === ($parent.giftCards().length - 1)) -->
+                    <button class="iwd_opc_small_button active"
+                            data-bind="'title': $t('Add Another'), click: $parent.addAnother.bind($parent)">
+                        <!-- ko i18n: 'Add Another'--><!-- /ko -->
+                    </button>
+                    <!-- /ko -->
+                    <button  data-bind="'title': $t('Remove'),
+                    css: !$parent.isShowGiftCardForm() && ($index() === ($parent.giftCards().length - 1))? 'iwd_opc_small_button':'iwd_opc_button',
+                    click: $parent.remove.bind($parent, card.c)">
+                        <!-- ko i18n: 'Remove'--><!-- /ko -->
+                    </button>
+                </div>
+            <!--/ko-->
+        <!-- /ko -->
+        <!-- ko if: !giftCards().length || isShowGiftCardForm() -->
+        <div class="field">
+            <div class="control">
+                <input class="input-text"
+                       type="text"
+                       id="giftcard-code"
+                       name="giftcard_code"
+                       data-validate="{'required-entry':true}"
+                       data-bind="value: giftCardCode, attr:{placeholder: $t('Gift Code')} "/>
+            </div>
+        </div>
+        <div class="iwd_opc_universal_wrapper iwd_opc_small_button_container">
+            <button class="iwd_opc_small_button active"
+                    data-bind="'title': $t('Apply'), click: apply">
+                <!-- ko i18n: 'Apply'--><!-- /ko -->
+            </button>
+            <button class="iwd_opc_small_button"
+                    data-bind="'title': $t('Cancel'), click: isShowGiftCardForm()? hideAnother: cancel ">
+                <!-- ko i18n: 'Cancel'--><!-- /ko -->
+            </button>
+        </div>
+        <!-- /ko -->
+    </form>
+</div>

@@ -1,0 +1,47 @@
+<!--<div class="items payment-methods">-->
+<!--    <div class="field">-->
+<!--        <div class="control">-->
+<!--            <select class="select"-->
+<!--                    id="iwd_opc_payment_method_select"-->
+<!--                    data-validate="{required:true}"-->
+<!--                    data-can-unselect="false"-->
+<!--                    data-bind="-->
+<!--                        value: selectedPaymentMethod,-->
+<!--                        options: paymentMethods,-->
+<!--                        optionsAfterRender:-->
+<!--                            function(option, item) {-->
+<!--                                decorateSelect('iwd_opc_payment_method_select', option, item);-->
+<!--                            },-->
+<!--                        optionsText: 'title',-->
+<!--                        optionsValue: 'method',-->
+<!--                        optionsCaption: '',-->
+<!--                        event: {change: function(data, event){selectPaymentMethod(data, event, selectedPaymentMethod())}}-->
+<!--                    "></select>-->
+<!--        </div>-->
+<!--    </div>-->
+<!--    <div repeat="foreach: paymentGroupsList, item: '$group'">-->
+<!--        <each args="data: getRegion($group().displayArea), as: 'method'" render=""/>-->
+<!--    </div>-->
+<!--</div>-->
+<!--
+/**
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
+ */
+ -->
+<div if="isPaymentMethodsAvailable()"
+     class="items payment-methods">
+    <div repeat="foreach: paymentGroupsList, item: '$group'"
+         class="payment-group">
+<!--        <div if="regionHasElements($group().displayArea)"-->
+<!--             translate="getGroupTitle($group)"-->
+<!--             class="step-title"-->
+<!--             data-role="title">-->
+<!--        </div>-->
+        <each args="data: getRegion($group().displayArea), as: 'method'" render=""></each>
+    </div>
+</div>
+<div ifnot="isPaymentMethodsAvailable()"
+     class="no-payments-block"
+     translate="'No Payment Methods'">
+</div>

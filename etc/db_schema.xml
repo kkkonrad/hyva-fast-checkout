@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schema xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Setup/Declaration/Schema/etc/schema.xsd">
+    <table name="iwd_google_fonts" resource="default" engine="innodb" comment="Author Table">
+        <column xsi:type="smallint" name="id" unsigned="false" nullable="false" identity="true" comment="Font ID"/>
+        <column xsi:type="varchar" name="font" nullable="false" length="255" comment="Font Family"/>
+        <constraint xsi:type="primary" referenceId="PRIMARY">
+            <column name="id"/>
+        </constraint>
+    </table>
+</schema>

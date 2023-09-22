@@ -1,0 +1,189 @@
+<!-- ko if: isGiftMessageAvailableForOrder() || isGiftMessageAvailableForItems() -->
+<div
+        id="iwd_opc_gift_message"
+        data-bind="mageInit: {'collapsible':{'openedState': 'iwd_opc_collapsible_opened', 'active': isUsedForCheckout()}}"
+        class="iwd_opc_collapsible_container">
+    <div class="iwd_opc_universal_wrapper iwd_opc_collapsible_title"
+         data-role="title">
+        <!-- ko i18n: 'Gift Message' --><!-- /ko -->
+    </div>
+    <div class="iwd_opc_universal_wrapper fieldset" data-role="content" data-bind="iwdBlockLoader: isLoading">
+        <!-- ko if: isGiftMessageAvailableForOrder() -->
+        <div class="field choice">
+            <input type="checkbox"
+                   data-bind="checked: isUsedForOrderLevel"
+                   id="allow_gift_messages_for_order"/>
+            <label for="allow_gift_messages_for_order">
+                <!-- ko i18n: 'Gift Entire Order' --><!-- /ko -->
+            </label>
+        </div>
+        <form data-bind="visible: isUsedForOrderLevel(), attr: {'data-iwd-gm-id': 'orderLevel'}">
+            <div class="field">
+                <div class="control">
+                    <input type="text"
+                           name="sender"
+                           data-bind="value: getValue('sender'),
+                            attr: {
+                                title: $t('From Name'),
+                                placeholder: $t('From Name')
+                            }"
+                           class="input-text"/>
+                </div>
+            </div>
+            <div class="field">
+                <div class="control">
+                    <input type="text"
+                           name="recipient"
+                           data-bind="value: getValue('recipient'),
+                            attr: {
+                                title: $t('To Name'),
+                                placeholder: $t('To Name')
+                            }"
+                           class="input-text"/>
+                </div>
+            </div>
+            <div class="field">
+                <div class="control">
+                        <textarea
+                                rows="1"
+                                name="message"
+                                data-bind="
+                                value: getValue('message'),
+                                afterRender: textareaAutoSize,
+                                attr: {
+                                    title: $t('Message'),
+                                    placeholder: $t('Message'),
+                                }"></textarea>
+                </div>
+            </div>
+            <!-- ko if: isWrappingAvailableForOrder() -->
+            <!-- ko if: isAllowGiftReceipt() -->
+            <div class="field choice">
+                <input type="checkbox"
+                       id="giftReceipt"
+                       name="extension_attributes[wrappingAllowGiftReceipt]"
+                       data-bind="checked: isGiftReceiptUsed"/>
+                <label for="giftReceipt">
+                    <!-- ko i18n: 'Gift Receipt' --><!-- /ko -->
+                </label>
+            </div>
+            <!-- /ko -->
+            <!-- ko if: isAllowPrintedCard() -->
+            <div class="field choice">
+                <input type="checkbox"
+                       id="printedCard"
+                       name="extension_attributes[wrappingAddPrintedCard]"
+                       data-bind="checked: isPrintedCardUsed"/>
+                <label for="printedCard">
+                    <!-- ko i18n: 'Printed card' --><!-- /ko --> <!-- ko text: getPrintedCardPrice() --><!-- /ko -->
+                </label>
+            </div>
+            <!-- /ko -->
+            <!-- ko if: getWrappingItems().length -->
+            <div class="field">
+                <div class="control">
+                    <select class="select"
+                            name="extension_attributes[wrappingId]"
+                            data-bind="
+                                        optionsCaption: '',
+                                        attr: {'id' : 'gift_wrap_order_select'},
+                                        value: giftWrapForOrder(),
+                                        afterRender:decorateSelect('gift_wrap_order_select')
+                                    ">
+                        <option value=""></option>
+                        <!-- ko foreach: getWrappingItems() -->
+                        <option data-bind="value: id, attr: {selected: (id === $parent.giftWrapForOrder()?'selected':null),'data-image': path}, text: price+' - '+label"></option>
+                        <!-- /ko -->
+                    </select>
+                </div>
+            </div>
+            <!-- /ko -->
+            <!-- /ko -->
+        </form>
+        <!-- /ko -->
+        <!-- ko if: isGiftMessageAvailableForItems() -->
+        <div class="field choice">
+            <input type="checkbox"
+                   data-bind="checked: isUsedForItemsLevel"
+                   id="allow_gift_messages_for_items"/>
+            <label for="allow_gift_messages_for_items">
+                <!-- ko i18n: 'Gift Individual Items' --><!-- /ko -->
+            </label>
+        </div>
+        <div data-bind="visible: isUsedForItemsLevel()">
+            <!--ko foreach: { data: getGiftMessageItems(), as: 'item'}-->
+            <div class="field choice">
+                <input type="checkbox"
+                       data-bind="checked: $parent.isUsedForItemLevel[item.id], attr:{id:'allow_gift_messages_for_item_'+item.id}"/>
+                <label data-bind="attr:{for: 'allow_gift_messages_for_item_'+item.id}">
+                    <!-- ko text: item.name --><!-- /ko -->
+                </label>
+            </div>
+            <form data-bind="visible: $parent.isUsedForItemLevel[item.id](), attr:{'data-iwd-gm-id' : item.id}">
+                <div class="field">
+                    <div class="control">
+                        <input type="text"
+                               name="sender"
+                               data-bind="value: $parent.getValue('sender', item.id),
+                            attr: {
+                                title: $t('From Name'),
+                                placeholder: $t('From Name')
+                            }"
+                               class="input-text"/>
+                    </div>
+                </div>
+                <div class="field">
+                    <div class="control">
+                        <input type="text"
+                               name="recipient"
+                               data-bind="value: $parent.getValue('recipient', item.id),
+                            attr: {
+                                title: $t('To Name'),
+                                placeholder: $t('To Name')
+                            }"
+                               class="input-text"/>
+                    </div>
+                </div>
+                <div class="field">
+                    <div class="control">
+                        <textarea
+                                rows="1"
+                                data-bind="
+                                value: $parent.getValue('message', item.id),
+                                afterRender: $parent.textareaAutoSize,
+                                attr: {
+                                    title: $t('Message'),
+                                    placeholder: $t('Message'),
+                                    name: 'message',
+                                }"></textarea>
+                    </div>
+                </div>
+                <!-- ko if: $parent.isWrappingAvailableForItems(item.id) -->
+                    <!-- ko if: $parent.getWrappingItems(item.id).length -->
+                    <div class="field">
+                        <div class="control">
+                            <select class="select"
+                                    name="extension_attributes[wrappingId]"
+                                    data-bind="
+                                        attr: {
+                                            'id':'gift_wrap_item_select_'+item.id
+                                        },
+                                        optionsCaption: '',
+                                        afterRender:$parent.decorateSelect('gift_wrap_item_select_'+item.id)
+                                        ">
+                                <option value=""></option>
+                                <!-- ko foreach: $parent.getWrappingItems(item.id) -->
+                                <option data-bind="value: id, attr: {selected: (id === $parents[1].giftWrapForItem(item.id)?'selected':null),'data-image': path}, text: price+' - '+label"></option>
+                                <!-- /ko -->
+                            </select>
+                        </div>
+                    </div>
+                    <!-- /ko -->
+                <!-- /ko -->
+            </form>
+            <!-- /ko -->
+        </div>
+        <!-- /ko -->
+    </div>
+</div>
+<!-- /ko -->

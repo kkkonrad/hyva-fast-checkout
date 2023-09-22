@@ -1,0 +1,44 @@
+Checkout Suite
+
+3.5.0 - 3.6.0
+
+### Fixes
+- Compatibility with Magento 2.3.1 and Magento 2.2.8
+
+3.4.0 - 3.5.0
+
+### Added
+
+### Features
+
+### Fixes
+
+
+3.3.0 - 3.4.0
+
+### Features
+IWD OPC features available on Standart Magento Checkout
+
+### Fixes
+- fixed IE 11 js compatibility
+- minor Checkout Smart Buttons Fixes
+
+
+3.2.0 - 3.3.0
+
+### Added
+Pay Pal and Amazom Pay quick payment buttons
+
+### Features
+Updated guest checkout functionality (user can go through checkout as a guest, system allows to purchase without creating an account)
+Design updates
+
+
+### Fixes
+- fixed frontend require-js initialization error with standard checkout via moving depencies to phtml file
+- fixed disabling module on Magento 2.1.1 version (onepage.phtml rewrites not take place correctly)
+- fixed infinity loader of payment method block (conflict in Magento_NegotiableQuote module)
+- fixed paypal express checkout error ìThe payment disallow storing objects.
+- fixed checkbox for newsletters displaying correctly
+- fixed incorrect gift message values position in admin panel
+- fixed amazon pay fixed required address fields validation issues

@@ -1,0 +1,27 @@
+<!--
+/**
+ * Copyright © Magento, Inc. All rights reserved.
+ * See COPYING.txt for license details.
+ */
+-->
+<div class="opc-block-summary" data-bind="blockLoader: isLoading,fadeVisible: opcBlockSummary()">
+    <div class="opc-block-summary-wrapper">
+        <span data-bind="i18n: 'Order Summary'" class="title"></span>
+        <!-- ko foreach: elems() -->
+        <!-- ko template: getTemplate() --><!-- /ko -->
+        <!-- /ko -->
+    </div>
+</div>
+
+<div class="opc-block-summary-manage-button-wrapper">
+    <div class="opc-block-summary-manage-button"
+         data-bind="
+        click: manageVisibility,
+        fadeVisible: opcManageSummaryButton(),
+        mageInit: {'collapsible':{'openedState': '_active'}}">
+        <!-- ko i18n: opcManageSummaryButtonTitle() --><!-- /ko -->
+        <strong>
+            <!-- ko i18n: grandTotal() --><!-- /ko -->
+        </strong>
+    </div>
+</div>

@@ -1,0 +1,65 @@
+<div class="payment-method" data-bind="css: {'_active': (getCode() == isChecked())}">
+    <div class="payment-method-title field choice">
+        <input type="radio"
+               name="payment[method]"
+               class="radio"
+               data-bind="attr: {'id': getCode()}, value: getCode(), checked: isChecked, click: selectPaymentMethod, visible: isRadioButtonVisible()"/>
+        <label data-bind="attr: {'for': getCode()}" class="label">
+            <span data-bind="text: getTitle()"></span>
+        </label>
+    </div>
+
+    <div class="payment-method-content">
+        <!-- ko foreach: getRegion('messages') -->
+        <!-- ko template: getTemplate() --><!-- /ko -->
+        <!--/ko-->
+
+        <form id="purchaseorder-form" class="form form-purchase-order" data-role="purchaseorder-form">
+            <div class="fieldset payment method" data-bind='attr: {id: "payment_form_" + getCode()}'>
+                <div class="field field-number required">
+                    <label for="po_number" class="label">
+                        <span><!-- ko i18n: 'Purchase Order Number'--><!-- /ko --></span>
+                    </label>
+                    <div class="control">
+                        <input type="text"
+                               id="po_number"
+                               name="payment[po_number]"
+                               data-validate="{required:true}"
+                               data-bind='
+                                attr: {title: $t("Purchase Order Number"), placeholder: $t("Purchase Order Number")+" *"},
+                                value: purchaseOrderNumber'
+                               class="input-text"/>
+                        <!--ko if: isCurrentlySecure -->
+                        <div data-icon="&#xf023" class="iwd_opc_field_tooltip iwd_opc_cc_tooltip">
+                            <div class="iwd_opc_field_tooltip_content"
+                                 data-bind="text: $t('We don\'t store or transfer your data, we rely on industry-leading third party partners to keep your information safe.')">
+                            </div>
+                        </div>
+                        <!--/ko-->
+                    </div>
+                </div>
+            </div>
+        </form>
+        <div class="payment-method-billing-address">
+            <!-- ko foreach: $parent.getRegion(getBillingAddressFormName()) -->
+            <!-- ko template: getTemplate() --><!-- /ko -->
+            <!--/ko-->
+        </div>
+        <div class="actions-toolbar" id="review-buttons-container">
+            <div class="primary">
+                <button class="action primary checkout"
+                        type="submit"
+                        data-bind="
+                        click: placeOrder,
+                        attr: {title: $t('Place Order')},
+                        enable: (getCode() == isChecked()),
+                        css: {disabled: !isPlaceOrderActionAllowed()}
+                        "
+                        data-role="review-save">
+                    <span data-bind="i18n: 'Place Order'"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+        

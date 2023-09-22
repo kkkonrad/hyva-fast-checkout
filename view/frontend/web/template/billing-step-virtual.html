@@ -1,0 +1,29 @@
+<!-- ko template: 'IWD_Opc/header' --><!-- /ko -->
+
+<div class="iwd_opc_column iwd_opc_address_column" data-bind="fadeVisible: AddressStep">
+    <div class="iwd_opc_alternative_column">
+        <!-- ko template: 'IWD_Opc/shipping-address/customer-data' --><!-- /ko -->
+        <div tabindex="-1" class="billing virtual-product iwd_opc_column_content" data-bind="attr:{'class': isCustomerLoggedIn() ? 'billing virtual-product iwd_opc_column_content customerLoggedIn' : 'billing virtual-product iwd_opc_column_content'}">
+            <!-- ko foreach: getRegion('customer-email') -->
+            <!-- ko template: getTemplate() --><!-- /ko -->
+            <!--/ko-->
+            <!-- ko foreach: getRegion('billing-address-form') -->
+            <!-- ko template: getTemplate() --><!-- /ko -->
+            <!--/ko-->
+            <!-- ko template: 'IWD_Opc/shipping/comment' --><!-- /ko -->
+        </div>
+    </div>
+    <!-- ko if: (isMultiStepResolution() && AddressStep()) -->
+        <div class="iwd_opc_universal_wrapper multistep">
+            <button type="button" class="iwd_opc_button primary"
+                    data-bind="i18n: 'Continue to  payment',click: goToPaymentStep">
+            </button>
+            <div class="step-back" data-bind="click: goToShoppingCart">
+                <!-- ko i18n: 'Back to edit shopping cart' --><!-- /ko -->
+            </div>
+        </div>
+    <!-- /ko -->
+</div>
+
+<!-- ko if: (setDesignResolution()) -->
+<!-- /ko -->

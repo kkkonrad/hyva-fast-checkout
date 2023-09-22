@@ -1,0 +1,179 @@
+<?php
+/**
+ * @var $block \IWD\Opc\Block\Onepage\Success
+ */
+?>
+<?php
+$isShowRegistrationForm = $block->isShowRegistrationForm();
+$opcHelper = $block->opcHelper;
+?>
+<div class="iwd_success_page_wrapper iwd_main_wrapper">
+    <div class="iwd_opc_alternative_wrapper">
+        <div class="iwd_opc_column iwd_opc_success_page_column">
+            <div class="iwd_opc_alternative_column">
+                <div class="iwd_opc_universal_wrapper iwd_opc_column_name">
+                    <?php echo __('Order Confirmation'); ?>
+                </div>
+                <div class="iwd_opc_column_content">
+                    <div class="iwd_opc_universal_wrapper iwd_success_page_info">
+                        <?php if ($block->getOrderId()) { ?>
+                            <?php if ($block->getCanViewOrder()) { ?>
+                                <?php echo sprintf(__(
+                                    'Your order (%s) has been placed. You will receive an email with more details of your purchase.'),
+                                    sprintf(
+                                        '<a href="%s">#%s</a>',
+                                        $block->escapeHtml($block->getViewOrderUrl()),
+                                        $block->escapeHtml($block->getOrderId())
+                                    )
+                                ); ?>
+                            <?php } else { ?>
+                                <?php echo sprintf(__(
+                                    'Your order (%s) has been placed. You will receive an email with more details of your purchase.'),
+                                    '#' . $block->escapeHtml($block->getOrderId())
+                                ); ?>
+                            <?php } ?>
+                        <?php } ?>
+                        <?php echo $block->getAdditionalInfoHtml() ?>
+                    </div>
+                    <?php if ($block->getCanViewOrder() && $block->getCanPrintOrder()) : ?>
+                        <div class="iwd_opc_universal_wrapper iwd_success_page_info">
+                            <?php /* @escapeNotVerified */
+                            echo __('<a href="%1" target="_blank" class="printReceipt">Print receipt</a>', $block->getPrintUrl()) ?>
+                        </div>
+                    <?php endif; ?>
+                    <div class="iwd_opc_universal_wrapper">
+                        <a href="<?php echo $block->getUrl(); ?>"
+                           class="iwd_opc_button <?php if ($block->isCustomerLoggedIn()) { ?>active<?php } ?>"
+                           title="<?php echo __('Continue Shopping'); ?>">
+                            <?php echo __('Continue Shopping'); ?>
+                        </a>
+                    </div>
+                    <?php if ($block->isCustomerLoggedIn()) { ?>
+                        <div class="iwd_opc_universal_wrapper">
+                            <a href="<?php echo $block->getCustomerAccountUrl(); ?>"
+                               class="iwd_opc_button"
+                               title="<?php echo __('My Account'); ?>">
+                                <?php echo __('My Account'); ?>
+                            </a>
+                        </div>
+                    <?php } ?>
+                    <?php if ($isShowRegistrationForm) { ?>
+                        <div class="iwd_opc_section_delimiter"></div>
+                        <div class="iwd_opc_universal_wrapper">
+
+                            <div id="iwd_opc_open_registration_form">
+                                <div class="iwd_opc_universal_wrapper">
+                                    <button type="button"
+                                            id="iwd_success_page_open_register_form"
+                                            class="iwd_opc_button active"
+                                            title="<?php echo __('Create Account'); ?>">
+                                        <?php echo __('Create Account'); ?>
+                                    </button>
+                                </div>
+                                <div class="iwd_opc_universal_wrapper iwd_opc_success_page_create_account_info">
+                                    <?php echo __('Save your shipping and payment details for your next purchase.') ?>
+                                </div>
+                            </div>
+
+                            <form id="form-validate" class="iwd_opc_wrapper iwd_opc_create_account_form" action="/" method="post" enctype="multipart/form-data" autocomplete="off" style="display:none;">
+                                <fieldset class="iwd_opc_alternative_wrapper fieldset create account" data-hasrequired="* Required Fields">
+                                    <div class="field required">
+                                        <div class="control">
+                                            <input type="password"
+                                                   id="iwd_opc_create_account_password"
+                                                   class="iwd_opc_input iwd_opc_field"
+                                                   name="password"
+                                                   data-password-min-length="8"
+                                                   data-password-min-character-sets="3"
+                                                   data-validate="{required:true,'validate-customer-password':true}"
+                                                   autocomplete="off"
+                                                   aria-required="true" />
+                                            <span class="iwd_opc_show_hide_password active"></span>
+                                        </div>
+                                    </div>
+                                </fieldset>
+                                <div class="iwd_opc_alternative_wrapper iwd_opc_universal_wrapper">
+                                    <button type="submit"
+                                            id="iwd_opc_create_account_button"
+                                            class="iwd_opc_button iwd_opc_create_account_button active"
+                                            title="<?php echo __('Create Account'); ?>">
+                                        <?php echo __('Create Account'); ?>
+                                    </button>
+                                </div>
+                                <div class="iwd_opc_universal_wrapper iwd_opc_message" style="display:none;"></div>
+                            </form>
+
+                            <div id="iwd_created_account_page" style="display:none;">
+                                <div class="iwd_opc_universal_wrapper">
+                                    <button type="button"
+                                            id="iwd_success_page_login_btn"
+                                            class="iwd_opc_button active"
+                                            onclick="window.location.href='<?php echo $block->getLogInUrl(); ?>'"
+                                            title="<?php echo __('Log In'); ?>">
+                                        <?php echo __('Log In'); ?>
+                                    </button>
+                                </div>
+                                <div class="iwd_opc_universal_wrapper iwd_opc_message" style="display:none;"></div>
+                            </div>
+
+                        </div>
+
+                        <script>
+                            require([
+                                'jquery',
+                                'mage/mage',
+                                'Magento_Ui/js/model/messageList'
+                            ], function ($, messageList) {
+                                $('body').addClass('iwd_opc_success_page');
+                                var registration_form = $('#form-validate'),
+                                    password_input = $('#iwd_opc_create_account_password');
+
+                                registration_form.mage('validation');
+
+                                $(document).on('click', '#iwd_success_page_open_register_form', function () {
+                                    $(this).closest('#iwd_opc_open_registration_form').hide();
+                                    registration_form.show();
+                                    password_input.focus();
+                                });
+
+                                $(document).on('click', '.iwd_opc_show_hide_password', function () {
+                                    $(this).toggleClass('active');
+                                    (password_input.attr('type') === 'text') ? password_input.attr('type', 'password') : password_input.attr('type', 'text');
+                                });
+
+                                $(document).on('submit', '#form-validate.iwd_opc_create_account_form', function (e) {
+                                    e.preventDefault();
+                                    if(registration_form.validation('isValid') === true) {
+                                        $.ajax({
+                                            url: "<?php echo $block->getCreateAccountWithPasswordUrl(); ?>",
+                                            type: 'post',
+                                            showLoader: true,
+                                            data: {'password': password_input.val()},
+                                            context: $('.iwd_success_page_wrapper'),
+                                            dataType: 'json'
+                                        }).done(
+                                            function (response) {
+                                                var created_account_section = $('#iwd_created_account_page');
+                                                if (response.errors === false) {
+                                                    $('#form-validate.iwd_opc_create_account_form').hide();
+                                                    created_account_section.show();
+                                                    created_account_section.find('.iwd_opc_message').html('').html('<div class="iwd_opc_message_success">' + response.message + '</div>').show();
+                                                } else {
+                                                    $(this).find('.iwd_opc_message').html('').html('<div class="iwd_opc_message_error">' + response.message + '</div>').show();
+                                                }
+                                            }
+                                        ).fail(
+                                            function (response) {
+                                                messageList.addErrorMessage(response);
+                                            }
+                                        );
+                                    }
+                                });
+                            })
+                        </script>
+                    <?php } ?>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

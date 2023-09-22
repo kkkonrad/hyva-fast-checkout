@@ -1,0 +1,9 @@
+<div class="iwd_opc_universal_wrapper iwd_opc_message"
+     data-bind="visible: isVisible(), click: removeAll">
+    <!-- ko foreach: messageContainer.getErrorMessages() -->
+    <div class="iwd_opc_message_error" data-bind="text: $data"></div>
+    <!--/ko-->
+    <!-- ko foreach: messageContainer.getSuccessMessages() -->
+    <div class="iwd_opc_message_success" data-bind="text: $data"></div>
+    <!--/ko-->
+</div>

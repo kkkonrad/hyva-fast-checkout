@@ -1,0 +1,30 @@
+<div class="iwd_opc_alternative_step delivery" data-bind="fadeVisible: DeliveryStep">
+    <div class="iwd_opc_alternative_column">
+        <div id="checkout-shipping-method-load">
+            <div class="iwd_opc_universal_wrapper iwd_opc_column_name" data-bind="i18n: 'Delivery Method'"></div>
+            <table class="table-checkout-shipping-method" markdown="1">
+                <!-- tbody was moved inside item template -->
+                <!-- ko foreach: { data: rates(), as: 'method'} -->
+                    <!-- ko if: element.isShippingMethodActive(method) -->
+                        <!--ko template: { name: element.shippingMethodActiveItemTemplate} -->
+                        <!-- /ko -->
+                    <!-- /ko -->
+                    <!-- ko ifnot: element.isShippingMethodActive(method) -->
+                        <!--ko template: { name: element.shippingMethodItemTemplate} -->
+                        <!-- /ko -->
+                    <!-- /ko -->
+                <!-- /ko -->
+            </table>
+        </div>
+        <div id="onepage-checkout-shipping-method-additional-load">
+            <each args="getRegion('shippingAdditional')" render="" >
+            </each>
+        </div>
+        <div role="alert"
+             if="errorValidationMessage().length"
+             class="message notice">
+            <span text="errorValidationMessage()" >
+            </span>
+        </div>
+    </div>
+</div>

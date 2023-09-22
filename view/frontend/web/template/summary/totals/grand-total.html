@@ -1,0 +1,22 @@
+<!-- ko if: isDisplayed() -->
+    <!-- ko if: isTaxDisplayedInGrandTotal -->
+    <div class="iwd_opc_review_total iwd_opc_grand_total">
+        <div class="iwd_opc_review_total_cell" data-bind="i18n: inclTaxLabel"></div>
+        <div class="iwd_opc_review_total_cell"><!-- ko text: getValue() --><!-- /ko --></div>
+    </div>
+    <!-- /ko -->
+
+    <!-- ko if: !isTaxDisplayedInGrandTotal -->
+    <div class="iwd_opc_review_total iwd_opc_grand_total">
+        <div class="iwd_opc_review_total_cell" data-bind="i18n: title"></div>
+        <div class="iwd_opc_review_total_cell"><!-- ko text: getValue() --><!-- /ko --></div>
+    </div>
+    <!-- /ko -->
+
+    <!-- ko if: isBaseGrandTotalDisplayNeeded() -->
+    <div class="iwd_opc_review_total iwd_opc_grand_total">
+        <div class="iwd_opc_review_total_cell" data-bind="i18n: basicCurrencyMessage"></div>
+        <div class="iwd_opc_review_total_cell"><!-- ko text: getBaseValue() --><!-- /ko --></div>
+    </div>
+    <!-- /ko -->
+<!-- /ko -->

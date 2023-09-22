@@ -1,0 +1,20 @@
+<div class="checkout-billing-address">
+
+    <!-- ko if: (isVisibleManageBlock()) -->
+    <div class="billing-address-same-as-shipping-block field choice"
+         data-bind="
+            visible: canUseShippingAddress(),
+            attr: {'class' : (isAddressSameAsShipping()) ? 'billing-address-same-as-shipping-block field choice' : 'billing-address-same-as-shipping-block field choice checked'}">
+        <input type="checkbox" name="billing-address-same-as-shipping"
+               data-bind="checked: isAddressSameAsShipping, click: useShippingAddress, attr: {id: 'billing-address-same-as-shipping'}"/>
+        <label data-bind="attr: {for: 'billing-address-same-as-shipping'}">
+            <span data-bind="i18n: 'My billing address is different'"></span>
+        </label>
+    </div>
+    <!-- /ko -->
+
+    <fieldset class="fieldset">
+        <!-- ko template: 'IWD_Opc/billing-address/form' --><!-- /ko -->
+    </fieldset>
+
+</div>
