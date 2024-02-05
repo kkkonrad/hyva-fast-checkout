@@ -6,7 +6,6 @@
     <preference for="Magento\Downloadable\Observer\IsAllowedGuestCheckoutObserver" type="IWD\Opc\Observer\Downloadable\IsAllowedGuestCheckoutObserver"/>
     <preference for="Magento\Checkout\Helper\Data" type="IWD\Opc\Helper\Checkout\Data"/>
     <preference for="Magento\Customer\Model\AccountManagement" type="IWD\Opc\Model\Customer\AccountManagement" />
-    <preference for="Temando\Shipping\Model\Shipping\Carrier" type="IWD\Opc\Model\Shipping\Carrier" />
     <type name="Magento\GiftCardAccount\Model\Giftcardaccount">
         <plugin name="iwd_opc_giftcardaccount_plugin" type="IWD\Opc\Plugin\GiftCardAccount" />
     </type>

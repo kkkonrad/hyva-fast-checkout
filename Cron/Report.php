@@ -95,7 +95,7 @@ class Report
 
             $http = $this->curlFactory->create();
             $http->setConfig($config);
-            $http->write(\Zend_Http_Client::GET, self::API_URL . $request, '1.1');
+            $http->write(\Laminas\Http\Request::METHOD_GET, self::API_URL . $request, '1.1');
             $response = $http->read();
         } catch (\Exception $e) {
             // do nothing

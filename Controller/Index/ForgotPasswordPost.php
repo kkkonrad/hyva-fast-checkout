@@ -11,6 +11,7 @@ use Magento\Customer\Controller\AbstractAccount;
 use Magento\Framework\Controller\Result\RawFactory;
 use Magento\Framework\Controller\Result\JsonFactory;
 use Magento\Framework\Json\Helper\Data;
+use Magento\Framework\Validator\EmailAddress;
 
 class ForgotPasswordPost extends AbstractAccount
 {
@@ -70,7 +71,7 @@ class ForgotPasswordPost extends AbstractAccount
         }
 
         if (!$email || $this->getRequest()->getMethod() !== 'POST' ||
-            !\Zend_Validate::is($email, 'EmailAddress') ||
+            !\Magento\Framework\Validator\ValidatorChain::is($email, EmailAddress::class) ||
             !$this->getRequest()->isXmlHttpRequest()
         ) {
             return $resultRaw->setHttpResponseCode($httpBadRequestCode);

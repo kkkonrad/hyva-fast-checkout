@@ -12,7 +12,7 @@ class AbstractResolution implements ArrayInterface
             [
                 'value' => 'onepage',
                 'label' => __('Onepage Design')
-            ], 
+            ],
             [
                 'value' => 'multistep',
                 'label' => __('Multistep Design')
@@ -20,5 +20,3 @@ class AbstractResolution implements ArrayInterface
         ];
     }
 }
-
-?>

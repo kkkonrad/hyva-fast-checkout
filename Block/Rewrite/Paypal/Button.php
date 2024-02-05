@@ -6,5 +6,3 @@ class Button extends \PayPal\Braintree\Block\Paypal\Button
 {
 
 }
-
-?>
