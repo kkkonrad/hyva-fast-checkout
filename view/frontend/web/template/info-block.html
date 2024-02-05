@@ -38,12 +38,13 @@
                 </div>
             </div>
         <!-- /ko -->
+        <!-- ko if: (customerEventListener()) --><!-- /ko -->
     </div>
 <!-- /ko -->
 
 <!-- ko if: (isVisibleShoppingCartLink()) -->
     <div class="iwd-edit-cart">
-        <a href="/checkout/cart/">
+        <a data-bind="attr: {href: window.checkoutConfig.cartUrl }">
             <!-- ko i18n: 'Back to edit shopping cart'--><!-- /ko -->
         </a>
     </div>

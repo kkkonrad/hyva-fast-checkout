@@ -30,7 +30,9 @@ if ($helper && $helper->isCheckoutPage()) : ?>
                     // to fix infinity loader of payment method block on OPC
                     'Magento_NegotiableQuote/js/view/shipping-address/address-renderer/default': 'IWD_Opc/js/view/shipping-address/address-renderer/default',
 
-                    'Magento_Checkout/js/action/select-billing-address': 'IWD_Opc/js/action/select-billing-address'
+                    'Magento_Checkout/js/action/select-billing-address': 'IWD_Opc/js/action/select-billing-address',
+
+                    'Magento_Ui/js/view/messages': 'IWD_Opc/js/view/messages'
                 }
             },
             paths: {
@@ -58,6 +60,9 @@ if ($helper && $helper->isCheckoutPage()) : ?>
                     'PayPal_Braintree/js/view/payment/adapter': {
                         'IWD_Opc/js/view/payment/methods-renderers/braintree/adapter': true
                     },
+                    'Magento_Ui/js/lib/validation/validator': {
+                        'IWD_Opc/js/mixin/validation-mixin': true
+                    }
                 }
             }
         });

@@ -1,8 +1,8 @@
 {
   "name": "iwd/opc",
-  "description": "IWD One Step Checkout",
+  "description": "Dominate Checkout (Open Source)",
   "type": "magento2-module",
-  "version": "5.1.0",
+  "version": "6.0.0",
   "license": [
     "proprietary"
   ],
@@ -24,6 +24,7 @@
     "magento/module-checkout": "100.*|101.*|102.*|103.*",
     "magento/module-sales": "100.*|101.*|102.*|103.*",
     "magento/module-quote": "100.*|101.*|102.*|103.*",
-    "magento/module-payment": "100.*|101.*|102.*|103.*"
+    "magento/module-payment": "100.*|101.*|102.*|103.*",
+    "php": "~7.1.0|~7.2.0|~7.3.0|~7.4.0|~8.1.0|~8.2.0"
   }
 }

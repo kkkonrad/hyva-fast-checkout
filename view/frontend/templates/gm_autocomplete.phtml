@@ -27,18 +27,24 @@ if ($helper->isEnable() && $helper->isModuleOutputEnabled('IWD_Opc') &&
                     street_number: 'short_name',
                     locality: 'long_name',
                     postal_town: 'long_name',
+                    administrative_area_level_2: 'long_name',
                     administrative_area_level_1: 'long_name',
                     country: 'short_name',
-                    postal_code: 'short_name'
+                    postal_code: 'short_name',
+                    neighborhood: 'short_name',
+                    postal_code_prefix: 'short_name'
                 },
                 addressFieldsMap = {
                     route: 'street[0]',
                     street_number: 'street[0]',
                     locality: 'city',
                     postal_town: 'city',
+                    administrative_area_level_2: 'city',
                     administrative_area_level_1: 'region_id',
                     country: 'country_id',
-                    postal_code: 'postcode'
+                    postal_code: 'postcode',
+                    neighborhood: 'street[0]',
+                    postal_code_prefix: 'postcode'
                 };
 
             function initAutocomplete(elem) {
@@ -53,25 +59,36 @@ if ($helper->isEnable() && $helper->isModuleOutputEnabled('IWD_Opc') &&
             }
 
             function fillInAddress() {
-                var place = autocomplete.getPlace();
+                var place = autocomplete.getPlace(),
+                    street = false,
+                    country = {},
+                    region = {};
+
                 if (!place) {
                     return false;
                 }
 
                 $.each(addressFieldsMap, function () {
-                    $(currentFormClass + " [name='" + this + "']").val('').change();
+                    $(currentFormClass + " [name='" + this + "']")
+                        .val('')
+                        .closest('.control').removeClass('focus');
                 });
 
                 // Get each component of the address from the place details
                 // and fill the corresponding field on the form.
-                let country = {}, region = {};
 
                 for (var i = 0; i < place.address_components.length; i++) {
                     var addressType = place.address_components[i].types[0],
                         selector = currentFormClass + " [name='" + addressFieldsMap[addressType] + "']";
 
+                    if(addressFieldsMap[addressType] === 'street[0]') street = true;
+
                     if (componentForm[addressType]) {
                         var val = place.address_components[i][componentForm[addressType]];
+                        $(selector).trigger('change');
+
+                        //replace special symbol, but it can be more. need to find all of them
+                        val = val.replace("é","e");
 
                         if(addressType == 'administrative_area_level_1') {
                             region.val = val;
@@ -80,6 +97,9 @@ if ($helper->isEnable() && $helper->isModuleOutputEnabled('IWD_Opc') &&
                             country.val = val;
                             country.selector = selector;
                         } else {
+                            if(addressType == 'administrative_area_level_2') {
+                                if($(selector).val()) val = '';
+                            }
                             setValue(val, selector);
                         }
                     }
@@ -87,6 +107,14 @@ if ($helper->isEnable() && $helper->isModuleOutputEnabled('IWD_Opc') &&
 
                 setValue(country.val, country.selector);
                 setValue(region.val, region.selector);
+
+                //Some places doesn't have street address. In this case we set whole format address to street field
+                if(!street) {
+                    let formatted_address = place.formatted_address;
+                    formatted_address = formatted_address.replace("é","e");
+                    setValue(formatted_address, currentFormClass + " [name='street[0]']");
+                }
+
             }
 
             function setValue(value, selector) {

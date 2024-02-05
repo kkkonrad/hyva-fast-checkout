@@ -29,8 +29,7 @@ class Index extends Action
     public function execute()
     {
         if (!$this->opcHelper->isEnable()
-            || !$this->opcHelper->isModuleOutputEnabled('IWD_Opc')
-            || !$this->opcHelper->isCheckoutDesign()) {
+            || !$this->opcHelper->isModuleOutputEnabled('IWD_Opc')) {
             return $this->resultRedirectFactory->create()->setPath('checkout');
         }
 

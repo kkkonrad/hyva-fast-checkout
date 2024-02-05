@@ -28,13 +28,12 @@
         </div>
         <div
                 data-bind="visible: isPasswordVisible"
-                id="iwd_opc_login_password" class="iwd_opc_universal_wrapper">
+                id="iwd_opc_login_password" class="iwd_opc_universal_wrapper control">
             <input name="context" type="hidden" value="checkout"/>
+            <span class="floating-span">Password</span>
             <input
                     data-bind="attr:{
                                 'type': passwordType,
-                                placeholder: passwordPlaceholder,
-                                title: passwordPlaceholder,
                             },
                             hasFocus: passwordFocused"
                     class="iwd_opc_input iwd_opc_field"

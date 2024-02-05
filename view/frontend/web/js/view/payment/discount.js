@@ -10,8 +10,9 @@ define([
     'Magento_Checkout/js/model/quote',
     'Magento_SalesRule/js/action/set-coupon-code',
     'Magento_SalesRule/js/action/cancel-coupon',
-    'Magento_SalesRule/js/model/coupon'
-], function ($, ko, Component, quote, setCouponCodeAction, cancelCouponAction, coupon) {
+    'Magento_SalesRule/js/model/coupon',
+    'IWD_Opc/js/ga4Events'
+], function ($, ko, Component, quote, setCouponCodeAction, cancelCouponAction, coupon, ga4Events) {
     'use strict';
 
     var totals = quote.getTotals(),
@@ -39,6 +40,7 @@ define([
          */
         apply: function () {
             if (this.validate()) {
+                ga4Events.applyCouponEvent();
                 setCouponCodeAction(couponCode(), isApplied);
             }
         },
@@ -49,6 +51,7 @@ define([
         cancel: function () {
             if (this.validate()) {
                 couponCode('');
+                ga4Events.cancelCouponEvent();
                 cancelCouponAction(isApplied);
             }
         },

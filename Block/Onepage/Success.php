@@ -4,6 +4,7 @@ namespace IWD\Opc\Block\Onepage;
 
 use Magento\Checkout\Block\Onepage\Success as CheckoutSuccess;
 use IWD\Opc\Helper\Data as OpcHelper;
+use IWD\Opc\Helper\Order as OpcOrder;
 use Magento\Framework\View\Element\Template\Context;
 use Magento\Checkout\Model\Session as CheckoutSession;
 use Magento\Sales\Model\Order\Config;
@@ -41,8 +42,31 @@ class Success extends CheckoutSuccess
      */
     public $orderRepository;
 
+    /**
+     * @var OpcHelper
+     */
     public $opcHelper;
 
+    /**
+     * @var OpcOrder
+     */
+    public $opcOrder;
+
+    /**
+     * Success constructor.
+     * @param Context $context
+     * @param CheckoutSession $checkoutSession
+     * @param Config $orderConfig
+     * @param HttpContext $httpContext
+     * @param Registration $registration
+     * @param AccountManagementInterface $accountManagement
+     * @param CustomerSession $customerSession
+     * @param Validator $addressValidator
+     * @param OrderRepositoryInterface $orderRepository
+     * @param OpcHelper $opcHelper
+     * @param OpcOrder $opcOrder
+     * @param array $data
+     */
     public function __construct(
         Context $context,
         CheckoutSession $checkoutSession,
@@ -54,6 +78,7 @@ class Success extends CheckoutSuccess
         Validator $addressValidator,
         OrderRepositoryInterface $orderRepository,
         OpcHelper $opcHelper,
+        OpcOrder $opcOrder,
         array $data = []
     ) {
         $data['module_name'] = 'Magento_Checkout';
@@ -64,6 +89,7 @@ class Success extends CheckoutSuccess
         $this->addressValidator = $addressValidator;
         $this->orderRepository = $orderRepository;
         $this->opcHelper = $opcHelper;
+        $this->opcOrder = $opcOrder;
     }
 
     protected function _toHtml()
@@ -136,8 +162,7 @@ class Success extends CheckoutSuccess
 
     public function validateAddresses()
     {
-        $order = $this->orderRepository->get($this->_checkoutSession->getLastOrderId());
-        $addresses = $order->getAddresses();
+        $addresses = $this->getOrder()->getAddresses();
         foreach ($addresses as $address) {
             $result = $this->addressValidator->validateForCustomer($address);
             if (is_array($result) && !empty($result)) {
@@ -146,5 +171,13 @@ class Success extends CheckoutSuccess
         }
 
         return true;
+    }
+
+    public function getOrder() {
+        return $this->orderRepository->get($this->_checkoutSession->getLastOrderId());
+    }
+
+    public function getOrderDetailsForGa4() {
+        return $this->opcOrder->getOrderDetailsForGa4($this->getOrder());
     }
 }

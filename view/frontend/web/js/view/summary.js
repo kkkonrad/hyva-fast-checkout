@@ -22,56 +22,52 @@ define([
             summaryWrapper.css({'top':top + 'px'});
         },
 
+        setSummaryWrapperTop: function(){
+            let scrollY = window.scrollY,
+                summary = $('.opc-block-summary'),
+                summaryWrapper = $('.opc-block-summary-wrapper'),
+                top,
+                summaryWrapperHeight,
+                paddingBottom = 50;
+            //IWD: replace .height with .innerHeight() to include inner padding
+            summaryWrapperHeight = summaryWrapper.innerHeight() + paddingBottom + scrollY;
+
+            if (summaryWrapperHeight < summary.height()) {
+                top = scrollY;
+            } else {
+                if (window.innerWidth > 992) {
+                    //IWD: need to scroll back
+                    let currentSummaryScrollTop = parseInt($(summaryWrapper).css('top'), 10);
+                    let possibleScrollTopBack = summaryWrapper.innerHeight() + currentSummaryScrollTop - summary.height();
+                    if (possibleScrollTopBack > 0) {
+                        let scrollTopBack = summaryWrapper.innerHeight() + currentSummaryScrollTop - summary.height();
+                        top = currentSummaryScrollTop - possibleScrollTopBack;
+
+                    }
+
+                } else {
+                    return;
+                }
+
+            }
+
+            if (window.innerWidth < 992) {
+                top = 0;
+            }
+
+            summaryWrapper.css({'top':top+'px'});
+        },
+
         checkoutStepsResize: function () {
-            // let summary = $('.opc-block-summary'),
-            //     wrapper = document.getElementById("checkoutSteps"),
-            //     resizeObserver;
-            //
-            // resizeObserver = new ResizeObserver(function (checkoutSteps) {
-            //     let height = checkoutSteps[0].target.clientHeight;
-            //
-            //     if ($(document).width() < 992) {
-            //         height = '100%';
-            //     }
-            //
-            //     summary.height(height);
-            // })
-
-            //resizeObserver.observe(wrapper);
-
             if (typeof window.safari === 'object') {
                 $('.onepage-index-index .opc-block-summary').css({'height': '-webkit-fill-available'});
 
-                if ($(document).width() > 991) {
+                if (window.innerWidth > 991) {
                     $('#maincontent > .columns').css({'max-height': $('#maincontent').height() +'px'});
                 } else {
                     $('#maincontent > .columns').css({'max-height': '100%'});
                 }
             }
-
-            window.addEventListener('scroll', function (event) {
-                let scrollY = window.scrollY,
-                    summary = $('.opc-block-summary'),
-                    summaryWrapper = $('.opc-block-summary-wrapper'),
-                    top,
-                    summaryWrapperHeight,
-                    paddingBottom = 50;
-
-                summaryWrapperHeight = summaryWrapper.height() + paddingBottom + scrollY;
-
-                if (summaryWrapperHeight < summary.height()) {
-                    top = scrollY;
-                } else {
-                    return;
-                }
-
-                if ($(document).width() < 992) {
-                    top = 0;
-                }
-
-                summaryWrapper.css({'top':top+'px'});
-            });
-
         },
         bodyResize: function () {
             let self = this,
@@ -85,7 +81,7 @@ define([
                 if (typeof window.safari === 'object') {
                     $('.onepage-index-index .opc-block-summary').css({'height': '-webkit-fill-available'});
 
-                    if ($(document).width() > 991) {
+                    if (window.innerWidth > 991) {
                         $('#maincontent > .columns').css({'max-height': $('#maincontent').height() +'px'});
                     } else {
                         $('#maincontent > .columns').css({'max-height': '100%'});
@@ -101,7 +97,7 @@ define([
 
             let checkoutStepsInterval = setInterval(function (){
                 let wrapper = $('#checkoutSteps');
-                    //summary = $('.opc-block-summary')
+                //summary = $('.opc-block-summary')
 
                 if (wrapper.length) {
                     if (!wrapper.height()) {
@@ -121,6 +117,18 @@ define([
             },200)
 
             self.bodyResize();
+        },
+
+        initEvents: function () {
+            let self = this;
+            window.addEventListener('scroll', function (event) {
+                self.setSummaryWrapperTop();
+            });
+
+            $(document).on("dimensionsChanged", ".opc-payment-additional.discount-code", function (event, data) {
+                self.setSummaryWrapperTop();
+            });
+
         },
 
         manageVisibility: function () {
@@ -154,8 +162,8 @@ define([
                 defaultActiveButtonTitle: 'Back to Checkout',
                 opcManageSummaryButtonTitle: '',
                 grandTotal: this.getFormattedPrice(totals.totals().grand_total),
-                screenWidth: ko.observable(window.screen.width),
-                screenHeight: ko.observable(window.screen.height)
+                screenWidth: ko.observable(window.innerWidth),
+                screenHeight: ko.observable(window.innerHeight)
             });
 
             window.checkoutData.summary = this;
@@ -170,7 +178,7 @@ define([
             }
 
             self.screenWidth.subscribe(function (screenWidth) {
-                if (self.screenWidth() > 991) {
+                if (window.innerWidth > 991) {
                     self.opcManageSummaryButtonTitle('');
                     self.opcManageSummaryButton(false);
                     self.opcBlockSummary(true);
@@ -182,6 +190,7 @@ define([
             });
 
             self.screenResize();
+            self.initEvents();
 
             return this;
         },

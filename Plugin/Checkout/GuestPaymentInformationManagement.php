@@ -15,9 +15,14 @@ class GuestPaymentInformationManagement extends PaymentMethodManagement
         PaymentInterface $paymentMethod,
         AddressInterface $billingAddress = null
     ) {
-        $result = $proceed($cartId, $email, $paymentMethod, $billingAddress);
-        $this->saveCommentToSession($paymentMethod);
-        $this->saveSubscribeToSession($paymentMethod);
+        try {
+            $result = $proceed($cartId, $email, $paymentMethod, $billingAddress);
+            $this->saveCommentToSession($paymentMethod);
+            $this->saveSubscribeToSession($paymentMethod);
+        } catch (\Exception $e) {
+            //We can select payment method before set address
+            $result = true;
+        }
 
         return $result;
     }

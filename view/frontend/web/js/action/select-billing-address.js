@@ -15,11 +15,15 @@ define([
                 address.saveInAddressBook = null;
             } else {
                 address = billingAddress;
+
+                if(typeof address.saveInAddressBook == 'string' && !address.saveInAddressBook.length) {
+                    address.saveInAddressBook = 0;
+                }
             }
         } catch (e) {
             address = null;
         }
-        
+
         quote.billingAddress(address);
     };
 });

@@ -23,10 +23,10 @@
 
             <!-- ko if : (DeliveryStep()) -->
                 <div class="iwd_opc_universal_wrapper multistep">
-                    <button type="button" class="iwd_opc_button primary"
-                            data-bind="i18n: 'Continue to  payment',click: goToPaymentStep">
+                    <button type="button" class="iwd_opc_button primary js-send-option-event-to-ga" data-ga-event-step="2"
+                            data-ga-event-action="Delivery" data-bind="i18n: 'Continue to payment',click: goToPaymentStep">
                     </button>
-                    <div class="step-back" data-bind="click: goToAddressStep">
+                    <div class="step-back js-send-event-to-ga" data-bind="click: goToAddressStep" data-ga-event-action="Delivery" data-ga-event-label="Edit Address">
                         <!-- ko i18n: 'Back to edit address' --><!-- /ko -->
                     </div>
                 </div>

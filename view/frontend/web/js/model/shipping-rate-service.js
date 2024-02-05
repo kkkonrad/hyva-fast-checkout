@@ -3,9 +3,11 @@ define(
         'Magento_Checkout/js/model/quote',
         'Magento_Checkout/js/model/shipping-rate-processor/new-address',
         'Magento_Checkout/js/model/shipping-rate-processor/customer-address',
-        'Magento_Checkout/js/checkout-data'
+        'Magento_Checkout/js/checkout-data',
+        'Magento_Checkout/js/model/shipping-rate-registry',
+        'IWD_Opc/js/form/address-manager'
     ],
-    function (quote, defaultProcessor, customerAddressProcessor, checkoutData) {
+    function (quote, defaultProcessor, customerAddressProcessor, checkoutData, rateRegistry, iwdOpcAddressManager) {
         'use strict';
 
         var self = this,
@@ -14,26 +16,10 @@ define(
             processors['customer-address'] = customerAddressProcessor;
 
 
-        function loader(type, timeout = 0) {
-            // if(window.fullScreenLoader) {
-            //     if(typeof window.checkoutData == 'undefined'){
-            //         window.checkoutData = {};
-            //     }
-            //
-            //     setTimeout(function () {
-            //         if(type == 'start') {
-            //             window.checkoutData.loader = 1;
-            //             window.fullScreenLoader.startLoader();
-            //         } else if (type == 'stop') {
-            //             window.checkoutData.loader = 0;
-            //             window.fullScreenLoader.stopLoader();
-            //         }
-            //     }, timeout)
-            // }
-        }
-
-        quote.shippingAddress.subscribe(function () {
-            loader('start');
+        quote.shippingAddress.subscribe(function (shippingAddress) {
+            if(shippingAddress.getKey() == 'new-customer-address' && !iwdOpcAddressManager.isNewCustomerAddressValid()) {
+                return true;
+            }
 
             if (checkoutData.getNeedEstimateShippingRates()) {
                 var type = quote.shippingAddress().getType();
@@ -45,8 +31,6 @@ define(
                     processors.default.getRates(address);
                 }
             }
-
-            loader('stop', 1000);
         });
 
         return {

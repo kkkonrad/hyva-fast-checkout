@@ -15,12 +15,13 @@ use Magento\Framework\UrlInterface;
 use \Magento\Framework\Mail\Template\TransportBuilder;
 use Magento\Store\Model\ScopeInterface;
 use Magento\Checkout\Model\Cart;
+use Magento\Quote\Model\QuoteFactory;
+use Magento\Directory\Model\ResourceModel\Region\CollectionFactory;
 
 class Data extends AbstractHelper
 {
 
     const XML_PATH_ENABLE = 'iwd_opc/general/enable';
-    const XML_PATH_CHECKOUT_SUITE_DESIGN = 'iwd_opc/general/checkout_suite_design';
 
     const XML_PATH_TITLE = 'iwd_opc/extended/title';
     const XML_PATH_IWD_EXPERIENCE = 'iwd_opc/extended/use_iwd_checkout_experience';
@@ -38,35 +39,8 @@ class Data extends AbstractHelper
     const XML_PATH_RESTRICT_PAYMENT_ENABLE = 'iwd_opc/restrict_payment/enable';
     const XML_PATH_RESTRICT_PAYMENT_METHODS = 'iwd_opc/restrict_payment/methods';
 
-    const XML_PATH_GA_AB_TEST_ENABLE = 'iwd_opc/ga_ab_test/enable';
-    const XML_PATH_GA_AB_TEST_CODE = 'iwd_opc/ga_ab_test/code';
-
     const XML_PATH_GM_AUTOCOMPLETE_ENABLE = 'iwd_opc/extended/gm_autocomplete';
     const XML_PATH_GM_APIKEY = 'iwd_opc/extended/gm_apikey';
-
-
-    //Layout
-    const XML_PATH_DESKTOP_RESOLUTION = 'iwd_opc/design/layout/desktop';
-    const XML_PATH_MOBILE_RESOLUTION = 'iwd_opc/design/layout/mobile';
-    const XML_PATH_TABLET_RESOLUTION = 'iwd_opc/design/layout/tablet';
-    const XML_PATH_ADDRESS_TYPE_ORDER = 'iwd_opc/design/layout/address_type_order';
-
-    //Style
-    const XML_PATH_FONT_FAMILY = 'iwd_opc/design/style/font';
-
-    const XML_PATH_MAIN_BACKGROUND = 'iwd_opc/design/style/page_background';
-    const XML_PATH_SUMMARY_BACKGROUND = 'iwd_opc/design/style/sidebar_background';
-
-    const XML_PATH_MAIN_COLOR = 'iwd_opc/design/style/body_text_color';
-    const XML_PATH_HEADING_COLOR = 'iwd_opc/design/style/heading_text_color';
-    const XML_PATH_LINK_COLOR = 'iwd_opc/design/style/link_color';
-    const XML_PATH_HIGHLIGHT_COLOR = 'iwd_opc/design/style/input_highlight_color';
-
-    const XML_PATH_PRIMARY_BUTTON_BACKGROUND = 'iwd_opc/design/style/primary_btn_background';
-    const XML_PATH_PRIMARY_BUTTON_TEXT_COLOR = 'iwd_opc/design/style/primary_btn_text_color';
-
-    const XML_PATH_SECONDARY_BUTTON_BACKGROUND = 'iwd_opc/design/style/secondary_btn_background';
-    const XML_PATH_SECONDARY_BUTTON_TEXT_COLOR = 'iwd_opc/design/style/secondary_btn_text_color';
 
     public $storeManager;
     public $resourceConfig;
@@ -79,6 +53,8 @@ class Data extends AbstractHelper
     public $request;
     protected $transportBuilder;
     protected $cart;
+    protected $quoteFactory;
+    protected $regionCollectionFactory;
 
     public function __construct(
         Context $context,
@@ -90,7 +66,9 @@ class Data extends AbstractHelper
         FlagFactory $flagFactory,
         JsonHelper $jsonHelper,
         TransportBuilder $transportBuilder,
-        Cart $cart
+        Cart $cart,
+        QuoteFactory $quoteFactory,
+        CollectionFactory $regionCollectionFactory
     ) {
         parent::__construct($context);
         $this->resourceConfig = $resourceConfig;
@@ -102,32 +80,18 @@ class Data extends AbstractHelper
         $this->jsonHelper = $jsonHelper;
         $this->transportBuilder = $transportBuilder;
         $this->cart = $cart;
+        $this->quoteFactory = $quoteFactory;
+        $this->regionCollectionFactory = $regionCollectionFactory;
     }
 
     public function isEnable()
     {
-        $status = $this->scopeConfig->getValue(self::XML_PATH_ENABLE, ScopeInterface::SCOPE_STORE);
-        return (bool)$status;
-    }
-
-    public function isCheckoutDesign()
-    {
-        return (bool)$this->scopeConfig->getValue(self::XML_PATH_CHECKOUT_SUITE_DESIGN, ScopeInterface::SCOPE_STORE);
+        return (bool)$this->scopeConfig->getValue(self::XML_PATH_ENABLE, ScopeInterface::SCOPE_STORE);
     }
 
     public function isLoginAccountCreationEnabled()
     {
         return (bool)$this->scopeConfig->getValue(self::XML_PATH_IWD_EXPERIENCE, ScopeInterface::SCOPE_STORE);
-    }
-
-    public function isGaAbEnable()
-    {
-        return (bool)$this->scopeConfig->getValue(self::XML_PATH_GA_AB_TEST_ENABLE, ScopeInterface::SCOPE_STORE);
-    }
-
-    public function getGaAbCode()
-    {
-        return $this->scopeConfig->getValue(self::XML_PATH_GA_AB_TEST_CODE, ScopeInterface::SCOPE_STORE );
     }
 
     public function isGmAutocompleteEnabled()
@@ -144,7 +108,6 @@ class Data extends AbstractHelper
     {
         return $this->_getRequest()->getModuleName() === 'onepage'
             && $this->isEnable()
-            && $this->isCheckoutDesign()
             && $this->isModuleOutputEnabled('IWD_Opc');
     }
 
@@ -241,11 +204,6 @@ class Data extends AbstractHelper
         return trim($this->scopeConfig->getValue('iwd_opc/general/license_email'));
     }
 
-    public function isBluePayEnabled()
-    {
-        return false;
-    }
-
     public function setModuleActive($isActive)
     {
         $this->resourceConfig->saveConfig(self::XML_PATH_ENABLE, (int)$isActive, 'default', 0);
@@ -281,81 +239,6 @@ class Data extends AbstractHelper
         return (bool)$this->scopeConfig->getValue(self::XML_PATH_DISPLAY_ALL_METHODS, ScopeInterface::SCOPE_STORE);
     }
 
-    public function getMainBackground()
-    {
-        return $this->scopeConfig->getValue(self::XML_PATH_MAIN_BACKGROUND, ScopeInterface::SCOPE_STORE);
-    }
-
-    public function getMainColor()
-    {
-        return $this->scopeConfig->getValue(self::XML_PATH_MAIN_COLOR, ScopeInterface::SCOPE_STORE);
-    }
-
-    public function getSummaryBackground()
-    {
-        return $this->scopeConfig->getValue(self::XML_PATH_SUMMARY_BACKGROUND, ScopeInterface::SCOPE_STORE);
-    }
-
-    public function getHeadingColor()
-    {
-        return $this->scopeConfig->getValue(self::XML_PATH_HEADING_COLOR, ScopeInterface::SCOPE_STORE);
-    }
-
-    public function getLinkColor()
-    {
-        return $this->scopeConfig->getValue(self::XML_PATH_LINK_COLOR, ScopeInterface::SCOPE_STORE);
-    }
-
-    public function getHighlightColor()
-    {
-        return $this->scopeConfig->getValue(self::XML_PATH_HIGHLIGHT_COLOR, ScopeInterface::SCOPE_STORE);
-    }
-
-    public function getPrimaryButtonBackground()
-    {
-        return $this->scopeConfig->getValue(self::XML_PATH_PRIMARY_BUTTON_BACKGROUND, ScopeInterface::SCOPE_STORE);
-    }
-
-    public function getPrimaryButtonTextColor()
-    {
-        return $this->scopeConfig->getValue(self::XML_PATH_PRIMARY_BUTTON_TEXT_COLOR, ScopeInterface::SCOPE_STORE);
-    }
-
-    public function getSecondaryButtonBackground()
-    {
-        return $this->scopeConfig->getValue(self::XML_PATH_SECONDARY_BUTTON_BACKGROUND, ScopeInterface::SCOPE_STORE);
-    }
-
-    public function getSecondaryButtonTextColor()
-    {
-        return $this->scopeConfig->getValue(self::XML_PATH_SECONDARY_BUTTON_TEXT_COLOR, ScopeInterface::SCOPE_STORE);
-    }
-
-    public function getFontFamily()
-    {
-        return $this->scopeConfig->getValue(self::XML_PATH_FONT_FAMILY, ScopeInterface::SCOPE_STORE);
-    }
-
-    public function getDesktopResolution()
-    {
-        return $this->scopeConfig->getValue(self::XML_PATH_DESKTOP_RESOLUTION, ScopeInterface::SCOPE_STORE);
-    }
-
-    public function getMobileResolution()
-    {
-        return $this->scopeConfig->getValue(self::XML_PATH_MOBILE_RESOLUTION, ScopeInterface::SCOPE_STORE);
-    }
-
-    public function getTabletResolution()
-    {
-        return $this->scopeConfig->getValue(self::XML_PATH_TABLET_RESOLUTION, ScopeInterface::SCOPE_STORE);
-    }
-
-    public function getAddressTypeOrder()
-    {
-        return $this->scopeConfig->getValue(self::XML_PATH_ADDRESS_TYPE_ORDER, ScopeInterface::SCOPE_STORE);
-    }
-
     public function getDefaultShipping()
     {
         $quote = $this->cart->getQuote();
@@ -371,5 +254,24 @@ class Data extends AbstractHelper
     public function getDefaultPayment()
     {
         return $this->scopeConfig->getValue(self::XML_PATH_DEFAULT_PAYMENT_METHOD, ScopeInterface::SCOPE_STORE);
+    }
+
+    public function getPreSelectedBillingAddressId () {
+        try {
+            $quote = $this->quoteFactory->create()->load($this->cart->getQuote()->getId());
+            return $quote->getBillingAddress()->getCustomerAddressId();
+        } catch (\Exception $e) {
+            return '';
+        }
+    }
+
+    public function getRegionCollection() {
+        $collection = $this->regionCollectionFactory->create();
+
+        if($collection->toArray()) {
+            return $collection->toArray()['items'];
+        }
+
+        return [];
     }
 }

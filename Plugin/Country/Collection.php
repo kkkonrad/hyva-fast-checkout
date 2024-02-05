@@ -17,10 +17,6 @@ class Collection
 
     public function beforeToOptionArray(CountryCollection $subject, $emptyLabel = ' ')
     {
-        if ($emptyLabel === ' ' && $this->opcHelper->isCheckoutPage()) {
-            $emptyLabel = __('Select a Country *');
-        }
-
         return [$emptyLabel];
     }
 }

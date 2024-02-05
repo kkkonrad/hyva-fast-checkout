@@ -24,8 +24,7 @@ class Index
 
     public function beforeExecute()
     {
-        if ($this->opcHelper->isEnable() && $this->opcHelper->isCheckoutDesign()
-            && !($this->opcHelper->isGaAbEnable() && $this->opcHelper->getGaAbCode())) {
+        if ($this->opcHelper->isEnable()) {
             $url = $this->url->getUrl('onepage');
             $this->response->setRedirect($url);
         }

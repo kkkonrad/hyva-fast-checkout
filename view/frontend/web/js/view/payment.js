@@ -19,7 +19,8 @@ define(
         'IWD_Opc/js/model/payment/is-loading',
         'Magento_Checkout/js/action/set-billing-address',
         'Magento_Ui/js/model/messageList',
-        'mage/validation'
+        'mage/validation',
+        'IWD_Opc/js/ga4Events'
     ],
     function ($,
               _,
@@ -39,7 +40,10 @@ define(
               registry,
               paymentIsLoading,
               setBillingAddressAction,
-              globalMessageList) {
+              globalMessageList,
+              validation,
+              ga4Events
+    ) {
         'use strict';
 
         /** Set payment methods to collection */
@@ -90,6 +94,7 @@ define(
                 summary.updateSummaryWrapperTopHeight(0);
                 this.PaymentStep(false);
                 this.checkoutData.shipping.DeliveryStep(true);
+                this.checkoutData.shipping.updateBreadcrumbs('delivery');
                 this.stopLoader(1000);
             },
 
@@ -100,6 +105,7 @@ define(
                 summary.updateSummaryWrapperTopHeight(0);
                 this.PaymentStep(false);
                 this.checkoutData.billingStepVirtual.AddressStep(true);
+                this.checkoutData.shipping.updateBreadcrumbs('address');
                 this.stopLoader(1000);
             },
 
@@ -194,7 +200,10 @@ define(
 
                 $(document).on('click', '.payment-method:not(._active)', function (e) {
                     self.errorValidationMessage(false);
-                    $(this).find('input[name="payment[method]"]').click();
+                    let method = $(this).find('input[name="payment[method]"]');
+
+                    ga4Events.changePaymentMethod(method.data('title'));
+                    method.click();
 
                     if ($(this).attr('id') === 'payment-method-braintree-paypal') {
                         $('#braintree_paypal_placeholder').show();
@@ -282,6 +291,8 @@ define(
                         clearInterval(paymentMethodInterval);
                     }
                 },500);
+
+                window.IWDStartPlacingOrder = false;
 
                 return this;
             },
@@ -371,6 +382,10 @@ define(
                     shipping = self.checkoutData.shipping,
                     billing = self.checkoutData.billing;
 
+                window.IWDStartPlacingOrder = true;
+                shipping.addressHandler();
+                billing.addressHandler();
+
                 this.isPlaceOrderActionAllowed(false);
 
                 if (event) {
@@ -382,16 +397,19 @@ define(
                         $t('The payment method is missing. Select the payment method and try again.')
                     );
 
+                    ga4Events.failedPaymentEvent();
                     this.isPlaceOrderActionAllowed(true);
                     return false;
                 } else {
                     if (quote.isVirtual()) {
                         if (billing.isAddressHasError()) {
+                            ga4Events.failedPaymentEvent();
                             this.isPlaceOrderActionAllowed(true);
                             return false;
                         }
                     } else {
                         if (shipping.isAddressHasError()) {
+                            ga4Events.failedPaymentEvent();
                             this.isPlaceOrderActionAllowed(true);
                             return false;
                         }
@@ -406,20 +424,25 @@ define(
                             if (!quote.isVirtual()) {
                                 var shippingAddress = registry.get('checkout.steps.shipping-step.shippingAddress');
 
-                                if (shippingAddress.setShippingInformation()) {
-                                    localStorage.setItem('custom_attributes', JSON.stringify(shippingAddress.source.shippingAddress));
+                                shippingAddress.setShippingInformation()
+                                    .done(function () {
+                                        localStorage.setItem('custom_attributes', JSON.stringify(shippingAddress.source.shippingAddress));
+                                        self.clickNativePlaceOrder();
+                                    })
+                                    .fail(function () {
+                                        self.stopLoader(1000);
+                                        self.isPlaceOrderActionAllowed(true);
+                                        window.IWDStartPlacingOrder = false;
+                                        ga4Events.failedPaymentEvent();
+                                    });
 
-                                    self.clickNativePlaceOrder();
-                                } else {
-                                    this.stopLoader(1000);
-                                    self.isPlaceOrderActionAllowed(true);
-                                }
                             } else {
                                 this.isPlaceOrderActionAllowed(true);
                                 $('.payment-method._active button[type=submit].checkout').click();
                             }
                         }
                     } else {
+                        ga4Events.failedPaymentEvent();
                         this.isPlaceOrderActionAllowed(true);
                         return false;
                     }
@@ -427,10 +450,8 @@ define(
             },
             clickNativePlaceOrder: function () {
                 this.isPlaceOrderActionAllowed(true);
-                setTimeout(function (){
-                    $('.payment-method._active button[type=submit].checkout').click();
-                },1000);
-
+                $('.payment-method._active button[type=submit].checkout').click();
+                window.IWDStartPlacingOrder = false;
             }
         });
     }

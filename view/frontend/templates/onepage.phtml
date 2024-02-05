@@ -29,14 +29,7 @@ $isVirtual = $block->checkoutSession->getQuote()->isVirtual() ?>
 
 <div id="checkout" data-bind="scope:'checkout'" class="iwd_opc_wrapper iwd_main_wrapper">
     <div class="iwd_opc_alternative_wrapper">
-        <?php if ($isVirtual) : ?>
-            <div class="iwd_opc_two_column_wrapper">
-                <!-- ko template: getTemplate() --><!-- /ko -->
-            </div>
-        <?php else : ?>
-            <!-- ko template: getTemplate() --><!-- /ko -->
-        <?php endif; ?>
-
+        <!-- ko template: getTemplate() --><!-- /ko -->
 
         <script type="text/x-magento-init">
         {

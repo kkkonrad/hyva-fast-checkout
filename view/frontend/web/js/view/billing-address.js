@@ -19,7 +19,9 @@ define(
         'uiRegistry',
         'Magento_Checkout/js/model/postcode-validator',
         'Magento_Checkout/js/model/address-converter',
-        'Magento_Checkout/js/action/select-shipping-address'
+        'Magento_Checkout/js/action/select-shipping-address',
+        'IWD_Opc/js/form/address-manager',
+        'IWD_Opc/js/ga4Events'
     ],
     function ($,
               ko,
@@ -40,7 +42,10 @@ define(
               registry,
               postcodeValidator,
               addressConverter,
-              selectShippingAddress) {
+              selectShippingAddress,
+              iwdOpcAddressManager,
+              ga4Events
+    ) {
         'use strict';
 
         var observedElements = [],
@@ -62,6 +67,15 @@ define(
                 inlineAddress = address.getAddressInline();
                 return address.getType() === 'customer-address' && !isDublicate;
             });
+
+        if(window.checkoutData.preSelectedBillingAddressId) {
+            let activeAddressId = addressOptions.findIndex(address => address.customerAddressId == window.checkoutData.preSelectedBillingAddressId);
+            if(addressOptions[activeAddressId]) {
+                let activeAddressOption = addressOptions[activeAddressId];
+                addressOptions.splice(activeAddressId, 1);
+                addressOptions.unshift(activeAddressOption);
+            }
+        }
 
         addressOptions.push(newAddressOption);
 
@@ -205,7 +219,8 @@ define(
 
             billingStepVirtualValidate: function () {
                 let self = this,
-                    login = self.checkoutData.login;
+                    login = self.checkoutData.login,
+                    addressFormValid = true;
 
                 self.source.set('params.invalid', false);
 
@@ -213,17 +228,18 @@ define(
                     if (!login.validateEmail()) {
                         $("#iwd_opc_login form").validate().element("input[type='email']");
                         this.stopLoader(100);
-                        return false;
+                        addressFormValid = false;
                     }
                 }
 
                 self.source.trigger('billingAddressshared.data.validate');
+                iwdOpcAddressManager.billingAddressValidation();
 
                 if (self.source.get('params.invalid')) {
-                    return false;
-                } else {
-                    return true;
+                    addressFormValid = false;
                 }
+
+                return addressFormValid;
             },
 
             initialize: function () {
@@ -272,29 +288,6 @@ define(
                         billingAddress.saveInAddressBook = 0;
                         billingAddress.save_in_address_book = 0;
                         selectBillingAddress(billingAddress);
-                        var origAddress = self.source.get(self.dataScopePrefix),
-                            convertedAddress = addressConverter.quoteAddressToFormAddressData(billingAddress);
-
-                        $.each(origAddress, function(key, val) {
-                            if (key === 'street') {
-                                if (typeof convertedAddress[key] === 'undefined') {
-                                    convertedAddress[key] = {};
-                                }
-
-                                $.each(origAddress[key], function(streetKey, streetVal) {
-                                    if (typeof streetVal !== 'undefined' && typeof convertedAddress[key][streetKey] === 'undefined') {
-                                        convertedAddress[key][streetKey] = '';
-                                    }
-                                });
-                            } else if (typeof val !== 'undefined' && typeof convertedAddress[key] === 'undefined') {
-                                convertedAddress[key] = '';
-                            }
-                        });
-                        var obj = {};
-                        Object.entries(convertedAddress).forEach(([key, value]) => {
-                            obj[key] = value ? value : '';
-                        });
-                        self.source.set(self.dataScopePrefix,obj );
                     }
                 });
 
@@ -305,8 +298,7 @@ define(
                         return false;
                     }
 
-                    let shipping = self.checkoutData.shipping,
-                        dataScopePrefix = 'shippingAddress';
+                    let shipping = self.checkoutData.shipping;
 
                     if (self.isBillingFormFirst()) {
                         if (shipping.isAddressSameAsBilling()) {
@@ -314,29 +306,6 @@ define(
                             shippingAddress.saveInAddressBook = '0';
                             shippingAddress.save_in_address_book = '0';
                             selectShippingAddress(shippingAddress);
-                            var origAddress = self.source.get(dataScopePrefix),
-                                convertedAddress = addressConverter.quoteAddressToFormAddressData(shippingAddress);
-
-                            $.each(origAddress, function(key, val) {
-                                if (key === 'street') {
-                                    if (typeof convertedAddress[key] === 'undefined') {
-                                        convertedAddress[key] = {};
-                                    }
-
-                                    $.each(origAddress[key], function(streetKey, streetVal) {
-                                        if (typeof streetVal !== 'undefined' && typeof convertedAddress[key][streetKey] === 'undefined') {
-                                            convertedAddress[key][streetKey] = '';
-                                        }
-                                    });
-                                } else if (typeof val !== 'undefined' && typeof convertedAddress[key] === 'undefined') {
-                                    convertedAddress[key] = '';
-                                }
-                            });
-                            var obj = {};
-                            Object.entries(convertedAddress).forEach(([key, value]) => {
-                                obj[key] = value ? value : '';
-                            });
-                            self.source.set(dataScopePrefix,obj );
 
                             let selectShippingMethod = setInterval(function () {
                                 if (!$('table.table-checkout-shipping-method tbody._active').length) {
@@ -353,18 +322,8 @@ define(
                         }
                     }
 
-                    if (address.customerAddressId) {
-                        self.selectedAddress(address.customerAddressId);
-                    } else {
-                        self.selectedAddress('');
-                    }
-                });
-
-                self.isAddressSameAsShipping.subscribe(function (value) {
-                    self.fullFillBillingForm();
-                    if (!value) {
-                        $('.co-billing-form select').trigger('change');
-                    }
+                    if (self.isAddressSameAsShipping()) self.selectedAddress(null);
+                    if (!self.isAddressSameAsShipping() && address && address.customerAddressId) self.selectedAddress(address.customerAddressId);
                 });
 
                 if (addressList().length !== 0) {
@@ -420,6 +379,10 @@ define(
 
                             var billingAddressData = checkoutData.getBillingAddressFromData();
 
+                            if(!customer.isLoggedIn() || !window.checkoutData.addressList) {
+                                billingAddressData = {};
+                            }
+
                             if (billingAddressData) {
                                 checkoutProvider.set(
                                     billingAddressCode,
@@ -456,10 +419,18 @@ define(
             },
 
             decorateBillingForm: function() {
-                let decorateBillingSelect = setInterval(function () {
-                    if ($('#billing-new-address-form select[name="country_id"]').length && $('#billing-new-address-form select[name="region_id"]').length) {
-                        $('#billing-new-address-form select[name="country_id"]').selectize({});
-                        $('#billing-new-address-form select[name="region_id"]').selectize({});
+                let self = this,
+                    decorateBillingSelect = setInterval(function () {
+                    let country_id = $('#billing-new-address-form select[name="country_id"]'),
+                        region_id = $('#billing-new-address-form select[name="region_id"]');
+                    if (country_id.length && region_id.length) {
+                        if(region_id.data('selectize') && country_id.data('selectize')) {
+                            region_id.data('selectize').clear(true);
+                            country_id.data('selectize').clear(true);
+                        } else {
+                            self.customerAddressesDecorateSelect(region_id.attr('id'));
+                            self.customerAddressesDecorateSelect(country_id.attr('id'));
+                        }
                         $('#billing-new-address-form .field').each(function () {
                             if ($(this).find('input').val()) {
                                 $(this).find('.control').addClass('focus');
@@ -467,23 +438,124 @@ define(
                         });
                         clearInterval(decorateBillingSelect);
                     }
-                },500);
+                },250);
+            },
+
+            isEmpty: function (value) {
+                return (!value || value.length === 0);
+            },
+
+            toggleInput: function (input) {
+                if (!this.isEmpty(input.val())) {
+                    input.closest('.control').addClass('focus');
+                } else {
+                    input.closest('.control').removeClass('focus');
+                }
+            },
+
+            validateAddressForAddressHandler: function (address) {
+                if(!address) {
+                    address = {};
+                    var form = $('#billing-new-address-form');
+                    for (var i = 0; i < form.serializeArray().length; i++) {
+                        let obj = form.serializeArray()[i];
+                        if(obj.name !== 'billing-country-id' && obj.name !== 'billing-region-id') {
+                            if(obj.name === 'street[0]')  {
+                                address['street'] = { 0 : obj.value};
+                            } else if(obj.name === 'street[1]')  {
+                                address['street'][1] = obj.value;
+                            } else {
+                                address[obj.name] = obj.value;
+                            }
+                        }
+                    }
+
+                    if(address['region_id']) {
+                        let selectizeItem = form.find('div[name$="region_id"] .selectize-input .item');
+                        address['region'] = selectizeItem.text();
+                        address['region_id'] = selectizeItem.data('value');
+                    }
+                }
+
+                return address;
+            },
+
+            addressHandler: function () {
+                let address = this.validateAddressForAddressHandler(this.source.get('billingAddress'));
+                this.source.set('params.invalid', false);
+                this.source.trigger('billingAddress.data.validate');
+                iwdOpcAddressManager.billingAddressValidation();
+
+                if(!address || this.source.get('params.invalid') || iwdOpcAddressManager.isBillingAddressHasEmptyField()) return;
+
+                if($('#billing_address_id').length && !$('#billing_address_id').data('selectize').getValue()) {
+                    address['save_in_address_book'] = this.saveInAddressBook() && !this.isAddressSameAsShipping() ? 1 : 0;
+                } else if ($('#billing_address_id').length && $('#billing_address_id').data('selectize').getValue()) {
+                    let customerAddressId = $('#billing_address_id').data('selectize').getValue(),
+                        customerAddresses = window.checkoutData.addressList;
+                    address['save_in_address_book'] = 0;
+
+                    if(customerAddresses) {
+                        $.each(customerAddresses, function (key, customerAddress) {
+                            if(customerAddressId === customerAddress.customerAddressId) {
+                                $.each(address, function (k, v) {
+                                    if(k == 'save_in_address_book') return true;
+                                    if(k == 'country_id') k = "countryId";
+                                    if(k == 'region_id') k = "regionId";
+                                    if(v !== customerAddress[k] && customerAddress[k] !== null) {
+                                        if(k === 'street') {
+                                            if(v[0] === customerAddress[k][0] || v[1] === customerAddress[k][1]) {
+                                                return true;
+                                            }
+                                        }
+                                        address['save_in_address_book'] = 1;
+                                    }
+                                })
+                            }
+                        })
+                    }
+                } else {
+                    address['save_in_address_book'] = 1;
+                }
+
+                this.selectedAddress(address);
+                checkoutData.setSelectedBillingAddress(address);
+                quote.billingAddress(address);
+                if(!this.isAddressSameAsShipping()) this.isAddressFormVisible(true);
             },
 
             resetBillingAddressForm: function () {
                 let billingAddress = $('#billing-new-address-form');
+                billingAddress.find('.field').removeClass('_error');
                 billingAddress.find('input').val('');
-                billingAddress.find('.control.focus').removeClass('focus');
+                billingAddress.find('.control').removeClass('focus');
                 let country_id = billingAddress.find('select[name="country_id"]');
                 let region_id = billingAddress.find('select[name="region_id"]');
-                country_id.selectize({})[0].selectize.clear(true);
-                region_id.selectize({})[0].selectize.clear(true);
+                region_id.data('selectize').clear(true);
+                country_id.data('selectize').clear(true);
+
+                if(customer.isLoggedIn()) {
+                    iwdOpcAddressManager.setCustomerData(billingAddress, customer);
+                }
             },
 
             useShippingAddress: function () {
+
+                ga4Events.changeAddressEvent();
+
                 if (!this.isAddressSameAsShipping()) {
+
+
+                    if($('#billing_address_id').length && $('#billing_address_id').data('selectize').getValue()) {
+                        // to do nothing
+                    } else {
+                        this.selectedAddress(null);
+                        checkoutData.setSelectedBillingAddress(null);
+                        this.resetBillingAddressForm();
+                    }
+
                     this.checkoutData.infoBlock.isAddressSame(false);
-                    this.resetBillingAddressForm();
+
                     if(addressOptions.length == 1) {
                         this.isAddressFormVisible(true);
                     } else {
@@ -493,7 +565,7 @@ define(
                             this.isAddressFormVisible(true);
                         }
                     }
-                    this.decorateBillingForm();
+                    //this.decorateBillingForm();
                     this.customEventListener();
                 } else {
                     this.checkoutData.infoBlock.isAddressSame(true);
@@ -517,6 +589,10 @@ define(
 
             fullFillBillingForm: function () {
                 let self = this;
+
+                // self.source.trigger('billingAddress.data.clearError');
+                // self.source.set('params.invalid', false);
+
                 if (self.checkoutData.address && self.checkoutData.address.billing) {
                     let address = self.checkoutData.address.billing;
                     self.startLoader();
@@ -524,7 +600,7 @@ define(
                     let setDataToBillingAddressFrom = setInterval(function () {
                         let form = $('#billing-new-address-form');
 
-                        if ($('#billing-new-address-form input[name="firstname"]').length) {
+                        if ($('#billing-new-address-form select[name="country_id"]').length) {
                             $.each(self.addressFields, function (id,key) {
                                 if (address[key]) {
                                     if (key == 'prefix' || key == 'countryId' || key == 'regionId') {
@@ -534,30 +610,43 @@ define(
                                         if (key === 'regionId') name = 'region_id';
                                         let select = form.find('select[name="'+name+'"]');
 
-                                        if (!select.hasClass('selectized')) {
-                                            if(typeof select.selectize({})[0] != 'undefined'){
-                                                select.selectize({})[0].selectize.refreshOptions(false);
+                                        try {
+                                            if(key == 'countryId') {
+                                                let countryCode = form.find('select[name="country_id"] option:selected').val();
+                                                if(countryCode.length && address[key] !== countryCode) {
+                                                    form.find('select[name="region_id"]').data('selectize').clearOptions();
+                                                } else {
+                                                    form.find('select[name="country_id"]').trigger('change');
+                                                }
                                             }
-                                        } else {
-                                            select.selectize({})[0].selectize.refreshOptions(false);
+
+                                            if(key == 'regionId' && address[key]) {
+                                                let options = form.find('select[name="region_id"] option');
+                                                if(options.length) {
+                                                    options.each(function () {
+                                                        if($(this).val() && $(this).text()) {
+                                                            form.find('select[name="region_id"]').data('selectize').addOption({'value': $(this).val(), 'text' : $(this).text()});
+                                                        }
+                                                    })
+                                                }
+                                            }
+
+                                            select.data('selectize').setValue(address[key]);
+                                        }catch (e) {
+                                            console.log(e);
                                         }
-
-                                        let control = select.closest('.field')
-                                        control.find('.selectize-dropdown-content .option[data-value="'+address[key]+'"]').trigger('click');
-
-                                        control.find('.selectize-dropdown-content .option[data-value="'+address[key]+'"]').trigger('click');
-                                    }else if (key === 'street') {
+                                    } else if (key === 'street') {
                                         // In case street line 2's value in the new address is empty: Remove street line 2 value
                                         // In case street line 2's value in the new address is not empty: the each below will replace the old one
-                                        if (form.find('input[name="street[1]"]').length && form.find('input[name="street[1]"]').val()) {
-                                            form.find('input[name="street[1]"]').val('').trigger('change');
-                                        }
+                                        // if (form.find('input[name="street[1]"]').length && form.find('input[name="street[1]"]').val()) {
+                                        //     form.find('input[name="street[1]"]').val('').trigger('change');
+                                        // }
 
                                         $.each(address[key], function (number,value) {
                                             if (form.find('input[name="street['+number+']"]').length) {
                                                 let control = form.find('input[name="street['+number+']"]').closest('.control');
 
-                                                if (!control.hasClass('focus')) {
+                                                if (value && !control.hasClass('focus')) {
                                                     control.addClass('focus');
                                                 }
 
@@ -603,8 +692,13 @@ define(
 
                                         let control = select.closest('.field')
                                         control.find('.selectize-dropdown-content .option[data-value="'+value+'"]').trigger('click');
-                                    } if (form.find('input[name="' + key + '"]').length) {
-                                        form.find('input[name="' + key + '"]').val('').trigger('change');
+                                    } else if (form.find('input[name="' + key + '"]').length) {
+                                        let customerData = customer.customerData, val = '';
+                                        if((key === 'firstname' || key === 'lastname') && customerData[key]) val = customerData[key];
+
+                                        form.find('input[name="' + key + '"]').val(val).trigger('change');
+                                        self.toggleInput(form.find('input[name="' + key + '"]'));
+
                                     } else if (form.find('select[name="' + key + '"]').length) {
                                         if (form.find('select[name="' + key + '"] option[value=""]').length) {
                                             form.find('select[name="' + key + '"] option[value=""]').prop('selected', true);
@@ -617,7 +711,7 @@ define(
                         }
                     },500);
                 }
-                self.source.set('params.invalid', false);
+                //self.source.set('params.invalid', false);
             },
 
             onAddressChange: function (addressId) {
@@ -643,33 +737,23 @@ define(
                     let newBillingAddressInterval = setInterval(function () {
                         let newBillingAddress = $('#billing-new-address-form');
                         if (newBillingAddress.length) {
-                            if (newBillingAddress.find('select[name="country_id"]').length && newBillingAddress.find('select[name="region_id"]').length) {
-
-                                $.each(self.addressFields, function (id,key) {
-                                    if (newBillingAddress.find('input[name="'+key+'"]').length) {
-                                        newBillingAddress.find('input[name="'+key+'"]').val('').trigger('change');
-                                        newBillingAddress.find('input[name="'+key+'"]').closest('.control.focus').removeClass('focus');
-                                    }
-                                });
-
-                                newBillingAddress.find('input[name="street[0]"]').val('').trigger('change');
-                                newBillingAddress.find('input[name="street[0]"]').closest('.control.focus').removeClass('focus');
-                                newBillingAddress.find('input[name="street[1]"]').val('').trigger('change');
-                                newBillingAddress.find('input[name="street[1]"]').closest('.control.focus').removeClass('focus');
-
-                                let country_id = newBillingAddress.find('select[name="country_id"]');
-                                let region_id = newBillingAddress.find('select[name="region_id"]');
-                                country_id.selectize({})[0].selectize.clear(true);
-                                region_id.selectize({})[0].selectize.clear(true);
-                                newBillingAddress.find('.control.focus').removeClass('focus');
-
+                            let country_id = newBillingAddress.find('select[name="country_id"]'),
+                                region_id = newBillingAddress.find('select[name="region_id"]');
+                            if (country_id.length && region_id.length) {
+                                newBillingAddress.find('.field').removeClass('_error');
+                                newBillingAddress.find('.control').removeClass('focus');
+                                newBillingAddress.find('input').val('');
+                                region_id.data('selectize').clear(true); country_id.data('selectize').clear(true);
+                                if(customer.isLoggedIn()) {
+                                    iwdOpcAddressManager.setCustomerData(newBillingAddress, customer);
+                                }
                                 clearInterval(newBillingAddressInterval);
                                 self.stopLoader(100);
                             }
                         }
                     },500);
                 }
-                self.source.set('params.invalid', false);
+                //self.source.set('params.invalid', false);
                 self.stopLoader(1000);
             },
 
@@ -713,7 +797,7 @@ define(
                         self.validateAddressTimeout = setTimeout(function () {
                             if (!self.isAddressSameAsShipping() || self.isBillingFormFirst()) {
                                 if (self.postcodeValidation()) {
-                                    if (self.validateFields(false)) {
+                                    if (self.validateFields(true)) {
                                         self.setBillingAddress();
                                     }
                                 }
@@ -750,7 +834,9 @@ define(
                 return validationResult;
             },
 
-            validateFields: function (showErrors) {
+            validateFields: function (element, showErrors) {
+                if(!this.isAddressSameAsShipping() && !quote.isVirtual()) return false;
+
                 showErrors = showErrors || false;
                 var self = this;
                 if (!this.isAddressFormVisible()) {
@@ -765,6 +851,12 @@ define(
                 }
 
                 if (!this.source.get('params.invalid')) {
+
+                    if(quote.isVirtual() && quote.billingAddress() && quote.billingAddress().customerAddressId) {
+                        //not needed to save address like new, we will save address with address id what we have in quote.billingAddress()
+                        return true;
+                    }
+
                     var addressData = this.source.get(this.dataScopePrefix),
                         newBillingAddress;
 
@@ -776,12 +868,14 @@ define(
                     checkoutData.setNewCustomerBillingAddress(addressData);
                     return true;
                 } else {
+                    if(quote.isVirtual()) showErrors = true;
                     if (!showErrors && this.canHideErrors) {
                         var billingAddress = this.source.get(this.dataScopePrefix);
                         billingAddress = _.extend({
                             region_id: '',
                             region_id_input: '',
-                            region: ''
+                            region: '',
+                            postcode: ''
                         }, billingAddress);
                         _.each(billingAddress, function (value, index) {
                             self.hideErrorForElement(value, index);

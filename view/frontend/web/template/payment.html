@@ -97,14 +97,14 @@
     </div>
     <!-- ko if: (isMultiStepResolution() && quoteIsVirtual) -->
         <div class="iwd_opc_universal_wrapper multistep">
-            <div class="step-back" data-bind="click: goToBillingVirtualStep">
+            <div class="step-back js-send-event-to-ga" data-bind="click: goToBillingVirtualStep" data-ga-event-action="Payment" data-ga-event-label="Edit Address">
                 <!-- ko i18n: 'Back to edit address' --><!-- /ko -->
             </div>
         </div>
     <!-- /ko -->
     <!-- ko if: (isMultiStepResolution() && !quoteIsVirtual) -->
         <div class="iwd_opc_universal_wrapper multistep">
-            <div class="step-back" data-bind="click: goToDeliveryStep">
+            <div class="step-back js-send-event-to-ga" data-bind="click: goToDeliveryStep" data-ga-event-action="Payment" data-ga-event-label="Change Delivery Method">
                 <!-- ko i18n: 'Back to edit delivery method' --><!-- /ko -->
             </div>
         </div>

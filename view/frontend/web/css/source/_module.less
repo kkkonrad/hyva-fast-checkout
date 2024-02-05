@@ -30,44 +30,77 @@
             position: relative;
             z-index: 102;
 
+            //.breadcrumbs {
+            //    padding: 0;
+            //    margin: 0;
+            //    display: inline-block;
+            //
+            //    .breadcrumbs__item {
+            //        position: relative;
+            //        margin-right: 12px;
+            //        padding-right: 15px;
+            //        list-style: none;
+            //        float: left;
+            //        text-decoration: underline;
+            //        color: #5185db;
+            //        cursor: pointer;
+            //
+            //        &.active {
+            //            color: #333333;
+            //        }
+            //        &:after {
+            //            content: "\F105";
+            //            position: absolute;
+            //            top: 50%;
+            //            right: 0;
+            //            transform: translateY(-50%);
+            //            font-size: 14px;
+            //            font-family: FontAwesome,sans-serif;
+            //            color: #909090;
+            //        }
+            //        &:last-child {
+            //            margin: 0;
+            //            padding: 0;
+            //
+            //            &:after {
+            //                content: '';
+            //            }
+            //        }
+            //        &:hover {
+            //            text-decoration: none;
+            //        }
+            //    }
+            //}
             .breadcrumbs {
-                padding: 0;
-                margin: 0;
-                display: inline-block;
+                padding: 0 60px;
+                margin: 0 0 25px 0;
+                display: block;
+                text-align: center;
 
                 .breadcrumbs__item {
                     position: relative;
-                    margin-right: 12px;
-                    padding-right: 15px;
                     list-style: none;
-                    float: left;
-                    text-decoration: underline;
-                    color: #5185db;
+                    display: inline-block;
                     cursor: pointer;
+                    text-decoration: none;
+                    font-size: 14px;
+                    text-align: center;
+                    width: calc(~'30% - 14px');
+                    margin: 0 6px 0 6px !important;
+                    padding: 4px 0;
 
                     &.active {
-                        color: #333333;
+                        font-weight: 600;
                     }
                     &:after {
-                        content: "\F105";
+                        content: "";
                         position: absolute;
-                        top: 50%;
+                        width: 100%;
+                        height: 4px;
+                        bottom: -4px;
+                        left: 0;
                         right: 0;
-                        transform: translateY(-50%);
-                        font-size: 14px;
-                        font-family: FontAwesome,sans-serif;
-                        color: #909090;
-                    }
-                    &:last-child {
-                        margin: 0;
-                        padding: 0;
-
-                        &:after {
-                            content: '';
-                        }
-                    }
-                    &:hover {
-                        text-decoration: none;
+                        margin: auto;
                     }
                 }
             }
@@ -216,14 +249,60 @@
             z-index: 1;
         }
 
-        div.control {
-            .selectize-input {
-                max-height: 50px !important;
-                line-height: 35px;
+        input[type="email"] {
+            &.mage-error {
+                border-color: #ed8380;
 
-                input{
-                    padding: 0 14px;
-                    min-height: 50px !important;
+                & ~ .mage-error {
+                    &::before {
+                        margin-right: 9px;
+                        content: "\F06A";
+                        font-family: FontAwesome,sans-serif;
+                        font-size: 11px;
+                    }
+                }
+            }
+        }
+
+        .field-select-shipping,
+        .field-select-billing {
+            div.control {
+                .selectize-input {
+                    input {
+                        display: none !important;
+                    }
+                }
+            }
+        }
+        div.control {
+            .selectize-control {
+                cursor: pointer;
+                max-height: 50px;
+
+                .selectize-input {
+                    max-height: 50px !important;
+                    line-height: 35px;
+                    padding: 0;
+
+                    input{
+                        padding: 0 14px;
+                        min-height: 50px !important;
+                    }
+
+                    &.dropdown-active {
+                        position: relative;
+                        z-index: 1;
+                        pointer-events: none;
+
+                        &:after {
+                            content: '\f106';
+                            z-index: 100;
+                        }
+                    }
+
+                    .item {
+                        padding-right: 30px;
+                    }
                 }
             }
         }
@@ -415,6 +494,7 @@
             position: relative;
             height: 50px;
             width: 100%;
+            clear: both;
 
             .opc-block-summary-manage-button{
                 cursor: pointer;
@@ -1263,7 +1343,7 @@
                                         position: absolute;
                                         pointer-events: none;
                                         left: 15px;
-                                        top: 38px;
+                                        top: 35px;
                                         transition: 0.2s ease all;
                                         display: -webkit-box;
                                         -webkit-line-clamp: 1;
@@ -1271,8 +1351,8 @@
                                         overflow: hidden;
                                     }
                                 }
-                                .control.focus{
-                                    .floating-span{
+                                .control.focus {
+                                    & > .floating-span {
                                         top: 25px;
                                         left: 15px;
                                         font-size: 12px;
@@ -1345,7 +1425,7 @@
                             position: absolute;
                             pointer-events: none;
                             left: 15px;
-                            top: 17px;
+                            top: 15px;
                             transition: .2s ease all;
                         }
                     }
@@ -1500,6 +1580,8 @@
             float: left;
         }
 
+        .field[name='billingAddressshared.region'],
+        .field[name='billingAddressshared.region_id'],
         .field[name='billingAddress.region'],
         .field[name='billingAddress.region_id'],
         .field[name='shippingAddress.region_id'],
@@ -1511,15 +1593,19 @@
                 }
             }
         }
+        .field[name='billingAddress.country_id'],
+        .field[name='billingAddressshared.country_id'],
+        .field[name='shippingAddress.country_id'],
         .field[name='billingAddress.region_id'],
+        .field[name='billingAddressshared.region_id'],
         .field[name='shippingAddress.region_id'] {
             .control {
                 .selectize-control {
                     .selectize-input {
                         &.items {
-                            &.not-full:not(.input-active) {
+                            &:not(.full):not(.input-active) {
                                 &::before {
-                                    padding: 7px 10px;
+                                    padding: 7px 14px;
                                     content: 'Select a State *';
                                     display: -webkit-box;
                                     -webkit-line-clamp: 1;
@@ -1531,6 +1617,23 @@
                                 input::placeholder {
                                     display: none;
                                     opacity: 0;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .field[name='billingAddressshared.country_id'],
+        .field[name='billingAddress.country_id'],
+        .field[name='shippingAddress.country_id'] {
+            .control {
+                .selectize-control {
+                    .selectize-input {
+                        &.items {
+                            &:not(.full):not(.input-active) {
+                                &::before {
+                                    content: 'Select a Country *';
                                 }
                             }
                         }
@@ -1788,15 +1891,22 @@
 
             #maincontent{
                 .columns{
-                    #checkout{
-                        .iwd_opc_alternative_wrapper{
-                            display: flex;
-                            flex-wrap: wrap;
+                    .opc-wrapper {
+                        width: 100%;
+                        padding: 0;
 
-                            .opc-wrapper{
-                                width: 100%;
-                                padding: 0;
-                                order: inherit;
+                        #checkout{
+                            .iwd_opc_alternative_wrapper{
+                                .iwd_opc_two_column_wrapper {
+                                    display: flex;
+                                    flex-wrap: wrap;
+
+                                    .opc-wrapper{
+                                        width: 100%;
+                                        padding: 0;
+                                        order: inherit;
+                                    }
+                                }
                             }
                         }
                     }
@@ -1869,6 +1979,27 @@
             padding-left: 25px;
             padding-right: 25px;
         }
+
+        .secure {
+            .breadcrumbs {
+                display: block;
+                padding: 0;
+
+                .breadcrumbs__item {
+                    width: 30%;
+                    margin: 0 5px !important;
+
+                    &:first-child {
+                        margin-left: 0 !important;
+                    }
+
+                    &:last-child {
+                        margin-right: 0 !important;
+                    }
+                }
+            }
+        }
+
         #iwd_opc_login{
             width: 100%;
         }
@@ -2074,4 +2205,16 @@ input#credit-card-number{
 
 .onepage-index-index .iwd_main_wrapper .iwd_opc_alternative_wrapper .iwd_opc_alternative_column .iwd_opc_column_content #billing-new-address-form div[name="billingAddress.region"].field .control .floating-span:not(.set-region){
     display: none ;
+}
+
+.onepage-index-index input[name="billing-country-id"],
+.onepage-index-index input[name="billing-region-id"],
+.onepage-index-index input[name="shipping-country-id"],
+.onepage-index-index input[name="shipping-region-id"] {
+    opacity: 0;
+    position: absolute;
+}
+
+.onepage-index-index .iwdHide {
+    display: none !important;
 }

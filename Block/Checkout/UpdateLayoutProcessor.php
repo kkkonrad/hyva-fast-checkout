@@ -431,8 +431,9 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
                                                             'placeholder' => __('Select Country *'),
                                                             'config' => [
                                                                 'template' => 'IWD_Opc/form/field',
-                                                                'additionalClasses' => 'float-left wd30-66 mr4'
-                                                            ]
+                                                                'additionalClasses' => 'float-left wd30-66 mr4',
+                                                            ],
+                                                            'validation' => ['required-entry' => true],
 
                                                         ],
                                                         'region' => [
@@ -477,7 +478,8 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
                                                                 'tooltip' => false,
                                                                 'template' => 'IWD_Opc/form/field',
                                                                 'additionalClasses' => 'float-left wd30-66 mr4',
-                                                            ]
+                                                            ],
+                                                            'validation' => ['required-entry' => true, 'phone' => true],
                                                         ],
                                                         'company' => [
                                                             'visible' => false,
@@ -846,23 +848,26 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
             $fieldConfig['label'] = new \Magento\Framework\Phrase('Select Country *');
             $fieldConfig['sortOrder'] = '40';
             $fieldConfig['placeholder'] = __('Select Country *');
+            $fieldConfig['component'] = 'IWD_Opc/js/form/billing-address/element/select';
             $fieldConfig['config']['template'] = 'IWD_Opc/form/field';
+            $fieldConfig['config']['elementTmpl'] = 'IWD_Opc/form/billing-address/element/select';
             $fieldConfig['config']['additionalClasses'] = 'float-left wd30-66 mr4';
+            $fieldConfig['validation']['required-entry'] = true;
         } else if ($fieldCode === 'region') {
             $fieldConfig['label'] = new \Magento\Framework\Phrase('');
             $fieldConfig['visible'] = false;
             $fieldConfig['sortOrder'] = '50';
-            $fieldConfig['config']['template'] = 'IWD_Opc/form/field';
+            $fieldConfig['config']['template'] = 'IWD_Opc/form/field-region';
             $fieldConfig['config']['additionalClasses'] = 'float-left wd30-66 mr4';
             $fieldConfig['config']['elementTmpl'] = 'IWD_Opc/form/element/input';
         } else if ($fieldCode === 'region_id') {
             $fieldConfig['label'] = new \Magento\Framework\Phrase('');
             $fieldConfig['sortOrder'] = '50';
             $fieldConfig['placeholder'] = __('');
-            $fieldConfig['component'] = 'Magento_Ui/js/form/element/region';
-            $fieldConfig['config']['template'] = 'IWD_Opc/form/field';
-            $fieldConfig['config']['elementTmpl'] = 'ui/form/element/select';
-            $fieldConfig['config']['customEntry'] = 'billingAddress.region';
+            $fieldConfig['component'] = 'IWD_Opc/js/form/element/region';
+            $fieldConfig['config']['template'] = 'IWD_Opc/form/field-region';
+            $fieldConfig['config']['elementTmpl'] = 'IWD_Opc/form/element/select';
+            $fieldConfig['config']['customEntry'] = 'billingAddressshared.region';
             $fieldConfig['config']['additionalClasses'] = 'float-left wd30-66 mr4';
             $fieldConfig['validation']['required-entry'] = true;
             $fieldConfig['filterBy']['target'] = '${ $.provider }:${ $.parentScope }.country_id';
@@ -891,6 +896,7 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
             $fieldConfig['config']['template'] = 'IWD_Opc/form/field';
             $fieldConfig['config']['elementTmpl'] = 'IWD_Opc/form/element/input';
             $fieldConfig['config']['additionalClasses'] = 'float-left wd30-66 mr4';
+            $fieldConfig['validation'] = ['required-entry' => true, 'phone' => true];
         } else if ($fieldCode === 'company') {
             $fieldConfig['visible'] = false;
         } else if ($fieldCode === 'fax') {
@@ -1159,7 +1165,7 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
         $this->setComponent($placeOrderButton);
     }
 
-    private function reconstructionOpc(){
+    public function reconstructionOpc(){
         $movePosition = [
             'components' => [
                 'checkout' => [

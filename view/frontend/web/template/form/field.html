@@ -14,11 +14,11 @@
             <span data-bind="text: element.error"></span>
         </div>
 
-        <!-- ko if: (element.dataScope == 'shippingAddress.region_id' || element.dataScope == 'billingAddress.region_id') -->
+        <!-- ko if: (element.dataScope == 'shippingAddress.region_id' || element.dataScope == 'billingAddress.region_id' || element.dataScope == 'billingAddressshared.region_id') -->
             <span class="floating-span select-state" data-bind="text: $t('Select a State *')"></span>
         <!-- /ko -->
 
-        <!-- ko if: (element.dataScope == 'shippingAddress.region' || element.dataScope == 'billingAddress.region') -->
+        <!-- ko if: (element.dataScope == 'shippingAddress.region' || element.dataScope == 'billingAddress.region' || element.dataScope == 'billingAddressshared.region') -->
             <span class="floating-span set-region" data-bind="text: $t('State / Province / Region')"></span>
         <!-- /ko -->
 

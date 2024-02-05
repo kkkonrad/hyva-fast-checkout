@@ -60,7 +60,7 @@ class IsAllowedGuestCheckoutObserver extends \Magento\Downloadable\Observer\IsAl
             if (($product = $item->getProduct())
                 && $product->getTypeId() == \Magento\Downloadable\Model\Product\Type::TYPE_DOWNLOADABLE
             ) {
-                $result->setIsAllowed(true);
+                $result->setIsAllowed(false);
                 break;
             }
         }

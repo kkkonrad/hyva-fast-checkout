@@ -1,3 +1,7 @@
+<!-- ko if: (inputName == 'country_id') -->
+    <span class="floating-span set-country" data-bind="text: $t('Select a Country *')"></span>
+<!-- /ko -->
+
 <select 2 class="select" data-bind="
     attr: {
         name: inputName,
@@ -19,3 +23,7 @@
             ko.applyBindingsToNode(option, {attr: {disabled: true}}, item);
         }
     }"></select>
+<!-- ko if: (inputName == 'country_id') -->
+    <input type="text" name="billing-country-id" autocomplete="country-name" selector=".billing-address-form [name='country_id']">
+    <input type="text" name="billing-region-id" autocomplete="address-level1" selector=".billing-address-form [name='region_id']">
+<!-- /ko -->

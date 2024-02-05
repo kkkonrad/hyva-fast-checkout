@@ -1021,7 +1021,7 @@ define(['iwdOpcSelectize', 'jquery', 'underscore', 'uiRegistry'], function (sele
                 onChange: function() {
                     var value = this.$input.val(),
                         changed = this.$input.html(),
-                        elements = $("select[name='" + this.$input.attr('name') +"']");
+                        elements = $("select#" + this.$input.attr('id'));
 
                     this.$input.val('');
                     this.$input.val(value);

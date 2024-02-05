@@ -15,6 +15,11 @@
                     <!-- /ko -->
                 <!-- /ko -->
             </table>
+            <!-- ko ifnot: rates().length -->
+            <div role="alert" class="message notice no-rates-available">
+                <div data-bind="i18n: 'The shipping methods are currently unavailable. Enter your full address to see shipping costs or contact us to  get assistance.'"></div>
+            </div>
+            <!-- /ko -->
         </div>
         <div id="onepage-checkout-shipping-method-additional-load">
             <each args="getRegion('shippingAdditional')" render="" >

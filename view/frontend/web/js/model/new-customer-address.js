@@ -18,6 +18,10 @@ define([
             regionId = window.checkoutConfig.defaultRegionId || undefined;
         }
 
+        if(typeof addressData.custom_attributes == 'string' && !addressData.custom_attributes.length) {
+            delete addressData['custom_attributes'];
+        }
+
         return {
             email: addressData.email,
             countryId: addressData['country_id'] || addressData.countryId || window.checkoutConfig.defaultCountryId,

@@ -10,8 +10,11 @@ define([
     'Magento_Checkout/js/checkout-data',
     'IWD_Opc/js/model/login/messageList',
     'mage/translate',
-    'mage/validation'
-], function ($, Component, registry, ko, checkEmailAvailability, loginAction, resetAction, quote, checkoutData, messageContainer, $t) {
+    'mage/validation',
+    'mage/storage',
+    'Magento_Checkout/js/model/url-builder',
+    'IWD_Opc/js/ga4Events'
+], function ($, Component, registry, ko, checkEmailAvailability, loginAction, resetAction, quote, checkoutData, messageContainer, $t, $v, storage, urlBuilder, ga4Events) {
     'use strict';
 
     var validatedEmail = checkoutData.getValidatedEmailValue();
@@ -73,9 +76,7 @@ define([
         },
 
         onCustomerEmailChange: function() {
-            if($('body').hasClass('ajax-loading')) {
-                return true;
-            }
+            if(!quote.isCustomerLoggedIn() && !quote.guestEmail) return true;
 
             let self = this,customerData = {};
             self.emailHasChanged();
@@ -103,6 +104,7 @@ define([
             this.emailCheckTimeout = setTimeout(function () {
                 if (self.validateEmail()) {
                     self.checkEmailAvailability();
+                    self.showPasswordFieldForCustomer();
                 } else {
                     self.isPasswordVisible(false);
                     checkoutData.setIsPasswordVisible(false);
@@ -120,14 +122,34 @@ define([
             this.checkRequest = checkEmailAvailability(this.isEmailCheckComplete, this.email());
 
             $.when(this.isEmailCheckComplete).done(function () {
-                self.isPasswordVisible(false);
-                checkoutData.setIsPasswordVisible(false);
+                //Waiting Email Check Complete
+                // Do nothing
             }).fail(function () {
-                //self.isPasswordVisible(true);
-                //checkoutData.setIsPasswordVisible(true);
+                //Waiting Email Check Complete
+                // Do nothing
             }).always(function () {
                 self.isLoading(false);
             });
+        },
+
+        showPasswordFieldForCustomer: function () {
+            var self = this;
+            let response = storage.post(
+                    urlBuilder.createUrl('/customers/isEmailAvailable', {}),
+                    JSON.stringify({customerEmail: self.email()}),
+                    false
+                );
+
+            $.when(response)
+                .done(function (isEmailAvailable) {
+                    if (isEmailAvailable) {
+                        self.isPasswordVisible(false);
+                        checkoutData.setIsPasswordVisible(false);
+                    } else {
+                        self.isPasswordVisible(true);
+                        checkoutData.setIsPasswordVisible(true);
+                    }
+                }).fail(function () { console.log('showPasswordFieldForCustomer fail') })
         },
 
         validateRequest: function () {
@@ -140,8 +162,11 @@ define([
         validateEmail: function (focused) {
             var loginFormSelector = 'form[data-role=email-with-possible-login]',
                 usernameSelector = loginFormSelector + ' input[name=username]',
-                loginForm = $(loginFormSelector),
-                validator;
+                loginForm = $(loginFormSelector);
+
+            if(typeof focused !== 'undefined' && !$(usernameSelector).val()) {
+                return true;
+            }
 
             loginForm.validation();
 
@@ -163,6 +188,7 @@ define([
 
             if (self.validateEmail()) {
                 self.isLoading(true);
+                ga4Events.recoverPasswordEvent();
                 resetAction(resetData, undefined, undefined, messageContainer).always(function () {
                     self.isLoading(false);
                 });
@@ -179,7 +205,10 @@ define([
             });
 
             if (this.isPasswordVisible() && $(loginForm).validation() && $(loginForm).validation('isValid')) {
+                ga4Events.loginEvent();
                 loginAction(loginData, undefined, undefined, messageContainer, self);
+            } else {
+                ga4Events.failedLoginEvent();
             }
         }
     });

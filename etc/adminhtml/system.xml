@@ -96,24 +96,6 @@
                     <backend_model>IWD\Opc\Model\Config\Backend\RestrictPayment</backend_model>
                 </field>
             </group>
-            <group id="ga_ab_test" translate="label" type="text"
-                   sortOrder="5" showInDefault="1" showInWebsite="1" showInStore="1">
-                <label>Google Analytics Web Experiments</label>
-                <field id="enable" translate="label comment" type="select"
-                       sortOrder="1" showInDefault="1" showInWebsite="1" showInStore="1">
-                    <label>Enable?</label>
-                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
-                    <comment><![CDATA[To use Google Analytics Web Experiments you should enable and configure Google Analytics for your website in "System/Sales/Google API". Also, you should configure 2 variants(pages) of experiment: "Native checkout page" - original page(with url "@your_store_url@/checkout") and "IWD Checkout Page"(with url "@your_store_url@/onepage").]]></comment>
-                </field>
-                <field id="code" translate="label comment" type="textarea"
-                       sortOrder="2" showInDefault="1" showInWebsite="1" showInStore="1">
-                    <label>Google Analytics Experiment code</label>
-                    <comment><![CDATA[You will get this code after experiment registered in Google Analytics account]]></comment>
-                    <depends>
-                        <field id="enable">1</field>
-                    </depends>
-                </field>
-            </group>
             <group id="design" translate="label" type="text"
                    sortOrder="6" showInDefault="1" showInWebsite="1" showInStore="1">
                 <label>Customize Checkout Design</label>
@@ -135,11 +117,11 @@
                         <label>Design for Mobile Resolution</label>
                         <source_model>IWD\Opc\Block\Adminhtml\System\Config\Layout\Resolution\Mobile</source_model>
                     </field>
-                    <field id="address_type_order" translate="label" type="select"
-                           sortOrder="4" showInDefault="1" showInWebsite="1" showInStore="1">
-                        <label>Address Forms Order</label>
-                        <source_model>IWD\Opc\Block\Adminhtml\System\Config\Layout\Address\FormOrder</source_model>
-                    </field>
+<!--                    <field id="address_type_order" translate="label" type="select"-->
+<!--                           sortOrder="4" showInDefault="1" showInWebsite="1" showInStore="1">-->
+<!--                        <label>Address Forms Order</label>-->
+<!--                        <source_model>IWD\Opc\Block\Adminhtml\System\Config\Layout\Address\FormOrder</source_model>-->
+<!--                    </field>-->
                 </group>
                 <group id="style" translate="label" type="text"
                        sortOrder="2" showInDefault="1" showInWebsite="1" showInStore="1">
@@ -213,6 +195,46 @@
                         <comment><![CDATA[This color will be applied to Secondary Action Buttons Text.<br/>
                                     Ex: Log In, Reset, Apply a Promo Code.]]></comment>
                     </field>
+                    <group id="breadcrumbs" translate="label" type="text"
+                           sortOrder="12" showInDefault="1" showInWebsite="1" showInStore="1">
+                        <label>Breadcrumbs</label>
+                        <field id="item_color" translate="label" type="text"
+                               sortOrder="1" showInDefault="1" showInWebsite="1" showInStore="1">
+                            <label>Item Text Color</label>
+                            <frontend_model>IWD\Opc\Block\Adminhtml\System\Config\Style\ColorPicker</frontend_model>
+                            <comment><![CDATA[This color will be applied to item text.]]></comment>
+                        </field>
+                        <field id="item_background" translate="label" type="text"
+                               sortOrder="2" showInDefault="1" showInWebsite="1" showInStore="1">
+                            <label>Item Arrow Color</label>
+                            <frontend_model>IWD\Opc\Block\Adminhtml\System\Config\Style\ColorPicker</frontend_model>
+                            <comment><![CDATA[This color will be applied to arrow under text.]]></comment>
+                        </field>
+                        <field id="active_item_color" translate="label" type="text"
+                               sortOrder="3" showInDefault="1" showInWebsite="1" showInStore="1">
+                            <label>Active Item Text Color</label>
+                            <frontend_model>IWD\Opc\Block\Adminhtml\System\Config\Style\ColorPicker</frontend_model>
+                            <comment><![CDATA[This color will be applied to active item text.]]></comment>
+                        </field>
+                        <field id="active_item_background" translate="label" type="text"
+                               sortOrder="4" showInDefault="1" showInWebsite="1" showInStore="1">
+                            <label>Active Item Arrow Color</label>
+                            <frontend_model>IWD\Opc\Block\Adminhtml\System\Config\Style\ColorPicker</frontend_model>
+                            <comment><![CDATA[This color will be applied to arrow under text with active step.]]></comment>
+                        </field>
+                        <field id="completed_item_color" translate="label" type="text"
+                               sortOrder="5" showInDefault="1" showInWebsite="1" showInStore="1">
+                            <label>Completed Item Text Color</label>
+                            <frontend_model>IWD\Opc\Block\Adminhtml\System\Config\Style\ColorPicker</frontend_model>
+                            <comment><![CDATA[This color will be applied to completed item text.]]></comment>
+                        </field>
+                        <field id="completed_item_background" translate="label" type="text"
+                               sortOrder="6" showInDefault="1" showInWebsite="1" showInStore="1">
+                            <label>Completed Item Arrow Color</label>
+                            <frontend_model>IWD\Opc\Block\Adminhtml\System\Config\Style\ColorPicker</frontend_model>
+                            <comment><![CDATA[This color will be applied to arrow under text with completed step.]]></comment>
+                        </field>
+                    </group>
                 </group>
             </group>
         </section>

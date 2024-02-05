@@ -1,0 +1,12 @@
+<?php
+/**
+ * @var $block IWD\Opc\Block\Checkout\GA
+ */
+?>
+
+<script>
+    if(typeof window.checkoutData == 'undefined') window.checkoutData = {};
+
+    window.checkoutData.ga4 = JSON.parse('<?= \Laminas\Json\Json::encode($block->getGa4()) ?>');
+    window.checkoutData.cart = JSON.parse('<?= \Laminas\Json\Json::encode($block->getCart()) ?>');
+</script>

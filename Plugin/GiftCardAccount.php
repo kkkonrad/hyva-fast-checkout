@@ -38,7 +38,7 @@ class GiftCardAccount
      */
     public function afterAddToCart($subject, $result)
     {
-        if ($this->opcHelper->isEnable() && $this->opcHelper->isCheckoutDesign()) {
+        if ($this->opcHelper->isEnable()) {
             $quote = $this->checkoutSession->getQuote();
             if ($quote) {
                 $website = $this->storeManager->getStore($quote->getStoreId())->getWebsite();

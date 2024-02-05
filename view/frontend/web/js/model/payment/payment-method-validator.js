@@ -8,28 +8,21 @@ define(
 
         return {
             validate: function () {
-                return true;
-                var $coPaymentForm = $('#co-payment-form');
-                var paymentMethodSelected = $coPaymentForm.validate({
-                    errorClass: 'mage-error',
-                    errorElement: 'div',
-                    meta: 'validate'
-                }).element($('#iwd_opc_payment_method_select'));
-                var paymentMethodFormValid = true;
-                if (paymentMethodSelected) {
-                    var activeForm = $coPaymentForm.find('.payment-method._active form:not(.co-billing-form)').first();
-                    if (activeForm.length) {
-                        activeForm.validate({
-                            errorClass: 'mage-error',
-                            errorElement: 'div',
-                            meta: 'validate'
-                        });
-                        activeForm.validation();
-                        paymentMethodFormValid = activeForm.validation('isValid');
-                    }
+                var $coPaymentForm = $('#co-payment-form'),
+                    paymentMethodFormValid = true;
+
+                var activeForm = $coPaymentForm.find('.payment-method._active form:not(.co-billing-form)').first();
+                if (activeForm.length) {
+                    activeForm.validate({
+                        errorClass: 'mage-error',
+                        errorElement: 'div',
+                        meta: 'validate'
+                    });
+                    activeForm.validation();
+                    paymentMethodFormValid = activeForm.validation('isValid');
                 }
 
-                return paymentMethodSelected && paymentMethodFormValid;
+                return paymentMethodFormValid;
             }
         };
     }

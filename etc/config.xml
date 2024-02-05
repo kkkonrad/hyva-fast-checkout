@@ -21,9 +21,6 @@
             <restrict_payment>
                 <enable>0</enable>
             </restrict_payment>
-            <ga_ab_test>
-                <enable>0</enable>
-            </ga_ab_test>
             <design>
                 <layout>
                     <desktop>onepage</desktop>
@@ -43,6 +40,14 @@
                     <primary_btn_text_color>FFFFFF</primary_btn_text_color>
                     <secondary_btn_background>333333</secondary_btn_background>
                     <secondary_btn_text_color>FFFFFF</secondary_btn_text_color>
+                    <breadcrumbs>
+                        <item_color>707070</item_color>
+                        <item_background>AFAFAF</item_background>
+                        <active_item_color>151515</active_item_color>
+                        <active_item_background>9D1DE3</active_item_background>
+                        <completed_item_color>151515</completed_item_color>
+                        <completed_item_background>151515</completed_item_background>
+                    </breadcrumbs>
                 </style>
             </design>
         </iwd_opc>

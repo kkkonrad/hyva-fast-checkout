@@ -113,7 +113,7 @@ class QuoteSubmitSuccess implements ObserverInterface
             $this->assignOrderToCustomer($order, $customer);
         }
 
-        if ($this->opcHelper->isEnable() && $this->opcHelper->isCheckoutDesign()) {
+        if ($this->opcHelper->isEnable()) {
             if ($this->opcHelper->isLoginAccountCreationEnabled()
                 && !$this->customerSession->isLoggedIn()
                 && !is_array($customerCandidate)
@@ -144,7 +144,7 @@ class QuoteSubmitSuccess implements ObserverInterface
                 $this->saveDownloadableOrderItemObserver->execute($observer);
 
                 /* Assign Customer to Downloadable product links */
-                if($customer->getId() && $link = $this->downloadLink->create()->load($item->getId(), 'order_item_id')){
+                if(isset($customer) && $customer->getId() && $link = $this->downloadLink->create()->load($item->getId(), 'order_item_id')){
                     $link->setCustomerId($customer->getId());
                     $link->save();
                 }

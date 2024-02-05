@@ -177,3 +177,13 @@ $opcHelper = $block->opcHelper;
         </div>
     </div>
 </div>
+
+<!-- GA4 -->
+<script>
+    require([
+        'jquery',
+        'IWD_Opc/js/ga4Events'
+    ], function ($, ga4Events) {
+        ga4Events.purchaseEvent('<?= \Laminas\Json\Json::encode($block->getOrderDetailsForGa4()) ?>');
+    })
+</script>

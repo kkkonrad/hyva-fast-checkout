@@ -4,14 +4,20 @@
             <div class="secure">
                 <!-- ko if: (isMultiStepResolution()) -->
                     <ul class="breadcrumbs">
-                        <li class="address breadcrumbs__item active" data-bind="i18n: 'Address',click: goToAddressStep"></li>
-                        <li class="delivery breadcrumbs__item" data-bind="i18n: 'Delivery',click: goToDeliveryStep"></li>
-                        <li class="pay breadcrumbs__item" data-bind="i18n: 'Pay & Review',click: goToPaymentStep"></li>
+                        <li class="address breadcrumbs__item active js-send-event-to-ga"  data-ga-event-action="Address"
+                            data-ga-event-label="Edit Address Information" data-bind="i18n: 'Address', click: goToAddressStep"></li>
+                        <!-- ko ifnot: (quoteIsVirtual === true) -->
+                            <li class="delivery breadcrumbs__item js-send-event-to-ga" data-ga-event-action="Delivery"
+                                data-ga-event-label="Change Delivery Method" data-bind="i18n: 'Delivery', click: goToDeliveryStep"></li>
+                        <!-- /ko -->
+                        <li class="pay breadcrumbs__item" data-bind="i18n: 'Pay & Review', click: goToPaymentStep"></li>
                     </ul>
                 <!--/ko-->
-                <div class="secured-checkout">
-                    <!-- ko i18n: 'Secured Checkout' --><!--/ko-->
-                </div>
+                <!-- ko ifnot: (isMultiStepResolution()) -->
+                    <div class="secured-checkout">
+                        <!-- ko i18n: 'Secured Checkout' --><!--/ko-->
+                    </div>
+                <!--/ko-->
             </div>
             <div class="iwd_opc_universal_wrapper iwd_opc_column_name secure-title">
                 <!-- ko i18n: 'Secure Checkout' --><!--/ko-->

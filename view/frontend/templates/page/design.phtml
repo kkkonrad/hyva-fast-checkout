@@ -1,3 +1,9 @@
+<?php
+/**
+ * @var $block IWD\Opc\Block\Checkout\Design
+ */
+?>
+
 <link href="https://fonts.googleapis.com/css?family=<?php echo $block->getFontFamily();?>" rel="stylesheet" type="text/css">
 <style>
     body,.opc-wrapper{
@@ -57,23 +63,25 @@
     .selectize-input.input-active + .selectize-dropdown{
         border-color: #<?php echo $block->getHighlightColor() ?>;
     }
+
+    .onepage-index-index .secure .breadcrumbs .breadcrumbs__item {color: #<?php echo $block->getBreadcrumbsItemColor() ?>}
+    .onepage-index-index .secure .breadcrumbs .breadcrumbs__item.active {color: #<?php echo $block->getBreadcrumbsActiveItemColor() ?>}
+    .onepage-index-index .secure .breadcrumbs .breadcrumbs__item.done {color: #<?php echo $block->getBreadcrumbsCompletedItemColor() ?>}
+    .onepage-index-index .secure .breadcrumbs .breadcrumbs__item::after {background: #<?php echo $block->getBreadcrumbsItemBackground() ?>}
+    .onepage-index-index .secure .breadcrumbs .breadcrumbs__item.active::after {background: #<?php echo $block->getBreadcrumbsActiveItemBackground() ?>}
+    .onepage-index-index .secure .breadcrumbs .breadcrumbs__item.done::after {background: #<?php echo $block->getBreadcrumbsCompletedItemBackground() ?>}
 </style>
 
 <script>
-    if(typeof window.checkoutData == 'undefined'){
-        window.checkoutData = {};
-    }
+    if(typeof window.checkoutData == 'undefined') window.checkoutData = {};
+
     window.checkoutData.customerData = {};
-
-    window.checkoutData.layout = {};
-    window.checkoutData.layout.desktop = '<?php echo $block->getDesktopResolution(); ?>';
-    window.checkoutData.layout.tablet = '<?php echo $block->getTabletResolution(); ?>';
-    window.checkoutData.layout.mobile = '<?php echo $block->getMobileResolution(); ?>';
-
     window.checkoutData.address = {};
-    window.checkoutData.address_type_order = '<?php echo $block->getAddressTypeOrder(); ?>';
 
-    window.checkoutData.default = {};
-    window.checkoutData.default.shipping = '<?php echo $block->getDefaultShipping(); ?>';
-    window.checkoutData.default.payment = '<?php echo $block->getDefaultPayment(); ?>';
+    window.checkoutData.address_type_order = '<?php echo $block->getAddressTypeOrder(); ?>';
+    window.checkoutData.preSelectedBillingAddressId = '<?php echo $block->getPreSelectedBillingAddressId(); ?>';
+    window.checkoutData.countryCollection = '<?= \Laminas\Json\Json::encode($block->getRegionCollection()); ?>';
+
+    window.checkoutData.layout = JSON.parse('<?= \Laminas\Json\Json::encode($block->getResolution()) ?>');
+    window.checkoutData.default = JSON.parse('<?= \Laminas\Json\Json::encode($block->getDefault()) ?>');
 </script>

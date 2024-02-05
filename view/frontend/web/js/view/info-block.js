@@ -139,15 +139,20 @@ define(
                 let address = {};
 
                 if(type == 'shipping') {
-                    for (var i = 0; i < $('#co-shipping-form').serializeArray().length; i++) {
-                        let obj = $('#co-shipping-form').serializeArray()[i];
-                        address[obj.name] = obj.value;
-                    }
+                    var form = $('#co-shipping-form');
                 } else {
-                    for (var i = 0; i < $('#billing-new-address-form').serializeArray().length; i++) {
-                        let obj = $('#billing-new-address-form').serializeArray()[i];
-                        address[obj.name] = obj.value;
-                    }
+                    var form = $('#billing-new-address-form');
+                }
+
+                for (var i = 0; i < form.serializeArray().length; i++) {
+                    let obj = form.serializeArray()[i];
+                    address[obj.name] = obj.value;
+                }
+
+                if(address['region_id']) {
+                    let selectizeItem = form.find('div[name$="region_id"] .selectize-input .item');
+                    address['region'] = selectizeItem.text();
+                    address['region_id'] = selectizeItem.data('value');
                 }
 
                 return address;
@@ -157,7 +162,7 @@ define(
                 let self = this,
                     shipping = self.checkoutData.shipping;
 
-                if (shipping.isMultiStepResolution() && shipping.AddressStep()) {
+                if (typeof shipping !== 'undefined' && shipping.isMultiStepResolution() && shipping.AddressStep()) {
                     self.isVisible(false);
                     return false;
                 }
@@ -204,7 +209,7 @@ define(
                         }
 
                         self.billingAddress({ title: 'Bill To', fullName:billingFullName, street:billingStreet, city:billingCity })
-                        self.shippingAddress({ title: 'Sipp To', fullName:fullName, street:street, city:city })
+                        self.shippingAddress({ title: 'Ship To', fullName:fullName, street:street, city:city })
                     }
 
                     let address = [self.shippingAddress(),self.billingAddress()]
@@ -329,10 +334,10 @@ define(
 
                 window.addEventListener('load', function (event) {
                     self.updateAddress('billing',{});
-                    self.updateAddress('shipping',{});  
+                    self.updateAddress('shipping',{});
                 })
 
-                $(document).on('change','input', function () {
+                $(document).on('change','input, select', function () {
                   self.updateAddress('billing',{});
                   self.updateAddress('shipping',{});
                 });
@@ -374,6 +379,15 @@ define(
                 self.subscribeShipping();
                 self.subscribePayment();
                 self.customEventListener();
+            },
+
+            customerEventListener: function () {
+                let user = $('input[name=username]'),
+                customerEmail = this.customerEmail() ? this.customerEmail() : (user.length && user.val().length) ? user.val() : null;
+
+                if(customerEmail) {
+                    this.updateCustomerEmailItem({customerEmail:customerEmail,isEmailValid:true});
+                }
             }
 
         });

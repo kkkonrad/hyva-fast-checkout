@@ -20,8 +20,7 @@ class Link
 
     public function afterGetHref($subject, $result)
     {
-        if ($this->opcHelper->isEnable() && $this->opcHelper->isCheckoutDesign()
-            && !($this->opcHelper->isGaAbEnable() && $this->opcHelper->getGaAbCode())) {
+        if ($this->opcHelper->isEnable()) {
             $result = $this->url->getUrl('onepage', ['_secure' => true]);
         }
 

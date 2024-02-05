@@ -1,7 +1,7 @@
-**IWD One Step Checkout Extension**
+**Dominate Checkout (Open Source)**
 
-Magento version - 2.1.x
+Magento version - 2.4.x
 
-Installation Guide - https://www.iwdagency.com/help/general-information/installing-iwd-extensions
+Installation Guide - https://help.dominate.co/magento-adobe-commerce/dominate-checkout-suite-open-source-installation-guide-magento-2
 
-Support - extensions@iwdagency.com
+Support - support@dominate.co

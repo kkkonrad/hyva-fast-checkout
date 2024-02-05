@@ -193,6 +193,7 @@ class LayoutProcessor
             $country['placeholder'] = __('Select Country *');
             $country['config']['template'] = 'IWD_Opc/form/field';
             $country['config']['additionalClasses'] = 'float-left wd30-66 mr4';
+            $country['validation']['required-entry'] = true;
 
             $jsLayoutResult['components']['checkout']['children']['steps']['children']['shipping-step']
             ['children']['shippingAddress']['children']['billing-address']['children']['form-fields']['children']['country_id'] = $country;
@@ -271,6 +272,7 @@ class LayoutProcessor
             $telephone['config']['template'] = 'IWD_Opc/form/field';
             $telephone['config']['elementTmpl'] = 'IWD_Opc/form/element/input';
             $telephone['config']['additionalClasses'] = 'float-left wd30-66 mr4';
+            $telephone['validation'] = ['required-entry' => true, 'phone' => true];
 
             $jsLayoutResult['components']['checkout']['children']['steps']['children']['shipping-step']
             ['children']['shippingAddress']['children']['billing-address']['children']['form-fields']['children']['telephone'] = $telephone;
@@ -377,10 +379,8 @@ class LayoutProcessor
                                     'elementTmpl' => 'IWD_Opc/form/billing-address/element/select',
                                     'customEntry' => 'billingAddress.country_id',
                                 ],
+                                'validation' => ['required-entry' => true],
                             ],
-//                            'region' => [
-//                                'visible' => false,
-//                            ],
                             'region_id' => [
                                 'component' => 'Magento_Ui/js/form/element/region',
                                 'config' => [

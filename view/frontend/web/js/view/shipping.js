@@ -24,6 +24,8 @@ var defineArray =  [
     'Magento_Checkout/js/model/cart/totals-processor/default',
     'IWD_Opc/js/model/payment/is-loading',
     'Magento_Ui/js/model/messageList',
+    'IWD_Opc/js/form/address-manager',
+    'IWD_Opc/js/ga4Events'
 ];
 
 // Use AmazonPayStorage Script if AmazonPay is enabled
@@ -70,6 +72,8 @@ define( defineArray,
               totalsDefaultProvider,
               paymentIsLoading,
               globalMessageList,
+              iwdOpcAddressManager,
+              ga4Events,
               amazonStorage,
               )
         {
@@ -149,7 +153,7 @@ define( defineArray,
             isRatesLoading: shippingService.isLoading,
 
             isFormInline: addressList().length === 0,
-            shippingMethod : 'table.table-checkout-shipping-method tbody',
+            shippingMethod: 'table.table-checkout-shipping-method tbody',
 
             checkoutData: window.checkoutData,
 
@@ -168,12 +172,13 @@ define( defineArray,
             },
             resetShippingAddressForm: function () {
                 let shippingAddress = $('#shipping-new-address-form');
+                shippingAddress.find('.field').removeClass('_error');
                 shippingAddress.find('input').val('');
-                shippingAddress.find('.control.focus').removeClass('focus');
+                shippingAddress.find('.control').removeClass('focus');
                 let country_id = shippingAddress.find('select[name="country_id"]');
                 let region_id = shippingAddress.find('select[name="region_id"]');
-                country_id.selectize({})[0].selectize.clear(true);
-                region_id.selectize({})[0].selectize.clear(true);
+                if(region_id.data('selectize')) region_id.selectize({})[0].selectize.clear(true);
+                if(country_id.data('selectize')) country_id.selectize({})[0].selectize.clear(true);
             },
 
             useBillingAddress: function() {
@@ -200,6 +205,7 @@ define( defineArray,
 
             goToShoppingCart: function() {
                 this.startLoader();
+                ga4Events.editCartEvent();
                 window.location.href = window.location.origin + '/checkout/cart/';
             },
 
@@ -225,7 +231,8 @@ define( defineArray,
                     isAddressMultiple = true,
                     billing = self.checkoutData.billing,
                     login = self.checkoutData.login,
-                    payment = self.checkoutData.payment;
+                    payment = self.checkoutData.payment,
+                    addressFormValid = true;
 
                 self.startLoader();
                 self.source.set('params.invalid', false);
@@ -245,7 +252,7 @@ define( defineArray,
                     if (!login.validateEmail()) {
                         $("#iwd_opc_login form").validate().element("input[type='email']");
                         this.stopLoader(100);
-                        return false;
+                        addressFormValid = false;
                     }
                 }
 
@@ -254,6 +261,7 @@ define( defineArray,
 
                     if(isAddressMultiple){
                         self.source.trigger('billingAddress.data.validate');
+                        iwdOpcAddressManager.billingAddressValidation();
                     }
 
                 } else {
@@ -261,6 +269,7 @@ define( defineArray,
 
                     if (isAddressMultiple) {
                         self.source.trigger('shippingAddress.data.validate');
+                        iwdOpcAddressManager.shippingAddressValidation();
                     }
                 }
 
@@ -270,21 +279,25 @@ define( defineArray,
                     self.source.set('params.invalid', false);
                     self.source.trigger('billingAddress.data.validate');
                     self.source.trigger('shippingAddress.data.validate');
+                    iwdOpcAddressManager.addressValidation();
                 }
 
                 if (self.source.get('params.invalid')) {
                     this.stopLoader(100);
-                    return false;
-                } else {
-                    if (type === 'onepage') {
-                        this.stopLoader(100);
-                        return true;
-                    }
-                    summary.updateSummaryWrapperTopHeight(0);
-                    self.AddressStep(false);
-                    self.DeliveryStep(true);
-                    payment.PaymentStep(false);
+                    addressFormValid = false;
                 }
+
+                if(!addressFormValid) return false;
+
+                if (type === 'onepage') {
+                    this.stopLoader(100);
+                    return true;
+                }
+
+                summary.updateSummaryWrapperTopHeight(0);
+                self.AddressStep(false);
+                self.DeliveryStep(true);
+                payment.PaymentStep(false);
 
                 self.CurrentStep(2);
                 self.updateBreadcrumbs('delivery');
@@ -360,6 +373,10 @@ define( defineArray,
 
             fullFillShippingForm: function (addressType) {
                 let self = this;
+
+                // self.source.trigger('shippingAddress.data.clearError');
+                // self.source.set('params.invalid', false);
+
                 if (self.checkoutData.address) {
                     let address = self.checkoutData.address;
 
@@ -406,7 +423,7 @@ define( defineArray,
                                         control.find('.selectize-dropdown-content .option[data-value="'+address[key]+'"]').trigger('click');
 
                                         control.find('.selectize-dropdown-content .option[data-value="'+address[key]+'"]').trigger('click');
-                                    }else if (key === 'street') {
+                                    } else if (key === 'street') {
                                         // In case street line 2's value in the new address is empty: Remove street line 2 value
                                         // In case street line 2's value in the new address is not empty: the each below will replace the old one
                                         if (form.find('input[name="street[1]"]').length && form.find('input[name="street[1]"]').val()) {
@@ -417,7 +434,7 @@ define( defineArray,
                                             if (form.find('input[name="street['+number+']"]').length) {
                                                 let control = form.find('input[name="street['+number+']"]').closest('.control');
 
-                                                if (!control.hasClass('focus')) {
+                                                if (value && !control.hasClass('focus')) {
                                                     control.addClass('focus');
                                                 }
 
@@ -463,8 +480,13 @@ define( defineArray,
 
                                         let control = select.closest('.field')
                                         control.find('.selectize-dropdown-content .option[data-value="'+value+'"]').trigger('click');
-                                    } if (form.find('input[name="' + key + '"]').length) {
-                                        form.find('input[name="' + key + '"]').val('').trigger('change');
+                                    } else if (form.find('input[name="' + key + '"]').length) {
+                                        let customerData = customer.customerData, val = '';
+                                        if((key === 'firstname' || key === 'lastname') && customerData[key]) val = customerData[key];
+
+                                        form.find('input[name="' + key + '"]').val(val).trigger('change');
+                                        self.toggleInput(form.find('input[name="' + key + '"]'));
+
                                     } else if (form.find('select[name="' + key + '"]').length) {
                                         if (form.find('select[name="' + key + '"] option[value=""]').length) {
                                             form.find('select[name="' + key + '"] option[value=""]').prop('selected', true);
@@ -477,7 +499,7 @@ define( defineArray,
                         }
                     },500);
                 }
-                self.source.set('params.invalid', false);
+                //self.source.set('params.invalid', false);
             },
 
             onAddressChange: function (addressId) {
@@ -500,14 +522,18 @@ define( defineArray,
                     let newShippingAddressInterval = setInterval(function () {
                         let newShippingAddress = $('#co-shipping-form');
                         if (newShippingAddress.length) {
-                            if (newShippingAddress.find('select[name="country_id"]').length && newShippingAddress.find('select[name="region_id"]').length) {
+                            let country_id = newShippingAddress.find('select[name="country_id"]'),
+                                region_id = newShippingAddress.find('select[name="region_id"]');
+                            if (country_id.length && region_id.length) {
+                                newShippingAddress.find('.field').removeClass('_error');
                                 newShippingAddress.validate().resetForm();
                                 newShippingAddress.trigger("reset");
-                                let country_id = newShippingAddress.find('select[name="country_id"]');
-                                let region_id = newShippingAddress.find('select[name="region_id"]');
-                                country_id.selectize({})[0].selectize.clear(true);
                                 region_id.selectize({})[0].selectize.clear(true);
-                                newShippingAddress.find('.control.focus').removeClass('focus');
+                                country_id.selectize({})[0].selectize.clear(true);
+                                newShippingAddress.find('.control').removeClass('focus');
+                                if(customer.isLoggedIn()) {
+                                    iwdOpcAddressManager.setCustomerData(newShippingAddress, customer);
+                                }
                                 clearInterval(newShippingAddressInterval);
                             }
                         }
@@ -515,7 +541,13 @@ define( defineArray,
                 }
                 self.source.set('params.invalid', false);
 
-                self.reSelectShippingMethod();
+                if(addressId) {
+                    self.reSelectShippingMethod();
+                } else {
+                    rateRegistry.set('new-customer-address', null);
+                    rateRegistry.set('new-customer-address' + Date.now(), null);
+                    shippingService.setShippingRates([]);
+                }
 
                 self.stopLoader(1000);
             },
@@ -534,11 +566,11 @@ define( defineArray,
 
             multiStepEventListener: function () {
                 let self = this,
-                    screen = window.screen;
+                    screenWidth = window.innerWidth;
 
-                if (screen.width > 991) {
+                if (screenWidth > 991) {
                     self.updateMultiStepResolution(self.isDesktopMultiResolution());
-                } else if (screen.width <= 991 & screen.width > 575) {
+                } else if (screenWidth <= 991 && screenWidth > 575) {
                     self.updateMultiStepResolution(self.isTabletMultiResolution());
                 } else {
                     self.updateMultiStepResolution(self.isMobileMultiResolution());
@@ -595,14 +627,28 @@ define( defineArray,
 
                 $(document).on('blur','input',function (){
                     if (!self.isEmpty($(this).val())) {
-                        $(this).closest('.control').addClass('focus');
+                        if($(this).attr('name') !== 'shipping-country-id'
+                            && $(this).attr('name') !== 'shipping-region-id'
+                            && $(this).attr('name') !== 'billing-country-id'
+                            && $(this).attr('name') !== 'billing-region-id') {
+                            $(this).closest('.control').addClass('focus');
+                        }
                     }
                 });
             },
 
+            toggleInput: function (input) {
+                if (!this.isEmpty(input.val())) {
+                    input.closest('.control').addClass('focus');
+                } else {
+                    input.closest('.control').removeClass('focus');
+                }
+            },
+
             initialize: function () {
                 let self = this,
-                    fieldsetName = 'checkout.steps.shipping-step.shippingAddress.shipping-address-fieldset';
+                    fieldsetName = 'checkout.steps.shipping-step.shippingAddress.shipping-address-fieldset',
+                    screenWidth = window.innerWidth;
 
                 this._super().observe({
                     isAddressShippingFormVisible: false,
@@ -611,9 +657,9 @@ define( defineArray,
                     CurrentStep: ko.observable(1),
                     AddressStep: ko.observable(true),
                     DeliveryStep: ko.observable(false),
-                    isMultiStepResolution: (window.screen.width > 991 && self.checkoutData.layout.desktop == 'multistep') ? ko.observable(true) :
-                                           (window.screen.width <= 991 && window.screen.width > 575 && self.checkoutData.layout.tablet == 'multistep') ? ko.observable(true) :
-                                           (window.screen.width <= 575 && self.checkoutData.layout.mobile == 'multistep') ? ko.observable(true) : ko.observable(false),
+                    isMultiStepResolution: (screenWidth > 991 && self.checkoutData.layout.desktop == 'multistep') ? ko.observable(true) :
+                                           (screenWidth <= 991 && screenWidth > 575 && self.checkoutData.layout.tablet == 'multistep') ? ko.observable(true) :
+                                           (screenWidth <= 575 && self.checkoutData.layout.mobile == 'multistep') ? ko.observable(true) : ko.observable(false),
                     isDesktopMultiResolution: ko.observable(self.checkoutData.layout.desktop),
                     isTabletMultiResolution: ko.observable(self.checkoutData.layout.tablet),
                     isMobileMultiResolution: ko.observable(self.checkoutData.layout.mobile),
@@ -644,6 +690,11 @@ define( defineArray,
                 checkoutDataResolver.resolveShippingAddress();
                 registry.async('checkoutProvider')(function (checkoutProvider) {
                     var shippingAddressData = checkoutData.getShippingAddressFromData();
+
+                    if(!customer.isLoggedIn() || !window.checkoutData.addressList) {
+                        shippingAddressData = {};
+                    }
+
                     if (shippingAddressData) {
                         checkoutProvider.set(
                             'shippingAddress',
@@ -662,6 +713,10 @@ define( defineArray,
                     self.checkoutData.addressList = addressList();
                     this.selectedAddress.subscribe(function (addressId) {
                         if (typeof addressId === 'undefined' || addressId === '') { addressId = null; }
+                        let shippingAddressListValue = $('#shipping_address_id').val();
+                        if (typeof addressId == 'object' && shippingAddressListValue !== "") {
+                            addressId = shippingAddressListValue;
+                        }
                         var address = _.filter(self.addressOptions, function (address) {
                             return address.customerAddressId === addressId;
                         })[0];
@@ -676,10 +731,17 @@ define( defineArray,
                             selectShippingAddress(address);
                             checkoutData.setSelectedShippingAddress(address.getKey());
                         } else {
+                            if (!document.activeElement.classList.contains('iwd_opc_place_order_button')
+                                && !window.IWDStartPlacingOrder) {
+                                self.resetShippingAddressForm();
+                            }
                             var addressData,
                                 newShippingAddress;
                             addressData = self.source.get('shippingAddress');
-                            addressData.save_in_address_book = self.saveInAddressBook ? 1 : 0;
+                            //addressData.save_in_address_book = self.saveInAddressBook ? 1 : 0;
+                            if(addressData.save_in_address_book !== 1 && addressData.save_in_address_book !== 0) {
+                                addressData.save_in_address_book = self.saveInAddressBook ? 1 : 0;
+                            }
                             newShippingAddress = addressConverter.formAddressDataToQuoteAddress(addressData);
                             selectShippingAddress(newShippingAddress);
                             checkoutData.setSelectedShippingAddress(newShippingAddress.getKey());
@@ -706,6 +768,10 @@ define( defineArray,
                 });
 
                 this.rates.subscribe(function (rates) {
+                    if(quote.shippingAddress().getKey() == 'new-customer-address' && !iwdOpcAddressManager.isNewCustomerAddressValid()) {
+                        return true;
+                    }
+
                     self.rateBuilding(true);
                     self.shippingRateGroups([]);
                     if (rates.length > 1) {
@@ -805,6 +871,7 @@ define( defineArray,
 
                 self.changeShippingMethod();
                 self.autoFill();
+                self.newAddressHandler();
 
                 return this;
             },
@@ -937,7 +1004,7 @@ define( defineArray,
                 },timeout)
             },
 
-            changeShippingMethod:function(){
+            changeShippingMethod:function() {
                 let self = this;
 
                 $(document).on('click',self.shippingMethod,function (event) {
@@ -949,11 +1016,12 @@ define( defineArray,
                     let shippingMethod = $(this).find('input[type="radio"]');
                     shippingMethod.prop('checked',true);
 
+                    ga4Events.changeShippingMethod(shippingMethod.data('title'));
+
                     if(self.checkoutData.shippingMethodCode && self.checkoutData.shippingMethodCode === shippingMethod.val()){
                         self.stopLoader();
                         return false;
-                    }
-                    else{
+                    }  else {
                         self.selectCurrentShippingMethod(shippingMethod.attr('name'));
                         self.stopLoader();
                     }
@@ -1053,7 +1121,7 @@ define( defineArray,
                                 }
                             }
 
-                            if (customer.isLoggedIn()) {
+                            if (!window.checkoutData.addressList) {
                                 shippingAddress.save_in_address_book = this.saveInAddressBook ? 1 : 0;
                             }
 
@@ -1323,9 +1391,55 @@ define( defineArray,
             },
 
             updateBreadcrumbs: function (step) {
-                $('.breadcrumbs .breadcrumbs__item').removeClass('active');
-                $('.breadcrumbs .breadcrumbs__item.'+step).addClass('active');
+                $('.breadcrumbs .breadcrumbs__item.active').addClass('done').removeClass('active');
+                $('.breadcrumbs .breadcrumbs__item.'+step).addClass('active').removeClass('done');
+                $('.breadcrumbs .breadcrumbs__item.pay').removeClass('done');
             },
+
+            addressHandler: function () {
+                let address = this.source.get('shippingAddress');
+
+                if($('#shipping_address_id').length && !$('#shipping_address_id').data('selectize').getValue()) {
+                    address['save_in_address_book'] = this.saveInAddressBook ? 1 : 0;
+                } else if ($('#shipping_address_id').length && $('#shipping_address_id').data('selectize').getValue()) {
+                    let customerAddressId = $('#shipping_address_id').data('selectize').getValue(),
+                        customerAddresses = window.checkoutData.addressList;
+                    address['save_in_address_book'] = 0;
+
+                    if(customerAddresses) {
+                        $.each(customerAddresses, function (key, customerAddress) {
+                            if(customerAddressId === customerAddress.customerAddressId) {
+                                $.each(address, function (k, v) {
+                                    if(k == 'save_in_address_book') return true;
+                                    if(k == 'country_id') k = "countryId";
+                                    if(k == 'region_id') k = "regionId";
+                                    if(v !== customerAddress[k] && customerAddress[k] !== null) {
+                                        if(k === 'street') {
+                                            if(v[0] === customerAddress[k][0] || v[1] === customerAddress[k][1]) {
+                                                return true;
+                                            }
+                                        }
+                                        address['save_in_address_book'] = 1;
+                                    }
+                                })
+                            }
+                        })
+                    }
+                }
+
+                this.selectedAddress(address);
+                checkoutData.setSelectedShippingAddress(address);
+                this.isAddressFormVisible(true);
+            },
+
+            newAddressHandler: function () {
+                let self = this;
+                $(document).on('keyup', '.form-shipping-address input', function () {
+                    if(quote.shippingAddress().getKey() === 'new-customer-address' && !self.isEmpty($(this).val())) {
+                        iwdOpcAddressManager.newAddressHandler($(this).attr('id'));
+                    }
+                })
+            }
         });
     }
 );

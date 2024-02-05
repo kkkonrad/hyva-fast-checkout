@@ -10,8 +10,10 @@
                    ifnot="method.error_message"
                    ko-checked="element.isSelected"
                    ko-value="method.carrier_code + '_' + method.method_code"
-                   attr="'id': method.method_code + '_' + method.carrier_code, 'aria-labelledby': 'label_method_' + method.method_code + '_' + method.carrier_code + ' ' + 'label_carrier_' + method.method_code + '_' + method.carrier_code,
-                            'checked': element.rates().length == 1 || element.isSelected" />
+                   attr="'id': method.method_code + '_' + method.carrier_code,
+                         'aria-labelledby': 'label_method_' + method.method_code + '_' + method.carrier_code + ' ' + 'label_carrier_' + method.method_code + '_' + method.carrier_code,
+                         'checked': element.rates().length == 1 || element.isSelected,
+                         'data-title': method.method_title + ' - ' +method.carrier_title" />
         </div>
         <div class="shipping-method">
                 <span class="col col-method"

@@ -13,7 +13,8 @@ define(
         'Magento_Checkout/js/action/create-billing-address',
         'Magento_Checkout/js/action/select-billing-address',
         'mage/translate',
-        'iwdOpcHelper'
+        'iwdOpcHelper',
+        'IWD_Opc/js/ga4Events'
     ],
     function ($,
               _,
@@ -27,7 +28,10 @@ define(
               addressList,
               createBillingAddress,
               selectBillingAddress,
-              $t) {
+              $t,
+              iwdOpcHelper,
+              ga4Events
+    ) {
         'use strict';
 
         $(document).on('focus','input',function (e) {
@@ -44,6 +48,7 @@ define(
         var observedElements = [],
             setBillingActionTimeout = 0,
             inlineAddress = "",
+            screenWidth = window.innerWidth,
             newAddressOption = {
                 /**
                  * Get new address label
@@ -79,6 +84,9 @@ define(
             customerHasAddresses: addressOptions.length > 1,
             logoutUrl: quote.getLogoutUrl(),
             selectedAddress: ko.observable(null),
+            isMultiStepResolution: (screenWidth > 991 && window.checkoutData.layout.desktop == 'multistep') ? ko.observable(true) :
+                (screenWidth <= 991 && screenWidth > 575 && window.checkoutData.layout.tablet == 'multistep') ? ko.observable(true) :
+                    (screenWidth <= 575 && window.checkoutData.layout.mobile == 'multistep') ? ko.observable(true) : ko.observable(false),
 
             screenResize: function () {
                 let self = this;
@@ -90,11 +98,11 @@ define(
 
             multiStepEventListener: function () {
                 let self = this,
-                    screen = window.screen;
+                    screenWidth = window.innerWidth;
 
-                if (screen.width > 991) {
+                if (screenWidth > 991) {
                     self.updateMultiStepResolution(self.isDesktopMultiResolution());
-                } else if (screen.width <= 991 & screen.width > 575) {
+                } else if (screenWidth <= 991 && screenWidth > 575) {
                     self.updateMultiStepResolution(self.isTabletMultiResolution());
                 } else {
                     self.updateMultiStepResolution(self.isMobileMultiResolution());
@@ -172,10 +180,12 @@ define(
 
                 if ($('.field .control.focus').length) {
                     $('.field .control.focus').each(function () {
-                        let input = $(this).find('input');
-                        if (self.isEmpty(input.val())) {
-                            $(this).removeClass('focus');
-                        }
+                        let inputs = $(this).find('input');
+                        inputs.each(function () {
+                            if (self.isEmpty($(this).val())) {
+                                $(this).closest('.control').removeClass('focus');
+                            }
+                        })
                     });
                 }
             },
@@ -185,7 +195,9 @@ define(
 
                 $(document).on('blur','input',function (){
                     if (!self.isEmpty($(this).val())) {
-                        $(this).closest('.control').addClass('focus');
+                        if($(this).attr('name') !== 'billing-country-id' && $(this).attr('name') !== 'billing-region-id') {
+                            $(this).closest('.control').addClass('focus');
+                        }
                     } else {
                         $(this).closest('.control').removeClass('focus');
                     }
@@ -193,13 +205,14 @@ define(
             },
 
             setDesignResolution: function() {
-                let self = this;
+                let self = this,
+                    screenWidth = window.innerWidth;
 
-                if(window.screen.width > 991 && self.checkoutData.layout.desktop == 'multistep') {
+                if(screenWidth > 991 && self.checkoutData.layout.desktop == 'multistep') {
                     this.isMultiStepResolution(true);
-                } else if(window.screen.width <= 991 && window.screen.width > 575 && self.checkoutData.layout.tablet == 'multistep') {
+                } else if(screenWidth <= 991 && screenWidth > 575 && self.checkoutData.layout.tablet == 'multistep') {
                     this.isMultiStepResolution(true);
-                } else if(window.screen.width <= 575 && self.checkoutData.layout.mobile == 'multistep') {
+                } else if(screenWidth <= 575 && self.checkoutData.layout.mobile == 'multistep') {
                     this.isMultiStepResolution(true);
                 } else {
                     this.isMultiStepResolution(false);
@@ -208,7 +221,12 @@ define(
 
             goToShoppingCart: function() {
                 this.startLoader();
+                ga4Events.editCartEvent();
                 window.location.href = window.location.origin + '/checkout/cart/';
+            },
+
+            goToAddressStep: function () {
+                window.checkoutData.payment.goToBillingVirtualStep();
             },
 
             goToPaymentStep: function() {
@@ -218,7 +236,8 @@ define(
 
                 self.startLoader();
 
-                if(!billing.billingStepVirtualValidate()){
+                if(!billing.billingStepVirtualValidate()) {
+                    this.stopLoader(500);
                     return false;
                 }
 
@@ -226,6 +245,7 @@ define(
                 payment.PaymentStep(true);
 
                 self.CurrentStep(2);
+                this.checkoutData.shipping.updateBreadcrumbs('pay');
                 this.stopLoader(500);
 
                 return true;
@@ -253,7 +273,7 @@ define(
                 });
 
                 quote.billingAddress.subscribe(function (address) {
-                        self.updateFocusControl();
+                    self.updateFocusControl();
                 })
 
                 self.isDesktopMultiResolution(self.checkoutData.layout.desktop);
