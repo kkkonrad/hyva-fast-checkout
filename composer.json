@@ -2,7 +2,7 @@
   "name": "iwd/opc",
   "description": "Dominate Checkout (Open Source)",
   "type": "magento2-module",
-  "version": "6.0.0",
+  "version": "6.1.0",
   "license": [
     "proprietary"
   ],

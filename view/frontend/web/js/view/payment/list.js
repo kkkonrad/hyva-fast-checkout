@@ -144,11 +144,13 @@ define(defineArray,
         initialize: function () {
             this._super().initDefaultGroup().initChildren();
             paymentMethods.subscribe(function (methods) {
+                if(typeof window.checkoutData.paymentMethodCode !== 'undefined') return;
                 checkoutDataResolver.resolvePaymentMethod();
             });
 
             paymentMethods.subscribe(
                 function (changes) {
+                    if(typeof window.checkoutData.paymentMethodCode !== 'undefined') return;
                     //remove renderer for "deleted" payment methods
                     _.each(changes, function (change) {
                         if (change.status === 'deleted') {
@@ -174,7 +176,11 @@ define(defineArray,
                 }, this, 'arrayChange');
 
             quote.paymentMethod.subscribe(function (method) {
+
+                if(typeof window.checkoutData.paymentMethodCode !== 'undefined' && window.checkoutData.paymentMethodCode === method.method) return;
+
                 if (method) {
+                    window.checkoutData.paymentMethodCode = method.method;
                     this.selectedPaymentMethod(method.method);
                 } else {
                     this.selectedPaymentMethod(null);

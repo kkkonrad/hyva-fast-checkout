@@ -758,11 +758,22 @@ define( defineArray,
                     checkoutData.setComment(value);
                 });
 
-                quote.shippingAddress.subscribe(function () {
+                quote.shippingAddress.subscribe(function (shippingAddress) {
                     self.reSelectShippingMethod(1000);
                 });
 
                 quote.shippingMethod.subscribe(function (shippingMethod) {
+                    if(shippingMethod && window.checkoutData && window.checkoutData.shippingMethodCode) {
+                        let shippingMethodCode = shippingMethod.carrier_code + '_' + shippingMethod.method_code,
+                            shippingAmount = parseFloat(shippingMethod.amount).toFixed(2),
+                            currentShippingMethodCode = window.checkoutData.shippingMethodCode,
+                            currentShippingAmount = parseFloat(window.checkoutData.totalsData.shipping_amount).toFixed(2);
+
+                        if(shippingMethodCode === currentShippingMethodCode && shippingAmount === currentShippingAmount) return;
+                    }
+
+                    if(shippingMethod) window.checkoutData.totalsData.shipping_amount = parseFloat(shippingMethod.amount).toFixed(2);
+
                     totalsDefaultProvider.estimateTotals(quote.shippingAddress());
                     self.reSelectShippingMethod(1000);
                 });
