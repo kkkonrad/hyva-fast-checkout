@@ -1,6 +1,6 @@
 {
   "name": "iwd/opc",
-  "description": "Dominate Checkout (Open Source)",
+  "description": "Dominate Checkout Open Source",
   "type": "magento2-module",
   "version": "6.1.1",
   "license": [
@@ -25,6 +25,6 @@
     "magento/module-sales": "100.*|101.*|102.*|103.*",
     "magento/module-quote": "100.*|101.*|102.*|103.*",
     "magento/module-payment": "100.*|101.*|102.*|103.*",
-    "php": "~7.1.0|~7.2.0|~7.3.0|~7.4.0|~8.1.0|~8.2.0"
+    "php": "~7.1.0|~7.2.0|~7.3.0|~7.4.0|~8.1.0|~8.2.0|~8.3.0"
   }
 }
