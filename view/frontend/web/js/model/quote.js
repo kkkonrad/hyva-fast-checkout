@@ -89,6 +89,9 @@ define(
             isVirtual: function () {
                 return !!Number(quoteData.is_virtual);
             },
+            isPersistent: function () {
+                return !!Number(quoteData.is_persistent);
+            },
             getPriceFormat: function () {
                 return priceFormat;
             },
