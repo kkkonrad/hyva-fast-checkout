@@ -24,7 +24,7 @@
         <div data-role="content" class="content">
             <dl class="item-options">
                 <!--ko foreach: JSON.parse($parent.options)-->
-                <dt class="label" data-bind="text: label"></dt>
+                <dt class="label" data-bind="text: $t(label)"></dt>
                 <!-- ko if: ($data.full_view)-->
                 <!-- ko with: {full_viewUnsanitizedHtml: $data.full_view}-->
                 <dd class="values" data-bind="html: full_viewUnsanitizedHtml"></dd>

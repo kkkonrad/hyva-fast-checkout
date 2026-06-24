@@ -29,7 +29,7 @@ class Style extends Data
      */
     public function getFontFamily()
     {
-        return $this->scopeConfig->getValue(self::XML_PATH_FONT_FAMILY, ScopeInterface::SCOPE_STORE);
+        return $this->scopeConfig->getValue(self::XML_PATH_FONT_FAMILY, ScopeInterface::SCOPE_STORE) ?: 'Open+Sans';
     }
 
     /**

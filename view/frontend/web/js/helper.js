@@ -1,4 +1,4 @@
-define(['iwdOpcSelectize', 'jquery', 'underscore', 'uiRegistry'], function (selectize, $, _, registry) {
+define(['iwdOpcSelectize', 'jquery', 'underscore', 'uiRegistry', 'mage/translate'], function (selectize, $, _, registry, $t) {
     (function ($, window, document) {
 
         var pluginName = "textareaAutoSize";
@@ -994,6 +994,8 @@ define(['iwdOpcSelectize', 'jquery', 'underscore', 'uiRegistry'], function (sele
                 $text = $emptyOptions.first().text();
             }
 
+            $text = $t($text);
+
             if ($emptyOptions.length) {
                 var $newEmptyOption = $('<option/>').attr('value', '').text($text);
                 var currentVal = $select.val();
@@ -1067,6 +1069,7 @@ define(['iwdOpcSelectize', 'jquery', 'underscore', 'uiRegistry'], function (sele
                     }
                 },
                 onInitialize: function () {
+                    this.$control.attr('data-placeholder', $text);
                     this.$input.attr('tabindex', -1).css({'position': 'absolute', 'opacity': '0'}).after(this.$wrapper);
                 }
             });

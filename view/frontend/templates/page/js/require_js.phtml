@@ -7,6 +7,9 @@ $helper = $this->helper("IWD\Opc\Helper\Data");
 if ($helper && $helper->isCheckoutPage()) : ?>
     <script>
         require.config({
+            deps: [
+                'IWD_Opc/js/i18n-phrases'
+            ],
             map: {
                 '*': {
                     'Magento_Checkout/js/model/quote': 'IWD_Opc/js/model/quote',

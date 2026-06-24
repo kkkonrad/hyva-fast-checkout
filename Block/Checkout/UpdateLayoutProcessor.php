@@ -488,6 +488,9 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
                                                 ],
                                                 'customer-email' => [
                                                     'component' => 'IWD_Opc/js/view/form/element/email',
+                                                    'config' => [
+                                                        'template' => 'IWD_Opc/form/element/email',
+                                                    ],
                                                     'children' => [
                                                         'errors' => [
                                                             'component' => 'IWD_Opc/js/view/form/element/email/errors',
@@ -557,6 +560,9 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
                                             'children' => [
                                                 'customer-email' => [
                                                     'component' => 'IWD_Opc/js/view/form/element/email',
+                                                    'config' => [
+                                                        'template' => 'IWD_Opc/form/element/email',
+                                                    ],
                                                     'children' => [
                                                         'errors' => [
                                                             'component' => 'IWD_Opc/js/view/form/element/email/errors',
@@ -1122,7 +1128,7 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
                                             'sortOrder' => 10,
                                             'component' => 'IWD_Opc/js/view/summary/edit-cart',
                                             'config' => [
-                                                'title' => 'Edit Cart',
+                                                'title' => __('Edit Cart'),
                                                 'link' => '/checkout/cart/',
                                                 'template' => 'IWD_Opc/summary/edit-cart',
                                             ],
@@ -1221,26 +1227,26 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
                                                 'subtotal' =>[
                                                     'component' => 'IWD_Opc/js/view/summary/subtotal',
                                                     'config' => [
-                                                        'title' => 'Subtotal',
+                                                        'title' => __('Subtotal'),
                                                     ],
                                                 ],
                                                 'discount' => [
                                                     'component' => 'IWD_Opc/js/view/summary/discount',
                                                     'config' => [
-                                                        'title' => 'Discount',
+                                                        'title' => __('Discount'),
                                                     ],
                                                 ],
                                                 'shipping' => [
                                                     'component' => 'IWD_Opc/js/view/summary/shipping',
                                                     'config' => [
-                                                        'title' => 'Shipping',
-                                                        'notCalculatedMessage' => 'Not yet calculated'
+                                                        'title' => __('Shipping'),
+                                                        'notCalculatedMessage' => __('Not yet calculated')
                                                     ],
                                                 ],
                                                 'grand-total' => [
                                                     'component' => 'IWD_Opc/js/view/summary/grand-total',
                                                     'config' => [
-                                                        'title' => 'Total to pay'
+                                                        'title' => __('Total to pay')
                                                     ],
                                                 ],
                                             ],

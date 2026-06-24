@@ -1606,12 +1606,8 @@
                         &.items {
                             &:not(.full):not(.input-active) {
                                 &::before {
-                                    padding: 7px 14px;
-                                    content: 'Select a State *';
-                                    display: -webkit-box;
-                                    -webkit-line-clamp: 1;
-                                    -webkit-box-orient: vertical;
-                                    overflow: hidden;
+                                    content: none;
+                                    display: none;
                                 }
                             }
                             &.input-active {
@@ -1634,7 +1630,8 @@
                         &.items {
                             &:not(.full):not(.input-active) {
                                 &::before {
-                                    content: 'Select a Country *';
+                                    content: none;
+                                    display: none;
                                 }
                             }
                         }

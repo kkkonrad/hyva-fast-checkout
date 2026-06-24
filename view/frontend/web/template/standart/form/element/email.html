@@ -24,7 +24,7 @@
     <fieldset id="customer-email-fieldset" class="fieldset" data-bind="blockLoader: isLoading">
         <div class="field required">
             <label class="label" for="customer-email">
-                <span data-bind="i18n: 'Email Address'"></span>
+                <span data-bind="i18n: 'Email Address'">Adres e-mail</span>
             </label>
             <div class="control _with-tooltip">
                 <input class="input-text"
@@ -41,8 +41,8 @@
                         id="iwd_opc_login_here"
                         class="fieldset" >
                     <p class="note">
-                        <span data-bind="i18n: 'Already have an account?'"></span>
-                        <a id="iwd_opc_top_login_button" href="" data-bind="i18n: 'Log in here'"></a>
+                        <span data-bind="i18n: 'Already have an account?'">Masz już konto?</span>
+                        <a id="iwd_opc_top_login_button" href="" data-bind="i18n: 'Log in here'">Zaloguj się tutaj</a>
                     </p>
                 </div>
             </div>
@@ -52,7 +52,7 @@
         <fieldset class="fieldset hidden-fields" data-bind="fadeVisible: isPasswordVisible">
             <div class="field">
                 <label class="label" for="customer-password">
-                    <span data-bind="i18n: 'Password'"></span>
+                    <span data-bind="i18n: 'Password'">Hasło</span>
                 </label>
                 <div class="control">
                     <input class="input-text"
@@ -60,7 +60,7 @@
                            name="password"
                            id="customer-password"
                            data-validate="{required:true}" autocomplete="off"/>
-                    <span class="note" data-bind="i18n: 'You already have an account with us. Sign in or continue as guest.'"></span>
+                    <span class="note" data-bind="i18n: 'You already have an account with us. Sign in or continue as guest.'">Masz już u nas konto. Zaloguj się albo kontynuuj jako gość.</span>
                 </div>
 
             </div>
@@ -70,11 +70,11 @@
             <div class="actions-toolbar">
                 <input name="context" type="hidden" value="checkout" />
                 <div class="primary">
-                    <button type="submit" class="action login primary" data-action="checkout-method-login"><span data-bind="i18n: 'Login'"></span></button>
+                    <button type="submit" class="action login primary" data-action="checkout-method-login"><span data-bind="i18n: 'Login'">Zaloguj się</span></button>
                 </div>
                 <div class="secondary">
                     <a class="action remind" data-bind="attr: { href: forgotPasswordUrl }">
-                        <span data-bind="i18n: 'Forgot Your Password?'"></span>
+                        <span data-bind="i18n: 'Forgot Your Password?'">Nie pamiętasz hasła?</span>
                     </a>
                 </div>
             </div>

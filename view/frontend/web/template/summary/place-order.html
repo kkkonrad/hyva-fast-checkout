@@ -1,7 +1,10 @@
 <!-- ko if: (isVisible()) -->
 <div class="actions-toolbar-trigger place_button_wrapper" id="place-order-trigger-wrapper">
-    <button type="button" class="button action primary iwd_opc_button iwd_opc_place_order_button" id="place-order-trigger" value="Place Order" >
-        <span>Place Order</span>
+    <button type="button"
+            class="button action primary iwd_opc_button iwd_opc_place_order_button"
+            id="place-order-trigger"
+            data-bind="attr: {value: $t('Place Order'), title: $t('Place Order')}">
+        <span data-bind="i18n: 'Place Order'">Złóż zamówienie</span>
     </button>
 </div>
 <div role="alert"

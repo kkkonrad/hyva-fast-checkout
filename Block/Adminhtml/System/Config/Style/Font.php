@@ -26,6 +26,11 @@ class Font implements ArrayInterface
 
     public function toOptionArray()
     {
+        $this->option[] = [
+            'value' => 'Open+Sans',
+            'label' => __('Standardowa')
+        ];
+
         $connection = $this->resourceConnection->getConnection();
         $select = $connection->select()
             ->from(

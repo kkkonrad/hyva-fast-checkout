@@ -10,8 +10,9 @@ define([
     'Magento_Checkout/js/model/totals',
     'Magento_Checkout/js/model/quote',
     'Magento_Catalog/js/price-utils',
+    'mage/translate',
 
-], function ($, ko, Component, totals, quote, priceUtils) {
+], function ($, ko, Component, totals, quote, priceUtils, $t) {
     'use strict';
 
     return Component.extend({
@@ -156,10 +157,10 @@ define([
                 opcBlockSummary: false,
                 opcManageSummaryButton: false,
                 shoppingCartVisible: ko.observable(false),
-                shoppingCartTitle: 'Back to edit shopping cart',
+                shoppingCartTitle: $t('Back to edit shopping cart'),
                 shoppingCartLink: '/checkout/cart/',
-                defaultButtonTitle: 'View Order Summary - ',
-                defaultActiveButtonTitle: 'Back to Checkout',
+                defaultButtonTitle: $t('View Order Summary - '),
+                defaultActiveButtonTitle: $t('Back to Checkout'),
                 opcManageSummaryButtonTitle: '',
                 grandTotal: this.getFormattedPrice(totals.totals().grand_total),
                 screenWidth: ko.observable(window.innerWidth),

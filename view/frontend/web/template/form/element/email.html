@@ -3,8 +3,8 @@
 <!-- ko template: getTemplate() --><!-- /ko -->
 <!-- /ko -->
 <div id="iwd_opc_login_here">
-    <span id="iwd_opc_top_login_button">Log in</span>
-    <span>to your account or continue as a guest and create one after order is placed.</span>
+    <span id="iwd_opc_top_login_button" data-bind="i18n: 'Log in'">Zaloguj się</span>
+    <span data-bind="i18n: 'to your account or continue as a guest and create one after order is placed.'">do swojego konta albo kontynuuj jako gość i utwórz konto po złożeniu zamówienia.</span>
 </div>
 <div id="iwd_opc_login">
     <form
@@ -12,7 +12,7 @@
             data-bind="submit:login, iwdBlockLoader: isLoading"
             method="post">
         <div class="iwd_opc_universal_wrapper control" data-bind="attr: {'class': getInputFieldEmailValue() ? 'iwd_opc_universal_wrapper control focus' : 'iwd_opc_universal_wrapper control'}" >
-            <span class="floating-span">Email Address *</span>
+            <span class="floating-span" data-bind="i18n: 'Email Address *'">Adres e-mail *</span>
             <input
                     data-bind="
                             attr:{
@@ -30,7 +30,7 @@
                 data-bind="visible: isPasswordVisible"
                 id="iwd_opc_login_password" class="iwd_opc_universal_wrapper control">
             <input name="context" type="hidden" value="checkout"/>
-            <span class="floating-span">Password</span>
+            <span class="floating-span" data-bind="i18n: 'Password'">Hasło</span>
             <input
                     data-bind="attr:{
                                 'type': passwordType,
@@ -59,10 +59,12 @@
             <button
                     data-bind="i18n: 'Log In', attr:{title:$t('Log In')}"
                     type="submit" id="iwd_opc_login_button" class="iwd_opc_small_button active iwd_opc_button secondary">
+                Zaloguj się
             </button>
             <button
                     data-bind="i18n: 'Reset', attr:{title:$t('Reset')}, click: reset"
                     type="button" id="iwd_opc_reset_password_button" class="iwd_opc_small_button iwd_opc_button secondary">
+                Resetuj
             </button>
         </div>
         <!-- ko foreach: getRegion('errors') -->

@@ -4,8 +4,9 @@ define([
     'mageUtils',
     'uiRegistry',
     'Magento_Ui/js/form/element/abstract',
-    'uiLayout'
-], function ($, _, utils, registry, Abstract, layout) {
+    'uiLayout',
+    'mage/translate'
+], function ($, _, utils, registry, Abstract, layout, $t) {
     'use strict';
 
     var inputNode = {
@@ -362,13 +363,13 @@ define([
             if (this.indexedOptions && this.indexedOptions['']) {
                 var $this = this,
                     $select = $('#' + this.uid),
-                    $message = this.modifyRequiredMessage(this.indexedOptions['']['label'], required);
+                    $message = this.modifyRequiredMessage($t(this.indexedOptions['']['label']), required);
 
                 this.indexedOptions['']['label'] = $message;
 
                 registry.get(this.customName, function (input) {
                     var $input = $('#' + input.uid),
-                        $message = $this.modifyRequiredMessage(input.placeholder, required);
+                        $message = $this.modifyRequiredMessage($t(input.placeholder), required);
 
                     input.placeholder = $message;
 
@@ -383,6 +384,7 @@ define([
 
                     if ($selectize) {
                         $selectize.settings.placeholder = $message;
+                        $selectize.$control.attr('data-placeholder', $message);
                         $selectize.updatePlaceholder();
                     }
                 }

@@ -2,9 +2,13 @@
 /**
  * @var $block IWD\Opc\Block\Checkout\Design
  */
+$fontFamily = trim((string) $block->getFontFamily());
+$cssFontFamily = str_replace('+', ' ', preg_replace('/:.*/', '', $fontFamily));
 ?>
 
+<?php if ($fontFamily): ?>
 <link href="https://fonts.googleapis.com/css?family=<?php echo $block->getFontFamily();?>" rel="stylesheet" type="text/css">
+<?php endif; ?>
 <style>
     body,.opc-wrapper{
         background: #<?php echo $block->getMainBackground() ?>;
@@ -20,7 +24,9 @@
     .opc-wrapper,
     .opc-block-summary{
         color: #<?php echo $block->getMainColor() ?>;
-        font-family: <?php echo $block->getFontFamily();?>;
+        <?php if ($fontFamily): ?>
+        font-family: <?php echo $block->escapeHtmlAttr($cssFontFamily);?>;
+        <?php endif; ?>
     }
     a,
     .iwd-edit-cart,
