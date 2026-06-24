@@ -1606,8 +1606,12 @@
                         &.items {
                             &:not(.full):not(.input-active) {
                                 &::before {
-                                    content: none;
-                                    display: none;
+                                    padding: 7px 14px;
+                                    content: attr(data-placeholder);
+                                    display: -webkit-box;
+                                    -webkit-line-clamp: 1;
+                                    -webkit-box-orient: vertical;
+                                    overflow: hidden;
                                 }
                             }
                             &.input-active {
@@ -1630,8 +1634,12 @@
                         &.items {
                             &:not(.full):not(.input-active) {
                                 &::before {
-                                    content: none;
-                                    display: none;
+                                    padding: 7px 14px;
+                                    content: attr(data-placeholder);
+                                    display: -webkit-box;
+                                    -webkit-line-clamp: 1;
+                                    -webkit-box-orient: vertical;
+                                    overflow: hidden;
                                 }
                             }
                         }
