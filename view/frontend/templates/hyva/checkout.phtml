@@ -47,7 +47,7 @@ $paymentMethods = $magewire->getPaymentMethods();
             </a>
         </div>
     <?php else: ?>
-    <form id="co-checkout-form" x-data="{}" @submit.prevent="$el.checkValidity() ? $wire.placeOrder() : $el.reportValidity()" class="contents">
+    <form id="co-checkout-form" x-data="{}" @submit.prevent="console.log('Form submit intercepted. Form validity:', $el.checkValidity()); for (let el of $el.elements) { if (!el.checkValidity()) { console.warn('Invalid field:', el.tagName, el.getAttribute('wire:model.blur') || el.name || el.id, 'Value:', JSON.stringify(el.value), 'Msg:', el.validationMessage); } } $el.checkValidity() ? $wire.placeOrder() : $el.reportValidity()" class="contents">
 
     <!-- Two Column Layout -->
     <div class="grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_1fr] lg:items-start">
@@ -113,8 +113,7 @@ $paymentMethods = $magewire->getPaymentMethods();
                         <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('State/Province')) ?><?= $isRegionRequired ? ' *' : '' ?></span>
                         <?php $regions = $magewire->getRegions(); ?>
                         <?php if ($regions): ?>
-                            <select class="form-select mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" wire:model.blur="regionId" <?= $isRegionRequired ? 'required' : '' ?>>
-                                <option value=""><?= $escaper->escapeHtml(__('Please select...')) ?></option>
+                            <select name="region_id" class="form-select mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" wire:model.blur="regionId" <?= $isRegionRequired ? 'required' : '' ?>>
                                 <?php foreach ($regions as $regionOption): ?>
                                     <option value="<?= $escaper->escapeHtmlAttr($regionOption['value']) ?>">
                                         <?= $escaper->escapeHtml($regionOption['label']) ?>
@@ -122,7 +121,7 @@ $paymentMethods = $magewire->getPaymentMethods();
                                 <?php endforeach; ?>
                             </select>
                         <?php else: ?>
-                            <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" type="text" wire:model.blur="region" placeholder="<?= $escaper->escapeHtmlAttr(__('Enter state/province')) ?>" <?= $isRegionRequired ? 'required' : '' ?>/>
+                            <input name="region" class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" type="text" wire:model.blur="region" placeholder="<?= $escaper->escapeHtmlAttr(__('Enter state/province')) ?>" <?= $isRegionRequired ? 'required' : '' ?>/>
                         <?php endif; ?>
                     </label>
 
@@ -261,8 +260,7 @@ $paymentMethods = $magewire->getPaymentMethods();
                                 <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('State/Province')) ?><?= $isBillingRegionRequired ? ' *' : '' ?></span>
                                 <?php $billingRegions = $magewire->getBillingRegions(); ?>
                                 <?php if ($billingRegions): ?>
-                                    <select class="form-select mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" wire:model.blur="billingRegionId" <?= $isBillingRegionRequired ? 'required' : '' ?>>
-                                        <option value=""><?= $escaper->escapeHtml(__('Please select...')) ?></option>
+                                    <select name="billing_region_id" class="form-select mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" wire:model.blur="billingRegionId" <?= $isBillingRegionRequired ? 'required' : '' ?>>
                                         <?php foreach ($billingRegions as $regionOption): ?>
                                             <option value="<?= $escaper->escapeHtmlAttr($regionOption['value']) ?>">
                                                 <?= $escaper->escapeHtml($regionOption['label']) ?>
@@ -270,7 +268,7 @@ $paymentMethods = $magewire->getPaymentMethods();
                                         <?php endforeach; ?>
                                     </select>
                                 <?php else: ?>
-                                    <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" type="text" wire:model.blur="billingRegion" placeholder="<?= $escaper->escapeHtmlAttr(__('Enter state/province')) ?>" <?= $isBillingRegionRequired ? 'required' : '' ?>/>
+                                    <input name="billing_region" class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" type="text" wire:model.blur="billingRegion" placeholder="<?= $escaper->escapeHtmlAttr(__('Enter state/province')) ?>" <?= $isBillingRegionRequired ? 'required' : '' ?>/>
                                 <?php endif; ?>
                             </label>
 
