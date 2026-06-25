@@ -54,6 +54,7 @@ class Checkout extends Component
      */
     public $shippingMethod = '';
     public $paymentMethod = '';
+    public $poNumber = '';
     public $couponCode = '';
     public $subscribe = false;
 
@@ -178,6 +179,9 @@ class Checkout extends Component
         $payment = $quote->getPayment();
         if ($payment && $payment->getMethod()) {
             $this->paymentMethod = $payment->getMethod();
+            if (method_exists($payment, 'getPoNumber')) {
+                $this->poNumber = (string) $payment->getPoNumber();
+            }
         } else {
             $defaultPayment = $this->opcHelper->getDefaultPaymentMethod();
             if ($defaultPayment) {
@@ -489,6 +493,9 @@ class Checkout extends Component
         $payment = $quote->getPayment();
         if ($payment) {
             $payment->setMethod($methodCode);
+            if ($methodCode === 'purchaseorder' && method_exists($payment, 'setPoNumber')) {
+                $payment->setPoNumber($this->poNumber);
+            }
             $quote->collectTotals();
             $this->cartRepository->save($quote);
             $this->paymentMethod = $methodCode;
@@ -587,8 +594,25 @@ class Checkout extends Component
             return;
         }
 
+        if ($this->paymentMethod === 'purchaseorder') {
+            if (empty($this->poNumber)) {
+                $this->orderError = (string)__('Purchase Order Number is a required field.');
+                return;
+            }
+            $payment = $quote->getPayment();
+            if ($payment && method_exists($payment, 'setPoNumber')) {
+                $payment->setPoNumber($this->poNumber);
+            }
+        }
+
         try {
             $quote->getPayment()->setMethod($this->paymentMethod);
+            if ($this->paymentMethod === 'purchaseorder') {
+                $payment = $quote->getPayment();
+                if ($payment && method_exists($payment, 'setPoNumber')) {
+                    $payment->setPoNumber($this->poNumber);
+                }
+            }
             $this->cartRepository->save($quote);
 
             if ($this->subscribe && !empty($this->email)) {
@@ -667,6 +691,16 @@ class Checkout extends Component
                 $this->cartRepository->save($quote);
             } catch (\Exception $e) {
                 // Ignore
+            }
+        } elseif ($name === 'poNumber') {
+            $payment = $quote->getPayment();
+            if ($payment && method_exists($payment, 'setPoNumber')) {
+                $payment->setPoNumber($value);
+                try {
+                    $this->cartRepository->save($quote);
+                } catch (\Exception $e) {
+                    // Ignore
+                }
             }
         } elseif ($isShippingField) {
             $this->saveShippingAddress();

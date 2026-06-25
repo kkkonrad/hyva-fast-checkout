@@ -57,13 +57,13 @@ $opcHelper = $block->opcHelper;
     <!-- Actions -->
     <div class="pt-2 flex flex-col gap-3">
         <a href="<?= $block->escapeUrl($block->getUrl()) ?>"
-           class="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md shadow transition-colors block text-center"
+           class="btn btn-primary w-full"
            title="<?= $block->escapeHtmlAttr(__('Continue Shopping')) ?>">
             <?= $block->escapeHtml(__('Continue Shopping')) ?>
         </a>
         <?php if ($block->isCustomerLoggedIn()): ?>
             <a href="<?= $block->escapeUrl($block->getCustomerAccountUrl()) ?>"
-               class="w-full py-2.5 px-4 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-md transition-colors block text-center"
+               class="btn btn-secondary w-full"
                title="<?= $block->escapeHtmlAttr(__('My Account')) ?>">
                 <?= $block->escapeHtml(__('My Account')) ?>
             </a>
@@ -76,7 +76,7 @@ $opcHelper = $block->opcHelper;
             <div x-show="!formOpen && !accountCreated">
                 <button type="button" 
                         @click="formOpen = true" 
-                        class="w-full py-2.5 px-4 bg-gray-900 hover:bg-gray-800 text-white font-semibold rounded-md shadow transition-colors text-center text-sm">
+                        class="btn btn-primary w-full">
                     <?= $block->escapeHtml(__('Create Account')) ?>
                 </button>
                 <p class="mt-2 text-xs text-gray-500 text-center">
@@ -105,7 +105,7 @@ $opcHelper = $block->opcHelper;
                 </label>
                 <button type="submit" 
                         :disabled="loading"
-                        class="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded shadow transition-colors flex items-center justify-center gap-2">
+                        class="btn btn-primary w-full flex items-center justify-center gap-2">
                     <template x-if="loading">
                         <svg class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -121,7 +121,7 @@ $opcHelper = $block->opcHelper;
             <div x-show="accountCreated" class="space-y-3">
                 <div class="p-3 bg-green-50 border border-green-200 text-green-700 rounded text-sm font-medium" x-text="successMessage"></div>
                 <a href="<?= $block->escapeUrl($block->getLogInUrl()) ?>" 
-                   class="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded shadow transition-colors block text-center">
+                   class="btn btn-primary w-full text-center">
                     <?= $block->escapeHtml(__('Log In')) ?>
                 </a>
             </div>

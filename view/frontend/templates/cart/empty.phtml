@@ -15,19 +15,19 @@
         </p>
     </div>
     <div class="pt-4 flex flex-col gap-3">
-        <a class="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md shadow transition-colors block text-center"
+        <a class="btn btn-primary w-full"
            href="<?= $block->escapeUrl($block->getUrl()) ?>"
            title="<?= $block->escapeHtmlAttr(__('Continue Shopping')) ?>">
             <?= $block->escapeHtml(__('Continue Shopping')) ?>
         </a>
         <?php if ($block->getQuote()->getCustomer()->getId()): ?>
-            <a class="w-full py-2.5 px-4 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-md transition-colors block text-center"
+            <a class="btn btn-secondary w-full"
                href="<?= $block->escapeUrl($block->getUrl('customer/account')) ?>"
                title="<?= $block->escapeHtmlAttr(__('My Account')) ?>">
                 <?= $block->escapeHtml(__('My Account')) ?>
             </a>
         <?php else: ?>
-            <a class="w-full py-2.5 px-4 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-md transition-colors block text-center"
+            <a class="btn btn-secondary w-full"
                href="<?= $block->escapeUrl($block->getUrl('customer/account/login')) ?>"
                title="<?= $block->escapeHtmlAttr(__('Log In')) ?>">
                 <?= $block->escapeHtml(__('Log In')) ?>
