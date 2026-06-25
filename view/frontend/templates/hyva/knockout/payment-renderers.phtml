@@ -17,6 +17,7 @@ $mageInitConfig = [
     'rendererComponents' => $block->getPaymentRendererComponents(),
     'scope' => 'iwdOpcHyvaPaymentRenderers'
 ];
+$block->ensureRequireJsAssets();
 ?>
 <style>
     .iwd-opc-ko-payment-root .payment-method-title,
@@ -158,4 +159,3 @@ $mageInitConfig = [
     };
 })();
 </script>
-

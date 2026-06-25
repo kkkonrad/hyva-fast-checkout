@@ -21,6 +21,9 @@
             <restrict_payment>
                 <enable>0</enable>
             </restrict_payment>
+            <hyva>
+                <auto_generate_requirejs_assets>1</auto_generate_requirejs_assets>
+            </hyva>
             <design>
                 <layout>
                     <desktop>onepage</desktop>

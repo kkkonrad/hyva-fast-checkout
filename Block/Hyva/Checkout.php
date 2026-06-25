@@ -18,6 +18,7 @@ use Magento\Framework\View\Element\Template;
 use Magento\Framework\View\Element\Template\Context;
 use Magento\Quote\Model\Quote;
 use Magento\Quote\Model\Quote\Item;
+use IWD\Opc\Model\Hyva\RequireJsAssets;
 
 class Checkout extends Template
 {
@@ -126,6 +127,18 @@ class Checkout extends Template
     public function getHyvaCsp(): HyvaCsp
     {
         return $this->viewModelRegistry->require(HyvaCsp::class);
+    }
+
+    /**
+     * @return bool
+     */
+    public function ensureRequireJsAssets()
+    {
+        try {
+            return $this->getObjectManager()->get(RequireJsAssets::class)->ensure($this->getQuote()->getStoreId());
+        } catch (\Throwable $exception) {
+            return false;
+        }
     }
 
     /**
