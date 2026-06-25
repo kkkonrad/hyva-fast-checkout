@@ -16,6 +16,20 @@ use Magewirephp\Magewire\Component;
 
 class Checkout extends Component
 {
+    private const PAYU_GATEWAY_METHOD = 'payu_gateway';
+    private const PAYU_REDIRECT_URI_INFO = 'payu_redirect_uri';
+    private const PAYU_ADDITIONAL_INFO_KEYS = [
+        'payu_method',
+        'payu_method_type',
+        'payu_browser_screenWidth',
+        'payu_browser_javaEnabled',
+        'payu_browser_timezoneOffset',
+        'payu_browser_screenHeight',
+        'payu_browser_userAgent',
+        'payu_browser_colorDepth',
+        'payu_browser_language'
+    ];
+
     /**
      * Shipping address fields
      */
@@ -277,24 +291,6 @@ class Checkout extends Component
 
     public function saveShippingAddress(bool $ignoreValidation = true, bool $saveQuote = true, bool $collectRates = true): void
     {
-        try {
-            $this->logger->info('IWD OPC saveShippingAddress properties: ' . json_encode([
-                'firstname' => $this->firstname,
-                'lastname' => $this->lastname,
-                'street1' => $this->street1,
-                'street2' => $this->street2,
-                'city' => $this->city,
-                'postcode' => $this->postcode,
-                'countryId' => $this->countryId,
-                'regionId' => $this->regionId,
-                'region' => $this->region,
-                'telephone' => $this->telephone,
-                'company' => $this->company
-            ]));
-        } catch (\Exception $e) {
-            // ignore
-        }
-
         $quote = $this->checkoutSession->getQuote();
         $shippingAddress = $quote->getShippingAddress();
         
@@ -352,24 +348,6 @@ class Checkout extends Component
      */
     public function saveBillingAddress(bool $ignoreValidation = true, bool $saveQuote = true): void
     {
-        try {
-            $this->logger->info('IWD OPC saveBillingAddress properties: SameAsShipping=' . var_export($this->billingSameAsShipping, true) . ', Data=' . json_encode([
-                'firstname' => $this->billingFirstname,
-                'lastname' => $this->billingLastname,
-                'street1' => $this->billingStreet1,
-                'street2' => $this->billingStreet2,
-                'city' => $this->billingCity,
-                'postcode' => $this->billingPostcode,
-                'countryId' => $this->billingCountryId,
-                'regionId' => $this->billingRegionId,
-                'region' => $this->billingRegion,
-                'telephone' => $this->billingTelephone,
-                'company' => $this->billingCompany
-            ]));
-        } catch (\Exception $e) {
-            // ignore
-        }
-
         $quote = $this->checkoutSession->getQuote();
         $billingAddress = $quote->getBillingAddress();
 
@@ -555,6 +533,9 @@ class Checkout extends Component
         $quote = $this->checkoutSession->getQuote();
         try {
             $methods = $this->paymentMethodManagement->getList($quote->getId());
+            $methods = array_values(array_filter($methods, function ($method) {
+                return $this->opcHelper->isHyvaNativePaymentMethodSupported($method->getCode());
+            }));
 
             $currentShipping = $this->shippingMethod ?: $quote->getShippingAddress()->getShippingMethod();
             if (empty($currentShipping)) {
@@ -633,10 +614,31 @@ class Checkout extends Component
      */
     public function selectPaymentMethod(string $methodCode): void
     {
+        if (!$this->opcHelper->isHyvaNativePaymentMethodSupported($methodCode)) {
+            $this->paymentMethod = '';
+            return;
+        }
+
         $quote = $this->checkoutSession->getQuote();
+        $methodAvailable = false;
+        foreach ($this->getPaymentMethods() as $method) {
+            if ($method->getCode() === $methodCode) {
+                $methodAvailable = true;
+                break;
+            }
+        }
+
+        if (!$methodAvailable) {
+            $this->paymentMethod = '';
+            return;
+        }
+
         $payment = $quote->getPayment();
         if ($payment) {
             $payment->setMethod($methodCode);
+            if ($methodCode === self::PAYU_GATEWAY_METHOD) {
+                $this->clearPayuAdditionalInformation($payment);
+            }
             if ($methodCode === 'purchaseorder' && method_exists($payment, 'setPoNumber')) {
                 $payment->setPoNumber($this->poNumber);
             }
@@ -710,6 +712,11 @@ class Checkout extends Component
         $this->orderError = '';
         $quote = $this->checkoutSession->getQuote();
 
+        if (!$quote->hasItems()) {
+            $this->orderError = (string)__('Your cart is empty.');
+            return;
+        }
+
         if (empty($this->email)) {
             $this->orderError = (string)__('Please enter your email address.');
             return;
@@ -738,6 +745,19 @@ class Checkout extends Component
             return;
         }
 
+        $paymentAllowed = false;
+        foreach ($this->getPaymentMethods() as $method) {
+            if ($method->getCode() === $this->paymentMethod) {
+                $paymentAllowed = true;
+                break;
+            }
+        }
+
+        if (!$paymentAllowed || !$this->opcHelper->isHyvaNativePaymentMethodSupported($this->paymentMethod)) {
+            $this->orderError = (string)__('The selected payment method is not available for this checkout.');
+            return;
+        }
+
         if ($this->paymentMethod === 'purchaseorder' && empty($this->poNumber)) {
             $this->orderError = (string)__('Purchase Order Number is a required field.');
             return;
@@ -746,6 +766,9 @@ class Checkout extends Component
         try {
             $payment = $quote->getPayment();
             $payment->setMethod($this->paymentMethod);
+            if ($this->paymentMethod === self::PAYU_GATEWAY_METHOD) {
+                $this->clearPayuAdditionalInformation($payment);
+            }
             if ($this->paymentMethod === 'purchaseorder' && method_exists($payment, 'setPoNumber')) {
                 $payment->setPoNumber($this->poNumber);
             }
@@ -765,11 +788,15 @@ class Checkout extends Component
 
             $this->checkoutSession->clearHelperData();
 
+            $redirectUrl = '';
             try {
                 if ($this->orderFactory !== null) {
                     $order = $this->orderFactory->create()->load($orderId);
                     $this->checkoutSession->setLastRealOrderId($order->getIncrementId());
                     $this->checkoutSession->setLastOrderStatus($order->getStatus());
+                    if ($this->paymentMethod === self::PAYU_GATEWAY_METHOD && $order->getPayment()) {
+                        $redirectUrl = (string)$order->getPayment()->getAdditionalInformation(self::PAYU_REDIRECT_URI_INFO);
+                    }
                 }
                 $this->checkoutSession->setLastQuoteId($quoteId);
                 $this->checkoutSession->setLastSuccessQuoteId($quoteId);
@@ -781,8 +808,7 @@ class Checkout extends Component
                     // Ignore
                 }
             }
-            
-            $this->redirect('checkout/onepage/success');
+            $this->redirect($redirectUrl ?: 'checkout/onepage/success');
         } catch (\Exception $e) {
             $this->orderError = $e->getMessage();
         }
@@ -793,12 +819,6 @@ class Checkout extends Component
      */
     public function updated($value, string $name)
     {
-        try {
-            $this->logger->info('IWD OPC updated hook: Name = ' . $name . ', Value = ' . var_export($value, true));
-        } catch (\Exception $e) {
-            // ignore
-        }
-
         if ((int)$this->regionId <= 0) {
             $this->regionId = '';
         }
@@ -939,5 +959,16 @@ class Checkout extends Component
             return (string)$this->directoryHelper->getDefaultCountry();
         }
         return 'US';
+    }
+
+    private function clearPayuAdditionalInformation($payment): void
+    {
+        if (!method_exists($payment, 'unsAdditionalInformation')) {
+            return;
+        }
+
+        foreach (self::PAYU_ADDITIONAL_INFO_KEYS as $key) {
+            $payment->unsAdditionalInformation($key);
+        }
     }
 }

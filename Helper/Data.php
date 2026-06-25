@@ -17,6 +17,8 @@ use Magento\Store\Model\ScopeInterface;
 use Magento\Checkout\Model\Cart;
 use Magento\Quote\Model\QuoteFactory;
 use Magento\Directory\Model\ResourceModel\Region\CollectionFactory;
+use Magento\Framework\View\DesignInterface;
+use Magento\Theme\Model\ThemeFactory;
 
 class Data extends AbstractHelper
 {
@@ -56,6 +58,21 @@ class Data extends AbstractHelper
     protected $cart;
     protected $quoteFactory;
     protected $regionCollectionFactory;
+    protected $design;
+    protected $themeFactory;
+
+    /**
+     * Payment methods supported by the native Magewire checkout without
+     * additional gateway-specific frontend payloads.
+     */
+    private const HYVA_NATIVE_SUPPORTED_PAYMENT_METHODS = [
+        'free',
+        'checkmo',
+        'banktransfer',
+        'cashondelivery',
+        'purchaseorder',
+        'payu_gateway'
+    ];
 
     public function __construct(
         Context $context,
@@ -69,7 +86,9 @@ class Data extends AbstractHelper
         TransportBuilder $transportBuilder,
         Cart $cart,
         QuoteFactory $quoteFactory,
-        CollectionFactory $regionCollectionFactory
+        CollectionFactory $regionCollectionFactory,
+        DesignInterface $design,
+        ThemeFactory $themeFactory
     ) {
         parent::__construct($context);
         $this->resourceConfig = $resourceConfig;
@@ -83,6 +102,8 @@ class Data extends AbstractHelper
         $this->cart = $cart;
         $this->quoteFactory = $quoteFactory;
         $this->regionCollectionFactory = $regionCollectionFactory;
+        $this->design = $design;
+        $this->themeFactory = $themeFactory;
     }
 
     public function isEnable()
@@ -199,6 +220,57 @@ class Data extends AbstractHelper
     public function isReloadShippingOnDiscount()
     {
         return (bool)$this->scopeConfig->getValue(self::XML_PATH_RELOAD_SHIPPING_ON_DISCOUNT, ScopeInterface::SCOPE_STORE);
+    }
+
+    public function canUseHyvaNativeCheckout()
+    {
+        if (!$this->isEnable() || !$this->isModuleOutputEnabled('IWD_Opc')) {
+            return false;
+        }
+
+        if (!class_exists(\Hyva\Theme\ViewModel\HyvaCsp::class)
+            || !class_exists(\Magewirephp\Magewire\Component::class)) {
+            return false;
+        }
+
+        $themePath = '';
+        try {
+            $theme = $this->design ? $this->design->getDesignTheme() : null;
+            $themePath = $theme ? (string)$theme->getFullPath() : '';
+        } catch (\Exception $e) {
+            $themePath = '';
+        }
+
+        if (!$this->isHyvaThemePath($themePath) && $this->themeFactory !== null) {
+            try {
+                $themeId = (int)$this->scopeConfig->getValue(
+                    'design/theme/theme_id',
+                    ScopeInterface::SCOPE_STORE
+                );
+                if ($themeId > 0) {
+                    $themePath = (string)$this->themeFactory->create()
+                        ->load($themeId)
+                        ->getFullPath();
+                }
+            } catch (\Exception $e) {
+                $themePath = '';
+            }
+        }
+
+        return $this->isHyvaThemePath($themePath);
+    }
+
+    public function isHyvaNativePaymentMethodSupported($methodCode)
+    {
+        return in_array((string)$methodCode, self::HYVA_NATIVE_SUPPORTED_PAYMENT_METHODS, true);
+    }
+
+    private function isHyvaThemePath($themePath)
+    {
+        $themePath = (string)$themePath;
+
+        return stripos($themePath, 'frontend/Hyva/') === 0
+            || stripos($themePath, '/hyva') !== false;
     }
 
     public function getPaymentTitleType()

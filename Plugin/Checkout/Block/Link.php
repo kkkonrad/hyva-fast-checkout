@@ -20,7 +20,7 @@ class Link
 
     public function afterGetHref($subject, $result)
     {
-        if ($this->opcHelper->isEnable()) {
+        if ($this->opcHelper->canUseHyvaNativeCheckout()) {
             $result = $this->url->getUrl('fast-checkout', ['_secure' => true]);
         }
 

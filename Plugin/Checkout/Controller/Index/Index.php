@@ -3,30 +3,32 @@
 namespace IWD\Opc\Plugin\Checkout\Controller\Index;
 
 use IWD\Opc\Helper\Data as OpcHelper;
-use Magento\Framework\App\Response\Http as ResponseHttp;
+use Magento\Framework\Controller\Result\RedirectFactory;
 use Magento\Framework\UrlInterface;
 
 class Index
 {
     private $opcHelper;
     private $url;
-    private $response;
+    private $redirectFactory;
 
     public function __construct(
         OpcHelper $opcHelper,
-        ResponseHttp $response,
+        RedirectFactory $redirectFactory,
         UrlInterface $url
     ) {
         $this->opcHelper = $opcHelper;
-        $this->response = $response;
+        $this->redirectFactory = $redirectFactory;
         $this->url = $url;
     }
 
-    public function beforeExecute()
+    public function aroundExecute($subject, callable $proceed)
     {
-        if ($this->opcHelper->isEnable()) {
-            $url = $this->url->getUrl('fast-checkout');
-            $this->response->setRedirect($url);
+        if ($this->opcHelper->canUseHyvaNativeCheckout()) {
+            return $this->redirectFactory->create()
+                ->setUrl($this->url->getUrl('fast-checkout', ['_secure' => true]));
         }
+
+        return $proceed();
     }
 }

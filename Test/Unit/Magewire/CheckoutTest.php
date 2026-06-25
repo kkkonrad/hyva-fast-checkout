@@ -10,6 +10,7 @@ use Magento\Quote\Api\CartRepositoryInterface;
 use Magento\Quote\Api\ShippingMethodManagementInterface;
 use Magento\Quote\Api\PaymentMethodManagementInterface;
 use Magento\Quote\Api\CartManagementInterface;
+use Magento\Quote\Api\Data\PaymentMethodInterface;
 use Magento\Directory\Model\ResourceModel\Country\CollectionFactory as CountryCollectionFactory;
 use Magento\Directory\Model\ResourceModel\Region\CollectionFactory as RegionCollectionFactory;
 use Magento\Newsletter\Model\SubscriberFactory;
@@ -103,7 +104,7 @@ class CheckoutTest extends TestCase
 
         $this->quoteMock = $this->getMockBuilder(Quote::class)
             ->disableOriginalConstructor()
-            ->onlyMethods(['getShippingAddress', 'getBillingAddress', 'getPayment', 'isVirtual', 'getId', 'setCheckoutMethod', 'collectTotals'])
+            ->onlyMethods(['getShippingAddress', 'getBillingAddress', 'getPayment', 'isVirtual', 'getId', 'hasItems', 'setCheckoutMethod', 'collectTotals'])
             ->addMethods(['getCustomerId', 'getCustomerEmail', 'getCouponCode', 'setCustomerEmail', 'setCouponCode'])
             ->getMock();
 
@@ -112,6 +113,10 @@ class CheckoutTest extends TestCase
             ->willReturn($this->quoteMock);
 
         $loggerMock = $this->createMock(\Psr\Log\LoggerInterface::class);
+        $this->opcHelperMock->method('isHyvaNativePaymentMethodSupported')
+            ->willReturnCallback(static function ($methodCode): bool {
+                return in_array($methodCode, ['free', 'checkmo', 'banktransfer', 'cashondelivery', 'purchaseorder'], true);
+            });
 
         $this->checkoutComponent = new Checkout(
             $this->checkoutSessionMock,
@@ -125,6 +130,14 @@ class CheckoutTest extends TestCase
             $this->opcHelperMock,
             $loggerMock
         );
+    }
+
+    private function createPaymentMethodMock(string $code): PaymentMethodInterface
+    {
+        $method = $this->createMock(PaymentMethodInterface::class);
+        $method->method('getCode')->willReturn($code);
+
+        return $method;
     }
 
     private function createAddressMock(array $additionalMethods = []): MockObject
@@ -372,6 +385,16 @@ class CheckoutTest extends TestCase
 
     public function testSelectPaymentMethod(): void
     {
+        $this->checkoutComponent->shippingMethod = 'flatrate_flatrate';
+
+        $this->quoteMock->expects($this->any())
+            ->method('getId')
+            ->willReturn(42);
+        $this->paymentMethodManagementMock->expects($this->once())
+            ->method('getList')
+            ->with(42)
+            ->willReturn([$this->createPaymentMethodMock('checkmo')]);
+
         $paymentMock = $this->getMockBuilder(\Magento\Quote\Model\Quote\Payment::class)
             ->disableOriginalConstructor()
             ->getMock();
@@ -463,6 +486,10 @@ class CheckoutTest extends TestCase
         $this->checkoutComponent->email = 'guest@example.com';
         $this->checkoutComponent->paymentMethod = 'checkmo';
         $this->checkoutComponent->shippingMethod = 'flatrate_flatrate';
+
+        $this->quoteMock->expects($this->once())
+            ->method('hasItems')
+            ->willReturn(true);
         $this->checkoutComponent->billingSameAsShipping = false;
 
         $this->quoteMock->expects($this->once())
@@ -514,9 +541,14 @@ class CheckoutTest extends TestCase
             ->method('save')
             ->with($this->quoteMock);
 
-        $this->quoteMock->expects($this->once())
+        $this->quoteMock->expects($this->any())
             ->method('getId')
             ->willReturn(42);
+
+        $this->paymentMethodManagementMock->expects($this->once())
+            ->method('getList')
+            ->with(42)
+            ->willReturn([$this->createPaymentMethodMock('checkmo')]);
 
         $this->cartManagementMock->expects($this->once())
             ->method('placeOrder')
@@ -535,6 +567,10 @@ class CheckoutTest extends TestCase
         $this->checkoutComponent->email = 'guest@example.com';
         $this->checkoutComponent->paymentMethod = 'checkmo';
         $this->checkoutComponent->shippingMethod = 'flatrate_flatrate';
+
+        $this->quoteMock->expects($this->once())
+            ->method('hasItems')
+            ->willReturn(true);
 
         $this->quoteMock->expects($this->once())
             ->method('getCustomerId')

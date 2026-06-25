@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace IWD\Opc\Test\Unit\Block\Hyva;
 
 use IWD\Opc\Block\Hyva\Checkout;
+use Hyva\Theme\Model\ViewModelRegistry;
 use Magento\Catalog\Helper\Image as ImageHelper;
 use Magento\Catalog\Helper\Product\Configuration as ProductConfiguration;
 use Magento\Checkout\Model\Session as CheckoutSession;
@@ -48,6 +49,11 @@ class CheckoutTest extends TestCase
     private $productConfigurationMock;
 
     /**
+     * @var ViewModelRegistry|MockObject
+     */
+    private $viewModelRegistryMock;
+
+    /**
      * @var Quote|MockObject
      */
     private $quoteMock;
@@ -64,6 +70,7 @@ class CheckoutTest extends TestCase
         $this->pricingHelperMock = $this->createMock(PricingHelper::class);
         $this->imageHelperMock = $this->createMock(ImageHelper::class);
         $this->productConfigurationMock = $this->createMock(ProductConfiguration::class);
+        $this->viewModelRegistryMock = $this->createMock(ViewModelRegistry::class);
         $this->quoteMock = $this->createMock(Quote::class);
 
         $this->checkoutSessionMock->expects($this->any())
@@ -76,6 +83,7 @@ class CheckoutTest extends TestCase
             $this->pricingHelperMock,
             $this->imageHelperMock,
             $this->productConfigurationMock,
+            $this->viewModelRegistryMock,
             []
         );
     }

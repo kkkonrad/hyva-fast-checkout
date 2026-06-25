@@ -38,7 +38,7 @@ class Index extends Action
             return $this->resultRedirectFactory->create()->setPath('customer/account/edit');
         }
 
-        if ($this->getRequest()->getFrontName() !== 'hyvaopc') {
+        if (!$this->isHyvaOpcRequest()) {
             if (!$this->canShowForUnregisteredUsers()) {
                 throw new NotFoundException(__('Page not found.'));
             }
@@ -51,7 +51,7 @@ class Index extends Action
 
         $quote = $this->onepage->getQuote();
         
-        if ($this->getRequest()->getFrontName() === 'hyvaopc') {
+        if ($this->isHyvaOpcRequest()) {
             if ($quote->hasItems() && ($quote->getHasError() || !$quote->validateMinimumAmount())) {
                 return $this->resultRedirectFactory->create()->setPath('checkout/cart');
             }
@@ -82,11 +82,17 @@ class Index extends Action
         }
 
         $resultPage = $this->resultPageFactory->create();
-        if ($this->getRequest()->getFrontName() === 'hyvaopc') {
+        if ($this->isHyvaOpcRequest()) {
             $resultPage->getConfig()->getTitle()->set(__('Checkout'));
         } else {
             $resultPage->getConfig()->getTitle()->set($this->opcHelper->getTitle());
         }
         return $resultPage;
+    }
+
+    private function isHyvaOpcRequest()
+    {
+        return $this->getRequest()->getModuleName() === 'hyvaopc'
+            || $this->getRequest()->getFrontName() === 'fast-checkout';
     }
 }

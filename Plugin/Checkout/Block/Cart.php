@@ -20,7 +20,7 @@ class Cart
 
     public function afterGetCheckoutUrl($subject, $result)
     {
-        if ($this->opcHelper->isEnable()) {
+        if ($this->opcHelper->canUseHyvaNativeCheckout()) {
             $result = $this->url->getUrl('fast-checkout', ['_secure' => true]);
         }
 

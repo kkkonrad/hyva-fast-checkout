@@ -12,7 +12,7 @@ const selectors = {
     telephone: 'input[data-wire-field="telephone"]',
     country: 'select[wire\\:model\\.blur="countryId"]',
     region: 'select[wire\\:model\\.blur="regionId"]',
-    savedAddresses: 'select[data-select-id="saved-address-select"]',
+    savedAddresses: '#saved-address-select',
     useSavedAddressBtn: 'button[data-select-id="saved-address-select"]',
     placeOrderBtn: 'button[type="submit"]',
     orderError: '#messages .message-error, #messages .message.error',
@@ -30,7 +30,7 @@ export class CheckoutPage {
     }
 
     async goto() {
-        await this.page.goto('/checkout/onepage');
+        await this.page.goto('/fast-checkout/');
         await this.page.waitForLoadState('domcontentloaded');
     }
 

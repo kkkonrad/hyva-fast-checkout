@@ -20,8 +20,8 @@ class DefaultConfigProvider
 
     public function afterGetCheckoutUrl($subject, $result)
     {
-        if ($this->opcHelper->isEnable()) {
-            $result = $this->url->getUrl('fast-checkout');
+        if ($this->opcHelper->canUseHyvaNativeCheckout()) {
+            $result = $this->url->getUrl('fast-checkout', ['_secure' => true]);
         }
 
         return $result;
