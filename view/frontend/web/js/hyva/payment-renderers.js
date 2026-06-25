@@ -248,12 +248,14 @@ define([
                         return false;
                     }
 
-                    root.querySelectorAll('.payment-method').forEach(function (element) {
+                    var allRenderers = document.querySelectorAll('.payment-method');
+
+                    allRenderers.forEach(function (element) {
                         element.classList.remove('_active');
                         element.removeAttribute('data-iwd-active');
                     });
 
-                    root.querySelectorAll('.payment-method').forEach(function (element) {
+                    allRenderers.forEach(function (element) {
                         if (!activeElement && elementMatchesMethod(element, methodCode, activeCode)) {
                             activeElement = element;
                         }
@@ -262,6 +264,19 @@ define([
                     if (activeElement) {
                         activeElement.classList.add('_active');
                         activeElement.setAttribute('data-iwd-active', 'true');
+
+                        var target = document.querySelector('[data-iwd-payment-method-ko-target="' + methodCode + '"]');
+                        if (target) {
+                            // Hide all other placeholders
+                            document.querySelectorAll('.iwd-opc-payment-method-ko-container').forEach(function (placeholder) {
+                                placeholder.classList.add('hidden');
+                                placeholder.style.display = 'none';
+                            });
+
+                            target.appendChild(activeElement);
+                            target.classList.remove('hidden');
+                            target.style.display = 'block';
+                        }
                     }
 
                     return !!activeElement;
@@ -381,7 +396,21 @@ define([
                     }
                 }, true);
 
+                function moveRenderersBackToRoot() {
+                    var root = document.getElementById('iwd-opc-ko-payment-root');
+                    if (root) {
+                        document.querySelectorAll('.payment-method').forEach(function (element) {
+                            if (element.parentNode !== root) {
+                                root.appendChild(element);
+                            }
+                        });
+                    }
+                }
+
                 if (window.Livewire && typeof window.Livewire.hook === 'function') {
+                    window.Livewire.hook('message.sent', function () {
+                        moveRenderersBackToRoot();
+                    });
                     window.Livewire.hook('message.processed', function () {
                         if (window.console && typeof window.console.log === 'function') {
                             window.console.log('IWD OPC: Livewire message.processed triggered');
@@ -392,20 +421,6 @@ define([
                     });
                 }
 
-                if (typeof window.MutationObserver === 'function') {
-                    var observer = new MutationObserver(function (mutations) {
-                        syncPaymentMethods();
-                        patchRenderers();
-                        var selectedMethod = getSelectedMethodCode();
-                        if (selectedMethod) {
-                            setSelectedMethod(selectedMethod);
-                        }
-                    });
-                    observer.observe(document.body, {
-                        childList: true,
-                        subtree: true
-                    });
-                }
             });
         });
     };

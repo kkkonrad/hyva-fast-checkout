@@ -466,6 +466,8 @@ $paymentMethods = $magewire->getPaymentMethods();
                                     <span class="font-medium text-sm text-gray-800"><?= $escaper->escapeHtml($method->getTitle()) ?></span>
                                 </label>
                                 
+                                <div class="iwd-opc-payment-method-ko-container border-t border-gray-100 hidden" style="display: none;" data-iwd-payment-method-ko-target="<?= $escaper->escapeHtmlAttr($method->getCode()) ?>"></div>
+                                
                                  <?php if ($magewire->paymentMethod === $method->getCode()): ?>
                                      <?php $details = $magewire->getPaymentMethodDetails($method->getCode()); ?>
                                      <?php $isPurchaseOrder = ($method->getCode() === 'purchaseorder'); ?>
