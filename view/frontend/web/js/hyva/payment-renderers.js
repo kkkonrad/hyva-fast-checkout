@@ -399,6 +399,13 @@ define([
                     return updateActiveRendererClass(methodCode, activeCode);
                 }
 
+                var readyDispatched = false;
+                function dispatchReadyEvent() {
+                    if (readyDispatched) { return; }
+                    readyDispatched = true;
+                    document.dispatchEvent(new CustomEvent('iwd-opc:ready'));
+                }
+
                 function setSelectedMethod(methodCode) {
                     if (window.console && typeof window.console.log === 'function') {
                         window.console.log('IWD OPC: setSelectedMethod called with:', methodCode);
@@ -414,6 +421,9 @@ define([
                             applySelectedMethod(methodCode);
                         }, delay);
                     });
+
+                    // Signal the page overlay that KO renderers are fully initialized
+                    window.setTimeout(dispatchReadyEvent, 850);
                 }
 
 
