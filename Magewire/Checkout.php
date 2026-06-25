@@ -16,27 +16,23 @@ use Magewirephp\Magewire\Component;
 
 class Checkout extends Component
 {
-    private const PAYU_GATEWAY_METHOD = 'payu_gateway';
-    private const PAYU_REDIRECT_URI_INFO = 'payu_redirect_uri';
-    private const TPAY_GATEWAY_METHOD = 'Tpay_Magento2';
-    private const TPAY_CARD_METHOD = 'Tpay_Magento2_Cards';
-    private const TPAY_GENERIC_PREFIX = 'generic-';
-    private const TPAY_REDIRECT_PATH = 'magento2basic/tpay/redirect';
-    private const TPAY_INFO_ACCEPT_TOS = 'accept_tos';
-    private const TPAY_INFO_GROUP = 'group';
-    private const TPAY_INFO_CHANNEL = 'channel';
-    private const TPAY_INFO_BLIK_CODE = 'blik_code';
-    private const TPAY_INFO_BLIK_ALIAS = 'blik_alias';
-    private const PAYU_ADDITIONAL_INFO_KEYS = [
-        'payu_method',
-        'payu_method_type',
-        'payu_browser_screenWidth',
-        'payu_browser_javaEnabled',
-        'payu_browser_timezoneOffset',
-        'payu_browser_screenHeight',
-        'payu_browser_userAgent',
-        'payu_browser_colorDepth',
-        'payu_browser_language'
+    private const GENERIC_PAYMENT_METHOD_PREFIX = 'generic-';
+    private const REDIRECT_ADDITIONAL_INFORMATION_KEYS = [
+        'redirect_url',
+        'redirect_uri',
+        'redirectUrl',
+        'redirectUri',
+        'transaction_url',
+        'transactionUrl',
+        'payu_redirect_uri',
+        'order_place_redirect_url',
+        'checkout_redirect_url'
+    ];
+    private const REDIRECT_METHODS = [
+        'getOrderPlaceRedirectUrl',
+        'getCheckoutRedirectUrl',
+        'getPaymentRedirectUrl',
+        'getRedirectUrl'
     ];
 
     /**
@@ -114,7 +110,6 @@ class Checkout extends Component
     private $customerSession;
     private $addressRepository;
     private $searchCriteriaBuilder;
-    private $urlBuilder;
 
     /**
      * @param CheckoutSession $checkoutSession
@@ -133,7 +128,6 @@ class Checkout extends Component
      * @param CustomerSession|null $customerSession
      * @param AddressRepositoryInterface|null $addressRepository
      * @param SearchCriteriaBuilder|null $searchCriteriaBuilder
-     * @param \Magento\Framework\UrlInterface|null $urlBuilder
      */
     public function __construct(
         CheckoutSession $checkoutSession,
@@ -151,8 +145,7 @@ class Checkout extends Component
         \Magento\Sales\Model\OrderFactory $orderFactory = null,
         CustomerSession $customerSession = null,
         AddressRepositoryInterface $addressRepository = null,
-        SearchCriteriaBuilder $searchCriteriaBuilder = null,
-        \Magento\Framework\UrlInterface $urlBuilder = null
+        SearchCriteriaBuilder $searchCriteriaBuilder = null
     ) {
         $this->checkoutSession = $checkoutSession;
         $this->cartRepository = $cartRepository;
@@ -197,11 +190,6 @@ class Checkout extends Component
             $this->searchCriteriaBuilder = $searchCriteriaBuilder ?? \Magento\Framework\App\ObjectManager::getInstance()->get(SearchCriteriaBuilder::class);
         } catch (\Exception $e) {
             $this->searchCriteriaBuilder = null;
-        }
-        try {
-            $this->urlBuilder = $urlBuilder ?? \Magento\Framework\App\ObjectManager::getInstance()->get(\Magento\Framework\UrlInterface::class);
-        } catch (\Exception $e) {
-            $this->urlBuilder = null;
         }
     }
 
@@ -611,14 +599,7 @@ class Checkout extends Component
 
         $payment = $quote->getPayment();
         if ($payment) {
-            if ($this->isTpayPaymentMethod($methodCode)) {
-                $this->applyTpayPaymentData($payment, $methodCode);
-            } else {
-                $payment->setMethod($methodCode);
-            }
-            if ($methodCode === self::PAYU_GATEWAY_METHOD) {
-                $this->clearPayuAdditionalInformation($payment);
-            }
+            $this->importPaymentData($payment, $methodCode);
             if ($methodCode === 'purchaseorder' && method_exists($payment, 'setPoNumber')) {
                 $payment->setPoNumber($this->poNumber);
             }
@@ -745,14 +726,7 @@ class Checkout extends Component
 
         try {
             $payment = $quote->getPayment();
-            if ($this->isTpayPaymentMethod($this->paymentMethod)) {
-                $this->applyTpayPaymentData($payment, $this->paymentMethod);
-            } else {
-                $payment->setMethod($this->paymentMethod);
-            }
-            if ($this->paymentMethod === self::PAYU_GATEWAY_METHOD) {
-                $this->clearPayuAdditionalInformation($payment);
-            }
+            $this->importPaymentData($payment, $this->paymentMethod);
             if ($this->paymentMethod === 'purchaseorder' && method_exists($payment, 'setPoNumber')) {
                 $payment->setPoNumber($this->poNumber);
             }
@@ -778,12 +752,7 @@ class Checkout extends Component
                     $order = $this->orderFactory->create()->load($orderId);
                     $this->checkoutSession->setLastRealOrderId($order->getIncrementId());
                     $this->checkoutSession->setLastOrderStatus($order->getStatus());
-                    if ($this->paymentMethod === self::PAYU_GATEWAY_METHOD && $order->getPayment()) {
-                        $redirectUrl = (string)$order->getPayment()->getAdditionalInformation(self::PAYU_REDIRECT_URI_INFO);
-                    }
-                    if ($this->isTpayPaymentMethod($this->paymentMethod)) {
-                        $redirectUrl = $this->getTpayRedirectUrl();
-                    }
+                    $redirectUrl = $this->resolvePaymentRedirectUrl($order);
                 }
                 $this->checkoutSession->setLastQuoteId($quoteId);
                 $this->checkoutSession->setLastSuccessQuoteId($quoteId);
@@ -948,52 +917,99 @@ class Checkout extends Component
         return 'US';
     }
 
-    private function clearPayuAdditionalInformation($payment): void
+    private function importPaymentData($payment, string $methodCode): void
     {
-        if (!method_exists($payment, 'unsAdditionalInformation')) {
+        if (!$payment) {
             return;
         }
 
-        foreach (self::PAYU_ADDITIONAL_INFO_KEYS as $key) {
-            $payment->unsAdditionalInformation($key);
-        }
-    }
+        $data = [
+            'method' => $methodCode,
+            'additional_data' => $this->getGenericAdditionalPaymentData($methodCode),
+        ];
 
-    private function isTpayPaymentMethod(string $methodCode): bool
-    {
-        return $methodCode === self::TPAY_GATEWAY_METHOD
-            || $methodCode === self::TPAY_CARD_METHOD
-            || strpos($methodCode, self::TPAY_GENERIC_PREFIX) === 0;
-    }
-
-    private function applyTpayPaymentData($payment, string $methodCode): void
-    {
-        $payment->setMethod(self::TPAY_GATEWAY_METHOD);
-
-        if (!method_exists($payment, 'setAdditionalInformation')) {
+        if (method_exists($payment, 'importData')) {
+            $payment->importData($data);
             return;
         }
 
+        $payment->setMethod($methodCode);
+    }
+
+    private function getGenericAdditionalPaymentData(string $methodCode): array
+    {
         $channel = '';
-        if (strpos($methodCode, self::TPAY_GENERIC_PREFIX) === 0) {
-            $channel = substr($methodCode, strlen(self::TPAY_GENERIC_PREFIX));
+        if (strpos($methodCode, self::GENERIC_PAYMENT_METHOD_PREFIX) === 0) {
+            $channel = substr($methodCode, strlen(self::GENERIC_PAYMENT_METHOD_PREFIX));
         }
 
-        $payment->setAdditionalInformation(self::TPAY_INFO_ACCEPT_TOS, true);
-        $payment->setAdditionalInformation(self::TPAY_INFO_GROUP, $channel);
-        $payment->setAdditionalInformation(self::TPAY_INFO_CHANNEL, $channel);
-        $payment->setAdditionalInformation(self::TPAY_INFO_BLIK_CODE, '');
-        $payment->setAdditionalInformation(self::TPAY_INFO_BLIK_ALIAS, false);
+        return [
+            'accept_tos' => true,
+            'terms_accept' => true,
+            'group' => $channel,
+            'channel' => $channel,
+            'blik_code' => '',
+            'blik_alias' => false,
+        ];
     }
 
-    private function getTpayRedirectUrl(): string
+    private function resolvePaymentRedirectUrl($order): string
     {
-        if ($this->urlBuilder === null) {
-            return self::TPAY_REDIRECT_PATH;
+        if (!$order || !method_exists($order, 'getPayment')) {
+            return '';
         }
 
-        return $this->urlBuilder->getUrl(self::TPAY_REDIRECT_PATH, [
-            'uid' => time() . uniqid('', true)
-        ]);
+        $payment = $order->getPayment();
+        if (!$payment) {
+            return '';
+        }
+
+        $redirectUrl = $this->getRedirectUrlFromAdditionalInformation($payment);
+        if ($redirectUrl !== '') {
+            return $redirectUrl;
+        }
+
+        foreach (self::REDIRECT_METHODS as $method) {
+            if (method_exists($payment, $method)) {
+                $redirectUrl = (string)$payment->{$method}();
+                if ($redirectUrl !== '') {
+                    return $redirectUrl;
+                }
+            }
+        }
+
+        if (method_exists($payment, 'getMethodInstance')) {
+            try {
+                $methodInstance = $payment->getMethodInstance();
+                foreach (self::REDIRECT_METHODS as $method) {
+                    if (method_exists($methodInstance, $method)) {
+                        $redirectUrl = (string)$methodInstance->{$method}();
+                        if ($redirectUrl !== '') {
+                            return $redirectUrl;
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+                return '';
+            }
+        }
+
+        return '';
+    }
+
+    private function getRedirectUrlFromAdditionalInformation($payment): string
+    {
+        if (!method_exists($payment, 'getAdditionalInformation')) {
+            return '';
+        }
+
+        foreach (self::REDIRECT_ADDITIONAL_INFORMATION_KEYS as $key) {
+            $value = $payment->getAdditionalInformation($key);
+            if (is_string($value) && $value !== '') {
+                return $value;
+            }
+        }
+
+        return '';
     }
 }

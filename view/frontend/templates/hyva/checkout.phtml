@@ -468,7 +468,8 @@ $paymentMethods = $magewire->getPaymentMethods();
                                  <?php if ($magewire->paymentMethod === $method->getCode()): ?>
                                      <?php $details = $magewire->getPaymentMethodDetails($method->getCode()); ?>
                                      <?php $isPurchaseOrder = ($method->getCode() === 'purchaseorder'); ?>
-                                     <?php if ($isPurchaseOrder || !empty($details['instructions']) || !empty($details['payable_to']) || !empty($details['mailing_address'])): ?>
+                                     <?php $hasPaymentDetails = $isPurchaseOrder || !empty($details['instructions']) || !empty($details['payable_to']) || !empty($details['mailing_address']); ?>
+                                     <?php if ($hasPaymentDetails): ?>
                                          <div class="px-4 py-4 border-t border-gray-100 bg-gray-50/70 rounded-b-lg space-y-4">
                                              <?php if ($isPurchaseOrder): ?>
                                                  <label class="block">

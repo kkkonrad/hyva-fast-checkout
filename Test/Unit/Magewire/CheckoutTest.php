@@ -397,6 +397,7 @@ class CheckoutTest extends TestCase
 
         $paymentMock = $this->getMockBuilder(\Magento\Quote\Model\Quote\Payment::class)
             ->disableOriginalConstructor()
+            ->onlyMethods(['importData'])
             ->getMock();
 
         $this->quoteMock->expects($this->once())
@@ -404,8 +405,16 @@ class CheckoutTest extends TestCase
             ->willReturn($paymentMock);
 
         $paymentMock->expects($this->once())
-            ->method('setMethod')
-            ->with('checkmo');
+            ->method('importData')
+            ->with($this->callback(static function (array $data): bool {
+                return $data['method'] === 'checkmo'
+                    && $data['additional_data']['accept_tos'] === true
+                    && $data['additional_data']['terms_accept'] === true
+                    && $data['additional_data']['group'] === ''
+                    && $data['additional_data']['channel'] === ''
+                    && $data['additional_data']['blik_code'] === ''
+                    && $data['additional_data']['blik_alias'] === false;
+            }));
 
         $this->quoteMock->expects($this->once())->method('collectTotals');
         $this->cartRepositoryMock->expects($this->once())
@@ -416,7 +425,7 @@ class CheckoutTest extends TestCase
         $this->assertEquals('checkmo', $this->checkoutComponent->paymentMethod);
     }
 
-    public function testSelectTpayPaymentMethodStoresRequiredAdditionalInformation(): void
+    public function testSelectGenericPaymentMethodImportsChannelAdditionalData(): void
     {
         $this->quoteMock->expects($this->any())
             ->method('getId')
@@ -425,11 +434,11 @@ class CheckoutTest extends TestCase
         $this->paymentMethodManagementMock->expects($this->once())
             ->method('getList')
             ->with(42)
-            ->willReturn([$this->createPaymentMethodMock('Tpay_Magento2')]);
+            ->willReturn([$this->createPaymentMethodMock('generic-150')]);
 
         $paymentMock = $this->getMockBuilder(\Magento\Quote\Model\Quote\Payment::class)
             ->disableOriginalConstructor()
-            ->onlyMethods(['setMethod', 'setAdditionalInformation'])
+            ->onlyMethods(['importData'])
             ->getMock();
 
         $this->quoteMock->expects($this->once())
@@ -437,30 +446,25 @@ class CheckoutTest extends TestCase
             ->willReturn($paymentMock);
 
         $paymentMock->expects($this->once())
-            ->method('setMethod')
-            ->with('Tpay_Magento2');
-
-        $additionalInformation = [];
-        $paymentMock->expects($this->exactly(5))
-            ->method('setAdditionalInformation')
-            ->willReturnCallback(static function (string $key, $value) use (&$additionalInformation, $paymentMock) {
-                $additionalInformation[$key] = $value;
-                return $paymentMock;
-            });
+            ->method('importData')
+            ->with($this->callback(static function (array $data): bool {
+                return $data['method'] === 'generic-150'
+                    && $data['additional_data']['accept_tos'] === true
+                    && $data['additional_data']['terms_accept'] === true
+                    && $data['additional_data']['group'] === '150'
+                    && $data['additional_data']['channel'] === '150'
+                    && $data['additional_data']['blik_code'] === ''
+                    && $data['additional_data']['blik_alias'] === false;
+            }));
 
         $this->quoteMock->expects($this->once())->method('collectTotals');
         $this->cartRepositoryMock->expects($this->once())
             ->method('save')
             ->with($this->quoteMock);
 
-        $this->checkoutComponent->selectPaymentMethod('Tpay_Magento2');
+        $this->checkoutComponent->selectPaymentMethod('generic-150');
 
-        $this->assertEquals('Tpay_Magento2', $this->checkoutComponent->paymentMethod);
-        $this->assertSame(true, $additionalInformation['accept_tos']);
-        $this->assertSame('', $additionalInformation['group']);
-        $this->assertSame('', $additionalInformation['channel']);
-        $this->assertSame('', $additionalInformation['blik_code']);
-        $this->assertSame(false, $additionalInformation['blik_alias']);
+        $this->assertEquals('generic-150', $this->checkoutComponent->paymentMethod);
     }
 
     public function testGetPaymentMethodsReturnsAllMagentoAvailableMethods(): void
@@ -595,6 +599,7 @@ class CheckoutTest extends TestCase
 
         $paymentMock = $this->getMockBuilder(\Magento\Quote\Model\Quote\Payment::class)
             ->disableOriginalConstructor()
+            ->onlyMethods(['importData'])
             ->getMock();
 
         $this->quoteMock->expects($this->any())
@@ -602,8 +607,12 @@ class CheckoutTest extends TestCase
             ->willReturn($paymentMock);
 
         $paymentMock->expects($this->once())
-            ->method('setMethod')
-            ->with('checkmo');
+            ->method('importData')
+            ->with($this->callback(static function (array $data): bool {
+                return $data['method'] === 'checkmo'
+                    && $data['additional_data']['accept_tos'] === true
+                    && $data['additional_data']['terms_accept'] === true;
+            }));
 
         $this->cartRepositoryMock->expects($this->any())
             ->method('save')
