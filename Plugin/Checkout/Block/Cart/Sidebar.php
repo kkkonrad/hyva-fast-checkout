@@ -21,7 +21,7 @@ class Sidebar
     public function afterGetCheckoutUrl($subject, $result)
     {
         if ($this->opcHelper->isEnable()) {
-            $result = $this->url->getUrl('onepage');
+            $result = $this->url->getUrl('fast-checkout');
         }
 
         return $result;

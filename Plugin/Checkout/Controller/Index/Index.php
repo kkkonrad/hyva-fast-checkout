@@ -25,7 +25,7 @@ class Index
     public function beforeExecute()
     {
         if ($this->opcHelper->isEnable()) {
-            $url = $this->url->getUrl('onepage');
+            $url = $this->url->getUrl('fast-checkout');
             $this->response->setRedirect($url);
         }
     }

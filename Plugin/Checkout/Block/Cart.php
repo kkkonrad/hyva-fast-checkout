@@ -21,7 +21,7 @@ class Cart
     public function afterGetCheckoutUrl($subject, $result)
     {
         if ($this->opcHelper->isEnable()) {
-            $result = $this->url->getUrl('onepage', ['_secure' => true]);
+            $result = $this->url->getUrl('fast-checkout', ['_secure' => true]);
         }
 
         return $result;

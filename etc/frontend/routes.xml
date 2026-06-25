@@ -5,5 +5,8 @@
         <route id="onepage" frontName="onepage">
             <module name="IWD_Opc" />
         </route>
+        <route id="hyvaopc" frontName="fast-checkout">
+            <module name="IWD_Opc" />
+        </route>
     </router>
 </config>

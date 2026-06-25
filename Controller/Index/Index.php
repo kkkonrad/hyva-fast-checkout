@@ -38,8 +38,10 @@ class Index extends Action
             return $this->resultRedirectFactory->create()->setPath('customer/account/edit');
         }
 
-        if (!$this->canShowForUnregisteredUsers()) {
-            throw new NotFoundException(__('Page not found.'));
+        if ($this->getRequest()->getFrontName() !== 'hyvaopc') {
+            if (!$this->canShowForUnregisteredUsers()) {
+                throw new NotFoundException(__('Page not found.'));
+            }
         }
 
         if (!$this->checkoutHelper->canOnepageCheckout()) {
@@ -48,20 +50,43 @@ class Index extends Action
         }
 
         $quote = $this->onepage->getQuote();
-        if (!$quote->hasItems() || $quote->getHasError() || !$quote->validateMinimumAmount()) {
-            return $this->resultRedirectFactory->create()->setPath('checkout/cart');
+        
+        if ($this->getRequest()->getFrontName() === 'hyvaopc') {
+            if ($quote->hasItems() && ($quote->getHasError() || !$quote->validateMinimumAmount())) {
+                return $this->resultRedirectFactory->create()->setPath('checkout/cart');
+            }
+            
+            if ($quote->hasItems()) {
+                if (!$this->customerSession->isLoggedIn() && !$this->checkoutHelper->isAllowedGuestCheckout($quote)) {
+                    $this->messageManager->addErrorMessage(__('Guest checkout is disabled. Please Login or Create an Account'));
+                    return $this->resultRedirectFactory->create()->setPath('checkout/cart');
+                }
+
+                $this->customerSession->regenerateId();
+                $this->checkoutSession->setCartWasUpdated(false);
+                $this->onepage->initCheckout();
+            }
+        } else {
+            if (!$quote->hasItems() || $quote->getHasError() || !$quote->validateMinimumAmount()) {
+                return $this->resultRedirectFactory->create()->setPath('checkout/cart');
+            }
+
+            if (!$this->customerSession->isLoggedIn() && !$this->checkoutHelper->isAllowedGuestCheckout($quote)) {
+                $this->messageManager->addErrorMessage(__('Guest checkout is disabled. Please Login or Create an Account'));
+                return $this->resultRedirectFactory->create()->setPath('checkout/cart');
+            }
+
+            $this->customerSession->regenerateId();
+            $this->checkoutSession->setCartWasUpdated(false);
+            $this->onepage->initCheckout();
         }
 
-        if (!$this->customerSession->isLoggedIn() && !$this->checkoutHelper->isAllowedGuestCheckout($quote)) {
-            $this->messageManager->addErrorMessage(__('Guest checkout is disabled. Please Login or Create an Account'));
-            return $this->resultRedirectFactory->create()->setPath('checkout/cart');
-        }
-
-        $this->customerSession->regenerateId();
-        $this->checkoutSession->setCartWasUpdated(false);
-        $this->onepage->initCheckout();
         $resultPage = $this->resultPageFactory->create();
-        $resultPage->getConfig()->getTitle()->set($this->opcHelper->getTitle());
+        if ($this->getRequest()->getFrontName() === 'hyvaopc') {
+            $resultPage->getConfig()->getTitle()->set(__('Checkout'));
+        } else {
+            $resultPage->getConfig()->getTitle()->set($this->opcHelper->getTitle());
+        }
         return $resultPage;
     }
 }

@@ -1,55 +1,38 @@
 <?php
 /**  @var $block \Magento\Checkout\Block\Cart */
 ?>
-<?php echo $block->getChildHtml('checkout_cart_empty_widget'); ?>
-<div class="iwd_empty_cart_wrapper iwd_main_wrapper">
-    <div class="iwd_opc_alternative_wrapper">
-        <div class="iwd_opc_column iwd_opc_empty_cart_column">
-            <div class="iwd_opc_alternative_column">
-                <div class="iwd_opc_universal_wrapper iwd_opc_column_name">
-                    <?php echo __('Empty Cart'); ?>
-                </div>
-                <div class="iwd_opc_column_content">
-                    <div class="iwd_opc_universal_wrapper iwd_opc_empty_cart_info">
-                        <?php echo $block->escapeHtml(
-                            __('Looks like there\'s nothing here yet. Add something to your shopping cart to get started.')
-                        ); ?>
-                    </div>
-                    <div class="iwd_opc_universal_wrapper">
-                        <a class="iwd_opc_button active"
-                           href="<?php echo $block->getUrl(); ?>"
-                           title="<?php echo $block->escapeHtml(__('Continue Shopping')); ?>">
-                            <?php echo $block->escapeHtml(__('Continue Shopping')); ?>
-                        </a>
-                    </div>
-                    <?php if ($block->getQuote()->getCustomer()->getId()) { ?>
-                        <div class="iwd_opc_universal_wrapper">
-                            <a class="iwd_opc_button"
-                               href="<?php echo $block->getUrl('customer/account'); ?>"
-                               title="<?php echo $block->escapeHtml(__('My Account')); ?>">
-                                <?php echo $block->escapeHtml(__('My Account')); ?>
-                            </a>
-                        </div>
-                    <?php } else { ?>
-                        <div class="iwd_opc_universal_wrapper">
-                            <a class="iwd_opc_button"
-                               href="<?php echo $block->getUrl('customer/account/login'); ?>"
-                               title="<?php echo $block->escapeHtml(__('Log In')); ?>">
-                                <?php echo $block->escapeHtml(__('Log In')); ?>
-                            </a>
-                        </div>
-                    <?php } ?>
-                    <div class="iwd_opc_universal_wrapper iwd_empty_cart_powered_by">
-                        <a title="<?php echo $block->escapeHtml(__('Checkout by Dominate Open Source')); ?>"
-                           target="_blank"
-                           rel="nofollow"
-                           href="https://www.iwdagency.com/extensions/one-step-page-checkout.html">
-                            <?php echo $block->escapeHtml(__('Checkout by Dominate Open Source')); ?>
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
+<?= $block->getChildHtml('checkout_cart_empty_widget') ?>
+<div class="max-w-md mx-auto my-12 p-8 bg-white border border-gray-200 shadow-md rounded-lg text-center space-y-6">
+    <div class="mx-auto w-20 h-20 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center">
+        <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
+        </svg>
+    </div>
+    <div class="space-y-2">
+        <h1 class="text-2xl font-bold text-gray-900"><?= $block->escapeHtml(__('Empty Cart')) ?></h1>
+        <p class="text-sm text-gray-500">
+            <?= $block->escapeHtml(__('Looks like there\'s nothing here yet. Add something to your shopping cart to get started.')) ?>
+        </p>
+    </div>
+    <div class="pt-4 flex flex-col gap-3">
+        <a class="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-md shadow transition-colors block text-center"
+           href="<?= $block->escapeUrl($block->getUrl()) ?>"
+           title="<?= $block->escapeHtmlAttr(__('Continue Shopping')) ?>">
+            <?= $block->escapeHtml(__('Continue Shopping')) ?>
+        </a>
+        <?php if ($block->getQuote()->getCustomer()->getId()): ?>
+            <a class="w-full py-2.5 px-4 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-md transition-colors block text-center"
+               href="<?= $block->escapeUrl($block->getUrl('customer/account')) ?>"
+               title="<?= $block->escapeHtmlAttr(__('My Account')) ?>">
+                <?= $block->escapeHtml(__('My Account')) ?>
+            </a>
+        <?php else: ?>
+            <a class="w-full py-2.5 px-4 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-md transition-colors block text-center"
+               href="<?= $block->escapeUrl($block->getUrl('customer/account/login')) ?>"
+               title="<?= $block->escapeHtmlAttr(__('Log In')) ?>">
+                <?= $block->escapeHtml(__('Log In')) ?>
+            </a>
+        <?php endif; ?>
     </div>
 </div>
-<?php echo $block->getChildHtml('shopping.cart.table.after'); ?>
+<?= $block->getChildHtml('shopping.cart.table.after') ?>
