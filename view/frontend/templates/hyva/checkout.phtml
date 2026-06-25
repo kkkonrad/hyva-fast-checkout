@@ -468,60 +468,6 @@ $paymentMethods = $magewire->getPaymentMethods();
                                 </label>
                                 
                                 <div class="iwd-opc-payment-method-ko-container border-t border-gray-100 hidden" style="display: none;" data-iwd-payment-method-ko-target="<?= $escaper->escapeHtmlAttr($method->getCode()) ?>" wire:ignore></div>
-                                
-                                 <?php if ($magewire->paymentMethod === $method->getCode()): ?>
-                                     <?php $details = $magewire->getPaymentMethodDetails($method->getCode()); ?>
-                                     <?php $isPurchaseOrder = ($method->getCode() === 'purchaseorder'); ?>
-                                     <?php $hasPaymentDetails = $isPurchaseOrder || !empty($details['instructions']) || !empty($details['payable_to']) || !empty($details['mailing_address']); ?>
-                                     <?php if ($hasPaymentDetails): ?>
-                                         <div class="px-4 py-4 border-t border-gray-100 bg-gray-50/70 rounded-b-lg space-y-4">
-                                             <?php if ($isPurchaseOrder): ?>
-                                                 <label class="block">
-                                                     <span class="text-xs font-semibold text-gray-700"><?= $escaper->escapeHtml(__('Purchase Order Number')) ?> *</span>
-                                                     <input type="text"
-                                                            id="po_number"
-                                                            name="payment[po_number]"
-                                                            class="form-input mt-1 w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm bg-white"
-                                                            wire:model.blur="poNumber"
-                                                            placeholder="<?= $escaper->escapeHtmlAttr(__('Purchase Order Number')) ?>"
-                                                            required />
-                                                 </label>
-                                             <?php endif; ?>
-
-                                             <?php if (!empty($details['payable_to'])): ?>
-                                                 <div class="bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
-                                                     <span class="block text-xs font-semibold text-gray-500 uppercase tracking-wider"><?= $escaper->escapeHtml(__('Payable To / Bank Account')) ?></span>
-                                                     <div class="mt-1 flex items-center justify-between gap-2">
-                                                         <span class="text-sm font-mono font-bold text-gray-900 select-all"><?= $escaper->escapeHtml($details['payable_to']) ?></span>
-                                                         <button type="button" 
-                                                                 class="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 focus:outline-none"
-                                                                 data-copy-text="<?= $escaper->escapeHtmlAttr($details['payable_to']) ?>"
-                                                                 data-copied-label="<?= $escaper->escapeHtmlAttr(__('Copied!')) ?>"
-                                                                 @click="copyToClipboard">
-                                                             <?= $escaper->escapeHtml(__('Copy')) ?>
-                                                         </button>
-                                                     </div>
-                                                 </div>
-                                             <?php endif; ?>
-                                             
-                                             <?php if (!empty($details['mailing_address'])): ?>
-                                                 <div class="bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
-                                                     <span class="block text-xs font-semibold text-gray-500 uppercase tracking-wider"><?= $escaper->escapeHtml(__('Mailing Address')) ?></span>
-                                                     <span class="block mt-1 text-sm text-gray-800 whitespace-pre-line leading-relaxed"><?= $escaper->escapeHtml($details['mailing_address']) ?></span>
-                                                 </div>
-                                             <?php endif; ?>
-                                             
-                                             <?php if (!empty($details['instructions'])): ?>
-                                                 <div class="p-3 bg-blue-50/50 border-l-4 border-blue-500 rounded-r-lg">
-                                                     <span class="block text-xs font-semibold text-blue-800 uppercase tracking-wider mb-1"><?= $escaper->escapeHtml(__('Instructions')) ?></span>
-                                                     <p class="text-sm text-blue-900 leading-relaxed">
-                                                         <?= nl2br($escaper->escapeHtml($details['instructions'])) ?>
-                                                     </p>
-                                                 </div>
-                                             <?php endif; ?>
-                                         </div>
-                                     <?php endif; ?>
-                                 <?php endif; ?>
                             </div>
                         <?php endforeach; ?>
                     </div>
