@@ -385,6 +385,23 @@ class Checkout extends Component
     }
 
     /**
+     * Check if region is required for the country
+     */
+    public function isRegionRequired(string $countryId): bool
+    {
+        if (empty($countryId)) {
+            return false;
+        }
+        try {
+            $directoryHelper = \Magento\Framework\App\ObjectManager::getInstance()
+                ->get(\Magento\Directory\Helper\Data::class);
+            return $directoryHelper->isRegionRequired($countryId);
+        } catch (\RuntimeException $e) {
+            return false;
+        }
+    }
+
+    /**
      * Get available shipping rates
      */
     public function getShippingMethods(): array
