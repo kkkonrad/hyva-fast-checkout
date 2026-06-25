@@ -730,6 +730,16 @@ function initOpcCheckout() {
             if (this._validateAll()) {
                 const paymentBridge = window.iwdOpcHyvaPayment;
 
+                // Invoke Knockout JS validation first if available
+                if (paymentBridge && typeof paymentBridge.validate === 'function') {
+                    if (!paymentBridge.validate()) {
+                        if (window.console && typeof window.console.warn === 'function') {
+                            window.console.warn('IWD OPC: Order placement halted because Knockout payment validation failed.');
+                        }
+                        return;
+                    }
+                }
+
                 if (paymentBridge && typeof paymentBridge.syncPaymentData === 'function') {
                     Promise.resolve(paymentBridge.syncPaymentData(this.$wire)).then(() => {
                         this.$wire.placeOrder();

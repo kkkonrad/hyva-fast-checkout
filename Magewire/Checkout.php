@@ -720,6 +720,10 @@ class Checkout extends Component
             return;
         }
 
+        if ($this->paymentMethod === 'purchaseorder' && empty($this->poNumber) && isset($this->paymentAdditionalData['po_number'])) {
+            $this->poNumber = (string)$this->paymentAdditionalData['po_number'];
+        }
+
         if ($this->paymentMethod === 'purchaseorder' && empty($this->poNumber)) {
             $this->orderError = (string)__('Purchase Order Number is a required field.');
             return;

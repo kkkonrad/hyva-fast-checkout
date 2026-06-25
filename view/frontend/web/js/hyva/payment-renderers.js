@@ -403,7 +403,31 @@ define([
                             return Promise.resolve();
                         }
 
+                        // Extract PO number for purchaseorder
+                        if (paymentData && (paymentData.method === 'purchaseorder' || getSelectedMethodCode() === 'purchaseorder')) {
+                            var poNumber = paymentData.po_number || '';
+                            if (!poNumber) {
+                                var poInput = document.querySelector('input[name="payment[po_number]"]');
+                                if (poInput) {
+                                    poNumber = poInput.value;
+                                }
+                            }
+                            additionalData.po_number = poNumber;
+                        }
+
                         return Promise.resolve(wire.set('paymentAdditionalData', additionalData));
+                    },
+
+                    validate: function () {
+                        var component = getActiveRenderer();
+                        if (component && typeof component.validate === 'function') {
+                            var isValid = component.validate();
+                            if (window.console && typeof window.console.log === 'function') {
+                                window.console.log('IWD OPC: Knockout component validation result:', isValid);
+                            }
+                            return isValid;
+                        }
+                        return true;
                     },
 
                     selectPaymentMethod: setSelectedMethod
@@ -419,6 +443,11 @@ define([
                 });
 
                 document.addEventListener('click', function (event) {
+                    // Ignore clicks inside the Knockout payment form container to prevent inputs from losing focus
+                    if (event.target && event.target.closest('.iwd-opc-payment-method-ko-container')) {
+                        return;
+                    }
+
                     var option = event.target ? event.target.closest('[data-iwd-opc-payment-option]') : null,
                         input;
 
