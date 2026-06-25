@@ -247,6 +247,32 @@ class Checkout extends Component
                 $this->selectPaymentMethod($defaultPayment);
             }
         }
+
+        // Validate initially loaded payment method based on shipping method mapping
+        if ($this->paymentMethod !== '') {
+            $allowedPaymentMethods = $this->getPaymentMethods();
+            $paymentAllowed = false;
+            foreach ($allowedPaymentMethods as $method) {
+                if ($method->getCode() === $this->paymentMethod) {
+                    $paymentAllowed = true;
+                    break;
+                }
+            }
+            if (!$paymentAllowed) {
+                if (!empty($allowedPaymentMethods)) {
+                    $firstMethod = reset($allowedPaymentMethods);
+                    $this->selectPaymentMethod($firstMethod->getCode());
+                } else {
+                    $this->paymentMethod = '';
+                    $payment = $quote->getPayment();
+                    if ($payment) {
+                        $payment->setMethod('');
+                        $quote->collectTotals();
+                        $this->cartRepository->save($quote);
+                    }
+                }
+            }
+        }
     }
 
     public function saveShippingAddress(bool $ignoreValidation = true, bool $saveQuote = true, bool $collectRates = true): void
@@ -492,6 +518,32 @@ class Checkout extends Component
             $quote->collectTotals();
             $this->cartRepository->save($quote);
             $this->shippingMethod = $methodCode;
+
+            // Check if the currently selected payment method is still valid under new shipping method
+            if ($this->paymentMethod !== '') {
+                $allowedPaymentMethods = $this->getPaymentMethods();
+                $paymentAllowed = false;
+                foreach ($allowedPaymentMethods as $method) {
+                    if ($method->getCode() === $this->paymentMethod) {
+                        $paymentAllowed = true;
+                        break;
+                    }
+                }
+                if (!$paymentAllowed) {
+                    if (!empty($allowedPaymentMethods)) {
+                        $firstMethod = reset($allowedPaymentMethods);
+                        $this->selectPaymentMethod($firstMethod->getCode());
+                    } else {
+                        $this->paymentMethod = '';
+                        $payment = $quote->getPayment();
+                        if ($payment) {
+                            $payment->setMethod('');
+                            $quote->collectTotals();
+                            $this->cartRepository->save($quote);
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -502,7 +554,40 @@ class Checkout extends Component
     {
         $quote = $this->checkoutSession->getQuote();
         try {
-            return $this->paymentMethodManagement->getList($quote->getId());
+            $methods = $this->paymentMethodManagement->getList($quote->getId());
+
+            $currentShipping = $this->shippingMethod ?: $quote->getShippingAddress()->getShippingMethod();
+            if (empty($currentShipping)) {
+                return $methods;
+            }
+
+            $mapping = $this->opcHelper->getShippingPaymentMapping();
+            if (empty($mapping)) {
+                return $methods;
+            }
+
+            $allowedPaymentMethods = [];
+            $hasMappingForCurrentShipping = false;
+            foreach ($mapping as $row) {
+                if (isset($row['shipping_method']) && $row['shipping_method'] === $currentShipping) {
+                    $hasMappingForCurrentShipping = true;
+                    if (isset($row['payment_method']) && $row['payment_method'] !== '') {
+                        $allowedPaymentMethods[] = $row['payment_method'];
+                    }
+                }
+            }
+
+            if ($hasMappingForCurrentShipping) {
+                $filteredMethods = [];
+                foreach ($methods as $method) {
+                    if (in_array($method->getCode(), $allowedPaymentMethods)) {
+                        $filteredMethods[] = $method;
+                    }
+                }
+                return $filteredMethods;
+            }
+
+            return $methods;
         } catch (\Exception $e) {
             return [];
         }

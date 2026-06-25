@@ -18,7 +18,7 @@ $countries = $magewire->getCountries();
 $shippingMethods = $magewire->getShippingMethods();
 $paymentMethods = $magewire->getPaymentMethods();
 ?>
-<section class="space-y-8 max-w-7xl mx-auto p-4 md:p-6" id="iwd-opc-checkout">
+<section class="space-y-8 max-w-7xl mx-auto p-4 md:p-6 pb-24 md:pb-6 overflow-x-hidden" id="iwd-opc-checkout">
     <!-- Header -->
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-gray-200 pb-6">
         <div>
@@ -63,7 +63,7 @@ $paymentMethods = $magewire->getPaymentMethods();
         <div class="space-y-6">
             
             <!-- Shipping Address Form -->
-            <div class="card bg-white p-6 shadow rounded-lg border border-gray-200 relative">
+            <div class="card bg-white p-4 md:p-6 shadow rounded-lg border border-gray-200 relative">
                 <div class="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
                     <h2 class="text-xl font-semibold text-gray-900">
                         <?= $escaper->escapeHtml(__('Shipping Address')) ?>
@@ -73,7 +73,7 @@ $paymentMethods = $magewire->getPaymentMethods();
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        <span><?= $escaper->escapeHtml(__('Saving...')) ?></span>
+                        <span class="hidden md:inline"><?= $escaper->escapeHtml(__('Saving...')) ?></span>
                     </div>
                 </div>
                 <?php $savedAddresses = $magewire->getSavedAddresses(); ?>
@@ -137,7 +137,7 @@ $paymentMethods = $magewire->getPaymentMethods();
                     <label class="block sm:col-span-2">
                         <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Company')) ?></span>
                         <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                               type="text"
+                               type="text" autocomplete="organization"
                                wire:model.defer="company"
                                data-wire-field="company"
                                @input="onFieldInput"
@@ -147,14 +147,14 @@ $paymentMethods = $magewire->getPaymentMethods();
                     <label class="block sm:col-span-2">
                         <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Street Address')) ?> *</span>
                         <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                               type="text"
+                               type="text" autocomplete="address-line1"
                                wire:model.defer="street1"
                                data-wire-field="street1"
                                @input="onFieldInput"
                                @blur="onFieldBlur"
                                placeholder="<?= $escaper->escapeHtmlAttr(__('Line 1')) ?>" required/>
                         <input class="form-input mt-2 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                               type="text"
+                               type="text" autocomplete="address-line2"
                                wire:model.defer="street2"
                                data-wire-field="street2"
                                @input="onFieldInput"
@@ -165,7 +165,7 @@ $paymentMethods = $magewire->getPaymentMethods();
                     <label class="block">
                         <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Country')) ?> *</span>
                         <select class="form-select mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                wire:model.blur="countryId" @change="onSelectChange" required>
+                                wire:model.blur="countryId" @change="onSelectChange" autocomplete="country" required>
                             <?php foreach ($countries as $country): ?>
                                 <option value="<?= $escaper->escapeHtmlAttr($country['value']) ?>">
                                     <?= $escaper->escapeHtml($country['label']) ?>
@@ -179,7 +179,7 @@ $paymentMethods = $magewire->getPaymentMethods();
                         <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('State/Province')) ?><?= $isRegionRequired ? ' *' : '' ?></span>
                         <?php $regions = $magewire->getRegions(); ?>
                         <?php if ($regions): ?>
-                            <select name="region_id" class="form-select mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" wire:model.blur="regionId" <?= $isRegionRequired ? 'required' : '' ?>>
+                            <select name="region_id" class="form-select mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" wire:model.blur="regionId" autocomplete="address-level1" <?= $isRegionRequired ? 'required' : '' ?>>
                                 <?php foreach ($regions as $regionOption): ?>
                                     <option value="<?= $escaper->escapeHtmlAttr($regionOption['value']) ?>">
                                         <?= $escaper->escapeHtml($regionOption['label']) ?>
@@ -188,7 +188,7 @@ $paymentMethods = $magewire->getPaymentMethods();
                             </select>
                         <?php else: ?>
                             <input name="region" class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                   type="text" wire:model.blur="region"
+                                   type="text" wire:model.blur="region" autocomplete="address-level1"
                                    placeholder="<?= $escaper->escapeHtmlAttr(__('Enter state/province')) ?>" <?= $isRegionRequired ? 'required' : '' ?>/>
                         <?php endif; ?>
                     </label>
@@ -196,7 +196,7 @@ $paymentMethods = $magewire->getPaymentMethods();
                     <label class="block">
                         <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('City')) ?> *</span>
                         <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                               type="text"
+                               type="text" autocomplete="address-level2"
                                wire:model.defer="city"
                                data-wire-field="city"
                                @input="onFieldInput"
@@ -207,7 +207,7 @@ $paymentMethods = $magewire->getPaymentMethods();
                     <label class="block">
                         <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Zip/Postal Code')) ?> *</span>
                         <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                               type="text"
+                               type="text" autocomplete="postal-code"
                                wire:model.defer="postcode"
                                data-wire-field="postcode"
                                @input="onFieldInput"
@@ -218,7 +218,7 @@ $paymentMethods = $magewire->getPaymentMethods();
                     <label class="block sm:col-span-2">
                         <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Phone Number')) ?> *</span>
                         <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                               type="tel"
+                               type="tel" autocomplete="tel"
                                wire:model.defer="telephone"
                                data-wire-field="telephone"
                                @input="onFieldInput"
@@ -229,7 +229,7 @@ $paymentMethods = $magewire->getPaymentMethods();
             </div>
 
             <!-- Shipping Methods Section -->
-            <div class="card bg-white p-6 shadow rounded-lg border border-gray-200 relative">
+            <div class="card bg-white p-4 md:p-6 shadow rounded-lg border border-gray-200 relative">
                 <div class="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
                     <h2 class="text-xl font-semibold text-gray-900">
                         <?= $escaper->escapeHtml(__('Shipping Method')) ?>
@@ -239,7 +239,7 @@ $paymentMethods = $magewire->getPaymentMethods();
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        <span><?= $escaper->escapeHtml(__('Updating rates...')) ?></span>
+                        <span class="hidden md:inline"><?= $escaper->escapeHtml(__('Updating rates...')) ?></span>
                     </div>
                 </div>
 
@@ -261,9 +261,10 @@ $paymentMethods = $magewire->getPaymentMethods();
                             <tbody class="divide-y divide-gray-150">
                                 <?php foreach ($shippingMethods as $carrierCode => $rates): ?>
                                     <?php foreach ($rates as $rate): ?>
-                                        <tr class="hover:bg-gray-50 cursor-pointer" wire:click="selectShippingMethod('<?= $escaper->escapeHtmlAttr($rate->getCode()) ?>')">
-                                            <td class="py-3">
-                                                <input type="radio" class="form-radio text-blue-600 focus:ring-blue-500" name="shipping_method" value="<?= $escaper->escapeHtmlAttr($rate->getCode()) ?>" <?= $magewire->shippingMethod === $rate->getCode() ? 'checked' : '' ?> required/>
+                                        <?php $isSelected = ($magewire->shippingMethod === $rate->getCode()); ?>
+                                        <tr class="hover:bg-gray-50/50 cursor-pointer <?= $isSelected ? 'bg-blue-50/30' : '' ?> transition-colors" wire:click="selectShippingMethod('<?= $escaper->escapeHtmlAttr($rate->getCode()) ?>')">
+                                            <td class="py-3 pl-3">
+                                                <input type="radio" class="form-radio text-blue-600 focus:ring-blue-500" name="shipping_method" value="<?= $escaper->escapeHtmlAttr($rate->getCode()) ?>" <?= $isSelected ? 'checked' : '' ?> required/>
                                             </td>
                                             <td class="py-3 font-semibold text-gray-900">
                                                 <?= /* @noEscape */ $block->formatPrice($rate->getPrice()) ?>
@@ -271,7 +272,7 @@ $paymentMethods = $magewire->getPaymentMethods();
                                             <td class="py-3 text-gray-700">
                                                 <?= $escaper->escapeHtml($rate->getMethodTitle()) ?>
                                             </td>
-                                            <td class="py-3 text-gray-500">
+                                            <td class="py-3 pr-3 text-gray-500">
                                                 <?= $escaper->escapeHtml($rate->getCarrierTitle()) ?>
                                             </td>
                                         </tr>
@@ -288,7 +289,7 @@ $paymentMethods = $magewire->getPaymentMethods();
         <div class="space-y-6">
 
             <!-- Billing Address same as Shipping toggle -->
-            <div class="card bg-white p-6 shadow rounded-lg border border-gray-200">
+            <div class="card bg-white p-4 md:p-6 shadow rounded-lg border border-gray-200">
                 <label class="flex items-center gap-3 cursor-pointer mb-0">
                     <input type="checkbox" class="form-checkbox h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500" wire:model="billingSameAsShipping"/>
                     <span class="text-sm font-medium text-gray-900"><?= $escaper->escapeHtml(__('My billing address is different')) ?></span>
@@ -304,7 +305,7 @@ $paymentMethods = $magewire->getPaymentMethods();
                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                 </svg>
-                                <span><?= $escaper->escapeHtml(__('Saving...')) ?></span>
+                                <span class="hidden md:inline"><?= $escaper->escapeHtml(__('Saving...')) ?></span>
                             </div>
                         </div>
 
@@ -334,7 +335,7 @@ $paymentMethods = $magewire->getPaymentMethods();
                             <label class="block sm:col-span-2">
                                 <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Company')) ?></span>
                                 <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                       type="text"
+                                       type="text" autocomplete="organization"
                                        wire:model.defer="billingCompany"
                                        data-wire-field="billingCompany"
                                        @input="onFieldInput"
@@ -344,14 +345,14 @@ $paymentMethods = $magewire->getPaymentMethods();
                             <label class="block sm:col-span-2">
                                 <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Street Address')) ?> *</span>
                                 <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                       type="text"
+                                       type="text" autocomplete="address-line1"
                                        wire:model.defer="billingStreet1"
                                        data-wire-field="billingStreet1"
                                        @input="onFieldInput"
                                        @blur="onFieldBlur"
                                        placeholder="<?= $escaper->escapeHtmlAttr(__('Line 1')) ?>" required/>
                                 <input class="form-input mt-2 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                       type="text"
+                                       type="text" autocomplete="address-line2"
                                        wire:model.defer="billingStreet2"
                                        data-wire-field="billingStreet2"
                                        @input="onFieldInput"
@@ -363,7 +364,7 @@ $paymentMethods = $magewire->getPaymentMethods();
                                 <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Country')) ?> *</span>
                                 <select class="form-select mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                                         wire:model.blur="billingCountryId"
-                                        @change="onSelectChange"
+                                        @change="onSelectChange" autocomplete="country"
                                         required>
                                     <?php foreach ($countries as $country): ?>
                                         <option value="<?= $escaper->escapeHtmlAttr($country['value']) ?>">
@@ -381,7 +382,7 @@ $paymentMethods = $magewire->getPaymentMethods();
                                     <select name="billing_region_id"
                                             class="form-select mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                                             wire:model.blur="billingRegionId"
-                                            @change="onSelectChange"
+                                            @change="onSelectChange" autocomplete="address-level1"
                                             <?= $isBillingRegionRequired ? 'required' : '' ?>>
                                         <?php foreach ($billingRegions as $regionOption): ?>
                                             <option value="<?= $escaper->escapeHtmlAttr($regionOption['value']) ?>">
@@ -392,7 +393,7 @@ $paymentMethods = $magewire->getPaymentMethods();
                                 <?php else: ?>
                                     <input name="billing_region"
                                            class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                           type="text"
+                                           type="text" autocomplete="address-level1"
                                            wire:model.blur="billingRegion"
                                            @blur="onFieldBlurValidateOnly"
                                            placeholder="<?= $escaper->escapeHtmlAttr(__('Enter state/province')) ?>"
@@ -403,7 +404,7 @@ $paymentMethods = $magewire->getPaymentMethods();
                             <label class="block">
                                 <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('City')) ?> *</span>
                                 <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                       type="text"
+                                       type="text" autocomplete="address-level2"
                                        wire:model.defer="billingCity"
                                        data-wire-field="billingCity"
                                        @input="onFieldInput"
@@ -414,7 +415,7 @@ $paymentMethods = $magewire->getPaymentMethods();
                             <label class="block">
                                 <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Zip/Postal Code')) ?> *</span>
                                 <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                       type="text"
+                                       type="text" autocomplete="postal-code"
                                        wire:model.defer="billingPostcode"
                                        data-wire-field="billingPostcode"
                                        @input="onFieldInput"
@@ -425,7 +426,7 @@ $paymentMethods = $magewire->getPaymentMethods();
                             <label class="block sm:col-span-2">
                                 <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Phone Number')) ?> *</span>
                                 <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                       type="tel"
+                                       type="tel" autocomplete="tel"
                                        wire:model.defer="billingTelephone"
                                        data-wire-field="billingTelephone"
                                        @input="onFieldInput"
@@ -438,7 +439,7 @@ $paymentMethods = $magewire->getPaymentMethods();
             </div>
 
             <!-- Payment Methods Section -->
-            <div class="card bg-white p-6 shadow rounded-lg border border-gray-200 relative">
+            <div class="card bg-white p-4 md:p-6 shadow rounded-lg border border-gray-200 relative">
                 <div class="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
                     <h2 class="text-xl font-semibold text-gray-900">
                         <?= $escaper->escapeHtml(__('Payment Method')) ?>
@@ -448,7 +449,7 @@ $paymentMethods = $magewire->getPaymentMethods();
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        <span><?= $escaper->escapeHtml(__('Updating methods...')) ?></span>
+                        <span class="hidden md:inline"><?= $escaper->escapeHtml(__('Updating methods...')) ?></span>
                     </div>
                 </div>
 
@@ -523,7 +524,7 @@ $paymentMethods = $magewire->getPaymentMethods();
             </div>
 
             <!-- Discount/Coupon Form -->
-            <div class="card bg-white p-6 shadow rounded-lg border border-gray-200 relative">
+            <div class="card bg-white p-4 md:p-6 shadow rounded-lg border border-gray-200 relative">
                 <h2 class="text-xl font-semibold text-gray-900 border-b border-gray-200 pb-4 mb-4">
                     <?= $escaper->escapeHtml(__('Apply Discount Code')) ?>
                 </h2>
@@ -573,7 +574,8 @@ $paymentMethods = $magewire->getPaymentMethods();
             </div>
 
             <!-- Order Summary Sidebar -->
-            <div class="card bg-white p-6 shadow rounded-lg border border-gray-200 sticky top-6 space-y-6">
+            <div class="card bg-white p-4 md:p-6 shadow rounded-lg border border-gray-200 sticky top-6 space-y-6 transition-all duration-200"
+                 wire:loading.class="opacity-60 pointer-events-none">
                 
                 <!-- Order Items list -->
                 <div>
@@ -655,6 +657,31 @@ $paymentMethods = $magewire->getPaymentMethods();
     <?php endif; ?>
 
 </section>
+
+<?php if ($items): ?>
+    <!-- Sticky Place Order Bar on Mobile -->
+    <div class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 p-4 shadow-2xl flex items-center justify-between gap-4 transition-all duration-200"
+         wire:loading.class="opacity-60 pointer-events-none">
+        <div class="min-w-0">
+            <span class="block text-xs text-gray-500 uppercase tracking-wider font-semibold"><?= $escaper->escapeHtml(__('Grand Total')) ?></span>
+            <span class="block text-xl font-bold text-gray-950">
+                <?= /* @noEscape */ $block->formatPrice($block->getQuote()->getGrandTotal()) ?>
+            </span>
+        </div>
+        <button class="btn btn-primary flex-1 py-3 flex items-center justify-center gap-2" 
+                type="submit" 
+                form="co-checkout-form"
+                wire:loading.attr="disabled">
+            <span wire:loading wire:target="placeOrder">
+                <svg class="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            </span>
+            <span><?= $escaper->escapeHtml(__('Place Order')) ?></span>
+        </button>
+    </div>
+<?php endif; ?>
 
 <script>
 /**

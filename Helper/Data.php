@@ -35,6 +35,7 @@ class Data extends AbstractHelper
     const XML_PATH_DEFAULT_PAYMENT_METHOD = 'iwd_opc/extended/default_payment_method';
     const XML_PATH_PAYMENT_TITLE_TYPE = 'iwd_opc/extended/payment_title_type';
     const XML_PATH_DISPLAY_ALL_METHODS = 'iwd_opc/extended/show_all_ship_methods';
+    const XML_PATH_SHIPPING_PAYMENT_MAPPING = 'iwd_opc/extended/shipping_payment_mapping';
 
     const XML_PATH_RESTRICT_PAYMENT_ENABLE = 'iwd_opc/restrict_payment/enable';
     const XML_PATH_RESTRICT_PAYMENT_METHODS = 'iwd_opc/restrict_payment/methods';
@@ -129,6 +130,12 @@ class Data extends AbstractHelper
     public function getDefaultPaymentMethod()
     {
         return $this->scopeConfig->getValue(self::XML_PATH_DEFAULT_PAYMENT_METHOD, ScopeInterface::SCOPE_STORE);
+    }
+
+    public function getShippingPaymentMapping()
+    {
+        $mapping = $this->scopeConfig->getValue(self::XML_PATH_SHIPPING_PAYMENT_MAPPING, ScopeInterface::SCOPE_STORE);
+        return $mapping ? $this->jsonHelper->jsonDecode($mapping) : [];
     }
 
     public function getRestrictPaymentMethods()
