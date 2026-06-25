@@ -74,8 +74,8 @@ $block->ensureRequireJsAssets();
             baseUrl: staticBaseUrl
         });
 
-        window.require(['IWD_Opc/js/hyva/payment-renderers'], function (initPaymentRenderers) {
-            initPaymentRenderers(config);
+        window.require(['IWD_Opc/js/hyva/payment-renderers'], function (init) {
+            init(config);
         });
     }
 

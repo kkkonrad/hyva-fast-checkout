@@ -19,6 +19,26 @@ $shippingMethods = $magewire->getShippingMethods();
 $paymentMethods = $magewire->getPaymentMethods();
 ?>
 <section class="space-y-8 max-w-7xl mx-auto px-0 py-4 pb-24 md:p-6 md:pb-6 overflow-x-hidden" id="iwd-opc-checkout">
+
+    <!-- Magewire initial load overlay -->
+    <div x-data="initOpcLoader"
+         x-show="loading"
+         x-cloak
+         x-transition:leave="transition-opacity ease-out duration-500"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         class="fixed inset-0 z-[200] flex items-center justify-center bg-white/75 backdrop-blur-sm">
+        <div class="flex flex-col items-center gap-4">
+            <div class="relative">
+                <svg class="animate-spin h-12 w-12 text-blue-600" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+                    <path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            </div>
+            <p class="text-sm font-semibold text-gray-600 tracking-wide"><?= $escaper->escapeHtml(__('Loading checkout...')) ?></p>
+        </div>
+    </div>
+
     <!-- Header -->
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-gray-200 pb-6 px-4 md:px-0">
         <div>
@@ -443,13 +463,6 @@ $paymentMethods = $magewire->getPaymentMethods();
                     <h2 class="text-xl font-semibold text-gray-900">
                         <?= $escaper->escapeHtml(__('Payment Method')) ?>
                     </h2>
-                    <div wire:loading wire:target="selectPaymentMethod" class="text-xs text-blue-600 animate-pulse flex items-center gap-1.5">
-                        <svg class="animate-spin h-3.5 w-3.5 text-blue-600 inline" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        <span class="hidden md:inline"><?= $escaper->escapeHtml(__('Updating methods...')) ?></span>
-                    </div>
                 </div>
 
                 <?php if (empty($paymentMethods)): ?>
@@ -457,17 +470,27 @@ $paymentMethods = $magewire->getPaymentMethods();
                         <?= $escaper->escapeHtml(__('No payment methods available.')) ?>
                     </p>
                 <?php else: ?>
-                    <div class="grid gap-3">
+                    <?php /* wire:ignore — payment section is stable client-side; selection is passed
+                             directly to placeOrder() so no Magewire request fires on radio change. */ ?>
+                    <div class="grid gap-3" wire:ignore>
                         <?php foreach ($paymentMethods as $method): ?>
-                            <div class="border border-gray-200 rounded <?= $magewire->paymentMethod === $method->getCode() ? 'border-blue-500 bg-blue-50/10' : '' ?> transition-colors"
-                                 wire:key="payment-method-<?= $escaper->escapeHtmlAttr($method->getCode()) ?>"
+                            <div class="border border-gray-200 rounded transition-colors"
                                  data-iwd-opc-payment-option="<?= $escaper->escapeHtmlAttr($method->getCode()) ?>">
                                 <label class="flex items-center gap-3 p-3 cursor-pointer hover:bg-gray-50/50 mb-0">
-                                    <input type="radio" class="form-radio h-4 w-4 text-blue-600 focus:ring-blue-500" name="payment_method" value="<?= $escaper->escapeHtmlAttr($method->getCode()) ?>" data-iwd-opc-payment-option-input="<?= $escaper->escapeHtmlAttr($method->getCode()) ?>" wire:click="selectPaymentMethod('<?= $escaper->escapeHtmlAttr($method->getCode()) ?>')" <?= $magewire->paymentMethod === $method->getCode() ? 'checked' : '' ?> required/>
+                                    <input type="radio"
+                                           class="form-radio h-4 w-4 text-blue-600 focus:ring-blue-500"
+                                           name="payment_method"
+                                           value="<?= $escaper->escapeHtmlAttr($method->getCode()) ?>"
+                                           data-iwd-opc-payment-option-input="<?= $escaper->escapeHtmlAttr($method->getCode()) ?>"
+                                           <?= $magewire->paymentMethod === $method->getCode() ? 'checked' : '' ?>
+                                           required/>
                                     <span class="font-medium text-sm text-gray-800"><?= $escaper->escapeHtml($method->getTitle()) ?></span>
                                 </label>
-                                
-                                <div class="iwd-opc-payment-method-ko-container border-t border-gray-100 hidden" style="display: none;" data-iwd-payment-method-ko-target="<?= $escaper->escapeHtmlAttr($method->getCode()) ?>" wire:ignore></div>
+
+                                <div class="iwd-opc-payment-method-ko-container border-t border-gray-100 hidden"
+                                     style="display: none;"
+                                     data-iwd-payment-method-ko-target="<?= $escaper->escapeHtmlAttr($method->getCode()) ?>"
+                                     wire:ignore></div>
                             </div>
                         <?php endforeach; ?>
                     </div>
@@ -730,6 +753,10 @@ function initOpcCheckout() {
             if (this._validateAll()) {
                 const paymentBridge = window.iwdOpcHyvaPayment;
 
+                // Read selected payment method directly from DOM (no Magewire state needed)
+                const selectedMethodEl = document.querySelector('input[name="payment_method"]:checked');
+                const selectedMethod = selectedMethodEl ? selectedMethodEl.value : '';
+
                 // Invoke Knockout JS validation first if available
                 if (paymentBridge && typeof paymentBridge.validate === 'function') {
                     if (!paymentBridge.validate()) {
@@ -742,12 +769,12 @@ function initOpcCheckout() {
 
                 if (paymentBridge && typeof paymentBridge.syncPaymentData === 'function') {
                     Promise.resolve(paymentBridge.syncPaymentData(this.$wire)).then(() => {
-                        this.$wire.placeOrder();
+                        this.$wire.call('placeOrder', selectedMethod);
                     });
                     return;
                 }
 
-                this.$wire.placeOrder();
+                this.$wire.call('placeOrder', selectedMethod);
             }
         },
 
@@ -800,6 +827,31 @@ function initOpcCheckout() {
     };
 }
 window.addEventListener('alpine:init', () => Alpine.data('initOpcCheckout', initOpcCheckout), {once: true});
+
+/* ── Checkout loader overlay — hides after first Magewire response ─────── */
+function initOpcLoader() {
+    return {
+        loading: true,
+        init() {
+            var self = this;
+            function hide() { self.loading = false; }
+            function registerHook() {
+                if (window.Livewire && typeof window.Livewire.hook === 'function') {
+                    window.Livewire.hook('message.processed', hide);
+                }
+            }
+            if (window.Livewire) {
+                registerHook();
+            } else {
+                document.addEventListener('magewire:available', registerHook, {once: true});
+                document.addEventListener('livewire:available', registerHook, {once: true});
+                // Safety fallback: hide after 8s no matter what
+                setTimeout(hide, 8000);
+            }
+        }
+    };
+}
+window.addEventListener('alpine:init', () => Alpine.data('initOpcLoader', initOpcLoader), {once: true});
 
 /* ── localStorage backup (Livewire 2 / Magewire compatible) ──────────────── */
 (function () {

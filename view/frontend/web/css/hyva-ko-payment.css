@@ -81,6 +81,12 @@
     text-decoration: underline;
 }
 
+/* Active payment option highlight — pure CSS, no Magewire re-render needed */
+[data-iwd-opc-payment-option]:has(input[name="payment_method"]:checked) {
+    border-color: #3b82f6 !important;
+    background-color: rgba(239, 246, 255, 0.08);
+}
+
 /* Premium styles for original offline payment contents (checkmo, banktransfer, cashondelivery) */
 .iwd-opc-payment-method-ko-container .payment-method-note,
 .iwd-opc-payment-method-ko-container .payment-method-content > p,

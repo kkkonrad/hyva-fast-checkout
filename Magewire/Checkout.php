@@ -669,8 +669,13 @@ class Checkout extends Component
     /**
      * Place order
      */
-    public function placeOrder(): void
+    public function placeOrder(string $selectedPaymentMethod = ''): void
     {
+        // Payment method passed directly from client DOM — no wire:click request needed
+        if ($selectedPaymentMethod !== '') {
+            $this->paymentMethod = $selectedPaymentMethod;
+        }
+
         $this->orderError = '';
         $quote = $this->checkoutSession->getQuote();
 
