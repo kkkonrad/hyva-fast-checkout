@@ -416,6 +416,74 @@ class CheckoutTest extends TestCase
         $this->assertEquals('checkmo', $this->checkoutComponent->paymentMethod);
     }
 
+    public function testSelectTpayPaymentMethodStoresRequiredAdditionalInformation(): void
+    {
+        $this->quoteMock->expects($this->any())
+            ->method('getId')
+            ->willReturn(42);
+
+        $this->paymentMethodManagementMock->expects($this->once())
+            ->method('getList')
+            ->with(42)
+            ->willReturn([$this->createPaymentMethodMock('Tpay_Magento2')]);
+
+        $paymentMock = $this->getMockBuilder(\Magento\Quote\Model\Quote\Payment::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['setMethod', 'setAdditionalInformation'])
+            ->getMock();
+
+        $this->quoteMock->expects($this->once())
+            ->method('getPayment')
+            ->willReturn($paymentMock);
+
+        $paymentMock->expects($this->once())
+            ->method('setMethod')
+            ->with('Tpay_Magento2');
+
+        $additionalInformation = [];
+        $paymentMock->expects($this->exactly(5))
+            ->method('setAdditionalInformation')
+            ->willReturnCallback(static function (string $key, $value) use (&$additionalInformation, $paymentMock) {
+                $additionalInformation[$key] = $value;
+                return $paymentMock;
+            });
+
+        $this->quoteMock->expects($this->once())->method('collectTotals');
+        $this->cartRepositoryMock->expects($this->once())
+            ->method('save')
+            ->with($this->quoteMock);
+
+        $this->checkoutComponent->selectPaymentMethod('Tpay_Magento2');
+
+        $this->assertEquals('Tpay_Magento2', $this->checkoutComponent->paymentMethod);
+        $this->assertSame(true, $additionalInformation['accept_tos']);
+        $this->assertSame('', $additionalInformation['group']);
+        $this->assertSame('', $additionalInformation['channel']);
+        $this->assertSame('', $additionalInformation['blik_code']);
+        $this->assertSame(false, $additionalInformation['blik_alias']);
+    }
+
+    public function testGetPaymentMethodsReturnsAllMagentoAvailableMethods(): void
+    {
+        $this->quoteMock->expects($this->any())
+            ->method('getId')
+            ->willReturn(42);
+
+        $this->paymentMethodManagementMock->expects($this->once())
+            ->method('getList')
+            ->with(42)
+            ->willReturn([
+                $this->createPaymentMethodMock('checkmo'),
+                $this->createPaymentMethodMock('tpay'),
+            ]);
+
+        $methods = $this->checkoutComponent->getPaymentMethods();
+
+        $this->assertSame(['checkmo', 'tpay'], array_map(static function (PaymentMethodInterface $method): string {
+            return $method->getCode();
+        }, $methods));
+    }
+
     public function testApplyCoupon(): void
     {
         $this->checkoutComponent->couponCode = 'SALE10';

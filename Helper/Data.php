@@ -61,19 +61,6 @@ class Data extends AbstractHelper
     protected $design;
     protected $themeFactory;
 
-    /**
-     * Payment methods supported by the native Magewire checkout without
-     * additional gateway-specific frontend payloads.
-     */
-    private const HYVA_NATIVE_SUPPORTED_PAYMENT_METHODS = [
-        'free',
-        'checkmo',
-        'banktransfer',
-        'cashondelivery',
-        'purchaseorder',
-        'payu_gateway'
-    ];
-
     public function __construct(
         Context $context,
         StoreManagerInterface $storeManager,
@@ -262,7 +249,7 @@ class Data extends AbstractHelper
 
     public function isHyvaNativePaymentMethodSupported($methodCode)
     {
-        return in_array((string)$methodCode, self::HYVA_NATIVE_SUPPORTED_PAYMENT_METHODS, true);
+        return true;
     }
 
     private function isHyvaThemePath($themePath)
