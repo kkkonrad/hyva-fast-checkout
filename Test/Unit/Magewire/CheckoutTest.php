@@ -80,6 +80,10 @@ class CheckoutTest extends TestCase
         $this->checkoutSessionMock = $this->getMockBuilder(CheckoutSession::class)
             ->disableOriginalConstructor()
             ->onlyMethods(['getQuote', 'clearHelperData'])
+            ->addMethods([
+                'setLastQuoteId', 'setLastSuccessQuoteId', 'setLastOrderId',
+                'setLastRealOrderId', 'setLastOrderStatus'
+            ])
             ->getMock();
 
         $this->cartRepositoryMock = $this->createMock(CartRepositoryInterface::class);
@@ -107,6 +111,8 @@ class CheckoutTest extends TestCase
             ->method('getQuote')
             ->willReturn($this->quoteMock);
 
+        $loggerMock = $this->createMock(\Psr\Log\LoggerInterface::class);
+
         $this->checkoutComponent = new Checkout(
             $this->checkoutSessionMock,
             $this->cartRepositoryMock,
@@ -116,7 +122,8 @@ class CheckoutTest extends TestCase
             $this->countryCollectionFactoryMock,
             $this->regionCollectionFactoryMock,
             $this->subscriberFactoryMock,
-            $this->opcHelperMock
+            $this->opcHelperMock,
+            $loggerMock
         );
     }
 
@@ -572,5 +579,134 @@ class CheckoutTest extends TestCase
         $this->assertArrayHasKey('instructions', $details);
         $this->assertArrayHasKey('payable_to', $details);
         $this->assertArrayHasKey('mailing_address', $details);
+    }
+
+    public function testGetSavedAddressesReturnsEmptyForGuest(): void
+    {
+        // No customerSession injected → returns []
+        $this->assertSame([], $this->checkoutComponent->getSavedAddresses());
+    }
+
+    public function testGetSavedAddressesReturnsEmptyWhenNotLoggedIn(): void
+    {
+        $customerSessionMock = $this->getMockBuilder(\Magento\Customer\Model\Session::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['isLoggedIn', 'getCustomerId'])
+            ->getMock();
+        $customerSessionMock->method('isLoggedIn')->willReturn(false);
+
+        $addressRepoMock = $this->createMock(\Magento\Customer\Api\AddressRepositoryInterface::class);
+        $searchBuilderMock = $this->getMockBuilder(\Magento\Framework\Api\SearchCriteriaBuilder::class)
+            ->disableOriginalConstructor()
+            ->getMock();
+
+        $loggerMock = $this->createMock(\Psr\Log\LoggerInterface::class);
+
+        $component = new Checkout(
+            $this->checkoutSessionMock,
+            $this->cartRepositoryMock,
+            $this->shippingMethodManagementMock,
+            $this->paymentMethodManagementMock,
+            $this->cartManagementMock,
+            $this->countryCollectionFactoryMock,
+            $this->regionCollectionFactoryMock,
+            $this->subscriberFactoryMock,
+            $this->opcHelperMock,
+            $loggerMock,
+            null, null, null,
+            $customerSessionMock,
+            $addressRepoMock,
+            $searchBuilderMock
+        );
+
+        $this->assertSame([], $component->getSavedAddresses());
+    }
+
+    public function testFillFromSavedAddressPopulatesFields(): void
+    {
+        $regionMock = $this->getMockBuilder(\Magento\Customer\Api\Data\RegionInterface::class)
+            ->getMock();
+        $regionMock->method('getRegionId')->willReturn('10');
+        $regionMock->method('getRegion')->willReturn('Mazowieckie');
+
+        $addressMock = $this->getMockBuilder(\Magento\Customer\Api\Data\AddressInterface::class)
+            ->getMock();
+        $addressMock->method('getFirstname')->willReturn('Jan');
+        $addressMock->method('getLastname')->willReturn('Kowalski');
+        $addressMock->method('getCompany')->willReturn('ACME');
+        $addressMock->method('getStreet')->willReturn(['ul. Testowa 1', 'm. 2']);
+        $addressMock->method('getCity')->willReturn('Warszawa');
+        $addressMock->method('getPostcode')->willReturn('00-001');
+        $addressMock->method('getCountryId')->willReturn('PL');
+        $addressMock->method('getTelephone')->willReturn('123456789');
+        $addressMock->method('getRegion')->willReturn($regionMock);
+
+        $addressRepoMock = $this->createMock(\Magento\Customer\Api\AddressRepositoryInterface::class);
+        $addressRepoMock->method('getById')->with(42)->willReturn($addressMock);
+
+        $customerSessionMock = $this->getMockBuilder(\Magento\Customer\Model\Session::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['isLoggedIn', 'getCustomerId'])
+            ->getMock();
+        $customerSessionMock->method('isLoggedIn')->willReturn(true);
+
+        $searchBuilderMock = $this->getMockBuilder(\Magento\Framework\Api\SearchCriteriaBuilder::class)
+            ->disableOriginalConstructor()
+            ->getMock();
+
+        $loggerMock = $this->createMock(\Psr\Log\LoggerInterface::class);
+
+        $shippingAddressMock = $this->createAddressMock();
+        $shippingAddressMock->method('getShippingMethod')->willReturn(null);
+        $shippingAddressMock->method('getRegionId')->willReturn('10');
+        $this->quoteMock->method('getShippingAddress')->willReturn($shippingAddressMock);
+        $billingAddressMock = $this->createAddressMock();
+        $this->quoteMock->method('getBillingAddress')->willReturn($billingAddressMock);
+        $this->quoteMock->method('isVirtual')->willReturn(false);
+        $this->quoteMock->method('getId')->willReturn(1);
+
+        // Region collection mock so saveShippingAddress doesn't fail
+        $regionItemMock = $this->getMockBuilder(\Magento\Directory\Model\Region::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['getId', 'getName'])
+            ->getMock();
+        $regionItemMock->method('getId')->willReturn(10);
+        $regionItemMock->method('getName')->willReturn('Mazowieckie');
+
+        $regionCollectionMock = $this->getMockBuilder(\Magento\Directory\Model\ResourceModel\Region\Collection::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['addFieldToFilter', 'getFirstItem'])
+            ->getMock();
+        $regionCollectionMock->method('addFieldToFilter')->willReturnSelf();
+        $regionCollectionMock->method('getFirstItem')->willReturn($regionItemMock);
+
+        $this->regionCollectionFactoryMock->method('create')->willReturn($regionCollectionMock);
+
+        $component = new Checkout(
+            $this->checkoutSessionMock,
+            $this->cartRepositoryMock,
+            $this->shippingMethodManagementMock,
+            $this->paymentMethodManagementMock,
+            $this->cartManagementMock,
+            $this->countryCollectionFactoryMock,
+            $this->regionCollectionFactoryMock,
+            $this->subscriberFactoryMock,
+            $this->opcHelperMock,
+            $loggerMock,
+            null, null, null,
+            $customerSessionMock,
+            $addressRepoMock,
+            $searchBuilderMock
+        );
+
+        $component->fillFromSavedAddress(42);
+
+        $this->assertSame('Jan', $component->firstname);
+        $this->assertSame('Kowalski', $component->lastname);
+        $this->assertSame('Warszawa', $component->city);
+        $this->assertSame('00-001', $component->postcode);
+        $this->assertSame('PL', $component->countryId);
+        $this->assertSame('ul. Testowa 1', $component->street1);
+        $this->assertSame('m. 2', $component->street2);
     }
 }

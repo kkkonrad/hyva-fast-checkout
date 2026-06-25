@@ -2,6 +2,8 @@
 
 namespace IWD\Opc\Block\Hyva;
 
+use Hyva\Theme\Model\ViewModelRegistry;
+use Hyva\Theme\ViewModel\HyvaCsp;
 use Magento\Catalog\Helper\Image as ImageHelper;
 use Magento\Catalog\Helper\Product\Configuration as ProductConfiguration;
 use Magento\Checkout\Model\Session as CheckoutSession;
@@ -34,6 +36,11 @@ class Checkout extends Template
     private $productConfiguration;
 
     /**
+     * @var ViewModelRegistry
+     */
+    private $viewModelRegistry;
+
+    /**
      * @var Quote|null
      */
     private $quote;
@@ -44,6 +51,7 @@ class Checkout extends Template
      * @param PricingHelper $pricingHelper
      * @param ImageHelper $imageHelper
      * @param ProductConfiguration $productConfiguration
+     * @param ViewModelRegistry $viewModelRegistry
      * @param array $data
      */
     public function __construct(
@@ -52,14 +60,32 @@ class Checkout extends Template
         PricingHelper $pricingHelper,
         ImageHelper $imageHelper,
         ProductConfiguration $productConfiguration,
+        ViewModelRegistry $viewModelRegistry,
         array $data = []
     ) {
         $this->checkoutSession = $checkoutSession;
         $this->pricingHelper = $pricingHelper;
         $this->imageHelper = $imageHelper;
         $this->productConfiguration = $productConfiguration;
+        $this->viewModelRegistry = $viewModelRegistry;
 
         parent::__construct($context, $data);
+    }
+
+    /**
+     * @return HyvaCsp
+     */
+    public function getHyvaCsp(): HyvaCsp
+    {
+        return $this->viewModelRegistry->require(HyvaCsp::class);
+    }
+
+    /**
+     * @return \Hyva\Theme\ViewModel\Media
+     */
+    public function getMediaViewModel()
+    {
+        return $this->viewModelRegistry->require(\Hyva\Theme\ViewModel\Media::class);
     }
 
     /**
@@ -108,6 +134,28 @@ class Checkout extends Template
         return $this->imageHelper
             ->init($item->getProduct(), 'cart_page_product_thumbnail')
             ->getUrl();
+    }
+
+    /**
+     * @param Item $item
+     * @return int
+     */
+    public function getItemImageWidth(Item $item)
+    {
+        return (int) $this->imageHelper
+            ->init($item->getProduct(), 'cart_page_product_thumbnail')
+            ->getWidth() ?: 56;
+    }
+
+    /**
+     * @param Item $item
+     * @return int
+     */
+    public function getItemImageHeight(Item $item)
+    {
+        return (int) $this->imageHelper
+            ->init($item->getProduct(), 'cart_page_product_thumbnail')
+            ->getHeight() ?: 56;
     }
 
     /**

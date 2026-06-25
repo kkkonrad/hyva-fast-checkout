@@ -9,6 +9,9 @@ use Magento\Quote\Api\CartRepositoryInterface;
 use Magento\Quote\Api\ShippingMethodManagementInterface;
 use Magento\Quote\Api\PaymentMethodManagementInterface;
 use Magento\Quote\Api\CartManagementInterface;
+use Magento\Customer\Model\Session as CustomerSession;
+use Magento\Customer\Api\AddressRepositoryInterface;
+use Magento\Framework\Api\SearchCriteriaBuilder;
 use Magewirephp\Magewire\Component;
 
 class Checkout extends Component
@@ -24,7 +27,7 @@ class Checkout extends Component
     public $street2 = '';
     public $city = '';
     public $postcode = '';
-    public $countryId = 'PL';
+    public $countryId = '';
     public $regionId = '';
     public $region = '';
     public $telephone = '';
@@ -44,7 +47,7 @@ class Checkout extends Component
     public $billingStreet2 = '';
     public $billingCity = '';
     public $billingPostcode = '';
-    public $billingCountryId = 'PL';
+    public $billingCountryId = '';
     public $billingRegionId = '';
     public $billingRegion = '';
     public $billingTelephone = '';
@@ -81,6 +84,13 @@ class Checkout extends Component
     private $regionCollectionFactory;
     private $subscriberFactory;
     private $opcHelper;
+    private $logger;
+    private $directoryHelper;
+    private $paymentHelper;
+    private $orderFactory;
+    private $customerSession;
+    private $addressRepository;
+    private $searchCriteriaBuilder;
 
     /**
      * @param CheckoutSession $checkoutSession
@@ -92,6 +102,13 @@ class Checkout extends Component
      * @param \Magento\Directory\Model\ResourceModel\Region\CollectionFactory $regionCollectionFactory
      * @param \Magento\Newsletter\Model\SubscriberFactory $subscriberFactory
      * @param \IWD\Opc\Helper\Data $opcHelper
+     * @param \Psr\Log\LoggerInterface|null $logger
+     * @param \Magento\Directory\Helper\Data|null $directoryHelper
+     * @param \Magento\Payment\Helper\Data|null $paymentHelper
+     * @param \Magento\Sales\Model\OrderFactory|null $orderFactory
+     * @param CustomerSession|null $customerSession
+     * @param AddressRepositoryInterface|null $addressRepository
+     * @param SearchCriteriaBuilder|null $searchCriteriaBuilder
      */
     public function __construct(
         CheckoutSession $checkoutSession,
@@ -102,7 +119,14 @@ class Checkout extends Component
         \Magento\Directory\Model\ResourceModel\Country\CollectionFactory $countryCollectionFactory,
         \Magento\Directory\Model\ResourceModel\Region\CollectionFactory $regionCollectionFactory,
         \Magento\Newsletter\Model\SubscriberFactory $subscriberFactory,
-        \IWD\Opc\Helper\Data $opcHelper
+        \IWD\Opc\Helper\Data $opcHelper,
+        \Psr\Log\LoggerInterface $logger = null,
+        \Magento\Directory\Helper\Data $directoryHelper = null,
+        \Magento\Payment\Helper\Data $paymentHelper = null,
+        \Magento\Sales\Model\OrderFactory $orderFactory = null,
+        CustomerSession $customerSession = null,
+        AddressRepositoryInterface $addressRepository = null,
+        SearchCriteriaBuilder $searchCriteriaBuilder = null
     ) {
         $this->checkoutSession = $checkoutSession;
         $this->cartRepository = $cartRepository;
@@ -113,6 +137,41 @@ class Checkout extends Component
         $this->regionCollectionFactory = $regionCollectionFactory;
         $this->subscriberFactory = $subscriberFactory;
         $this->opcHelper = $opcHelper;
+        try {
+            $this->logger = $logger ?? \Magento\Framework\App\ObjectManager::getInstance()->get(\Psr\Log\LoggerInterface::class);
+        } catch (\Exception $e) {
+            $this->logger = new \Psr\Log\NullLogger();
+        }
+        try {
+            $this->directoryHelper = $directoryHelper ?? \Magento\Framework\App\ObjectManager::getInstance()->get(\Magento\Directory\Helper\Data::class);
+        } catch (\Exception $e) {
+            $this->directoryHelper = null;
+        }
+        try {
+            $this->paymentHelper = $paymentHelper ?? \Magento\Framework\App\ObjectManager::getInstance()->get(\Magento\Payment\Helper\Data::class);
+        } catch (\Exception $e) {
+            $this->paymentHelper = null;
+        }
+        try {
+            $this->orderFactory = $orderFactory ?? \Magento\Framework\App\ObjectManager::getInstance()->get(\Magento\Sales\Model\OrderFactory::class);
+        } catch (\Exception $e) {
+            $this->orderFactory = null;
+        }
+        try {
+            $this->customerSession = $customerSession ?? \Magento\Framework\App\ObjectManager::getInstance()->get(CustomerSession::class);
+        } catch (\Exception $e) {
+            $this->customerSession = null;
+        }
+        try {
+            $this->addressRepository = $addressRepository ?? \Magento\Framework\App\ObjectManager::getInstance()->get(AddressRepositoryInterface::class);
+        } catch (\Exception $e) {
+            $this->addressRepository = null;
+        }
+        try {
+            $this->searchCriteriaBuilder = $searchCriteriaBuilder ?? \Magento\Framework\App\ObjectManager::getInstance()->get(SearchCriteriaBuilder::class);
+        } catch (\Exception $e) {
+            $this->searchCriteriaBuilder = null;
+        }
     }
 
     /**
@@ -141,7 +200,7 @@ class Checkout extends Component
             
             $this->city = (string) $shippingAddress->getCity();
             $this->postcode = (string) $shippingAddress->getPostcode();
-            $this->countryId = (string) ($shippingAddress->getCountryId() ?: 'PL');
+            $this->countryId = (string) ($shippingAddress->getCountryId() ?: $this->getDefaultCountry());
             $regionIdVal = $shippingAddress->getRegionId();
             $this->regionId = (int)$regionIdVal > 0 ? (string)$regionIdVal : '';
             $this->region = (string) $shippingAddress->getRegion();
@@ -169,7 +228,7 @@ class Checkout extends Component
             
             $this->billingCity = (string) $billingAddress->getCity();
             $this->billingPostcode = (string) $billingAddress->getPostcode();
-            $this->billingCountryId = (string) ($billingAddress->getCountryId() ?: 'PL');
+            $this->billingCountryId = (string) ($billingAddress->getCountryId() ?: $this->getDefaultCountry());
             $billingRegionIdVal = $billingAddress->getRegionId();
             $this->billingRegionId = (int)$billingRegionIdVal > 0 ? (string)$billingRegionIdVal : '';
             $this->billingRegion = (string) $billingAddress->getRegion();
@@ -190,26 +249,24 @@ class Checkout extends Component
         }
     }
 
-    public function saveShippingAddress(bool $ignoreValidation = true, bool $saveQuote = true): void
+    public function saveShippingAddress(bool $ignoreValidation = true, bool $saveQuote = true, bool $collectRates = true): void
     {
         try {
-            \Magento\Framework\App\ObjectManager::getInstance()
-                ->get(\Psr\Log\LoggerInterface::class)
-                ->info('IWD OPC saveShippingAddress properties: ' . json_encode([
-                    'firstname' => $this->firstname,
-                    'lastname' => $this->lastname,
-                    'street1' => $this->street1,
-                    'street2' => $this->street2,
-                    'city' => $this->city,
-                    'postcode' => $this->postcode,
-                    'countryId' => $this->countryId,
-                    'regionId' => $this->regionId,
-                    'region' => $this->region,
-                    'telephone' => $this->telephone,
-                    'company' => $this->company
-                ]));
-        } catch (\RuntimeException $e) {
-            // ObjectManager not initialized in unit tests
+            $this->logger->info('IWD OPC saveShippingAddress properties: ' . json_encode([
+                'firstname' => $this->firstname,
+                'lastname' => $this->lastname,
+                'street1' => $this->street1,
+                'street2' => $this->street2,
+                'city' => $this->city,
+                'postcode' => $this->postcode,
+                'countryId' => $this->countryId,
+                'regionId' => $this->regionId,
+                'region' => $this->region,
+                'telephone' => $this->telephone,
+                'company' => $this->company
+            ]));
+        } catch (\Exception $e) {
+            // ignore
         }
 
         $quote = $this->checkoutSession->getQuote();
@@ -241,7 +298,7 @@ class Checkout extends Component
             $shippingAddress->setCompany($this->company);
             
             $shippingAddress->setShouldIgnoreValidation($ignoreValidation);
-            $shippingAddress->setCollectShippingRates(true);
+            $shippingAddress->setCollectShippingRates($collectRates);
         }
         
         if ($this->billingSameAsShipping) {
@@ -253,10 +310,8 @@ class Checkout extends Component
                 $this->cartRepository->save($quote);
             } catch (\Exception $e) {
                 try {
-                    \Magento\Framework\App\ObjectManager::getInstance()
-                        ->get(\Psr\Log\LoggerInterface::class)
-                        ->error('IWD OPC Save Shipping Error: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
-                } catch (\RuntimeException $logEx) {
+                    $this->logger->error('IWD OPC Save Shipping Error: ' . $e->getMessage() . "\n" . $e->getTraceAsString(), ['exception' => $e]);
+                } catch (\Exception $logEx) {
                     // ignore
                 }
                 if (!$ignoreValidation) {
@@ -272,23 +327,21 @@ class Checkout extends Component
     public function saveBillingAddress(bool $ignoreValidation = true, bool $saveQuote = true): void
     {
         try {
-            \Magento\Framework\App\ObjectManager::getInstance()
-                ->get(\Psr\Log\LoggerInterface::class)
-                ->info('IWD OPC saveBillingAddress properties: SameAsShipping=' . var_export($this->billingSameAsShipping, true) . ', Data=' . json_encode([
-                    'firstname' => $this->billingFirstname,
-                    'lastname' => $this->billingLastname,
-                    'street1' => $this->billingStreet1,
-                    'street2' => $this->billingStreet2,
-                    'city' => $this->billingCity,
-                    'postcode' => $this->billingPostcode,
-                    'countryId' => $this->billingCountryId,
-                    'regionId' => $this->billingRegionId,
-                    'region' => $this->billingRegion,
-                    'telephone' => $this->billingTelephone,
-                    'company' => $this->billingCompany
-                ]));
-        } catch (\RuntimeException $e) {
-            // ObjectManager not initialized in unit tests
+            $this->logger->info('IWD OPC saveBillingAddress properties: SameAsShipping=' . var_export($this->billingSameAsShipping, true) . ', Data=' . json_encode([
+                'firstname' => $this->billingFirstname,
+                'lastname' => $this->billingLastname,
+                'street1' => $this->billingStreet1,
+                'street2' => $this->billingStreet2,
+                'city' => $this->billingCity,
+                'postcode' => $this->billingPostcode,
+                'countryId' => $this->billingCountryId,
+                'regionId' => $this->billingRegionId,
+                'region' => $this->billingRegion,
+                'telephone' => $this->billingTelephone,
+                'company' => $this->billingCompany
+            ]));
+        } catch (\Exception $e) {
+            // ignore
         }
 
         $quote = $this->checkoutSession->getQuote();
@@ -339,10 +392,8 @@ class Checkout extends Component
                 $this->cartRepository->save($quote);
             } catch (\Exception $e) {
                 try {
-                    \Magento\Framework\App\ObjectManager::getInstance()
-                        ->get(\Psr\Log\LoggerInterface::class)
-                        ->error('IWD OPC Save Billing Error: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
-                } catch (\RuntimeException $logEx) {
+                    $this->logger->error('IWD OPC Save Billing Error: ' . $e->getMessage() . "\n" . $e->getTraceAsString(), ['exception' => $e]);
+                } catch (\Exception $logEx) {
                     // ignore
                 }
                 if (!$ignoreValidation) {
@@ -393,14 +444,17 @@ class Checkout extends Component
      */
     public function isRegionRequired(string $countryId): bool
     {
-        if (empty($countryId)) {
+        if (empty($countryId) || $this->directoryHelper === null) {
             return false;
         }
         try {
-            $directoryHelper = \Magento\Framework\App\ObjectManager::getInstance()
-                ->get(\Magento\Directory\Helper\Data::class);
-            return $directoryHelper->isRegionRequired($countryId);
-        } catch (\RuntimeException $e) {
+            return $this->directoryHelper->isRegionRequired($countryId);
+        } catch (\Exception $e) {
+            try {
+                $this->logger->error('IWD OPC isRegionRequired Error: ' . $e->getMessage(), ['exception' => $e]);
+            } catch (\Exception $ex) {
+                // ignore
+            }
             return false;
         }
     }
@@ -465,20 +519,25 @@ class Checkout extends Component
             'mailing_address' => ''
         ];
         
-        try {
-            $paymentHelper = \Magento\Framework\App\ObjectManager::getInstance()->get(\Magento\Payment\Helper\Data::class);
-            $methodInstance = $paymentHelper->getMethodInstance($methodCode);
-            
-            if (method_exists($methodInstance, 'getInstructions')) {
-                $details['instructions'] = (string) $methodInstance->getInstructions();
-            } else {
-                $details['instructions'] = (string) $methodInstance->getConfigData('instructions');
+        if ($this->paymentHelper !== null) {
+            try {
+                $methodInstance = $this->paymentHelper->getMethodInstance($methodCode);
+                
+                if (method_exists($methodInstance, 'getInstructions')) {
+                    $details['instructions'] = (string) $methodInstance->getInstructions();
+                } else {
+                    $details['instructions'] = (string) $methodInstance->getConfigData('instructions');
+                }
+                
+                $details['payable_to'] = (string) $methodInstance->getConfigData('payable_to');
+                $details['mailing_address'] = (string) $methodInstance->getConfigData('mailing_address');
+            } catch (\Exception $e) {
+                try {
+                    $this->logger->error('IWD OPC getPaymentMethodDetails Error: ' . $e->getMessage(), ['exception' => $e]);
+                } catch (\Exception $ex) {
+                    // ignore
+                }
             }
-            
-            $details['payable_to'] = (string) $methodInstance->getConfigData('payable_to');
-            $details['mailing_address'] = (string) $methodInstance->getConfigData('mailing_address');
-        } catch (\Exception $e) {
-            // ignore
         }
         
         return $details;
@@ -594,24 +653,16 @@ class Checkout extends Component
             return;
         }
 
-        if ($this->paymentMethod === 'purchaseorder') {
-            if (empty($this->poNumber)) {
-                $this->orderError = (string)__('Purchase Order Number is a required field.');
-                return;
-            }
-            $payment = $quote->getPayment();
-            if ($payment && method_exists($payment, 'setPoNumber')) {
-                $payment->setPoNumber($this->poNumber);
-            }
+        if ($this->paymentMethod === 'purchaseorder' && empty($this->poNumber)) {
+            $this->orderError = (string)__('Purchase Order Number is a required field.');
+            return;
         }
 
         try {
-            $quote->getPayment()->setMethod($this->paymentMethod);
-            if ($this->paymentMethod === 'purchaseorder') {
-                $payment = $quote->getPayment();
-                if ($payment && method_exists($payment, 'setPoNumber')) {
-                    $payment->setPoNumber($this->poNumber);
-                }
+            $payment = $quote->getPayment();
+            $payment->setMethod($this->paymentMethod);
+            if ($this->paymentMethod === 'purchaseorder' && method_exists($payment, 'setPoNumber')) {
+                $payment->setPoNumber($this->poNumber);
             }
             $this->cartRepository->save($quote);
 
@@ -630,16 +681,20 @@ class Checkout extends Component
             $this->checkoutSession->clearHelperData();
 
             try {
-                $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
-                $order = $objectManager->create(\Magento\Sales\Model\Order::class)->load($orderId);
-                
+                if ($this->orderFactory !== null) {
+                    $order = $this->orderFactory->create()->load($orderId);
+                    $this->checkoutSession->setLastRealOrderId($order->getIncrementId());
+                    $this->checkoutSession->setLastOrderStatus($order->getStatus());
+                }
                 $this->checkoutSession->setLastQuoteId($quoteId);
                 $this->checkoutSession->setLastSuccessQuoteId($quoteId);
                 $this->checkoutSession->setLastOrderId($orderId);
-                $this->checkoutSession->setLastRealOrderId($order->getIncrementId());
-                $this->checkoutSession->setLastOrderStatus($order->getStatus());
             } catch (\Exception $e) {
-                // Ignore errors during session/order load (e.g. in unit tests)
+                try {
+                    $this->logger->error('IWD OPC placeOrder load order Error: ' . $e->getMessage(), ['exception' => $e]);
+                } catch (\Exception $ex) {
+                    // Ignore
+                }
             }
             
             $this->redirect('checkout/onepage/success');
@@ -654,11 +709,9 @@ class Checkout extends Component
     public function updated($value, string $name)
     {
         try {
-            \Magento\Framework\App\ObjectManager::getInstance()
-                ->get(\Psr\Log\LoggerInterface::class)
-                ->info('IWD OPC updated hook: Name = ' . $name . ', Value = ' . var_export($value, true));
-        } catch (\RuntimeException $e) {
-            // ObjectManager not initialized in unit tests
+            $this->logger->info('IWD OPC updated hook: Name = ' . $name . ', Value = ' . var_export($value, true));
+        } catch (\Exception $e) {
+            // ignore
         }
 
         if ((int)$this->regionId <= 0) {
@@ -703,7 +756,8 @@ class Checkout extends Component
                 }
             }
         } elseif ($isShippingField) {
-            $this->saveShippingAddress();
+            $affectsShippingRates = in_array($name, ['countryId', 'regionId', 'region', 'postcode', 'city']);
+            $this->saveShippingAddress(true, true, $affectsShippingRates);
         } elseif ($isBillingField) {
             $this->saveBillingAddress();
         } elseif ($name === 'billingSameAsShipping') {
@@ -711,5 +765,94 @@ class Checkout extends Component
         }
 
         return $value;
+    }
+
+    /**
+     * Return saved addresses of the logged-in customer for the address autofill dropdown.
+     * Returns [] for guests or when dependencies are not available.
+     *
+     * @return array<int, array{id: int, label: string}>
+     */
+    public function getSavedAddresses(): array
+    {
+        if ($this->customerSession === null || $this->addressRepository === null || $this->searchCriteriaBuilder === null) {
+            return [];
+        }
+        try {
+            if (!$this->customerSession->isLoggedIn()) {
+                return [];
+            }
+            $customerId = (int) $this->customerSession->getCustomerId();
+            if ($customerId <= 0) {
+                return [];
+            }
+
+            $searchCriteria = $this->searchCriteriaBuilder
+                ->addFilter('parent_id', $customerId)
+                ->create();
+
+            $addresses = $this->addressRepository->getList($searchCriteria)->getItems();
+            $result = [];
+            foreach ($addresses as $address) {
+                $street = implode(', ', (array) $address->getStreet());
+                $label = trim(implode(' ', array_filter([
+                    $address->getFirstname(),
+                    $address->getLastname(),
+                    '–',
+                    $street,
+                    $address->getCity(),
+                ])));
+                $result[] = ['id' => (int) $address->getId(), 'label' => $label];
+            }
+            return $result;
+        } catch (\Exception $e) {
+            $this->logger->error('IWD OPC getSavedAddresses Error: ' . $e->getMessage(), ['exception' => $e]);
+            return [];
+        }
+    }
+
+    /**
+     * Fill shipping address fields from a saved customer address.
+     */
+    public function fillFromSavedAddress(int $addressId): void
+    {
+        if ($this->customerSession === null || $this->addressRepository === null) {
+            return;
+        }
+        try {
+            $address = $this->addressRepository->getById($addressId);
+            $street = (array) $address->getStreet();
+
+            $this->firstname  = (string) $address->getFirstname();
+            $this->lastname   = (string) $address->getLastname();
+            $this->company    = (string) $address->getCompany();
+            $this->street1    = $street[0] ?? '';
+            $this->street2    = $street[1] ?? '';
+            $this->city       = (string) $address->getCity();
+            $this->postcode   = (string) $address->getPostcode();
+            $this->countryId  = (string) $address->getCountryId();
+            $this->telephone  = (string) $address->getTelephone();
+
+            $region = $address->getRegion();
+            if ($region) {
+                $this->regionId = (string) ($region->getRegionId() ?: '');
+                $this->region   = (string) ($region->getRegion() ?: '');
+            }
+
+            $this->saveShippingAddress(true, true, true);
+        } catch (\Exception $e) {
+            $this->logger->error('IWD OPC fillFromSavedAddress Error: ' . $e->getMessage(), ['exception' => $e]);
+        }
+    }
+
+    /**
+     * Get default country from Magento configuration.
+     */
+    private function getDefaultCountry(): string
+    {
+        if ($this->directoryHelper) {
+            return (string)$this->directoryHelper->getDefaultCountry();
+        }
+        return 'US';
     }
 }

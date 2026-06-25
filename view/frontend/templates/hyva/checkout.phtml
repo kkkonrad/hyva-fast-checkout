@@ -3,12 +3,15 @@
  * Native Hyva checkout implementation.
  */
 
+use Hyva\Theme\ViewModel\HyvaCsp;
 use IWD\Opc\Block\Hyva\Checkout;
 use Magento\Framework\Escaper;
 
 /** @var Checkout $block */
 /** @var Escaper $escaper */
 /** @var \IWD\Opc\Magewire\Checkout $magewire */
+/** @var HyvaCsp $hyvaCsp */
+$hyvaCsp = $block->getHyvaCsp();
 
 $items = $block->getVisibleItems();
 $countries = $magewire->getCountries();
@@ -47,7 +50,11 @@ $paymentMethods = $magewire->getPaymentMethods();
             </a>
         </div>
     <?php else: ?>
-    <form id="co-checkout-form" x-data="{}" @submit.prevent="console.log('Form submit intercepted. Form validity:', $el.checkValidity()); for (let el of $el.elements) { if (!el.checkValidity()) { console.warn('Invalid field:', el.tagName, el.getAttribute('wire:model.blur') || el.name || el.id, 'Value:', JSON.stringify(el.value), 'Msg:', el.validationMessage); } } $el.checkValidity() ? $wire.placeOrder() : $el.reportValidity()" class="contents">
+    <form id="co-checkout-form"
+          x-data="initOpcCheckout"
+          @submit.prevent="handleSubmit"
+          class="contents">
+
 
     <!-- Two Column Layout -->
     <div class="grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_1fr] lg:items-start">
@@ -69,37 +76,96 @@ $paymentMethods = $magewire->getPaymentMethods();
                         <span><?= $escaper->escapeHtml(__('Saving...')) ?></span>
                     </div>
                 </div>
+                <?php $savedAddresses = $magewire->getSavedAddresses(); ?>
+                <?php if (!empty($savedAddresses)): ?>
+                    <div class="mb-4 pb-4 border-b border-gray-100">
+                        <label class="block">
+                            <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Use a Saved Address')) ?></span>
+                            <div class="mt-1 flex gap-2">
+                                <select id="saved-address-select"
+                                        class="form-select flex-1 rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                                    <option value=""><?= $escaper->escapeHtml(__('— Select saved address —')) ?></option>
+                                    <?php foreach ($savedAddresses as $saved): ?>
+                                        <option value="<?= (int)$saved['id'] ?>">
+                                            <?= $escaper->escapeHtml($saved['label']) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <button type="button"
+                                        class="btn btn-secondary text-sm px-3 shrink-0"
+                                        data-select-id="saved-address-select"
+                                        @click="fillSavedAddress">
+                                    <?= $escaper->escapeHtml(__('Use')) ?>
+                                </button>
+                            </div>
+                        </label>
+                    </div>
+                <?php endif; ?>
 
                 <div class="grid gap-4 sm:grid-cols-2">
                     <label class="block sm:col-span-2">
                         <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Email Address')) ?> *</span>
-                        <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" type="email" autocomplete="email" wire:model.blur="email" required/>
+                        <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                               type="email" autocomplete="email"
+                               wire:model.blur="email"
+                               @blur="onFieldBlurValidateOnly"
+                               required/>
                     </label>
 
                     <label class="block">
                         <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('First Name')) ?> *</span>
-                        <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" type="text" autocomplete="given-name" wire:model.blur="firstname" required/>
+                        <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                               type="text" autocomplete="given-name"
+                               wire:model.defer="firstname"
+                               data-wire-field="firstname"
+                               @input="onFieldInput"
+                               @blur="onFieldBlur"
+                               required/>
                     </label>
 
                     <label class="block">
                         <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Last Name')) ?> *</span>
-                        <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" type="text" autocomplete="family-name" wire:model.blur="lastname" required/>
+                        <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                               type="text" autocomplete="family-name"
+                               wire:model.defer="lastname"
+                               data-wire-field="lastname"
+                               @input="onFieldInput"
+                               @blur="onFieldBlur"
+                               required/>
                     </label>
 
                     <label class="block sm:col-span-2">
                         <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Company')) ?></span>
-                        <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" type="text" wire:model.blur="company"/>
+                        <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                               type="text"
+                               wire:model.defer="company"
+                               data-wire-field="company"
+                               @input="onFieldInput"
+                               @blur="onFieldBlurNoValidate"/>
                     </label>
 
                     <label class="block sm:col-span-2">
                         <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Street Address')) ?> *</span>
-                        <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" type="text" wire:model.blur="street1" placeholder="<?= $escaper->escapeHtmlAttr(__('Line 1')) ?>" required/>
-                        <input class="form-input mt-2 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" type="text" wire:model.blur="street2" placeholder="<?= $escaper->escapeHtmlAttr(__('Line 2')) ?>"/>
+                        <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                               type="text"
+                               wire:model.defer="street1"
+                               data-wire-field="street1"
+                               @input="onFieldInput"
+                               @blur="onFieldBlur"
+                               placeholder="<?= $escaper->escapeHtmlAttr(__('Line 1')) ?>" required/>
+                        <input class="form-input mt-2 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                               type="text"
+                               wire:model.defer="street2"
+                               data-wire-field="street2"
+                               @input="onFieldInput"
+                               @blur="onFieldBlurNoValidate"
+                               placeholder="<?= $escaper->escapeHtmlAttr(__('Line 2')) ?>"/>
                     </label>
 
                     <label class="block">
                         <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Country')) ?> *</span>
-                        <select class="form-select mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" wire:model.blur="countryId" required>
+                        <select class="form-select mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                wire:model.blur="countryId" @change="onSelectChange" required>
                             <?php foreach ($countries as $country): ?>
                                 <option value="<?= $escaper->escapeHtmlAttr($country['value']) ?>">
                                     <?= $escaper->escapeHtml($country['label']) ?>
@@ -121,23 +187,43 @@ $paymentMethods = $magewire->getPaymentMethods();
                                 <?php endforeach; ?>
                             </select>
                         <?php else: ?>
-                            <input name="region" class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" type="text" wire:model.blur="region" placeholder="<?= $escaper->escapeHtmlAttr(__('Enter state/province')) ?>" <?= $isRegionRequired ? 'required' : '' ?>/>
+                            <input name="region" class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                   type="text" wire:model.blur="region"
+                                   placeholder="<?= $escaper->escapeHtmlAttr(__('Enter state/province')) ?>" <?= $isRegionRequired ? 'required' : '' ?>/>
                         <?php endif; ?>
                     </label>
 
                     <label class="block">
                         <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('City')) ?> *</span>
-                        <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" type="text" wire:model.blur="city" required/>
+                        <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                               type="text"
+                               wire:model.defer="city"
+                               data-wire-field="city"
+                               @input="onFieldInput"
+                               @blur="onFieldBlur"
+                               required/>
                     </label>
 
                     <label class="block">
                         <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Zip/Postal Code')) ?> *</span>
-                        <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" type="text" wire:model.blur="postcode" required/>
+                        <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                               type="text"
+                               wire:model.defer="postcode"
+                               data-wire-field="postcode"
+                               @input="onFieldInput"
+                               @blur="onFieldBlur"
+                               required/>
                     </label>
 
                     <label class="block sm:col-span-2">
                         <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Phone Number')) ?> *</span>
-                        <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" type="tel" wire:model.blur="telephone" required/>
+                        <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                               type="tel"
+                               wire:model.defer="telephone"
+                               data-wire-field="telephone"
+                               @input="onFieldInput"
+                               @blur="onFieldBlur"
+                               required/>
                     </label>
                 </div>
             </div>
@@ -225,28 +311,60 @@ $paymentMethods = $magewire->getPaymentMethods();
                         <div class="grid gap-4 sm:grid-cols-2">
                             <label class="block">
                                 <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('First Name')) ?> *</span>
-                                <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" type="text" autocomplete="given-name" wire:model.blur="billingFirstname" required/>
+                                <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                       type="text" autocomplete="given-name"
+                                       wire:model.defer="billingFirstname"
+                                       data-wire-field="billingFirstname"
+                                       @input="onFieldInput"
+                                       @blur="onFieldBlur"
+                                       required/>
                             </label>
 
                             <label class="block">
                                 <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Last Name')) ?> *</span>
-                                <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" type="text" autocomplete="family-name" wire:model.blur="billingLastname" required/>
+                                <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                       type="text" autocomplete="family-name"
+                                       wire:model.defer="billingLastname"
+                                       data-wire-field="billingLastname"
+                                       @input="onFieldInput"
+                                       @blur="onFieldBlur"
+                                       required/>
                             </label>
 
                             <label class="block sm:col-span-2">
                                 <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Company')) ?></span>
-                                <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" type="text" wire:model.blur="billingCompany"/>
+                                <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                       type="text"
+                                       wire:model.defer="billingCompany"
+                                       data-wire-field="billingCompany"
+                                       @input="onFieldInput"
+                                       @blur="onFieldBlurNoValidate"/>
                             </label>
 
                             <label class="block sm:col-span-2">
                                 <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Street Address')) ?> *</span>
-                                <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" type="text" wire:model.blur="billingStreet1" placeholder="<?= $escaper->escapeHtmlAttr(__('Line 1')) ?>" required/>
-                                <input class="form-input mt-2 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" type="text" wire:model.blur="billingStreet2" placeholder="<?= $escaper->escapeHtmlAttr(__('Line 2')) ?>"/>
+                                <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                       type="text"
+                                       wire:model.defer="billingStreet1"
+                                       data-wire-field="billingStreet1"
+                                       @input="onFieldInput"
+                                       @blur="onFieldBlur"
+                                       placeholder="<?= $escaper->escapeHtmlAttr(__('Line 1')) ?>" required/>
+                                <input class="form-input mt-2 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                       type="text"
+                                       wire:model.defer="billingStreet2"
+                                       data-wire-field="billingStreet2"
+                                       @input="onFieldInput"
+                                       @blur="onFieldBlurNoValidate"
+                                       placeholder="<?= $escaper->escapeHtmlAttr(__('Line 2')) ?>"/>
                             </label>
 
                             <label class="block">
                                 <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Country')) ?> *</span>
-                                <select class="form-select mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" wire:model.blur="billingCountryId" required>
+                                <select class="form-select mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                        wire:model.blur="billingCountryId"
+                                        @change="onSelectChange"
+                                        required>
                                     <?php foreach ($countries as $country): ?>
                                         <option value="<?= $escaper->escapeHtmlAttr($country['value']) ?>">
                                             <?= $escaper->escapeHtml($country['label']) ?>
@@ -260,7 +378,11 @@ $paymentMethods = $magewire->getPaymentMethods();
                                 <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('State/Province')) ?><?= $isBillingRegionRequired ? ' *' : '' ?></span>
                                 <?php $billingRegions = $magewire->getBillingRegions(); ?>
                                 <?php if ($billingRegions): ?>
-                                    <select name="billing_region_id" class="form-select mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" wire:model.blur="billingRegionId" <?= $isBillingRegionRequired ? 'required' : '' ?>>
+                                    <select name="billing_region_id"
+                                            class="form-select mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                            wire:model.blur="billingRegionId"
+                                            @change="onSelectChange"
+                                            <?= $isBillingRegionRequired ? 'required' : '' ?>>
                                         <?php foreach ($billingRegions as $regionOption): ?>
                                             <option value="<?= $escaper->escapeHtmlAttr($regionOption['value']) ?>">
                                                 <?= $escaper->escapeHtml($regionOption['label']) ?>
@@ -268,23 +390,47 @@ $paymentMethods = $magewire->getPaymentMethods();
                                         <?php endforeach; ?>
                                     </select>
                                 <?php else: ?>
-                                    <input name="billing_region" class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" type="text" wire:model.blur="billingRegion" placeholder="<?= $escaper->escapeHtmlAttr(__('Enter state/province')) ?>" <?= $isBillingRegionRequired ? 'required' : '' ?>/>
+                                    <input name="billing_region"
+                                           class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                           type="text"
+                                           wire:model.blur="billingRegion"
+                                           @blur="onFieldBlurValidateOnly"
+                                           placeholder="<?= $escaper->escapeHtmlAttr(__('Enter state/province')) ?>"
+                                           <?= $isBillingRegionRequired ? 'required' : '' ?>/>
                                 <?php endif; ?>
                             </label>
 
                             <label class="block">
                                 <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('City')) ?> *</span>
-                                <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" type="text" wire:model.blur="billingCity" required/>
+                                <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                       type="text"
+                                       wire:model.defer="billingCity"
+                                       data-wire-field="billingCity"
+                                       @input="onFieldInput"
+                                       @blur="onFieldBlur"
+                                       required/>
                             </label>
 
                             <label class="block">
                                 <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Zip/Postal Code')) ?> *</span>
-                                <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" type="text" wire:model.blur="billingPostcode" required/>
+                                <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                       type="text"
+                                       wire:model.defer="billingPostcode"
+                                       data-wire-field="billingPostcode"
+                                       @input="onFieldInput"
+                                       @blur="onFieldBlur"
+                                       required/>
                             </label>
 
                             <label class="block sm:col-span-2">
                                 <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Phone Number')) ?> *</span>
-                                <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" type="tel" wire:model.blur="billingTelephone" required/>
+                                <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                       type="tel"
+                                       wire:model.defer="billingTelephone"
+                                       data-wire-field="billingTelephone"
+                                       @input="onFieldInput"
+                                       @blur="onFieldBlur"
+                                       required/>
                             </label>
                         </div>
                     </div>
@@ -344,7 +490,8 @@ $paymentMethods = $magewire->getPaymentMethods();
                                                          <span class="text-sm font-mono font-bold text-gray-900 select-all"><?= $escaper->escapeHtml($details['payable_to']) ?></span>
                                                          <button type="button" 
                                                                  class="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1 focus:outline-none"
-                                                                 @click="navigator.clipboard.writeText('<?= $escaper->escapeJs($details['payable_to']) ?>'); $el.innerText = 'Copied!'; setTimeout(() => $el.innerText = 'Copy', 2000)">
+                                                                 data-copy-text="<?= $escaper->escapeHtmlAttr($details['payable_to']) ?>"
+                                                                 @click="copyToClipboard">
                                                              Copy
                                                          </button>
                                                      </div>
@@ -396,10 +543,32 @@ $paymentMethods = $magewire->getPaymentMethods();
                 </div>
 
                 <?php if ($magewire->couponSuccess): ?>
-                    <p class="mt-2 text-sm text-green-600 font-medium"><?= $escaper->escapeHtml($magewire->couponSuccess) ?></p>
+                    <div x-data="{ show: true }"
+                         x-show="show"
+                         x-init="setTimeout(() => show = false, 4000)"
+                         x-transition:leave="transition ease-in duration-500"
+                         x-transition:leave-start="opacity-100 translate-y-0"
+                         x-transition:leave-end="opacity-0 -translate-y-1"
+                         class="mt-3 flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                        <svg class="h-4 w-4 shrink-0 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        <span><?= $escaper->escapeHtml($magewire->couponSuccess) ?></span>
+                    </div>
                 <?php endif; ?>
                 <?php if ($magewire->couponError): ?>
-                    <p class="mt-2 text-sm text-red-600 font-medium"><?= $escaper->escapeHtml($magewire->couponError) ?></p>
+                    <div x-data="{ show: true }"
+                         x-show="show"
+                         x-init="setTimeout(() => show = false, 4000)"
+                         x-transition:leave="transition ease-in duration-500"
+                         x-transition:leave-start="opacity-100 translate-y-0"
+                         x-transition:leave-end="opacity-0 -translate-y-1"
+                         class="mt-3 flex items-center gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                        <svg class="h-4 w-4 shrink-0 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                        <span><?= $escaper->escapeHtml($magewire->couponError) ?></span>
+                    </div>
                 <?php endif; ?>
             </div>
 
@@ -423,6 +592,8 @@ $paymentMethods = $magewire->getPaymentMethods();
                                 <img class="h-14 w-14 shrink-0 rounded border border-gray-200 object-contain bg-gray-50"
                                      src="<?= $escaper->escapeUrl($block->getItemImageUrl($item)) ?>"
                                      alt="<?= $escaper->escapeHtmlAttr($item->getName()) ?>"
+                                     width="<?= (int)$block->getItemImageWidth($item) ?>"
+                                     height="<?= (int)$block->getItemImageHeight($item) ?>"
                                      loading="lazy"/>
                                 <div class="min-w-0 flex-1">
                                     <h3 class="text-sm font-medium text-gray-800 truncate" title="<?= $escaper->escapeHtmlAttr($item->getName()) ?>">
@@ -482,4 +653,199 @@ $paymentMethods = $magewire->getPaymentMethods();
     </div>
     </form>
     <?php endif; ?>
+
 </section>
+
+<script>
+/**
+ * IWD OPC Checkout Alpine component — CSP compatible (Hyva Alpine CSP pattern)
+ * No inline expressions in x-data or event attributes.
+ */
+function initOpcCheckout() {
+    return {
+        _debounceTimers: {},
+
+        /**
+         * Debounced field save — called from @input.
+         * Reads data-wire-field attribute to determine the Magewire property name.
+         */
+        onFieldInput() {
+            const el = this.$el;
+            const field = el.dataset.wireField;
+            if (!field) return;
+            const value = el.value;
+            clearTimeout(this._debounceTimers[field]);
+            this._debounceTimers[field] = setTimeout(() => {
+                this.$wire.set(field, value);
+            }, 1000);
+        },
+
+        /**
+         * Immediate save + validation — called from @blur on required fields.
+         */
+        onFieldBlur() {
+            const el = this.$el;
+            const field = el.dataset.wireField;
+            if (field) {
+                clearTimeout(this._debounceTimers[field]);
+                this.$wire.set(field, el.value);
+            }
+            this._validateEl(el);
+        },
+
+        /**
+         * Immediate save without validation — called from @blur on optional fields.
+         */
+        onFieldBlurNoValidate() {
+            const el = this.$el;
+            const field = el.dataset.wireField;
+            if (field) {
+                clearTimeout(this._debounceTimers[field]);
+                this.$wire.set(field, el.value);
+            }
+        },
+
+        /**
+         * Validation only — for fields using wire:model.blur (email).
+         */
+        onFieldBlurValidateOnly() {
+            this._validateEl(this.$el);
+        },
+
+        /**
+         * Validate select on change.
+         */
+        onSelectChange() {
+            this._validateEl(this.$el);
+        },
+
+        /**
+         * Fill all shipping fields from a saved customer address.
+         * Reads the selected value from the select whose id is in data-select-id.
+         */
+        fillSavedAddress() {
+            const selectId = this.$el.dataset.selectId;
+            const sel = selectId ? document.getElementById(selectId) : null;
+            if (!sel) return;
+            const id = parseInt(sel.value, 10);
+            if (id > 0) {
+                this.$wire.call('fillFromSavedAddress', id);
+            }
+        },
+
+        /**
+         * Handle form submit — validate all, then place order.
+         */
+        handleSubmit() {
+            if (this._validateAll()) {
+                this.$wire.placeOrder();
+            }
+        },
+
+        /**
+         * Copy text to clipboard in a CSP compatible way.
+         */
+        copyToClipboard() {
+            const el = this.$el;
+            const text = el.dataset.copyText;
+            if (!text) return;
+            navigator.clipboard.writeText(text).then(() => {
+                const oldText = el.innerText;
+                el.innerText = 'Copied!';
+                setTimeout(() => el.innerText = oldText, 2000);
+            });
+        },
+
+        /* ── Private helpers ────────────────────────────────────────────── */
+
+        _validateEl(el) {
+            const wrapper = el.closest('label');
+            let msg = wrapper ? wrapper.querySelector('.field-error') : null;
+            if (!el.validity.valid) {
+                el.classList.add('border-red-400', 'ring-1', 'ring-red-400');
+                el.classList.remove('border-gray-300');
+                if (!msg && wrapper) {
+                    msg = document.createElement('span');
+                    msg.className = 'field-error mt-1 text-xs text-red-600 block';
+                    wrapper.appendChild(msg);
+                }
+                if (msg) msg.textContent = el.validationMessage;
+            } else {
+                el.classList.remove('border-red-400', 'ring-1', 'ring-red-400');
+                el.classList.add('border-gray-300');
+                if (msg) msg.remove();
+            }
+        },
+
+        _validateAll() {
+            let valid = true;
+            const form = this.$el; // on @submit.prevent this.$el is the <form>
+            for (const el of form.elements) {
+                if (el.willValidate) {
+                    this._validateEl(el);
+                    if (!el.validity.valid) valid = false;
+                }
+            }
+            return valid;
+        }
+    };
+}
+window.addEventListener('alpine:init', () => Alpine.data('initOpcCheckout', initOpcCheckout), {once: true});
+
+/* ── localStorage backup (Livewire 2 / Magewire compatible) ──────────────── */
+(function () {
+    const PREFIX = 'iwd_opc_';
+    const FIELDS = [
+        'email', 'firstname', 'lastname', 'company',
+        'street1', 'street2', 'city', 'postcode',
+        'countryId', 'regionId', 'region', 'telephone',
+    ];
+
+    function save(field, value) {
+        try { if (value) localStorage.setItem(PREFIX + field, value); } catch (e) {}
+    }
+
+    function restore(wire) {
+        FIELDS.forEach(function (field) {
+            try {
+                const val = localStorage.getItem(PREFIX + field);
+                if (val && !wire.get(field)) {
+                    wire.set(field, val);
+                }
+            } catch (e) {}
+        });
+    }
+
+    function clearStorage() {
+        FIELDS.forEach(function (field) {
+            try { localStorage.removeItem(PREFIX + field); } catch (e) {}
+        });
+    }
+
+    function getWire() {
+        const el = document.querySelector('[wire\\:id]');
+        return el ? (window.Livewire && window.Livewire.find(el.getAttribute('wire:id'))) : null;
+    }
+
+    if (window.Livewire) {
+        window.Livewire.hook('message.processed', function (message, component) {
+            if (!component || !component.data) return;
+            FIELDS.forEach(function (field) {
+                try { save(field, component.data[field]); } catch (e) {}
+            });
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        setTimeout(function () {
+            const wire = getWire();
+            if (wire) restore(wire);
+            window.addEventListener('magewire:order-placed', clearStorage);
+            if (window.location.href.includes('/checkout/onepage/success')) {
+                clearStorage();
+            }
+        }, 400);
+    });
+})();
+</script>
+<?php $hyvaCsp->registerInlineScript() ?>
