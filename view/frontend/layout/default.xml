@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <body>
+        <referenceContainer name="before.body.end">
+            <block name="iwd.opc.hyva.variables"
+                   template="Hyva_Theme::page/js/variables.phtml"
+                   before="iwd.opc.hyva.scripts"/>
+            <block name="iwd.opc.hyva.scripts"
+                   template="Hyva_Theme::page/js/hyva.phtml"
+                   before="script-alpine-js"/>
+        </referenceContainer>
+    </body>
+</page>
