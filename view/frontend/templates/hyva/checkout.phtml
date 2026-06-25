@@ -459,9 +459,10 @@ $paymentMethods = $magewire->getPaymentMethods();
                 <?php else: ?>
                     <div class="grid gap-3">
                         <?php foreach ($paymentMethods as $method): ?>
-                            <div class="border border-gray-200 rounded <?= $magewire->paymentMethod === $method->getCode() ? 'border-blue-500 bg-blue-50/10' : '' ?> transition-colors">
+                            <div class="border border-gray-200 rounded <?= $magewire->paymentMethod === $method->getCode() ? 'border-blue-500 bg-blue-50/10' : '' ?> transition-colors"
+                                 data-iwd-opc-payment-option="<?= $escaper->escapeHtmlAttr($method->getCode()) ?>">
                                 <label class="flex items-center gap-3 p-3 cursor-pointer hover:bg-gray-50/50 mb-0">
-                                    <input type="radio" class="form-radio h-4 w-4 text-blue-600 focus:ring-blue-500" name="payment_method" value="<?= $escaper->escapeHtmlAttr($method->getCode()) ?>" wire:click="selectPaymentMethod('<?= $escaper->escapeHtmlAttr($method->getCode()) ?>')" <?= $magewire->paymentMethod === $method->getCode() ? 'checked' : '' ?> required/>
+                                    <input type="radio" class="form-radio h-4 w-4 text-blue-600 focus:ring-blue-500" name="payment_method" value="<?= $escaper->escapeHtmlAttr($method->getCode()) ?>" data-iwd-opc-payment-option-input="<?= $escaper->escapeHtmlAttr($method->getCode()) ?>" wire:click="selectPaymentMethod('<?= $escaper->escapeHtmlAttr($method->getCode()) ?>')" <?= $magewire->paymentMethod === $method->getCode() ? 'checked' : '' ?> required/>
                                     <span class="font-medium text-sm text-gray-800"><?= $escaper->escapeHtml($method->getTitle()) ?></span>
                                 </label>
                                 
@@ -521,6 +522,20 @@ $paymentMethods = $magewire->getPaymentMethods();
                             </div>
                         <?php endforeach; ?>
                     </div>
+                    <?php
+                    $koPaymentMethods = [];
+                    foreach ($paymentMethods as $koPaymentMethod) {
+                        $koPaymentMethods[] = [
+                            'method' => (string) $koPaymentMethod->getCode(),
+                            'title' => (string) $koPaymentMethod->getTitle()
+                        ];
+                    }
+                    $koPaymentRenderersBlock = $block->getChildBlock('ko_payment_renderers');
+                    ?>
+                    <?php if ($koPaymentRenderersBlock): ?>
+                        <?php $koPaymentRenderersBlock->setData('payment_methods', $koPaymentMethods); ?>
+                        <?= $koPaymentRenderersBlock->toHtml() ?>
+                    <?php endif; ?>
                 <?php endif; ?>
             </div>
 
@@ -778,6 +793,15 @@ function initOpcCheckout() {
          */
         handleSubmit() {
             if (this._validateAll()) {
+                const paymentBridge = window.iwdOpcHyvaPayment;
+
+                if (paymentBridge && typeof paymentBridge.syncPaymentData === 'function') {
+                    Promise.resolve(paymentBridge.syncPaymentData(this.$wire)).then(() => {
+                        this.$wire.placeOrder();
+                    });
+                    return;
+                }
+
                 this.$wire.placeOrder();
             }
         },

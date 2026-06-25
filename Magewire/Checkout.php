@@ -76,6 +76,7 @@ class Checkout extends Component
      */
     public $shippingMethod = '';
     public $paymentMethod = '';
+    public $paymentAdditionalData = [];
     public $poNumber = '';
     public $couponCode = '';
     public $subscribe = false;
@@ -923,9 +924,14 @@ class Checkout extends Component
             return;
         }
 
+        $additionalData = array_merge(
+            $this->getGenericAdditionalPaymentData($methodCode),
+            $this->normalizePaymentAdditionalData($this->paymentAdditionalData)
+        );
+
         $data = [
             'method' => $methodCode,
-            'additional_data' => $this->getGenericAdditionalPaymentData($methodCode),
+            'additional_data' => $additionalData,
         ];
 
         if (method_exists($payment, 'importData')) {
@@ -934,6 +940,26 @@ class Checkout extends Component
         }
 
         $payment->setMethod($methodCode);
+    }
+
+    private function normalizePaymentAdditionalData($data): array
+    {
+        if (!is_array($data)) {
+            return [];
+        }
+
+        $result = [];
+        foreach ($data as $key => $value) {
+            if (!is_string($key) && !is_int($key)) {
+                continue;
+            }
+
+            if (is_scalar($value) || $value === null || is_array($value)) {
+                $result[(string)$key] = $value;
+            }
+        }
+
+        return $result;
     }
 
     private function getGenericAdditionalPaymentData(string $methodCode): array

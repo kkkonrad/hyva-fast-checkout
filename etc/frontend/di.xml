@@ -25,6 +25,14 @@
             </argument>
         </arguments>
     </type>
+    <type name="IWD\Opc\Block\Hyva\Checkout">
+        <arguments>
+            <argument name="configProvider" xsi:type="object">Magento\Checkout\Model\CompositeConfigProvider</argument>
+            <argument name="moduleList" xsi:type="object">Magento\Framework\Module\ModuleListInterface</argument>
+            <argument name="componentRegistrar" xsi:type="object">Magento\Framework\Component\ComponentRegistrarInterface</argument>
+            <argument name="localeResolver" xsi:type="object">Magento\Framework\Locale\ResolverInterface</argument>
+        </arguments>
+    </type>
     <type name="Magento\Directory\Model\ResourceModel\Country\Collection">
         <plugin name="iwd_opc_country_collection"
                 type="IWD\Opc\Plugin\Country\Collection"/>

@@ -1,0 +1,65 @@
+.iwd-opc-ko-payment-root {
+    display: block;
+}
+
+.iwd-opc-ko-payment-root:empty {
+    display: none;
+}
+
+.iwd-opc-ko-payment-root .payment-method {
+    display: none;
+    margin-top: 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    background: #f9fafb;
+}
+
+.iwd-opc-ko-payment-root .payment-method._active {
+    display: block;
+}
+
+.iwd-opc-ko-payment-root .payment-method-title,
+.iwd-opc-ko-payment-root .actions-toolbar,
+.iwd-opc-ko-payment-root .payment-method-billing-address {
+    display: none;
+}
+
+.iwd-opc-ko-payment-root .payment-method-content {
+    display: block;
+    padding: 1rem;
+}
+
+.iwd-opc-ko-payment-root img {
+    max-width: 100%;
+    height: auto;
+}
+
+.iwd-opc-ko-payment-root .field {
+    margin-bottom: 1rem;
+}
+
+.iwd-opc-ko-payment-root input[type='text'],
+.iwd-opc-ko-payment-root input[type='tel'],
+.iwd-opc-ko-payment-root input[type='number'],
+.iwd-opc-ko-payment-root input[type='password'],
+.iwd-opc-ko-payment-root select {
+    width: 100%;
+    max-width: 100%;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    background: #fff;
+    padding: 0.5rem 0.75rem;
+}
+
+.iwd-opc-ko-payment-root .checkout-agreements-block,
+.iwd-opc-ko-payment-root .payu-text,
+.iwd-opc-ko-payment-root .TpayRegulations {
+    color: #374151;
+    font-size: 0.875rem;
+    line-height: 1.5;
+}
+
+.iwd-opc-ko-payment-root a {
+    color: #2563eb;
+    text-decoration: underline;
+}
