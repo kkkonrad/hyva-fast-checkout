@@ -15,12 +15,12 @@
                 <arguments>
                     <argument name="magewire" xsi:type="object">IWD\Opc\Magewire\Checkout</argument>
                 </arguments>
-                <block class="IWD\Opc\Block\Hyva\Checkout"
-                       name="iwd.opc.hyva.checkout.ko_payment_renderers"
-                       as="ko_payment_renderers"
-                       template="IWD_Opc::hyva/knockout/payment-renderers.phtml"
-                       cacheable="false"/>
             </block>
+            <block class="IWD\Opc\Block\Hyva\Checkout"
+                   name="iwd.opc.hyva.checkout.ko_payment_renderers"
+                   as="ko_payment_renderers"
+                   template="IWD_Opc::hyva/knockout/payment-renderers.phtml"
+                   cacheable="false"/>
         </referenceContainer>
     </body>
 </page>

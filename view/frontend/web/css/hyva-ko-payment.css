@@ -14,27 +14,34 @@
     background: #f9fafb;
 }
 
-.iwd-opc-ko-payment-root .payment-method._active {
+.iwd-opc-ko-payment-root .payment-method._active,
+.iwd-opc-payment-method-ko-container .payment-method {
     display: block;
 }
 
 .iwd-opc-ko-payment-root .payment-method-title,
 .iwd-opc-ko-payment-root .actions-toolbar,
-.iwd-opc-ko-payment-root .payment-method-billing-address {
-    display: none;
+.iwd-opc-ko-payment-root .payment-method-billing-address,
+.iwd-opc-payment-method-ko-container .payment-method-title,
+.iwd-opc-payment-method-ko-container .actions-toolbar,
+.iwd-opc-payment-method-ko-container .payment-method-billing-address {
+    display: none !important;
 }
 
-.iwd-opc-ko-payment-root .payment-method-content {
+.iwd-opc-ko-payment-root .payment-method-content,
+.iwd-opc-payment-method-ko-container .payment-method-content {
     display: block;
     padding: 1rem;
 }
 
-.iwd-opc-ko-payment-root img {
+.iwd-opc-ko-payment-root img,
+.iwd-opc-payment-method-ko-container img {
     max-width: 100%;
     height: auto;
 }
 
-.iwd-opc-ko-payment-root .field {
+.iwd-opc-ko-payment-root .field,
+.iwd-opc-payment-method-ko-container .field {
     margin-bottom: 1rem;
 }
 
@@ -42,7 +49,12 @@
 .iwd-opc-ko-payment-root input[type='tel'],
 .iwd-opc-ko-payment-root input[type='number'],
 .iwd-opc-ko-payment-root input[type='password'],
-.iwd-opc-ko-payment-root select {
+.iwd-opc-ko-payment-root select,
+.iwd-opc-payment-method-ko-container input[type='text'],
+.iwd-opc-payment-method-ko-container input[type='tel'],
+.iwd-opc-payment-method-ko-container input[type='number'],
+.iwd-opc-payment-method-ko-container input[type='password'],
+.iwd-opc-payment-method-ko-container select {
     width: 100%;
     max-width: 100%;
     border: 1px solid #d1d5db;
@@ -53,13 +65,17 @@
 
 .iwd-opc-ko-payment-root .checkout-agreements-block,
 .iwd-opc-ko-payment-root .payu-text,
-.iwd-opc-ko-payment-root .TpayRegulations {
+.iwd-opc-ko-payment-root .TpayRegulations,
+.iwd-opc-payment-method-ko-container .checkout-agreements-block,
+.iwd-opc-payment-method-ko-container .payu-text,
+.iwd-opc-payment-method-ko-container .TpayRegulations {
     color: #374151;
     font-size: 0.875rem;
     line-height: 1.5;
 }
 
-.iwd-opc-ko-payment-root a {
+.iwd-opc-ko-payment-root a,
+.iwd-opc-payment-method-ko-container a {
     color: #2563eb;
     text-decoration: underline;
 }

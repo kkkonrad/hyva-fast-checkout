@@ -460,13 +460,14 @@ $paymentMethods = $magewire->getPaymentMethods();
                     <div class="grid gap-3">
                         <?php foreach ($paymentMethods as $method): ?>
                             <div class="border border-gray-200 rounded <?= $magewire->paymentMethod === $method->getCode() ? 'border-blue-500 bg-blue-50/10' : '' ?> transition-colors"
+                                 wire:key="payment-method-<?= $escaper->escapeHtmlAttr($method->getCode()) ?>"
                                  data-iwd-opc-payment-option="<?= $escaper->escapeHtmlAttr($method->getCode()) ?>">
                                 <label class="flex items-center gap-3 p-3 cursor-pointer hover:bg-gray-50/50 mb-0">
                                     <input type="radio" class="form-radio h-4 w-4 text-blue-600 focus:ring-blue-500" name="payment_method" value="<?= $escaper->escapeHtmlAttr($method->getCode()) ?>" data-iwd-opc-payment-option-input="<?= $escaper->escapeHtmlAttr($method->getCode()) ?>" wire:click="selectPaymentMethod('<?= $escaper->escapeHtmlAttr($method->getCode()) ?>')" <?= $magewire->paymentMethod === $method->getCode() ? 'checked' : '' ?> required/>
                                     <span class="font-medium text-sm text-gray-800"><?= $escaper->escapeHtml($method->getTitle()) ?></span>
                                 </label>
                                 
-                                <div class="iwd-opc-payment-method-ko-container border-t border-gray-100 hidden" style="display: none;" data-iwd-payment-method-ko-target="<?= $escaper->escapeHtmlAttr($method->getCode()) ?>"></div>
+                                <div class="iwd-opc-payment-method-ko-container border-t border-gray-100 hidden" style="display: none;" data-iwd-payment-method-ko-target="<?= $escaper->escapeHtmlAttr($method->getCode()) ?>" wire:ignore></div>
                                 
                                  <?php if ($magewire->paymentMethod === $method->getCode()): ?>
                                      <?php $details = $magewire->getPaymentMethodDetails($method->getCode()); ?>
@@ -524,20 +525,6 @@ $paymentMethods = $magewire->getPaymentMethods();
                             </div>
                         <?php endforeach; ?>
                     </div>
-                    <?php
-                    $koPaymentMethods = [];
-                    foreach ($paymentMethods as $koPaymentMethod) {
-                        $koPaymentMethods[] = [
-                            'method' => (string) $koPaymentMethod->getCode(),
-                            'title' => (string) $koPaymentMethod->getTitle()
-                        ];
-                    }
-                    $koPaymentRenderersBlock = $block->getChildBlock('ko_payment_renderers');
-                    ?>
-                    <?php if ($koPaymentRenderersBlock): ?>
-                        <?php $koPaymentRenderersBlock->setData('payment_methods', $koPaymentMethods); ?>
-                        <?= $koPaymentRenderersBlock->toHtml() ?>
-                    <?php endif; ?>
                 <?php endif; ?>
             </div>
 

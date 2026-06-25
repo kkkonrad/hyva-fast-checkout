@@ -18,6 +18,17 @@ $mageInitConfig = [
     'scope' => 'iwdOpcHyvaPaymentRenderers'
 ];
 ?>
+<style>
+    .iwd-opc-ko-payment-root .payment-method-title,
+    .iwd-opc-ko-payment-root .actions-toolbar,
+    .iwd-opc-ko-payment-root .payment-method-billing-address,
+    .iwd-opc-payment-method-ko-container .payment-method-title,
+    .iwd-opc-payment-method-ko-container .actions-toolbar,
+    .iwd-opc-payment-method-ko-container .payment-method-billing-address {
+        display: none !important;
+    }
+</style>
+
 <div id="iwd-opc-ko-payment-root"
      class="iwd-opc-ko-payment-root mt-4"
      wire:ignore
