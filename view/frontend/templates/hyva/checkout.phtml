@@ -462,18 +462,23 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                     <?= $escaper->escapeHtml(__('Apply Discount Code')) ?>
                 </h2>
 
-                <div class="flex gap-2">
-                    <input class="form-input flex-1 rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm" type="text" wire:model.defer="couponCode" placeholder="<?= $escaper->escapeHtmlAttr(__('Enter discount code')) ?>"/>
+                <div class="flex flex-col sm:flex-row gap-2">
+                    <input class="form-input w-full sm:flex-1 rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm" 
+                           type="text" 
+                           wire:model.defer="couponCode" 
+                           placeholder="<?= $escaper->escapeHtmlAttr(__('Enter discount code')) ?>"/>
                     
-                    <button class="btn btn-primary" type="button" wire:click="applyCoupon">
-                        <?= $escaper->escapeHtml(__('Apply')) ?>
-                    </button>
-                    
-                    <?php if ($magewire->couponCode): ?>
-                        <button class="btn btn-secondary text-red-600 border-red-200 hover:bg-red-50" type="button" wire:click="cancelCoupon">
-                            <?= $escaper->escapeHtml(__('Cancel')) ?>
+                    <div class="flex gap-2 w-full sm:w-auto">
+                        <button class="btn btn-primary flex-1 sm:flex-initial" type="button" wire:click="applyCoupon">
+                            <?= $escaper->escapeHtml(__('Apply')) ?>
                         </button>
-                    <?php endif; ?>
+                        
+                        <?php if ($magewire->couponCode): ?>
+                            <button class="btn btn-secondary text-red-600 border-red-200 hover:bg-red-50 flex-1 sm:flex-initial" type="button" wire:click="cancelCoupon">
+                                <?= $escaper->escapeHtml(__('Cancel')) ?>
+                            </button>
+                        <?php endif; ?>
+                    </div>
                 </div>
 
                 <?php if ($magewire->couponSuccess): ?>
@@ -653,7 +658,8 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
     </form>
     <?php if ($items): ?>
         <!-- Sticky Place Order Bar on Mobile -->
-        <div class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 p-4 shadow-2xl flex flex-col gap-3 transition-all duration-200"
+        <div class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 p-4 mb-0 shadow-2xl flex flex-col gap-3 transition-all duration-200"
+             style="margin-bottom: 0 !important;"
              wire:loading.class="opacity-60 pointer-events-none">
             <div class="flex items-center justify-between">
                 <div class="min-w-0">
