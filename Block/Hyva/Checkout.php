@@ -140,6 +140,14 @@ class Checkout extends Template
     }
 
     /**
+     * @return bool
+     */
+    public function isShowGiftMessage(): bool
+    {
+        return $this->opcHelper->isShowGiftMessage();
+    }
+
+    /**
      * @return HyvaCsp
      */
     public function getHyvaCsp(): HyvaCsp

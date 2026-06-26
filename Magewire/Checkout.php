@@ -81,6 +81,10 @@ class Checkout extends Component
     public $couponCode = '';
     public $subscribe = false;
     public $comment = '';
+    public $hasGiftMessage = false;
+    public $giftSender = '';
+    public $giftRecipient = '';
+    public $giftMessage = '';
 
 
     /**
@@ -113,6 +117,8 @@ class Checkout extends Component
     private $customerSession;
     private $addressRepository;
     private $searchCriteriaBuilder;
+    private $giftMessageRepository;
+    private $giftMessageFactory;
 
     /**
      * @param CheckoutSession $checkoutSession
@@ -148,7 +154,9 @@ class Checkout extends Component
         \Magento\Sales\Model\OrderFactory $orderFactory = null,
         CustomerSession $customerSession = null,
         AddressRepositoryInterface $addressRepository = null,
-        SearchCriteriaBuilder $searchCriteriaBuilder = null
+        SearchCriteriaBuilder $searchCriteriaBuilder = null,
+        \Magento\GiftMessage\Api\CartRepositoryInterface $giftMessageRepository = null,
+        \Magento\GiftMessage\Api\Data\MessageInterfaceFactory $giftMessageFactory = null
     ) {
         $this->checkoutSession = $checkoutSession;
         $this->cartRepository = $cartRepository;
@@ -193,6 +201,16 @@ class Checkout extends Component
             $this->searchCriteriaBuilder = $searchCriteriaBuilder ?? \Magento\Framework\App\ObjectManager::getInstance()->get(SearchCriteriaBuilder::class);
         } catch (\Exception $e) {
             $this->searchCriteriaBuilder = null;
+        }
+        try {
+            $this->giftMessageRepository = $giftMessageRepository ?? \Magento\Framework\App\ObjectManager::getInstance()->get(\Magento\GiftMessage\Api\CartRepositoryInterface::class);
+        } catch (\Exception $e) {
+            $this->giftMessageRepository = null;
+        }
+        try {
+            $this->giftMessageFactory = $giftMessageFactory ?? \Magento\Framework\App\ObjectManager::getInstance()->get(\Magento\GiftMessage\Api\Data\MessageInterfaceFactory::class);
+        } catch (\Exception $e) {
+            $this->giftMessageFactory = null;
         }
     }
 
@@ -292,6 +310,23 @@ class Checkout extends Component
                         $quote->collectTotals();
                         $this->cartRepository->save($quote);
                     }
+                }
+            }
+        }
+
+        if ($this->opcHelper->isShowGiftMessage() && $this->giftMessageRepository !== null) {
+            $giftMessageId = $quote->getGiftMessageId();
+            if ($giftMessageId) {
+                try {
+                    $gift = $this->giftMessageRepository->get($quote->getId());
+                    if ($gift) {
+                        $this->giftSender = (string)$gift->getSender();
+                        $this->giftRecipient = (string)$gift->getRecipient();
+                        $this->giftMessage = (string)$gift->getMessage();
+                        $this->hasGiftMessage = true;
+                    }
+                } catch (\Exception $e) {
+                    // Ignore loading errors
                 }
             }
         }
@@ -781,6 +816,7 @@ class Checkout extends Component
             if ($this->paymentMethod === 'purchaseorder' && method_exists($payment, 'setPoNumber')) {
                 $payment->setPoNumber($this->poNumber);
             }
+            $this->saveGiftMessage();
             $this->cartRepository->save($quote);
 
             // Save comment to session so QuoteSubmitSuccess observer can persist it to order history
@@ -879,9 +915,41 @@ class Checkout extends Component
             $this->saveBillingAddress();
         } elseif ($name === 'billingSameAsShipping') {
             $this->saveBillingAddress();
+        } elseif (in_array($name, ['hasGiftMessage', 'giftSender', 'giftRecipient', 'giftMessage'])) {
+            $this->saveGiftMessage();
         }
 
         return $value;
+    }
+
+    /**
+     * Save gift message to quote
+     */
+    public function saveGiftMessage(): void
+    {
+        if (!$this->opcHelper->isShowGiftMessage() || $this->giftMessageRepository === null || $this->giftMessageFactory === null) {
+            return;
+        }
+
+        $quote = $this->checkoutSession->getQuote();
+        
+        try {
+            if (!$this->hasGiftMessage) {
+                $quote->setGiftMessageId(null);
+                $this->cartRepository->save($quote);
+                $this->giftSender = '';
+                $this->giftRecipient = '';
+                $this->giftMessage = '';
+            } else {
+                $gift = $this->giftMessageFactory->create();
+                $gift->setSender($this->giftSender);
+                $gift->setRecipient($this->giftRecipient);
+                $gift->setMessage($this->giftMessage);
+                $this->giftMessageRepository->save($quote->getId(), $gift);
+            }
+        } catch (\Exception $e) {
+            $this->logger->error('Fastcheckout saveGiftMessage error: ' . $e->getMessage());
+        }
     }
 
     /**
