@@ -709,7 +709,6 @@ function initOpcCheckout() {
         _debounceTimers: {},
         _blurTimers: {},
         isProcessing: false,
-        _processingTimer: null,
 
         init() {
             this.$nextTick(() => {
@@ -722,16 +721,17 @@ function initOpcCheckout() {
             });
 
             if (window.Livewire && typeof window.Livewire.hook === 'function') {
-                window.Livewire.hook('message.sent', () => {
-                    clearTimeout(this._processingTimer);
-                    this.isProcessing = true;
-                });
-                window.Livewire.hook('message.processed', () => {
-                    clearTimeout(this._processingTimer);
-                    this._processingTimer = setTimeout(() => {
+                const handleProcessed = (message) => {
+                    const updates = message.updateQueue || (message.payload && message.payload.updates) || [];
+                    const isPlacingOrder = updates.some(update => 
+                        update.type === 'callMethod' && update.payload && update.payload.method === 'placeOrder'
+                    );
+                    if (isPlacingOrder) {
                         this.isProcessing = false;
-                    }, 400); // 400ms delay to bridge successive calls (like country/region change -> estimate -> selectShippingMethod)
-                });
+                    }
+                };
+                window.Livewire.hook('message.processed', handleProcessed);
+                window.Livewire.hook('message.failed', handleProcessed);
             }
         },
 
@@ -863,10 +863,19 @@ function initOpcCheckout() {
                     }
                 }
 
+                this.isProcessing = true;
+
                 if (paymentBridge && typeof paymentBridge.syncPaymentData === 'function') {
-                    Promise.resolve(paymentBridge.syncPaymentData(this.$wire)).then(() => {
-                        this.$wire.call('placeOrder', selectedMethod);
-                    });
+                    Promise.resolve(paymentBridge.syncPaymentData(this.$wire))
+                        .then(() => {
+                            this.$wire.call('placeOrder', selectedMethod);
+                        })
+                        .catch((err) => {
+                            if (window.console && typeof window.console.error === 'function') {
+                                window.console.error('Kkkonrad OPC: syncPaymentData failed:', err);
+                            }
+                            this.isProcessing = false;
+                        });
                     return;
                 }
 
