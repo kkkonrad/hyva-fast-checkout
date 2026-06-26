@@ -60,7 +60,7 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
 
 
     <!-- Two Column Layout -->
-    <div class="grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_1fr] lg:items-start w-full">
+    <div class="grid gap-8 lg:grid-cols-2 lg:items-start w-full">
         
         <!-- Left Column: Shipping Address & Shipping Methods -->
         <div class="space-y-6 min-w-0 w-full">
@@ -265,7 +265,7 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
             <div class="card bg-white p-4 md:p-6 shadow rounded-lg border border-gray-200">
                 <label class="flex items-center gap-3 cursor-pointer mb-0">
                     <input type="checkbox" class="form-checkbox h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500" wire:model="billingSameAsShipping"/>
-                    <span class="text-sm font-medium text-gray-900"><?= $escaper->escapeHtml(__('My billing address is different')) ?></span>
+                    <span class="text-sm font-medium text-gray-900"><?= $escaper->escapeHtml(__('My billing address is the same')) ?></span>
                 </label>
 
                 <!-- Billing Address Form -->
@@ -410,9 +410,8 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                     </div>
                 <?php endif; ?>
             </div>
-
             <!-- Payment Methods Section -->
-            <div class="card bg-white p-4 md:p-6 shadow rounded-lg border border-gray-200 relative">
+            <div class="card bg-white p-4 md:p-6 shadow rounded-lg border border-gray-200 relative" wire:key="checkout-payment-methods-card">
                 <div class="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
                     <h2 class="text-xl font-semibold text-gray-900">
                         <?= $escaper->escapeHtml(__('Payment Method')) ?>
@@ -424,34 +423,35 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                         <?= $escaper->escapeHtml(__('No payment methods available.')) ?>
                     </p>
                 <?php else: ?>
-	                    <div class="grid gap-3">
+	                    <div class="grid gap-3" wire:key="checkout-payment-methods-grid">
 	                        <?php foreach ($paymentMethods as $method): ?>
                                 <?php
                                 $methodCode = $method->getCode();
                                 $isPaymentMethodAllowed = !$hasPaymentMethodFilter || in_array($methodCode, $allowedPaymentMethodCodes, true);
                                 ?>
-	                            <div class="border border-gray-200 rounded transition-colors"
-	                                 data-iwd-opc-payment-option="<?= $escaper->escapeHtmlAttr($methodCode) ?>"
+ 	                            <div class="border border-gray-200 rounded transition-colors"
+ 	                                 wire:key="payment-method-item-<?= $escaper->escapeHtmlAttr($methodCode) ?>"
+ 	                                 data-iwd-opc-payment-option="<?= $escaper->escapeHtmlAttr($methodCode) ?>"
                                      data-iwd-opc-payment-allowed="<?= $isPaymentMethodAllowed ? '1' : '0' ?>"
                                      <?= $isPaymentMethodAllowed ? '' : 'style="display:none;" aria-hidden="true"' ?>>
-	                                <label class="flex items-center gap-3 p-3 cursor-pointer hover:bg-gray-50/50 mb-0">
-	                                    <input type="radio"
-	                                           class="form-radio h-4 w-4 text-blue-600 focus:ring-blue-500"
-	                                           name="payment_method"
-	                                           value="<?= $escaper->escapeHtmlAttr($methodCode) ?>"
-	                                           data-iwd-opc-payment-option-input="<?= $escaper->escapeHtmlAttr($methodCode) ?>"
-	                                           <?= $isPaymentMethodAllowed && $magewire->paymentMethod === $methodCode ? 'checked' : '' ?>
-                                               <?= $isPaymentMethodAllowed ? '' : 'disabled' ?>
-	                                           required/>
-	                                    <span class="font-medium text-sm text-gray-800"><?= $escaper->escapeHtml($method->getTitle()) ?></span>
-	                                </label>
+ 	                                <label class="flex items-center gap-3 p-3 cursor-pointer hover:bg-gray-50/50 mb-0">
+ 	                                    <input type="radio"
+ 	                                           class="form-radio h-4 w-4 text-blue-600 focus:ring-blue-500"
+ 	                                           name="payment_method"
+ 	                                           value="<?= $escaper->escapeHtmlAttr($methodCode) ?>"
+ 	                                           data-iwd-opc-payment-option-input="<?= $escaper->escapeHtmlAttr($methodCode) ?>"
+ 	                                           <?= $isPaymentMethodAllowed && $magewire->paymentMethod === $methodCode ? 'checked' : '' ?>
+                                                <?= $isPaymentMethodAllowed ? '' : 'disabled' ?>
+ 	                                           required/>
+ 	                                    <span class="font-medium text-sm text-gray-800"><?= $escaper->escapeHtml($method->getTitle()) ?></span>
+ 	                                </label>
 
-	                                <div class="iwd-opc-payment-method-ko-container border-t border-gray-100 hidden"
-	                                     style="display: none;"
-	                                     data-iwd-payment-method-ko-target="<?= $escaper->escapeHtmlAttr($methodCode) ?>"
-	                                     wire:ignore></div>
-	                            </div>
-	                        <?php endforeach; ?>
+ 	                                <div class="iwd-opc-payment-method-ko-container border-t border-gray-100 hidden"
+ 	                                     style="display: none;"
+ 	                                     data-iwd-payment-method-ko-target="<?= $escaper->escapeHtmlAttr($methodCode) ?>"
+ 	                                     wire:ignore></div>
+ 	                            </div>
+ 	                        <?php endforeach; ?>
                     </div>
                 <?php endif; ?>
             </div>
@@ -719,6 +719,7 @@ function initOpcCheckout() {
             const el = this.$el;
             const field = el.dataset.wireField;
             if (!field) return;
+            if (field !== 'postcode' && field !== 'billingPostcode') return;
             const value = el.value;
             clearTimeout(this._debounceTimers[field]);
             this._debounceTimers[field] = setTimeout(() => {
@@ -734,7 +735,9 @@ function initOpcCheckout() {
             const field = el.dataset.wireField;
             if (field) {
                 clearTimeout(this._debounceTimers[field]);
-                this.$wire.set(field, el.value);
+                if (field === 'postcode' || field === 'billingPostcode') {
+                    this.$wire.set(field, el.value);
+                }
             }
             this._validateEl(el);
         },
@@ -747,7 +750,9 @@ function initOpcCheckout() {
             const field = el.dataset.wireField;
             if (field) {
                 clearTimeout(this._debounceTimers[field]);
-                this.$wire.set(field, el.value);
+                if (field === 'postcode' || field === 'billingPostcode') {
+                    this.$wire.set(field, el.value);
+                }
             }
         },
 

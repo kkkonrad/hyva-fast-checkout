@@ -852,10 +852,31 @@ define([
                     }
                 }
 
-                if (window.Livewire && typeof window.Livewire.hook === 'function') {
-                    window.Livewire.hook('message.sent', function () {
-                        moveRenderersBackToRoot();
+                 if (window.Livewire && typeof window.Livewire.hook === 'function') {
+                    window.Livewire.hook('element.updating', function (fromEl, toEl) {
+                        if (fromEl.getAttribute('wire:key') === 'checkout-payment-methods-card') {
+                            var fromCodes = Array.from(fromEl.querySelectorAll('[data-iwd-opc-payment-option]')).map(function (el) {
+                                return el.getAttribute('data-iwd-opc-payment-option');
+                            }).sort().join(',');
+
+                            var toCodes = Array.from(toEl.querySelectorAll('[data-iwd-opc-payment-option]')).map(function (el) {
+                                return el.getAttribute('data-iwd-opc-payment-option');
+                            }).sort().join(',');
+
+                            if (fromCodes === toCodes) {
+                                if (window.console && typeof window.console.log === 'function') {
+                                    window.console.log('Kkkonrad OPC: Payment methods list did not change, ignoring DOM update.');
+                                }
+                                return false;
+                            }
+
+                            if (window.console && typeof window.console.log === 'function') {
+                                window.console.log('Kkkonrad OPC: Payment methods list changed, moving renderers to root before update.');
+                            }
+                            moveRenderersBackToRoot();
+                        }
                     });
+
                     window.Livewire.hook('message.processed', function () {
                         syncPaymentMethods();
                         var code = getSelectedMethodCode();
