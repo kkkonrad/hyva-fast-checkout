@@ -4,7 +4,6 @@
         <iwd_opc>
             <general>
                 <enable>0</enable>
-                <checkout_suite_design>1</checkout_suite_design>
             </general>
             <extended>
                 <title>Checkout</title>
@@ -24,35 +23,7 @@
             <hyva>
                 <auto_generate_requirejs_assets>1</auto_generate_requirejs_assets>
             </hyva>
-            <design>
-                <layout>
-                    <desktop>onepage</desktop>
-                    <mobile>onepage</mobile>
-                    <tablet>onepage</tablet>
-                    <address_type_order>shipping_first</address_type_order>
-                </layout>
-                <style>
-                    <font_family>Open+Sans</font_family>
-                    <page_background>FFFFFF</page_background>
-                    <sidebar_background>F5F5F5</sidebar_background>
-                    <heading_text_color>000000</heading_text_color>
-                    <body_text_color>333333</body_text_color>
-                    <link_color>006BB4</link_color>
-                    <input_highlight_color>00699B</input_highlight_color>
-                    <primary_btn_background>1979C3</primary_btn_background>
-                    <primary_btn_text_color>FFFFFF</primary_btn_text_color>
-                    <secondary_btn_background>333333</secondary_btn_background>
-                    <secondary_btn_text_color>FFFFFF</secondary_btn_text_color>
-                    <breadcrumbs>
-                        <item_color>707070</item_color>
-                        <item_background>AFAFAF</item_background>
-                        <active_item_color>151515</active_item_color>
-                        <active_item_background>9D1DE3</active_item_background>
-                        <completed_item_color>151515</completed_item_color>
-                        <completed_item_background>151515</completed_item_background>
-                    </breadcrumbs>
-                </style>
-            </design>
+
         </iwd_opc>
     </default>
 </config>

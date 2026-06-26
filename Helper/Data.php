@@ -8,7 +8,6 @@ use Magento\Framework\HTTP\Adapter\CurlFactory;
 use Magento\Framework\Message\Session as Session;
 use Magento\Framework\App\Config\ConfigResource\ConfigInterface;
 use Magento\Customer\Model\Session as CustomerSession;
-use Kkkonrad\Fastcheckout\Model\FlagFactory;
 use Magento\Framework\Json\Helper\Data as JsonHelper;
 use Magento\Framework\App\Helper\AbstractHelper;
 use Magento\Framework\UrlInterface;
@@ -50,7 +49,6 @@ class Data extends AbstractHelper
     public $curlFactory;
     public $session;
     public $customerSession;
-    public $flagFactory;
     public $response = null;
     public $jsonHelper;
     public $request;
@@ -68,7 +66,6 @@ class Data extends AbstractHelper
         CurlFactory $curlFactory,
         Session $session,
         ConfigInterface $resourceConfig,
-        FlagFactory $flagFactory,
         JsonHelper $jsonHelper,
         TransportBuilder $transportBuilder,
         Cart $cart,
@@ -83,7 +80,6 @@ class Data extends AbstractHelper
         $this->curlFactory = $curlFactory;
         $this->session = $session;
         $this->customerSession = $customerSession;
-        $this->flagFactory = $flagFactory;
         $this->jsonHelper = $jsonHelper;
         $this->transportBuilder = $transportBuilder;
         $this->cart = $cart;
