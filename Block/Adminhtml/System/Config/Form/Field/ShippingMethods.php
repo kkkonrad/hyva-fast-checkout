@@ -2,31 +2,37 @@
 
 namespace Kkkonrad\Fastcheckout\Block\Adminhtml\System\Config\Form\Field;
 
-use Magento\Framework\View\Element\Html\Select;
-use Magento\Backend\Block\Template\Context;
-use Magento\Shipping\Model\Config as ShippingConfig;
+use Kkkonrad\Fastcheckout\Model\Config\Source\Shipping as ShippingSource;
+use Magento\Framework\View\Element\Context;
 
-class ShippingMethods extends Select
+class ShippingMethods extends \Magento\Framework\View\Element\Html\Select
 {
     /**
-     * @var ShippingConfig
+     * @var ShippingSource
      */
-    private $shippingConfig;
+    private $shippingSource;
 
     /**
-     * Constructor
+     * ShippingMethods constructor.
+     *
+     * @param Context $context
+     * @param ShippingSource $shippingSource
+     * @param array $data
      */
     public function __construct(
         Context $context,
-        ShippingConfig $shippingConfig,
+        ShippingSource $shippingSource,
         array $data = []
     ) {
         parent::__construct($context, $data);
-        $this->shippingConfig = $shippingConfig;
+        $this->shippingSource = $shippingSource;
     }
 
     /**
      * Set input name
+     *
+     * @param string $value
+     * @return $this
      */
     public function setInputName($value)
     {
@@ -35,19 +41,19 @@ class ShippingMethods extends Select
 
     /**
      * Render block HTML
+     *
+     * @return string
      */
     public function _toHtml()
     {
         if (!$this->getOptions()) {
-            $this->addOption('', __('-- Select Shipping Method --'));
-            $activeCarriers = $this->shippingConfig->getActiveCarriers();
-            foreach ($activeCarriers as $carrierCode => $carrierModel) {
-                $carrierMethods = $carrierModel->getAllowedMethods();
-                $carrierTitle = $this->_scopeConfig->getValue('carriers/' . $carrierCode . '/title') ?: $carrierCode;
-                foreach ($carrierMethods as $methodCode => $methodTitle) {
-                    $fullCode = $carrierCode . '_' . $methodCode;
-                    $label = '[' . $carrierTitle . '] ' . ($methodTitle ?: $methodCode);
-                    $this->addOption($fullCode, $label);
+            foreach ($this->shippingSource->toOptionArray() as $shippingOption) {
+                if (is_array($shippingOption['value'])) {
+                    foreach ($shippingOption['value'] as $method) {
+                        $this->addOption($method['value'], $method['label']);
+                    }
+                } else {
+                    $this->addOption($shippingOption['value'], $shippingOption['label']);
                 }
             }
         }
