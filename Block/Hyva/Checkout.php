@@ -18,7 +18,9 @@ use Magento\Framework\View\Element\Template;
 use Magento\Framework\View\Element\Template\Context;
 use Magento\Quote\Model\Quote;
 use Magento\Quote\Model\Quote\Item;
+use Kkkonrad\Fastcheckout\Helper\Data as OpcHelper;
 use Kkkonrad\Fastcheckout\Model\Hyva\RequireJsAssets;
+
 
 class Checkout extends Template
 {
@@ -78,6 +80,12 @@ class Checkout extends Template
     private $objectManager;
 
     /**
+     * @var OpcHelper
+     */
+    private $opcHelper;
+
+
+    /**
      * @param Context $context
      * @param CheckoutSession $checkoutSession
      * @param PricingHelper $pricingHelper
@@ -97,6 +105,7 @@ class Checkout extends Template
         ImageHelper $imageHelper,
         ProductConfiguration $productConfiguration,
         ViewModelRegistry $viewModelRegistry,
+        OpcHelper $opcHelper,
         $configProvider = null,
         ModuleListInterface $moduleList = null,
         ComponentRegistrarInterface $componentRegistrar = null,
@@ -113,12 +122,21 @@ class Checkout extends Template
         $this->imageHelper = $imageHelper;
         $this->productConfiguration = $productConfiguration;
         $this->viewModelRegistry = $viewModelRegistry;
+        $this->opcHelper = $opcHelper;
         $this->configProvider = $configProvider instanceof CompositeConfigProvider ? $configProvider : null;
         $this->moduleList = $moduleList;
         $this->componentRegistrar = $componentRegistrar;
         $this->localeResolver = $localeResolver;
 
         parent::__construct($context, $data);
+    }
+
+    /**
+     * @return bool
+     */
+    public function isShowComment(): bool
+    {
+        return $this->opcHelper->isShowComment();
     }
 
     /**
@@ -139,14 +157,6 @@ class Checkout extends Template
         } catch (\Throwable $exception) {
             return false;
         }
-    }
-
-    /**
-     * @return \Hyva\Theme\ViewModel\Media
-     */
-    public function getMediaViewModel()
-    {
-        return $this->viewModelRegistry->require(\Hyva\Theme\ViewModel\Media::class);
     }
 
     /**

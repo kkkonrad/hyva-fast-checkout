@@ -2,12 +2,12 @@
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:noNamespaceSchemaLocation="urn:magento:framework:Backend/etc/system_file.xsd">
     <system>
-        <tab id="dominate" translate="label" sortOrder="999998" class="iwd-extensions-tab">
-            <label>Dominate</label>
+        <tab id="kkkonrad" translate="label" sortOrder="999998">
+            <label>Kkkonrad</label>
         </tab>
         <section id="iwd_opc" translate="label" sortOrder="1" showInDefault="1" showInWebsite="1" showInStore="1">
             <label>Checkout</label>
-            <tab>dominate</tab>
+            <tab>kkkonrad</tab>
             <resource>Kkkonrad_Fastcheckout::system_config</resource>
             <group id="general" translate="label" type="text"
                    sortOrder="1" showInDefault="1" showInWebsite="1" showInStore="1">

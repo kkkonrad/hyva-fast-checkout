@@ -80,6 +80,8 @@ class Checkout extends Component
     public $poNumber = '';
     public $couponCode = '';
     public $subscribe = false;
+    public $comment = '';
+
 
     /**
      * Coupon validation messages
@@ -780,6 +782,11 @@ class Checkout extends Component
                 $payment->setPoNumber($this->poNumber);
             }
             $this->cartRepository->save($quote);
+
+            // Save comment to session so QuoteSubmitSuccess observer can persist it to order history
+            if (!empty(trim($this->comment))) {
+                $this->checkoutSession->setIwdOpcComment(trim($this->comment));
+            }
 
             if ($this->subscribe && !empty($this->email)) {
                 try {

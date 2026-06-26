@@ -561,6 +561,20 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                     <span class="text-sm text-gray-700"><?= $escaper->escapeHtml(__('Sign Up For Newsletter')) ?></span>
                 </label>
 
+                <!-- Order Comment -->
+                <?php if ($block->isShowComment()): ?>
+                <div class="pt-2">
+                    <label class="block">
+                        <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Order Comment')) ?></span>
+                        <textarea
+                            class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm resize-none"
+                            rows="3"
+                            wire:model.defer="comment"
+                            placeholder="<?= $escaper->escapeHtmlAttr(__('Any special instructions or notes for your order...')) ?>"></textarea>
+                    </label>
+                </div>
+                <?php endif; ?>
+
                 <!-- Place Order Button -->
                 <div class="pt-2">
                     <button class="btn btn-primary w-full py-3 flex items-center justify-center gap-2" 

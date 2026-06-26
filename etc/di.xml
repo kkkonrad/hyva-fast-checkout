@@ -1,23 +1,12 @@
 <?xml version="1.0"?>
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
-    <preference for="Kkkonrad\Fastcheckout\Api\BalanceManagementInterface" type="Kkkonrad\Fastcheckout\Model\BalanceManagement"/>
-    <preference for="Kkkonrad\Fastcheckout\Api\RewardManagementInterface" type="Kkkonrad\Fastcheckout\Model\RewardManagement" />
+
     <preference for="Magento\Downloadable\Observer\IsAllowedGuestCheckoutObserver" type="Kkkonrad\Fastcheckout\Observer\Downloadable\IsAllowedGuestCheckoutObserver"/>
     <preference for="Magento\Checkout\Helper\Data" type="Kkkonrad\Fastcheckout\Helper\Checkout\Data"/>
     <preference for="Magento\Customer\Model\AccountManagement" type="Kkkonrad\Fastcheckout\Model\Customer\AccountManagement" />
-    <type name="Magento\GiftCardAccount\Model\Giftcardaccount">
-        <plugin name="iwd_opc_giftcardaccount_plugin" type="Kkkonrad\Fastcheckout\Plugin\GiftCardAccount" />
-    </type>
-    <type name="Magento\Checkout\Api\PaymentInformationManagementInterface">
-        <plugin name="iwd_opc_save_comment_subscribe" type="Kkkonrad\Fastcheckout\Plugin\Checkout\PaymentInformationManagement"/>
-    </type>
-    <type name="Magento\Checkout\Api\GuestPaymentInformationManagementInterface">
-        <plugin name="iwd_opc_save_comment_subscribe" type="Kkkonrad\Fastcheckout\Plugin\Checkout\GuestPaymentInformationManagement"/>
-    </type>
-    <type name="Magento\Quote\Api\PaymentMethodManagementInterface">
-        <plugin name="iwd_opc_save_comment_subscribe" type="Kkkonrad\Fastcheckout\Plugin\Checkout\PaymentMethodManagement"/>
-    </type>
+
+
 
     <type name="Magento\Customer\Model\Address\AbstractAddress">
         <plugin name="iwd_opc_customer_address" type="Kkkonrad\Fastcheckout\Plugin\Customer\Model\Address\AbstractAddress"/>
