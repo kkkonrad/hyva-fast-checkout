@@ -1159,6 +1159,37 @@ class Checkout extends Component
             }
         }
 
+        // Fallback heuristic for any new/unknown payment modules
+        $info = $payment->getAdditionalInformation();
+        if (is_array($info)) {
+            foreach ($info as $key => $value) {
+                if (is_string($value) && (strpos($value, 'http://') === 0 || strpos($value, 'https://') === 0)) {
+                    $lowerKey = strtolower($key);
+                    $hasKeyword = false;
+                    foreach (['url', 'uri', 'link', 'redirect', 'href', 'pay', 'transaction'] as $kw) {
+                        if (strpos($lowerKey, $kw) !== false) {
+                            $hasKeyword = true;
+                            break;
+                        }
+                    }
+                    if ($hasKeyword) {
+                        // Exclude image URLs
+                        $lowerVal = strtolower($value);
+                        $isImage = false;
+                        foreach (['.png', '.jpg', '.jpeg', '.gif', '.svg'] as $ext) {
+                            if (substr($lowerVal, -strlen($ext)) === $ext) {
+                                $isImage = true;
+                                break;
+                            }
+                        }
+                        if (!$isImage) {
+                            return $value;
+                        }
+                    }
+                }
+            }
+        }
+
         return '';
     }
 }
