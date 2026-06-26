@@ -1,27 +1,11 @@
 <?xml version="1.0"?>
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
-    <preference for="Magento\Checkout\Block\Onepage\Success" type="Kkkonrad\Fastcheckout\Block\Onepage\Success" />
-    <preference for="Magento\Checkout\Block\Onepage" type="Kkkonrad\Fastcheckout\Block\Onepage" />
     <type name="Magento\Checkout\Model\CompositeConfigProvider">
         <arguments>
             <argument name="configProviders" xsi:type="array">
                 <item name="iwd_opc_extended_checkout_config"
                       xsi:type="object">Kkkonrad\Fastcheckout\Model\ExtendedCheckoutConfigProvider</item>
-            </argument>
-        </arguments>
-    </type>
-    <type name="Magento\Framework\Url\SecurityInfo">
-        <arguments>
-            <argument name="secureUrlList" xsi:type="array">
-                <item name="checkout_index" xsi:type="string">/onepage</item>
-            </argument>
-        </arguments>
-    </type>
-    <type name="Kkkonrad\Fastcheckout\Block\Onepage">
-        <arguments>
-            <argument name="layoutProcessors" xsi:type="array">
-                <item name="updateLayout" xsi:type="object">Kkkonrad\Fastcheckout\Block\Checkout\UpdateLayoutProcessor</item>
             </argument>
         </arguments>
     </type>

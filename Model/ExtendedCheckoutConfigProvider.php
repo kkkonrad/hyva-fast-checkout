@@ -48,6 +48,7 @@ class ExtendedCheckoutConfigProvider implements ConfigProviderInterface
         $settings['restrictedPaymentMethods'] = $this->opcHelper->getRestrictPaymentMethods();
         $settings['defaultShippingMethod'] = $this->opcHelper->getDefaultShippingMethod();
         $settings['defaultPaymentMethod'] = $this->opcHelper->getDefaultPaymentMethod();
+        $settings['shippingPaymentMapping'] = $this->opcHelper->getShippingPaymentMapping();
         $settings['isReloadShippingOnDiscount'] = $this->opcHelper->isReloadShippingOnDiscount();
         $settings['paymentTitleType'] = $this->opcHelper->getPaymentTitleType();
         $settings['paymentLogosImages'] = [

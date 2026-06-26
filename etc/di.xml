@@ -28,11 +28,4 @@
         <plugin name="iwd_opc_unset_extension_attributes" type="Kkkonrad\Fastcheckout\Plugin\Payments\Info"/>
     </type>
 
-    <type name="\Magento\Checkout\Block\Checkout\AttributeMerger">
-        <plugin name="customAttributeMerger" type="Kkkonrad\Fastcheckout\Plugin\AttributeMergerPlugin"/>
-    </type>
-
-    <type name="Magento\Checkout\Block\Checkout\LayoutProcessor">
-        <plugin name="iwd_modified_checkout_layout_processor" type="Kkkonrad\Fastcheckout\Plugin\Block\LayoutProcessor" sortOrder="1"/>
-    </type>
 </config>

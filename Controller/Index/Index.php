@@ -38,12 +38,6 @@ class Index extends Action
             return $this->resultRedirectFactory->create()->setPath('customer/account/edit');
         }
 
-        if (!$this->isHyvaOpcRequest()) {
-            if (!$this->canShowForUnregisteredUsers()) {
-                throw new NotFoundException(__('Page not found.'));
-            }
-        }
-
         if (!$this->checkoutHelper->canOnepageCheckout()) {
             $this->messageManager->addErrorMessage(__('One-page checkout is turned off.'));
             return $this->resultRedirectFactory->create()->setPath('checkout/cart');
@@ -51,46 +45,21 @@ class Index extends Action
 
         $quote = $this->onepage->getQuote();
         
-        if ($this->isHyvaOpcRequest()) {
-            if (!$quote->hasItems() || $quote->getHasError() || !$quote->validateMinimumAmount()) {
-                return $this->resultRedirectFactory->create()->setPath('checkout/cart');
-            }
-            
-            if (!$this->customerSession->isLoggedIn() && !$this->checkoutHelper->isAllowedGuestCheckout($quote)) {
-                $this->messageManager->addErrorMessage(__('Guest checkout is disabled. Please Login or Create an Account'));
-                return $this->resultRedirectFactory->create()->setPath('checkout/cart');
-            }
-
-            $this->customerSession->regenerateId();
-            $this->checkoutSession->setCartWasUpdated(false);
-            $this->onepage->initCheckout();
-        } else {
-            if (!$quote->hasItems() || $quote->getHasError() || !$quote->validateMinimumAmount()) {
-                return $this->resultRedirectFactory->create()->setPath('checkout/cart');
-            }
-
-            if (!$this->customerSession->isLoggedIn() && !$this->checkoutHelper->isAllowedGuestCheckout($quote)) {
-                $this->messageManager->addErrorMessage(__('Guest checkout is disabled. Please Login or Create an Account'));
-                return $this->resultRedirectFactory->create()->setPath('checkout/cart');
-            }
-
-            $this->customerSession->regenerateId();
-            $this->checkoutSession->setCartWasUpdated(false);
-            $this->onepage->initCheckout();
+        if (!$quote->hasItems() || $quote->getHasError() || !$quote->validateMinimumAmount()) {
+            return $this->resultRedirectFactory->create()->setPath('checkout/cart');
         }
+        
+        if (!$this->customerSession->isLoggedIn() && !$this->checkoutHelper->isAllowedGuestCheckout($quote)) {
+            $this->messageManager->addErrorMessage(__('Guest checkout is disabled. Please Login or Create an Account'));
+            return $this->resultRedirectFactory->create()->setPath('checkout/cart');
+        }
+
+        $this->customerSession->regenerateId();
+        $this->checkoutSession->setCartWasUpdated(false);
+        $this->onepage->initCheckout();
 
         $resultPage = $this->resultPageFactory->create();
-        if ($this->isHyvaOpcRequest()) {
-            $resultPage->getConfig()->getTitle()->set(__('Checkout'));
-        } else {
-            $resultPage->getConfig()->getTitle()->set($this->opcHelper->getTitle());
-        }
+        $resultPage->getConfig()->getTitle()->set(__('Checkout'));
         return $resultPage;
-    }
-
-    private function isHyvaOpcRequest()
-    {
-        return $this->getRequest()->getModuleName() === 'hyvaopc'
-            || $this->getRequest()->getFrontName() === 'fast-checkout';
     }
 }
