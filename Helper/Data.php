@@ -11,7 +11,7 @@ use Magento\Customer\Model\Session as CustomerSession;
 use Magento\Framework\Json\Helper\Data as JsonHelper;
 use Magento\Framework\App\Helper\AbstractHelper;
 use Magento\Framework\UrlInterface;
-use \Magento\Framework\Mail\Template\TransportBuilder;
+
 use Magento\Store\Model\ScopeInterface;
 use Magento\Checkout\Model\Cart;
 use Magento\Quote\Model\QuoteFactory;
@@ -52,7 +52,7 @@ class Data extends AbstractHelper
     public $response = null;
     public $jsonHelper;
     public $request;
-    protected $transportBuilder;
+
     protected $cart;
     protected $quoteFactory;
     protected $regionCollectionFactory;
@@ -67,7 +67,6 @@ class Data extends AbstractHelper
         Session $session,
         ConfigInterface $resourceConfig,
         JsonHelper $jsonHelper,
-        TransportBuilder $transportBuilder,
         Cart $cart,
         QuoteFactory $quoteFactory,
         CollectionFactory $regionCollectionFactory,
@@ -81,7 +80,6 @@ class Data extends AbstractHelper
         $this->session = $session;
         $this->customerSession = $customerSession;
         $this->jsonHelper = $jsonHelper;
-        $this->transportBuilder = $transportBuilder;
         $this->cart = $cart;
         $this->quoteFactory = $quoteFactory;
         $this->regionCollectionFactory = $regionCollectionFactory;

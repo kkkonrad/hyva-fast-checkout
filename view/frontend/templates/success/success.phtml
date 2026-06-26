@@ -1,0 +1,68 @@
+<?php
+/**
+ * @var $block \Kkkonrad\Fastcheckout\Block\Onepage\Success
+ */
+?>
+<div class="max-w-md mx-auto my-12 p-8 bg-white border border-gray-200 shadow-md rounded-lg text-center space-y-6">
+    <!-- Success Green Checkmark SVG -->
+    <div class="mx-auto w-20 h-20 bg-green-50 text-green-500 rounded-full flex items-center justify-center animate-bounce">
+        <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path>
+        </svg>
+    </div>
+
+    <!-- Title and Info -->
+    <div class="space-y-3">
+        <h1 class="text-3xl font-extrabold text-gray-900 tracking-tight"><?= $block->escapeHtml(__('Thank You!')) ?></h1>
+        <p class="text-sm text-gray-500 leading-relaxed">
+            <?php if ($block->getOrderId()): ?>
+                <?php if ($block->getCanViewOrder()): ?>
+                    <?= sprintf(
+                        __('Your order %s has been placed. You will receive an email with more details of your purchase.'),
+                        sprintf(
+                            '<a class="font-semibold text-blue-600 hover:text-blue-700 underline" href="%s">#%s</a>',
+                            $block->escapeUrl($block->getViewOrderUrl()),
+                            $block->escapeHtml($block->getOrderId())
+                        )
+                    ) ?>
+                <?php else: ?>
+                    <?= sprintf(
+                        __('Your order %s has been placed. You will receive an email with more details of your purchase.'),
+                        '<span class="font-semibold text-gray-800">#' . $block->escapeHtml($block->getOrderId()) . '</span>'
+                    ) ?>
+                <?php endif; ?>
+            <?php endif; ?>
+            <?= $block->getAdditionalInfoHtml() ?>
+        </p>
+    </div>
+
+    <!-- Print Receipt -->
+    <?php if ($block->getCanViewOrder() && $block->getCanPrintOrder()): ?>
+        <div class="text-sm">
+            <a href="<?= $block->escapeUrl($block->getPrintUrl()) ?>"
+               target="_blank"
+               class="inline-flex items-center gap-1.5 font-medium text-blue-600 hover:text-blue-700 transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+                </svg>
+                <?= $block->escapeHtml(__('Print receipt')) ?>
+            </a>
+        </div>
+    <?php endif; ?>
+
+    <!-- Actions -->
+    <div class="pt-2 flex flex-col gap-3">
+        <a href="<?= $block->escapeUrl($block->getUrl()) ?>"
+           class="btn btn-primary w-full"
+           title="<?= $block->escapeHtmlAttr(__('Continue Shopping')) ?>">
+            <?= $block->escapeHtml(__('Continue Shopping')) ?>
+        </a>
+        <?php if ($block->isCustomerLoggedIn()): ?>
+            <a href="<?= $block->escapeUrl($block->getCustomerAccountUrl()) ?>"
+               class="btn btn-secondary w-full"
+               title="<?= $block->escapeHtmlAttr(__('My Account')) ?>">
+                <?= $block->escapeHtml(__('My Account')) ?>
+            </a>
+        <?php endif; ?>
+    </div>
+</div>
