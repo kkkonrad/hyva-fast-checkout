@@ -733,6 +733,14 @@ function initOpcCheckout() {
                         if (window.console && typeof window.console.warn === 'function') {
                             window.console.warn('IWD OPC: Order placement halted because Knockout payment validation failed.');
                         }
+                        if (selectedMethodEl) {
+                            const optionContainer = selectedMethodEl.closest('[data-iwd-opc-payment-option]');
+                            if (optionContainer) {
+                                optionContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            } else {
+                                selectedMethodEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            }
+                        }
                         return;
                     }
                 }
@@ -785,12 +793,22 @@ function initOpcCheckout() {
 
         _validateAll() {
             let valid = true;
+            let firstInvalidEl = null;
             const form = this.$el; // on @submit.prevent this.$el is the <form>
             for (const el of form.elements) {
                 if (el.willValidate) {
                     this._validateEl(el);
-                    if (!el.validity.valid) valid = false;
+                    if (!el.validity.valid) {
+                        valid = false;
+                        if (!firstInvalidEl) {
+                            firstInvalidEl = el;
+                        }
+                    }
                 }
+            }
+            if (firstInvalidEl) {
+                firstInvalidEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                firstInvalidEl.focus();
             }
             return valid;
         }

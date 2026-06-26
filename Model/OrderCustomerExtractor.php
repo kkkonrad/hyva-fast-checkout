@@ -6,6 +6,20 @@ use Magento\Quote\Model\Quote\Address as QuoteAddress;
 
 class OrderCustomerExtractor
 {
+    /**
+     * @var \Magento\Framework\DataObject\Copy
+     */
+    protected $objectCopyService;
+
+    /**
+     * @var \Magento\Customer\Api\Data\AddressInterfaceFactory
+     */
+    protected $addressFactory;
+
+    /**
+     * @var \Magento\Customer\Api\Data\RegionInterfaceFactory
+     */
+    protected $regionFactory;
 
     /**
      * OrderCustomerExtractor constructor.

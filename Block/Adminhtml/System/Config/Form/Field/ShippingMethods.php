@@ -30,7 +30,7 @@ class ShippingMethods extends Select
      */
     public function setInputName($value)
     {
-        return $this->setName($value);
+        return $this->setData('name', $value);
     }
 
     /**

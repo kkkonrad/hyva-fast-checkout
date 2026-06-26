@@ -103,6 +103,50 @@
     box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
+/* Premium styling for Check / Money Order instructions (checkmo) */
+.iwd-opc-payment-method-ko-container .items.check.payable,
+.iwd-opc-ko-payment-root .items.check.payable {
+    display: block;
+    padding: 1rem;
+    background-color: #eff6ff; /* Blue 50 */
+    border-left: 4px solid #3b82f6; /* Blue 500 */
+    border-radius: 0 0.5rem 0.5rem 0;
+    font-size: 0.875rem;
+    color: #1e3a8a; /* Blue 900 */
+    line-height: 1.6;
+    margin: 0;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.iwd-opc-payment-method-ko-container .items.check.payable dt,
+.iwd-opc-ko-payment-root .items.check.payable dt {
+    font-weight: 600;
+    color: #1e3a8a;
+    margin-top: 0.5rem;
+}
+
+.iwd-opc-payment-method-ko-container .items.check.payable dt:first-child,
+.iwd-opc-ko-payment-root .items.check.payable dt:first-child {
+    margin-top: 0;
+}
+
+.iwd-opc-payment-method-ko-container .items.check.payable dd,
+.iwd-opc-ko-payment-root .items.check.payable dd {
+    margin-left: 0;
+    margin-bottom: 0.5rem;
+    color: #374151; /* Gray 700 */
+}
+
+.iwd-opc-payment-method-ko-container .items.check.payable dd:last-child,
+.iwd-opc-ko-payment-root .items.check.payable dd:last-child {
+    margin-bottom: 0;
+}
+
+.iwd-opc-payment-method-ko-container .items.check.payable address,
+.iwd-opc-ko-payment-root .items.check.payable address {
+    font-style: normal;
+}
+
 .iwd-opc-payment-method-ko-container .fieldset {
     border: none;
     padding: 0;

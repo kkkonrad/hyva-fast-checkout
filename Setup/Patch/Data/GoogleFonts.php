@@ -49,6 +49,7 @@ class GoogleFonts implements \Magento\Framework\Setup\Patch\DataPatchInterface
             $data
         );
 
+        return $this;
     }
 
 

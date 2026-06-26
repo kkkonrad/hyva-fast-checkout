@@ -23,6 +23,16 @@ class CreateWithPassword extends \Magento\Framework\App\Action\Action
     public $customerFactory;
 
     /**
+     * @var JsonFactory
+     */
+    protected $resultJsonFactory;
+
+    /**
+     * @var \IWD\Opc\Model\OrderCustomerExtractor
+     */
+    protected $orderCustomerExtractor;
+
+    /**
      * @var \Magento\Customer\Api\AccountManagementInterface
      */
     protected $accountManagement;

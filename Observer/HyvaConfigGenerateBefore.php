@@ -23,7 +23,8 @@ class HyvaConfigGenerateBefore implements ObserverInterface
         $path = $this->componentRegistrar->getPath(ComponentRegistrar::MODULE, $moduleName);
 
         if ($path) {
-            $extensions[] = ['src' => substr($path, strlen(BP) + 1)];
+            $bp = defined('BP') ? BP : '';
+            $extensions[] = ['src' => substr($path, strlen($bp) + 1)];
         }
 
         $config->setData('extensions', $extensions);
