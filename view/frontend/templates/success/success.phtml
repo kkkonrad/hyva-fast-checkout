@@ -1,6 +1,6 @@
 <?php
 /**
- * @var $block \IWD\Opc\Block\Onepage\Success
+ * @var $block \Kkkonrad\Fastcheckout\Block\Onepage\Success
  */
 ?>
 <?php
@@ -176,7 +176,7 @@ $opcHelper = $block->opcHelper;
             if (typeof require !== 'undefined') {
                 require([
                     'jquery',
-                    'IWD_Opc/js/ga4Events'
+                    'Kkkonrad_Fastcheckout/js/ga4Events'
                 ], function ($, ga4Events) {
                     ga4Events.purchaseEvent(JSON.stringify(purchaseData));
                 });

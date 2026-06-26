@@ -1,6 +1,6 @@
 <?php
 
-namespace IWD\Opc\Cron;
+namespace Kkkonrad\Fastcheckout\Cron;
 
 use Magento\Store\Model\ScopeInterface;
 

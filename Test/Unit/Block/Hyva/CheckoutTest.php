@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace IWD\Opc\Test\Unit\Block\Hyva;
+namespace Kkkonrad\Fastcheckout\Test\Unit\Block\Hyva;
 
-use IWD\Opc\Block\Hyva\Checkout;
+use Kkkonrad\Fastcheckout\Block\Hyva\Checkout;
 use Hyva\Theme\Model\ViewModelRegistry;
 use Magento\Catalog\Helper\Image as ImageHelper;
 use Magento\Catalog\Helper\Product\Configuration as ProductConfiguration;

@@ -6,8 +6,8 @@ define([
     'Magento_Checkout/js/model/error-processor',
     'Magento_Customer/js/model/customer',
     'Magento_Checkout/js/model/full-screen-loader',
-    'IWD_Opc/js/model/comment-assigner',
-    'IWD_Opc/js/model/subscribe-assigner',
+    'Kkkonrad_Fastcheckout/js/model/comment-assigner',
+    'Kkkonrad_Fastcheckout/js/model/subscribe-assigner',
     'Magento_CheckoutAgreements/js/model/agreements-assigner'
 ], function ($, quote, urlBuilder, storage, errorProcessor, customer, fullScreenLoader, commentAssigner, subscribeAssigner, checkoutAgreementsAssigner) {
     'use strict';

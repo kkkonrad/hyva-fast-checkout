@@ -1,6 +1,6 @@
 <?php
 
-namespace IWD\Opc\Model\ResourceModel\Region;
+namespace Kkkonrad\Fastcheckout\Model\ResourceModel\Region;
 
 class Collection extends \Magento\Directory\Model\ResourceModel\Region\Collection
 {

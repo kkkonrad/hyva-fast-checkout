@@ -5,33 +5,33 @@
     <update handle="checkout_index_index"/>
     <head>
         <css src="//maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" src_type="url"/>
-        <script src="IWD_Opc::js/dominate.js"/>
-        <script src="IWD_Opc::js/ga4.js"/>
+        <script src="Kkkonrad_Fastcheckout::js/dominate.js"/>
+        <script src="Kkkonrad_Fastcheckout::js/ga4.js"/>
         <meta name="viewport" content="width=device-width, user-scalable=no" />
     </head>
     <body>
         <referenceBlock name="page.main.title" remove="true"/>
         <referenceBlock name="iwd_opc_ga_ab" remove="true"/>
-        <referenceBlock name="logo" template="IWD_Opc::html/header/logo.phtml"/>
+        <referenceBlock name="logo" template="Kkkonrad_Fastcheckout::html/header/logo.phtml"/>
         <referenceBlock name="checkout.root">
             <action method="setTemplate">
-                <argument name="template" xsi:type="string">IWD_Opc::onepage.phtml</argument>
+                <argument name="template" xsi:type="string">Kkkonrad_Fastcheckout::onepage.phtml</argument>
             </action>
             <block class="Magento\GiftMessage\Block\Cart\GiftOptions"
                    name="checkout.gift_options"
-                   template="IWD_Opc::gift_options.phtml"
+                   template="Kkkonrad_Fastcheckout::gift_options.phtml"
                    cacheable="false">
             </block>
         </referenceBlock>
         <referenceContainer name="before.body.end">
             <block class="Magento\Framework\View\Element\Template"
                    name="iwd.opc.popup"
-                   template="IWD_Opc::popup.phtml">
+                   template="Kkkonrad_Fastcheckout::popup.phtml">
             </block>
         </referenceContainer>
         <referenceContainer name="after.body.start">
-            <block class="IWD\Opc\Block\Checkout\Design" name="custom_style" template="IWD_Opc::page/design.phtml"/>
-            <block class="IWD\Opc\Block\Checkout\GA" name="ga" template="IWD_Opc::page/ga.phtml" ifconfig="google/analytics/active"/>
+            <block class="Kkkonrad\Fastcheckout\Block\Checkout\Design" name="custom_style" template="Kkkonrad_Fastcheckout::page/design.phtml"/>
+            <block class="Kkkonrad\Fastcheckout\Block\Checkout\GA" name="ga" template="Kkkonrad_Fastcheckout::page/ga.phtml" ifconfig="google/analytics/active"/>
         </referenceContainer>
     </body>
 </page>

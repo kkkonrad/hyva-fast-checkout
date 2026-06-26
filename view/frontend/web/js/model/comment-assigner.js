@@ -1,7 +1,7 @@
 define([
     'jquery',
-    'IWD_Opc/js/model/quote',
-    'IWD_Opc/js/checkout-data'
+    'Kkkonrad_Fastcheckout/js/model/quote',
+    'Kkkonrad_Fastcheckout/js/checkout-data'
 ], function ($, quote, checkoutData) {
     'use strict';
 

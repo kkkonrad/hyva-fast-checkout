@@ -36,7 +36,7 @@ define([
     return function (Component) {
         return Component.extend({
             defaults: {
-                template: 'IWD_Opc/address'
+                template: 'Kkkonrad_Fastcheckout/address'
             },
             setShippingInformation: function () {
                 if (this.validateShippingInformation() && this.validateBillingInformation()) {

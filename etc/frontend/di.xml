@@ -1,13 +1,13 @@
 <?xml version="1.0"?>
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
-    <preference for="Magento\Checkout\Block\Onepage\Success" type="IWD\Opc\Block\Onepage\Success" />
-    <preference for="Magento\Checkout\Block\Onepage" type="IWD\Opc\Block\Onepage" />
+    <preference for="Magento\Checkout\Block\Onepage\Success" type="Kkkonrad\Fastcheckout\Block\Onepage\Success" />
+    <preference for="Magento\Checkout\Block\Onepage" type="Kkkonrad\Fastcheckout\Block\Onepage" />
     <type name="Magento\Checkout\Model\CompositeConfigProvider">
         <arguments>
             <argument name="configProviders" xsi:type="array">
                 <item name="iwd_opc_extended_checkout_config"
-                      xsi:type="object">IWD\Opc\Model\ExtendedCheckoutConfigProvider</item>
+                      xsi:type="object">Kkkonrad\Fastcheckout\Model\ExtendedCheckoutConfigProvider</item>
             </argument>
         </arguments>
     </type>
@@ -18,14 +18,14 @@
             </argument>
         </arguments>
     </type>
-    <type name="IWD\Opc\Block\Onepage">
+    <type name="Kkkonrad\Fastcheckout\Block\Onepage">
         <arguments>
             <argument name="layoutProcessors" xsi:type="array">
-                <item name="updateLayout" xsi:type="object">IWD\Opc\Block\Checkout\UpdateLayoutProcessor</item>
+                <item name="updateLayout" xsi:type="object">Kkkonrad\Fastcheckout\Block\Checkout\UpdateLayoutProcessor</item>
             </argument>
         </arguments>
     </type>
-    <type name="IWD\Opc\Block\Hyva\Checkout">
+    <type name="Kkkonrad\Fastcheckout\Block\Hyva\Checkout">
         <arguments>
             <argument name="configProvider" xsi:type="object">Magento\Checkout\Model\CompositeConfigProvider</argument>
             <argument name="moduleList" xsi:type="object">Magento\Framework\Module\ModuleListInterface</argument>
@@ -35,43 +35,43 @@
     </type>
     <type name="Magento\Directory\Model\ResourceModel\Country\Collection">
         <plugin name="iwd_opc_country_collection"
-                type="IWD\Opc\Plugin\Country\Collection"/>
+                type="Kkkonrad\Fastcheckout\Plugin\Country\Collection"/>
     </type>
     <type name="Magento\Checkout\Controller\Index\Index">
         <plugin name="iwd_opc_checkout_controller"
-                type="IWD\Opc\Plugin\Checkout\Controller\Index\Index"/>
+                type="Kkkonrad\Fastcheckout\Plugin\Checkout\Controller\Index\Index"/>
     </type>
     <type name="Magento\Checkout\Model\DefaultConfigProvider">
         <plugin name="iwd_opc_get_checkout_url_dcp"
-                type="IWD\Opc\Plugin\Checkout\DefaultConfigProvider"/>
+                type="Kkkonrad\Fastcheckout\Plugin\Checkout\DefaultConfigProvider"/>
     </type>
     <type name="Magento\Checkout\Block\Onepage\Link">
         <plugin name="iwd_opc_get_checkout_url_onepage_link"
-                type="IWD\Opc\Plugin\Checkout\Block\Onepage\Link"/>
+                type="Kkkonrad\Fastcheckout\Plugin\Checkout\Block\Onepage\Link"/>
     </type>
     <type name="Magento\Checkout\Block\Cart\Sidebar">
         <plugin name="iwd_opc_get_checkout_url_cart_sidebar"
-                type="IWD\Opc\Plugin\Checkout\Block\Cart\Sidebar"/>
+                type="Kkkonrad\Fastcheckout\Plugin\Checkout\Block\Cart\Sidebar"/>
     </type>
     <type name="Magento\Checkout\Block\Link">
         <plugin name="iwd_opc_get_checkout_url_link"
-                type="IWD\Opc\Plugin\Checkout\Block\Link"/>
+                type="Kkkonrad\Fastcheckout\Plugin\Checkout\Block\Link"/>
     </type>
     <type name="Magento\Checkout\Block\Cart">
         <plugin name="iwd_opc_get_checkout_url_cart"
-                type="IWD\Opc\Plugin\Checkout\Block\Cart"/>
+                type="Kkkonrad\Fastcheckout\Plugin\Checkout\Block\Cart"/>
     </type>
 
-    <preference for="PayPal\Braintree\Block\Paypal\Button" type="IWD\Opc\Block\Rewrite\Paypal\Button" />
+    <preference for="PayPal\Braintree\Block\Paypal\Button" type="Kkkonrad\Fastcheckout\Block\Rewrite\Paypal\Button" />
 
-    <type name="IWD\Opc\Block\Rewrite\Paypal\Button">
+    <type name="Kkkonrad\Fastcheckout\Block\Rewrite\Paypal\Button">
         <arguments>
             <argument name="data" xsi:type="array">
-                <item name="template" xsi:type="string">IWD_Opc::paypal/button.phtml</item>
+                <item name="template" xsi:type="string">Kkkonrad_Fastcheckout::paypal/button.phtml</item>
             </argument>
         </arguments>
     </type>
 
-    <preference for="Magento\Directory\Model\ResourceModel\Region\Collection" type="IWD\Opc\Model\ResourceModel\Region\Collection" />
+    <preference for="Magento\Directory\Model\ResourceModel\Region\Collection" type="Kkkonrad\Fastcheckout\Model\ResourceModel\Region\Collection" />
 
 </config>

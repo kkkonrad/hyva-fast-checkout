@@ -8,7 +8,7 @@ define(
 
         return Component.extend({
             defaults: {
-                template: 'IWD_Opc/payment/methods-renderers/iwd_authcim/iframe',
+                template: 'Kkkonrad_Fastcheckout/payment/methods-renderers/iwd_authcim/iframe',
                 isCurrentlySecure: window.checkoutConfig.iwdOpcSettings.isCurrentlySecure
             },
             optionsRenderCallback: 0,

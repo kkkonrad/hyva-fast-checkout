@@ -34,7 +34,7 @@ define(
                 rendererList.push(
                     {
                         type: payPalType,
-                        component: 'IWD_Opc/js/view/payment/methods-renderers/paypal'
+                        component: 'Kkkonrad_Fastcheckout/js/view/payment/methods-renderers/paypal'
                     }
                 );
             }

@@ -1,11 +1,11 @@
 <?php
 
-namespace IWD\Opc\Block\Checkout;
+namespace Kkkonrad\Fastcheckout\Block\Checkout;
 
 use Magento\Framework\View\Element\Template;
-use IWD\Opc\Helper\Data as OpcHelper;
-use IWD\Opc\Helper\GoogleAnalitics;
-use IWD\Opc\Helper\Quote as QuoteHelper;
+use Kkkonrad\Fastcheckout\Helper\Data as OpcHelper;
+use Kkkonrad\Fastcheckout\Helper\GoogleAnalitics;
+use Kkkonrad\Fastcheckout\Helper\Quote as QuoteHelper;
 
 class GA extends Template
 {

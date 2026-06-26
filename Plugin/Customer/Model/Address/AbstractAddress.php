@@ -4,14 +4,14 @@
  * See LICENSE.txt bundled with this module for license details.
  */
 
-namespace IWD\Opc\Plugin\Customer\Model\Address;
+namespace Kkkonrad\Fastcheckout\Plugin\Customer\Model\Address;
 
 use Magento\Customer\Model\Address\AbstractAddress as ParentClass;
 use Magento\Framework\Phrase;
 
 /**
  * Class AbstractAddress
- * @package IWD\Opc\Plugin\Customer\Model\Address
+ * @package Kkkonrad\Fastcheckout\Plugin\Customer\Model\Address
  */
 class AbstractAddress
 {

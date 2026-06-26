@@ -8,7 +8,7 @@ define([
 
     return Component.extend({
         defaults: {
-            template: 'IWD_Opc/general-errors',
+            template: 'Kkkonrad_Fastcheckout/general-errors',
             selector: '.iwd_opc_general_errors'
         },
 

@@ -1,10 +1,10 @@
 <?php
 
-namespace IWD\Opc\Block\Onepage;
+namespace Kkkonrad\Fastcheckout\Block\Onepage;
 
 use Magento\Checkout\Block\Onepage\Success as CheckoutSuccess;
-use IWD\Opc\Helper\Data as OpcHelper;
-use IWD\Opc\Helper\Order as OpcOrder;
+use Kkkonrad\Fastcheckout\Helper\Data as OpcHelper;
+use Kkkonrad\Fastcheckout\Helper\Order as OpcOrder;
 use Magento\Framework\View\Element\Template\Context;
 use Magento\Checkout\Model\Session as CheckoutSession;
 use Magento\Sales\Model\Order\Config;
@@ -95,8 +95,8 @@ class Success extends CheckoutSuccess
     protected function _toHtml()
     {
         if ($this->opcHelper->isShowSuccessPage() &&
-            $this->opcHelper->isEnable() && $this->opcHelper->isModuleOutputEnabled('IWD_Opc')) {
-            $this->setTemplate('IWD_Opc::success/success.phtml');
+            $this->opcHelper->isEnable() && $this->opcHelper->isModuleOutputEnabled('Kkkonrad_Fastcheckout')) {
+            $this->setTemplate('Kkkonrad_Fastcheckout::success/success.phtml');
             if ($this->getNameInLayout() === 'checkout.success.print.button') {
                 return '';
             }

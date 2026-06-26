@@ -6,7 +6,7 @@ define(
         'use strict';
         return Component.extend({
             defaults: {
-                template: 'IWD_Opc/payment/methods-renderers/free'
+                template: 'Kkkonrad_Fastcheckout/payment/methods-renderers/free'
             }
         });
     }

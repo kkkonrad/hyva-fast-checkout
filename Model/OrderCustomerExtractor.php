@@ -1,6 +1,6 @@
 <?php
 
-namespace IWD\Opc\Model;
+namespace Kkkonrad\Fastcheckout\Model;
 
 use Magento\Quote\Model\Quote\Address as QuoteAddress;
 

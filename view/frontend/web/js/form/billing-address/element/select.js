@@ -12,7 +12,7 @@ define([
     var inputNode = {
         parent: '${ $.$data.parentName }',
         component: 'Magento_Ui/js/form/element/abstract',
-        template: 'IWD_Opc/form/billing-address/element/select',
+        template: 'Kkkonrad_Fastcheckout/form/billing-address/element/select',
         provider: '${ $.$data.provider }',
         name: '${ $.$data.index }',
         dataScope: '${ $.$data.customEntry }',
@@ -105,7 +105,7 @@ define([
     return Abstract.extend({
         defaults: {
             customName: '${ $.parentName }.${ $.index }_input',
-            elementTmpl: 'IWD_Opc/form/element/select',
+            elementTmpl: 'Kkkonrad_Fastcheckout/form/element/select',
             caption: '',
             options: []
         },

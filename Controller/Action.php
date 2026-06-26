@@ -1,6 +1,6 @@
 <?php
 
-namespace IWD\Opc\Controller;
+namespace Kkkonrad\Fastcheckout\Controller;
 
 use Magento\Customer\Api\AccountManagementInterface;
 use Magento\Customer\Api\CustomerRepositoryInterface;
@@ -10,7 +10,7 @@ use Magento\Customer\Model\Session as CustomerSession;
 use Magento\Framework\App\Action\Context;
 use Magento\Framework\Controller\Result\RawFactory;
 use Magento\Checkout\Model\Type\Onepage;
-use IWD\Opc\Helper\Data as OpcHelper;
+use Kkkonrad\Fastcheckout\Helper\Data as OpcHelper;
 use Magento\Checkout\Helper\Data as CheckoutHelper;
 use Magento\Checkout\Model\Session as CheckoutSession;
 use Magento\Framework\View\Result\PageFactory;

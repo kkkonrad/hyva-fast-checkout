@@ -10,7 +10,7 @@ define(
 
         return Component.extend({
             defaults: {
-                template: 'IWD_Opc/payment/methods-renderers/iframe-methods'
+                template: 'Kkkonrad_Fastcheckout/payment/methods-renderers/iframe-methods'
             },
             initialize: function () {
                 var self = this;

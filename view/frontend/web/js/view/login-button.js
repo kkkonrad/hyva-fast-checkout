@@ -9,7 +9,7 @@ define([
 
     return Component.extend({
         defaults: {
-            template: 'IWD_Opc/login-button',
+            template: 'Kkkonrad_Fastcheckout/login-button',
             isShowLoginButton: quote.isShowLoginButton(),
             isCustomerLoggedIn: quote.isCustomerLoggedIn(),
             logoutUrl: quote.getLogoutUrl()

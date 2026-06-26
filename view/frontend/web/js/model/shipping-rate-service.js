@@ -5,7 +5,7 @@ define(
         'Magento_Checkout/js/model/shipping-rate-processor/customer-address',
         'Magento_Checkout/js/checkout-data',
         'Magento_Checkout/js/model/shipping-rate-registry',
-        'IWD_Opc/js/form/address-manager'
+        'Kkkonrad_Fastcheckout/js/form/address-manager'
     ],
     function (quote, defaultProcessor, customerAddressProcessor, checkoutData, rateRegistry, iwdOpcAddressManager) {
         'use strict';

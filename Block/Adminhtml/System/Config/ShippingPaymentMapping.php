@@ -1,6 +1,6 @@
 <?php
 
-namespace IWD\Opc\Block\Adminhtml\System\Config;
+namespace Kkkonrad\Fastcheckout\Block\Adminhtml\System\Config;
 
 use Magento\Config\Block\System\Config\Form\Field\FieldArray\AbstractFieldArray;
 use Magento\Framework\DataObject;
@@ -41,7 +41,7 @@ class ShippingPaymentMapping extends AbstractFieldArray
     {
         if (!$this->shippingMethodRenderer) {
             $this->shippingMethodRenderer = $this->getLayout()->createBlock(
-                \IWD\Opc\Block\Adminhtml\System\Config\Form\Field\ShippingMethods::class,
+                \Kkkonrad\Fastcheckout\Block\Adminhtml\System\Config\Form\Field\ShippingMethods::class,
                 '',
                 ['data' => ['is_render_to_js_template' => true]]
             );
@@ -56,7 +56,7 @@ class ShippingPaymentMapping extends AbstractFieldArray
     {
         if (!$this->paymentMethodRenderer) {
             $this->paymentMethodRenderer = $this->getLayout()->createBlock(
-                \IWD\Opc\Block\Adminhtml\System\Config\Form\Field\PaymentMethods::class,
+                \Kkkonrad\Fastcheckout\Block\Adminhtml\System\Config\Form\Field\PaymentMethods::class,
                 '',
                 ['data' => ['is_render_to_js_template' => true]]
             );

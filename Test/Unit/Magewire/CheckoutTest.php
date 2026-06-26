@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace IWD\Opc\Test\Unit\Magewire;
+namespace Kkkonrad\Fastcheckout\Test\Unit\Magewire;
 
-use IWD\Opc\Magewire\Checkout;
+use Kkkonrad\Fastcheckout\Magewire\Checkout;
 use Magento\Checkout\Model\Session as CheckoutSession;
 use Magento\Quote\Api\CartRepositoryInterface;
 use Magento\Quote\Api\ShippingMethodManagementInterface;
@@ -67,7 +67,7 @@ class CheckoutTest extends TestCase
     private $subscriberFactoryMock;
 
     /**
-     * @var \IWD\Opc\Helper\Data|MockObject
+     * @var \Kkkonrad\Fastcheckout\Helper\Data|MockObject
      */
     private $opcHelperMock;
 
@@ -100,7 +100,7 @@ class CheckoutTest extends TestCase
         $this->subscriberFactoryMock = $this->getMockBuilder(SubscriberFactory::class)
             ->disableOriginalConstructor()
             ->getMock();
-        $this->opcHelperMock = $this->createMock(\IWD\Opc\Helper\Data::class);
+        $this->opcHelperMock = $this->createMock(\Kkkonrad\Fastcheckout\Helper\Data::class);
 
         $this->quoteMock = $this->getMockBuilder(Quote::class)
             ->disableOriginalConstructor()

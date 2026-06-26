@@ -11,7 +11,7 @@ define([
 
     return Component.extend({
         defaults: {
-            template: 'IWD_Opc/summary/item/details',
+            template: 'Kkkonrad_Fastcheckout/summary/item/details',
             allowedTags: ['b', 'strong', 'i', 'em', 'u']
         },
 

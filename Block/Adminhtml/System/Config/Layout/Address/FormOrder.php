@@ -1,6 +1,6 @@
 <?php
 
-namespace IWD\Opc\Block\Adminhtml\System\Config\Layout\Address;
+namespace Kkkonrad\Fastcheckout\Block\Adminhtml\System\Config\Layout\Address;
 
 use Magento\Framework\Option\ArrayInterface;
 

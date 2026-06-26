@@ -16,11 +16,11 @@ define(
         'Magento_Checkout/js/model/payment/method-list',
         'Magento_Checkout/js/model/payment/additional-validators',
         'uiRegistry',
-        'IWD_Opc/js/model/payment/is-loading',
+        'Kkkonrad_Fastcheckout/js/model/payment/is-loading',
         'Magento_Checkout/js/action/set-billing-address',
         'Magento_Ui/js/model/messageList',
         'mage/validation',
-        'IWD_Opc/js/ga4Events'
+        'Kkkonrad_Fastcheckout/js/ga4Events'
     ],
     function ($,
               _,
@@ -62,7 +62,7 @@ define(
 
         return Component.extend({
             defaults: {
-                template: 'IWD_Opc/payment',
+                template: 'Kkkonrad_Fastcheckout/payment',
                 activeMethod: ''
             },
             isLoading: paymentIsLoading.isLoading,

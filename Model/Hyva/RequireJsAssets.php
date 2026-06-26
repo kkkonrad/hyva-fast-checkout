@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace IWD\Opc\Model\Hyva;
+namespace Kkkonrad\Fastcheckout\Model\Hyva;
 
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\Filesystem\DirectoryList;
@@ -108,7 +108,7 @@ class RequireJsAssets
             return $generated;
         } catch (\Throwable $exception) {
             $this->logger->warning(
-                'IWD OPC: could not generate RequireJS static assets.',
+                'Kkkonrad OPC: could not generate RequireJS static assets.',
                 ['exception' => $exception]
             );
         }

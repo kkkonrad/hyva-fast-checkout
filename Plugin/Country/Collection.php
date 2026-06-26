@@ -1,8 +1,8 @@
 <?php
 
-namespace IWD\Opc\Plugin\Country;
+namespace Kkkonrad\Fastcheckout\Plugin\Country;
 
-use IWD\Opc\Helper\Data as OpcHelper;
+use Kkkonrad\Fastcheckout\Helper\Data as OpcHelper;
 use Magento\Directory\Model\ResourceModel\Country\Collection as CountryCollection;
 
 class Collection

@@ -7,7 +7,7 @@ define([
 
     return Abstract.extend({
         defaults: {
-            elementTmpl: 'IWD_Opc/form/element/textarea'
+            elementTmpl: 'Kkkonrad_Fastcheckout/form/element/textarea'
         },
         textareaAutoSize: function (element) {
             $(element).textareaAutoSize();

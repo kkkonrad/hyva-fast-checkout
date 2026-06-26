@@ -16,7 +16,7 @@ define([
 
     return Component.extend({
         defaults: {
-            template: 'IWD_Opc/summary/cart-items'
+            template: 'Kkkonrad_Fastcheckout/summary/cart-items'
         },
         totals: totals.totals(),
         items: ko.observable([]),

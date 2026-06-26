@@ -8,7 +8,7 @@ define(
         'Magento_Catalog/js/price-utils',
         'Magento_Checkout/js/checkout-data',
         'Magento_Checkout/js/model/full-screen-loader',
-        'IWD_Opc/js/view/shipping'
+        'Kkkonrad_Fastcheckout/js/view/shipping'
     ],
     function(
         $,

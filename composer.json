@@ -1,5 +1,5 @@
 {
-  "name": "iwd/opc",
+  "name": "kkkonrad/fastcheckout",
   "description": "Dominate Checkout Open Source",
   "type": "magento2-module",
   "version": "6.1.1",
@@ -11,7 +11,7 @@
       "registration.php"
     ],
     "psr-4": {
-      "IWD\\Opc\\": ""
+      "Kkkonrad\\Fastcheckout\\": ""
     }
   },
   "repositories": [

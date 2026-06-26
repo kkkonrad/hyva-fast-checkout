@@ -8,7 +8,7 @@ define(
         'use strict';
         return Component.extend({
             defaults: {
-                template: 'IWD_Opc/payment/methods-renderers/purchaseorder-form',
+                template: 'Kkkonrad_Fastcheckout/payment/methods-renderers/purchaseorder-form',
                 isCurrentlySecure: window.checkoutConfig.iwdOpcSettings.isCurrentlySecure
             }
         });

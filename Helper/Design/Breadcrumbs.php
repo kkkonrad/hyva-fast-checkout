@@ -1,9 +1,9 @@
 <?php
 
-namespace IWD\Opc\Helper\Design;
+namespace Kkkonrad\Fastcheckout\Helper\Design;
 
 use Magento\Store\Model\ScopeInterface;
-use IWD\Opc\Helper\Data;
+use Kkkonrad\Fastcheckout\Helper\Data;
 
 class Breadcrumbs extends Data
 {

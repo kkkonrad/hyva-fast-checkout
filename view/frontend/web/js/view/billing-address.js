@@ -20,8 +20,8 @@ define(
         'Magento_Checkout/js/model/postcode-validator',
         'Magento_Checkout/js/model/address-converter',
         'Magento_Checkout/js/action/select-shipping-address',
-        'IWD_Opc/js/form/address-manager',
-        'IWD_Opc/js/ga4Events'
+        'Kkkonrad_Fastcheckout/js/form/address-manager',
+        'Kkkonrad_Fastcheckout/js/ga4Events'
     ],
     function ($,
               ko,
@@ -81,7 +81,7 @@ define(
 
         return Component.extend({
             defaults: {
-                template: 'IWD_Opc/billing-address'
+                template: 'Kkkonrad_Fastcheckout/billing-address'
             },
             canHideErrors: true,
             postcodeElement: null,

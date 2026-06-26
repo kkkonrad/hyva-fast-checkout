@@ -1,6 +1,6 @@
 <?php
 
-namespace IWD\Opc\Plugin\Checkout;
+namespace Kkkonrad\Fastcheckout\Plugin\Checkout;
 
 use Magento\Quote\Api\Data\PaymentInterface;
 use Magento\Quote\Api\Data\AddressInterface;

@@ -2,7 +2,7 @@
 /**
  * Knockout payment renderer island for the Hyva/Magewire checkout.
  *
- * @var \IWD\Opc\Block\Hyva\Checkout $block
+ * @var \Kkkonrad\Fastcheckout\Block\Hyva\Checkout $block
  * @var \Magento\Framework\Escaper $escaper
  */
 
@@ -63,7 +63,7 @@ $block->ensureRequireJsAssets();
         script.onload = onload;
         script.onerror = function () {
             if (window.console && typeof window.console.warn === 'function') {
-                window.console.warn('IWD OPC: could not load script', src);
+                window.console.warn('Kkkonrad OPC: could not load script', src);
             }
         };
         document.head.appendChild(script);
@@ -79,7 +79,7 @@ $block->ensureRequireJsAssets();
             baseUrl: staticBaseUrl
         });
 
-        window.require(['IWD_Opc/js/hyva/payment-renderers'], function (init) {
+        window.require(['Kkkonrad_Fastcheckout/js/hyva/payment-renderers'], function (init) {
             init(config);
         });
     }

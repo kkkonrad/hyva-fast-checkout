@@ -10,7 +10,7 @@ define([
 
     return Component.extend({
         defaults: {
-            template: 'IWD_Opc/hyva/shipping-list'
+            template: 'Kkkonrad_Fastcheckout/hyva/shipping-list'
         },
 
         rates: shippingService.getShippingRates(),
@@ -19,7 +19,7 @@ define([
         initialize: function () {
             this._super();
             if (window.console && typeof window.console.log === 'function') {
-                window.console.log('IWD OPC: shipping-list JS component initialized');
+                window.console.log('Kkkonrad OPC: shipping-list JS component initialized');
             }
             return this;
         },
@@ -55,7 +55,7 @@ define([
                         var currentMethod = wire.shippingMethod || (typeof wire.get === 'function' ? wire.get('shippingMethod') : (wire.data ? wire.data.shippingMethod : ''));
                         if (currentMethod !== value) {
                             if (window.console && typeof window.console.log === 'function') {
-                                window.console.log('IWD OPC: KO selected shipping method, syncing to Magewire:', value);
+                                window.console.log('Kkkonrad OPC: KO selected shipping method, syncing to Magewire:', value);
                             }
                             wire.call('selectShippingMethod', value);
                         }

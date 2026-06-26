@@ -12,7 +12,7 @@ define(
 
         return Component.extend({
             defaults: {
-                template: 'IWD_Opc/checkout-agreements'
+                template: 'Kkkonrad_Fastcheckout/checkout-agreements'
             },
             isVisible: agreementsConfig.isEnabled,
             agreements: agreementsConfig.agreements,

@@ -1,6 +1,6 @@
 <?php
 /**
- * @var $block IWD\Opc\Block\Onepage
+ * @var $block Kkkonrad\Fastcheckout\Block\Onepage
  */
 ?>
 
@@ -54,7 +54,7 @@ $isVirtual = $block->checkoutSession->getQuote()->isVirtual() ?>
         <script>
             require([
                 'mage/url',
-                'IWD_Opc/js/block-loader'
+                'Kkkonrad_Fastcheckout/js/block-loader'
             ], function (url, iwdBlockLoader) {
                 iwdBlockLoader();
                 return url.setBaseUrl('<?php /* @escapeNotVerified */ echo $block->getBaseUrl();?>');
@@ -109,7 +109,7 @@ $isVirtual = $block->checkoutSession->getQuote()->isVirtual() ?>
 </script>
 <script>
     require([
-        'IWD_Opc/js/paypal/button',
+        'Kkkonrad_Fastcheckout/js/paypal/button',
         'jquery'
     ], function (button, $) {
         if (typeof window.checkoutData !== 'object') {

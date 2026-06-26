@@ -1,6 +1,6 @@
 <?php
 
-namespace IWD\Opc\Block\Hyva;
+namespace Kkkonrad\Fastcheckout\Block\Hyva;
 
 use Hyva\Theme\Model\ViewModelRegistry;
 use Hyva\Theme\ViewModel\HyvaCsp;
@@ -18,7 +18,7 @@ use Magento\Framework\View\Element\Template;
 use Magento\Framework\View\Element\Template\Context;
 use Magento\Quote\Model\Quote;
 use Magento\Quote\Model\Quote\Item;
-use IWD\Opc\Model\Hyva\RequireJsAssets;
+use Kkkonrad\Fastcheckout\Model\Hyva\RequireJsAssets;
 
 class Checkout extends Template
 {

@@ -1,46 +1,46 @@
 <?php
 /**
- * @var $helper \IWD\Opc\Helper\Data
+ * @var $helper \Kkkonrad\Fastcheckout\Helper\Data
  */
 
-$helper = $this->helper("IWD\Opc\Helper\Data");
+$helper = $this->helper("Kkkonrad\Fastcheckout\Helper\Data");
 if ($helper && $helper->isCheckoutPage()) : ?>
     <script>
         require.config({
             deps: [
-                'IWD_Opc/js/i18n-phrases'
+                'Kkkonrad_Fastcheckout/js/i18n-phrases'
             ],
             map: {
                 '*': {
-                    'Magento_Checkout/js/model/quote': 'IWD_Opc/js/model/quote',
-                    'Magento_Checkout/js/checkout-data': 'IWD_Opc/js/checkout-data',
-                    'Magento_Checkout/js/model/checkout-data-resolver': 'IWD_Opc/js/model/checkout-data-resolver',
-                    'Magento_Checkout/js/view/summary/abstract-total': 'IWD_Opc/js/view/summary/abstract-total',
+                    'Magento_Checkout/js/model/quote': 'Kkkonrad_Fastcheckout/js/model/quote',
+                    'Magento_Checkout/js/checkout-data': 'Kkkonrad_Fastcheckout/js/checkout-data',
+                    'Magento_Checkout/js/model/checkout-data-resolver': 'Kkkonrad_Fastcheckout/js/model/checkout-data-resolver',
+                    'Magento_Checkout/js/view/summary/abstract-total': 'Kkkonrad_Fastcheckout/js/view/summary/abstract-total',
 
-                    'Magento_Checkout/js/model/shipping-rate-service': 'IWD_Opc/js/model/shipping-rate-service',
-                    'Magento_Checkout/js/model/shipping-save-processor/default': 'IWD_Opc/js/model/shipping-save-processor/default',
-                    'Magento_Checkout/js/model/shipping-rates-validator': 'IWD_Opc/js/model/shipping-rates-validator',
-                    'Magento_Checkout/js/model/new-customer-address': 'IWD_Opc/js/model/new-customer-address',
+                    'Magento_Checkout/js/model/shipping-rate-service': 'Kkkonrad_Fastcheckout/js/model/shipping-rate-service',
+                    'Magento_Checkout/js/model/shipping-save-processor/default': 'Kkkonrad_Fastcheckout/js/model/shipping-save-processor/default',
+                    'Magento_Checkout/js/model/shipping-rates-validator': 'Kkkonrad_Fastcheckout/js/model/shipping-rates-validator',
+                    'Magento_Checkout/js/model/new-customer-address': 'Kkkonrad_Fastcheckout/js/model/new-customer-address',
 
-                    'Magento_Checkout/js/model/payment-service': 'IWD_Opc/js/model/payment-service',
+                    'Magento_Checkout/js/model/payment-service': 'Kkkonrad_Fastcheckout/js/model/payment-service',
 
-                    'Magento_CheckoutAgreements/js/model/agreement-validator': 'IWD_Opc/js/model/agreement-validator',
-                    'Magento_CheckoutAgreements/js/model/agreements-assigner': 'IWD_Opc/js/model/agreements-assigner',
+                    'Magento_CheckoutAgreements/js/model/agreement-validator': 'Kkkonrad_Fastcheckout/js/model/agreement-validator',
+                    'Magento_CheckoutAgreements/js/model/agreements-assigner': 'Kkkonrad_Fastcheckout/js/model/agreements-assigner',
 
-                    'Magento_Paypal/js/action/set-payment-method': 'IWD_Opc/js/action/paypal/set-payment-method',
+                    'Magento_Paypal/js/action/set-payment-method': 'Kkkonrad_Fastcheckout/js/action/paypal/set-payment-method',
 
-                    'Magento_Customer/js/action/login': 'IWD_Opc/js/action/login',
+                    'Magento_Customer/js/action/login': 'Kkkonrad_Fastcheckout/js/action/login',
                     // to fix infinity loader of payment method block on OPC
-                    'Magento_NegotiableQuote/js/view/shipping-address/address-renderer/default': 'IWD_Opc/js/view/shipping-address/address-renderer/default',
+                    'Magento_NegotiableQuote/js/view/shipping-address/address-renderer/default': 'Kkkonrad_Fastcheckout/js/view/shipping-address/address-renderer/default',
 
-                    'Magento_Checkout/js/action/select-billing-address': 'IWD_Opc/js/action/select-billing-address',
+                    'Magento_Checkout/js/action/select-billing-address': 'Kkkonrad_Fastcheckout/js/action/select-billing-address',
                 }
             },
             paths: {
-                'microplugin': 'IWD_Opc/js/libs/microplugin',
-                'sifter': 'IWD_Opc/js/libs/sifter',
-                'iwdOpcSelectize': 'IWD_Opc/js/libs/selectize',
-                'iwdOpcHelper': 'IWD_Opc/js/helper'
+                'microplugin': 'Kkkonrad_Fastcheckout/js/libs/microplugin',
+                'sifter': 'Kkkonrad_Fastcheckout/js/libs/sifter',
+                'iwdOpcSelectize': 'Kkkonrad_Fastcheckout/js/libs/selectize',
+                'iwdOpcHelper': 'Kkkonrad_Fastcheckout/js/helper'
             },
             shim: {
                 'iwdOpcSelectize': {
@@ -50,19 +50,19 @@ if ($helper && $helper->isCheckoutPage()) : ?>
             config: {
                 mixins: {
                     'Magento_Checkout/js/action/place-order': {
-                        'IWD_Opc/js/model/place-order-mixin': true
+                        'Kkkonrad_Fastcheckout/js/model/place-order-mixin': true
                     },
                     'Magento_Checkout/js/action/set-payment-information': {
-                        'IWD_Opc/js/model/set-payment-information-mixin': true
+                        'Kkkonrad_Fastcheckout/js/model/set-payment-information-mixin': true
                     },
                     'Magento_ReCaptchaFrontendUi/js/reCaptcha': {
-                        'IWD_Opc/js/reCaptcha-mixin': true
+                        'Kkkonrad_Fastcheckout/js/reCaptcha-mixin': true
                     },
                     'PayPal_Braintree/js/view/payment/adapter': {
-                        'IWD_Opc/js/view/payment/methods-renderers/braintree/adapter': true
+                        'Kkkonrad_Fastcheckout/js/view/payment/methods-renderers/braintree/adapter': true
                     },
                     'Magento_Ui/js/lib/validation/validator': {
-                        'IWD_Opc/js/mixin/validation-mixin': true
+                        'Kkkonrad_Fastcheckout/js/mixin/validation-mixin': true
                     }
                 }
             }

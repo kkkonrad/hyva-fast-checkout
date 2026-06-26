@@ -6,9 +6,9 @@
  *
  */
 
-/** @var IWD\Opc\Helper\Data $helper */
-$helper = $this->helper('IWD\Opc\Helper\Data');
-if ($helper->isEnable() && $helper->isModuleOutputEnabled('IWD_Opc') &&
+/** @var Kkkonrad\Fastcheckout\Helper\Data $helper */
+$helper = $this->helper('Kkkonrad\Fastcheckout\Helper\Data');
+if ($helper->isEnable() && $helper->isModuleOutputEnabled('Kkkonrad_Fastcheckout') &&
     $helper->isGmAutocompleteEnabled() && !empty($helper->getGmApikey())) : ?>
     <script type="text/javascript"
             src="https://maps.googleapis.com/maps/api/js?key=<?php echo $helper->getGmApikey() ?>&libraries=places&language=en"

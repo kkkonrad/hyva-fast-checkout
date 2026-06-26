@@ -1,6 +1,6 @@
 <?php
 
-namespace IWD\Opc\Model\Customer;
+namespace Kkkonrad\Fastcheckout\Model\Customer;
 
 class AccountManagement extends \Magento\Customer\Model\AccountManagement
 {

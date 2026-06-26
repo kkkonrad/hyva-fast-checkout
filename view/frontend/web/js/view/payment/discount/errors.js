@@ -8,7 +8,7 @@ define([
 
     return Component.extend({
         defaults: {
-            template: 'IWD_Opc/errors'
+            template: 'Kkkonrad_Fastcheckout/errors'
         },
 
         initialize: function () {

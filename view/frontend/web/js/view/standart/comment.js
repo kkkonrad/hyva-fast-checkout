@@ -10,7 +10,7 @@ define(
 
         return Component.extend({
             defaults: {
-                template: 'IWD_Opc/standart/comment'
+                template: 'Kkkonrad_Fastcheckout/standart/comment'
             },
             isShowComment: quote.isShowComment(),
             commentValue: ko.observable(checkoutData.getComment()),

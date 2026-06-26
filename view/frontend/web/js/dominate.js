@@ -1,6 +1,6 @@
 require([
     "jquery",
-    "IWD_Opc/js/ga4Events"
+    "Kkkonrad_Fastcheckout/js/ga4Events"
 ], function (
     $,
     ga4Events

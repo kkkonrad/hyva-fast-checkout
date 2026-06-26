@@ -1,8 +1,8 @@
 <?php
 
-namespace IWD\Opc\Controller\Index;
+namespace Kkkonrad\Fastcheckout\Controller\Index;
 
-use IWD\Opc\Controller\Action;
+use Kkkonrad\Fastcheckout\Controller\Action;
 use Magento\Framework\App\RequestInterface;
 use Magento\Framework\App\ResponseInterface;
 use Magento\Framework\Exception\NotFoundException;
@@ -29,7 +29,7 @@ class Index extends Action
     public function execute()
     {
         if (!$this->opcHelper->isEnable()
-            || !$this->opcHelper->isModuleOutputEnabled('IWD_Opc')) {
+            || !$this->opcHelper->isModuleOutputEnabled('Kkkonrad_Fastcheckout')) {
             return $this->resultRedirectFactory->create()->setPath('checkout');
         }
 

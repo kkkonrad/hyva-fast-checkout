@@ -8,7 +8,7 @@ define([
 
     return Component.extend({
         defaults: {
-            template: 'IWD_Opc/payment/methods-renderers/braintree/paypal'
+            template: 'Kkkonrad_Fastcheckout/payment/methods-renderers/braintree/paypal'
         },
         getInstructions: function () {
             return $t('After clicking "Place Order", you will be directed to one of our trusted partners to complete your purchase.');

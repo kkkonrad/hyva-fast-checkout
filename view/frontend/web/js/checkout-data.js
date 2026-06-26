@@ -1,7 +1,7 @@
 define([
     'jquery',
     'Magento_Customer/js/customer-data',
-    'IWD_Opc/js/model/quote'
+    'Kkkonrad_Fastcheckout/js/model/quote'
 ], function ($, storage, quote) {
     'use strict';
 

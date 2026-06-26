@@ -1,7 +1,7 @@
 <?php
-namespace IWD\Opc\Plugin\Block;
+namespace Kkkonrad\Fastcheckout\Plugin\Block;
 
-use IWD\Opc\Helper\Data as OpcHelper;
+use Kkkonrad\Fastcheckout\Helper\Data as OpcHelper;
 use Magento\Customer\Model\AttributeMetadataDataProvider;
 use Magento\Ui\Component\Form\AttributeMapper;
 use Magento\Checkout\Block\Checkout\AttributeMerger;
@@ -141,8 +141,8 @@ class LayoutProcessor
             $firstname['label'] = new \Magento\Framework\Phrase('First Name *');
             $firstname['sortOrder'] = '10';
             $firstname['placeholder'] = false;
-            $firstname['config']['template'] = 'IWD_Opc/form/field';
-            $firstname['config']['elementTmpl'] = 'IWD_Opc/form/element/input';
+            $firstname['config']['template'] = 'Kkkonrad_Fastcheckout/form/field';
+            $firstname['config']['elementTmpl'] = 'Kkkonrad_Fastcheckout/form/element/input';
             $firstname['config']['additionalClasses'] = 'float-left';
 
             $jsLayoutResult['components']['checkout']['children']['steps']['children']['shipping-step']
@@ -155,8 +155,8 @@ class LayoutProcessor
             $lastname['label'] = new \Magento\Framework\Phrase('Last Name *');
             $lastname['sortOrder'] = '20';
             $lastname['placeholder'] = false;
-            $lastname['config']['template'] = 'IWD_Opc/form/field';
-            $lastname['config']['elementTmpl'] = 'IWD_Opc/form/element/input';
+            $lastname['config']['template'] = 'Kkkonrad_Fastcheckout/form/field';
+            $lastname['config']['elementTmpl'] = 'Kkkonrad_Fastcheckout/form/element/input';
             $lastname['config']['additionalClasses'] = 'float-right';
 
             $jsLayoutResult['components']['checkout']['children']['steps']['children']['shipping-step']
@@ -167,17 +167,17 @@ class LayoutProcessor
             ['children']['shippingAddress']['children']['billing-address']['children']['form-fields']['children']['street'];
 
             $street['sortOrder'] = '30';
-            $street['config']['template'] = 'IWD_Opc/group/group';
+            $street['config']['template'] = 'Kkkonrad_Fastcheckout/group/group';
             $street['children'][0]['visible'] = true;
             $street['children'][0]['label'] = new \Magento\Framework\Phrase('Street Address *');
             $street['children'][0]['placeholder'] = __('Street Address *');
-            $street['children'][0]['config']['template'] = 'IWD_Opc/form/field';
-            $street['children'][0]['config']['elementTmpl'] = 'IWD_Opc/form/element/input';
+            $street['children'][0]['config']['template'] = 'Kkkonrad_Fastcheckout/form/field';
+            $street['children'][0]['config']['elementTmpl'] = 'Kkkonrad_Fastcheckout/form/element/input';
             $street['children'][1]['visible'] = true;
             $street['children'][1]['label'] = new \Magento\Framework\Phrase('Apartment / Suite / Building');
             $street['children'][1]['placeholder'] = __('Apartment / Suite / Building');
-            $street['children'][1]['config']['template'] = 'IWD_Opc/form/field';
-            $street['children'][1]['config']['elementTmpl'] = 'IWD_Opc/form/element/input';
+            $street['children'][1]['config']['template'] = 'Kkkonrad_Fastcheckout/form/field';
+            $street['children'][1]['config']['elementTmpl'] = 'Kkkonrad_Fastcheckout/form/element/input';
             $street['children'][1]['config']['validation'] = ['required-entry' => false];
             $street['children'][2]['visible'] = false;
 
@@ -191,7 +191,7 @@ class LayoutProcessor
             $country['label'] = new \Magento\Framework\Phrase('Select Country *');
             $country['sortOrder'] = '40';
             $country['placeholder'] = __('Select Country *');
-            $country['config']['template'] = 'IWD_Opc/form/field';
+            $country['config']['template'] = 'Kkkonrad_Fastcheckout/form/field';
             $country['config']['additionalClasses'] = 'float-left wd30-66 mr4';
             $country['validation']['required-entry'] = true;
 
@@ -205,9 +205,9 @@ class LayoutProcessor
             $region['label'] = new \Magento\Framework\Phrase('State');
             $region['visible'] = false;
             $region['sortOrder'] = '50';
-            $region['config']['template'] = 'IWD_Opc/form/field';
+            $region['config']['template'] = 'Kkkonrad_Fastcheckout/form/field';
             $region['config']['additionalClasses'] = 'float-left wd30-66 mr4';
-            $region['config']['elementTmpl'] = 'IWD_Opc/form/element/input';
+            $region['config']['elementTmpl'] = 'Kkkonrad_Fastcheckout/form/element/input';
 
             $jsLayoutResult['components']['checkout']['children']['steps']['children']['shipping-step']
             ['children']['shippingAddress']['children']['billing-address']['children']['form-fields']['children']['region'] = $region;
@@ -219,9 +219,9 @@ class LayoutProcessor
             $region_id['label'] = new \Magento\Framework\Phrase('');
             $region_id['sortOrder'] = '50';
             $region_id['placeholder'] = __('');
-            $region_id['component'] = 'IWD_Opc/js/form/billing-address/element/region';
-            $region_id['config']['template'] = 'IWD_Opc/form/field';
-            $region_id['config']['elementTmpl'] = 'IWD_Opc/form/billing-address/element/select';
+            $region_id['component'] = 'Kkkonrad_Fastcheckout/js/form/billing-address/element/region';
+            $region_id['config']['template'] = 'Kkkonrad_Fastcheckout/form/field';
+            $region_id['config']['elementTmpl'] = 'Kkkonrad_Fastcheckout/form/billing-address/element/select';
             $region_id['config']['customEntry'] = 'billingAddress.region';
             $region_id['config']['additionalClasses'] = 'float-left wd30-66 mr4';
             $region_id['validation']['required-entry'] = true;
@@ -238,9 +238,9 @@ class LayoutProcessor
             $city['label'] = new \Magento\Framework\Phrase('Town / City *');
             $city['sortOrder'] = '60';
             $city['placeholder'] = __('Town / City *');
-            $city['config']['template'] = 'IWD_Opc/form/field';
+            $city['config']['template'] = 'Kkkonrad_Fastcheckout/form/field';
             $city['config']['additionalClasses'] = 'float-left wd30-66';
-            $city['config']['elementTmpl'] = 'IWD_Opc/form/element/input';
+            $city['config']['elementTmpl'] = 'Kkkonrad_Fastcheckout/form/element/input';
 
             $jsLayoutResult['components']['checkout']['children']['steps']['children']['shipping-step']
             ['children']['shippingAddress']['children']['billing-address']['children']['form-fields']['children']['city'] = $city;
@@ -254,8 +254,8 @@ class LayoutProcessor
             $postcode['placeholder'] = __('Postcode / Zip *');
             $postcode['component'] = 'Magento_Ui/js/form/element/post-code';
             $postcode['validation']['required-entry'] = true;
-            $postcode['config']['template'] = 'IWD_Opc/form/field';
-            $postcode['config']['elementTmpl'] = 'IWD_Opc/form/element/input';
+            $postcode['config']['template'] = 'Kkkonrad_Fastcheckout/form/field';
+            $postcode['config']['elementTmpl'] = 'Kkkonrad_Fastcheckout/form/element/input';
             $postcode['config']['additionalClasses'] = 'float-left wd30-66 mr4';
 
             $jsLayoutResult['components']['checkout']['children']['steps']['children']['shipping-step']
@@ -269,8 +269,8 @@ class LayoutProcessor
             $telephone['sortOrder'] = '80';
             $telephone['placeholder'] = __('Phone *');
             $telephone['config']['tooltip'] = false;
-            $telephone['config']['template'] = 'IWD_Opc/form/field';
-            $telephone['config']['elementTmpl'] = 'IWD_Opc/form/element/input';
+            $telephone['config']['template'] = 'Kkkonrad_Fastcheckout/form/field';
+            $telephone['config']['elementTmpl'] = 'Kkkonrad_Fastcheckout/form/element/input';
             $telephone['config']['additionalClasses'] = 'float-left wd30-66 mr4';
             $telephone['validation'] = ['required-entry' => true, 'phone' => true];
 
@@ -359,7 +359,7 @@ class LayoutProcessor
     public function getCustomBillingAddressComponent($elements)
     {
         return [
-            'component' => 'IWD_Opc/js/view/billing-address',
+            'component' => 'Kkkonrad_Fastcheckout/js/view/billing-address',
             'displayArea' => 'billing-address',
             'provider' => 'checkoutProvider',
             'deps' => ['checkoutProvider'],
@@ -374,9 +374,9 @@ class LayoutProcessor
                         'billingAddress',
                         [
                             'country_id' => [
-                                'component' => 'IWD_Opc/js/form/billing-address/element/select',
+                                'component' => 'Kkkonrad_Fastcheckout/js/form/billing-address/element/select',
                                 'config' => [
-                                    'elementTmpl' => 'IWD_Opc/form/billing-address/element/select',
+                                    'elementTmpl' => 'Kkkonrad_Fastcheckout/form/billing-address/element/select',
                                     'customEntry' => 'billingAddress.country_id',
                                 ],
                                 'validation' => ['required-entry' => true],
@@ -384,7 +384,7 @@ class LayoutProcessor
                             'region_id' => [
                                 'component' => 'Magento_Ui/js/form/element/region',
                                 'config' => [
-                                    'template' => 'IWD_Opc/form/field',
+                                    'template' => 'Kkkonrad_Fastcheckout/form/field',
                                     'elementTmpl' => 'ui/form/element/select',
                                     'customEntry' => 'billingAddress.region',
                                 ],

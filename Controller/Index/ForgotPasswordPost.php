@@ -1,6 +1,6 @@
 <?php
 
-namespace IWD\Opc\Controller\Index;
+namespace Kkkonrad\Fastcheckout\Controller\Index;
 
 use Magento\Customer\Api\AccountManagementInterface;
 use Magento\Customer\Model\AccountManagement;

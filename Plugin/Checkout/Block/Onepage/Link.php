@@ -1,8 +1,8 @@
 <?php
 
-namespace IWD\Opc\Plugin\Checkout\Block\Onepage;
+namespace Kkkonrad\Fastcheckout\Plugin\Checkout\Block\Onepage;
 
-use IWD\Opc\Helper\Data as OpcHelper;
+use Kkkonrad\Fastcheckout\Helper\Data as OpcHelper;
 use Magento\Framework\UrlInterface;
 
 class Link

@@ -1,6 +1,6 @@
 <?php
 
-namespace IWD\Opc\Block\Adminhtml\System\Config\Form\Field;
+namespace Kkkonrad\Fastcheckout\Block\Adminhtml\System\Config\Form\Field;
 
 use Magento\Framework\View\Element\Html\Select;
 use Magento\Backend\Block\Template\Context;

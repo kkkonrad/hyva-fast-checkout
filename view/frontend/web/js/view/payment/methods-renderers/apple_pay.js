@@ -14,7 +14,7 @@ define([
 
     return Component.extend({
         defaults: {
-            template: 'IWD_Opc/payment/methods-renderers/apple_pay'
+            template: 'Kkkonrad_Fastcheckout/payment/methods-renderers/apple_pay'
         },
         quoteIsVirtual: quote.isVirtual(),
 

@@ -8,7 +8,7 @@ define([
 
     return Component.extend({
         defaults: {
-            template: 'IWD_Opc/shipping/shipping-policy'
+            template: 'Kkkonrad_Fastcheckout/shipping/shipping-policy'
         },
         config: config(),
         appendScrollbar: function (element) {

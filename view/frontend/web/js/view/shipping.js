@@ -22,10 +22,10 @@ var defineArray =  [
     'uiRegistry',
     'mage/translate',
     'Magento_Checkout/js/model/cart/totals-processor/default',
-    'IWD_Opc/js/model/payment/is-loading',
+    'Kkkonrad_Fastcheckout/js/model/payment/is-loading',
     'Magento_Ui/js/model/messageList',
-    'IWD_Opc/js/form/address-manager',
-    'IWD_Opc/js/ga4Events'
+    'Kkkonrad_Fastcheckout/js/form/address-manager',
+    'Kkkonrad_Fastcheckout/js/ga4Events'
 ];
 
 // Use AmazonPayStorage Script if AmazonPay is enabled
@@ -42,7 +42,7 @@ defineArray.push(
 );
 
 defineArray.push(
-    'IWD_Opc/js/view/payment',
+    'Kkkonrad_Fastcheckout/js/view/payment',
 );
 
 define( defineArray,
@@ -103,9 +103,9 @@ define( defineArray,
         window.fullScreenLoader = fullScreenLoader;
 
         var defaults = {};
-        defaults.template = 'IWD_Opc/shipping';
-        defaults.shippingMethodItemTemplate = 'IWD_Opc/shipping-address/custom-shipping-list';
-        defaults.shippingMethodActiveItemTemplate = 'IWD_Opc/shipping-address/custom-shipping-list-active';
+        defaults.template = 'Kkkonrad_Fastcheckout/shipping';
+        defaults.shippingMethodItemTemplate = 'Kkkonrad_Fastcheckout/shipping-address/custom-shipping-list';
+        defaults.shippingMethodActiveItemTemplate = 'Kkkonrad_Fastcheckout/shipping-address/custom-shipping-list-active';
         defaults.isShippingMethodActive = function (method) {
             let code = method.carrier_code + '_' + method.method_code;
             if(window.checkoutData && window.checkoutData.shippingMethodCode) {

@@ -11,7 +11,7 @@ define([
 
     return Component.extend({
         defaults: {
-            template: 'IWD_Opc/summary/subtotal'
+            template: 'Kkkonrad_Fastcheckout/summary/subtotal'
         },
 
         /**

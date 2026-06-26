@@ -1,8 +1,8 @@
 <?php
 
-namespace IWD\Opc\Model;
+namespace Kkkonrad\Fastcheckout\Model;
 
-use IWD\Opc\Api\RewardManagementInterface;
+use Kkkonrad\Fastcheckout\Api\RewardManagementInterface;
 use Magento\Quote\Api\CartRepositoryInterface;
 use Magento\Framework\ObjectManagerInterface;
 

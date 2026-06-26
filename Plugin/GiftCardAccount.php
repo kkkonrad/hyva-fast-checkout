@@ -1,8 +1,8 @@
 <?php
 
-namespace IWD\Opc\Plugin;
+namespace Kkkonrad\Fastcheckout\Plugin;
 
-use IWD\Opc\Helper\Data as OpcHelper;
+use Kkkonrad\Fastcheckout\Helper\Data as OpcHelper;
 use Magento\Framework\ObjectManagerInterface;
 use Magento\Checkout\Model\Session;
 use Magento\Store\Model\StoreManagerInterface;

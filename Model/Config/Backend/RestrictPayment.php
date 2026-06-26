@@ -1,6 +1,6 @@
 <?php
 
-namespace IWD\Opc\Model\Config\Backend;
+namespace Kkkonrad\Fastcheckout\Model\Config\Backend;
 
 use Magento\Framework\Json\Helper\Data as JsonHelper;
 use Magento\Framework\App\Config\Value;

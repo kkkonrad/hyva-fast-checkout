@@ -1,12 +1,12 @@
 <?php
 
-namespace IWD\Opc\Observer;
+namespace Kkkonrad\Fastcheckout\Observer;
 
 use Magento\Framework\Event\Observer as EventObserver;
 use Magento\Checkout\Model\Session as CheckoutSession;
 use Magento\Sales\Model\Order\Status\HistoryFactory;
 use Magento\Framework\Event\ObserverInterface;
-use IWD\Opc\Helper\Data as OpcHelper;
+use Kkkonrad\Fastcheckout\Helper\Data as OpcHelper;
 use Magento\Customer\Model\CustomerFactory;
 use Psr\Log\LoggerInterface;
 use Magento\Newsletter\Model\Subscriber;
@@ -20,7 +20,7 @@ use Magento\Downloadable\Observer\SaveDownloadableOrderItemObserver;
 
 /**
  * Class QuoteSubmitSuccess
- * @package IWD\Opc\Observer
+ * @package Kkkonrad\Fastcheckout\Observer
  */
 class QuoteSubmitSuccess implements ObserverInterface
 {

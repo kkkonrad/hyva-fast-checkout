@@ -1,8 +1,8 @@
 define([
     'jquery',
     'mage/utils/wrapper',
-    'IWD_Opc/js/model/comment-assigner',
-    'IWD_Opc/js/model/subscribe-assigner'
+    'Kkkonrad_Fastcheckout/js/model/comment-assigner',
+    'Kkkonrad_Fastcheckout/js/model/subscribe-assigner'
 ], function ($, wrapper, commentAssigner, subscribeAssigner) {
     'use strict';
 

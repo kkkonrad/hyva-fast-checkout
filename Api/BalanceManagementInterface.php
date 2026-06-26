@@ -1,6 +1,6 @@
 <?php
 
-namespace IWD\Opc\Api;
+namespace Kkkonrad\Fastcheckout\Api;
 
 /**
  * Customer balance(store credit) operations

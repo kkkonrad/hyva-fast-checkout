@@ -14,7 +14,7 @@ define(
         'Magento_Checkout/js/action/select-billing-address',
         'mage/translate',
         'iwdOpcHelper',
-        'IWD_Opc/js/ga4Events'
+        'Kkkonrad_Fastcheckout/js/ga4Events'
     ],
     function ($,
               _,
@@ -70,7 +70,7 @@ define(
 
         return Component.extend({
             defaults: {
-                template: 'IWD_Opc/billing-step-virtual'
+                template: 'Kkkonrad_Fastcheckout/billing-step-virtual'
             },
             isShowComment: quote.isShowComment(),
             commentValue: ko.observable(checkoutData.getComment()),

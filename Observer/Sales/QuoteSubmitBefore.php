@@ -1,5 +1,5 @@
 <?php
-namespace IWD\Opc\Observer\Sales;
+namespace Kkkonrad\Fastcheckout\Observer\Sales;
 
 use Magento\Framework\Event\Observer;
 use Magento\Framework\Event\ObserverInterface;

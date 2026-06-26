@@ -1,8 +1,8 @@
 <?php
 
-namespace IWD\Opc\Block\Adminhtml\System\Config\Style;
+namespace Kkkonrad\Fastcheckout\Block\Adminhtml\System\Config\Style;
 
-use IWD\Opc\Setup\Patch\Data\GoogleFonts;
+use Kkkonrad\Fastcheckout\Setup\Patch\Data\GoogleFonts;
 use Magento\Framework\Option\ArrayInterface;
 use Magento\Framework\App\ResourceConnection;
 

@@ -1,13 +1,13 @@
 <?php
 
-namespace IWD\Opc\Model\Config\Source;
+namespace Kkkonrad\Fastcheckout\Model\Config\Source;
 
 use Magento\Shipping\Model\Config\Source\Allmethods;
 
 /**
  * Class Shipping
  *
- * @package IWD\Opc\Model\Config\Source
+ * @package Kkkonrad\Fastcheckout\Model\Config\Source
  */
 class Shipping extends Allmethods
 {

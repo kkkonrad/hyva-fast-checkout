@@ -1,6 +1,6 @@
 <?php
 
-namespace IWD\Opc\Helper;
+namespace Kkkonrad\Fastcheckout\Helper;
 
 use Magento\Framework\App\Helper\Context;
 use Magento\Framework\App\Helper\AbstractHelper;

@@ -8,7 +8,7 @@ define([
     return Select.extend({
         defaults: {
             size: 5,
-            elementTmpl: 'IWD_Opc/form/element/multiselect'
+            elementTmpl: 'Kkkonrad_Fastcheckout/form/element/multiselect'
         },
 
         /**

@@ -1,6 +1,6 @@
 <?php
 
-namespace IWD\Opc\Helper\Checkout;
+namespace Kkkonrad\Fastcheckout\Helper\Checkout;
 
 /**
  * Checkout default helper

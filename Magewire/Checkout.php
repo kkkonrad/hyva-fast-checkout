@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace IWD\Opc\Magewire;
+namespace Kkkonrad\Fastcheckout\Magewire;
 
 use Magento\Checkout\Model\Session as CheckoutSession;
 use Magento\Quote\Api\CartRepositoryInterface;
@@ -121,7 +121,7 @@ class Checkout extends Component
      * @param \Magento\Directory\Model\ResourceModel\Country\CollectionFactory $countryCollectionFactory
      * @param \Magento\Directory\Model\ResourceModel\Region\CollectionFactory $regionCollectionFactory
      * @param \Magento\Newsletter\Model\SubscriberFactory $subscriberFactory
-     * @param \IWD\Opc\Helper\Data $opcHelper
+     * @param \Kkkonrad\Fastcheckout\Helper\Data $opcHelper
      * @param \Psr\Log\LoggerInterface|null $logger
      * @param \Magento\Directory\Helper\Data|null $directoryHelper
      * @param \Magento\Payment\Helper\Data|null $paymentHelper
@@ -139,7 +139,7 @@ class Checkout extends Component
         \Magento\Directory\Model\ResourceModel\Country\CollectionFactory $countryCollectionFactory,
         \Magento\Directory\Model\ResourceModel\Region\CollectionFactory $regionCollectionFactory,
         \Magento\Newsletter\Model\SubscriberFactory $subscriberFactory,
-        \IWD\Opc\Helper\Data $opcHelper,
+        \Kkkonrad\Fastcheckout\Helper\Data $opcHelper,
         \Psr\Log\LoggerInterface $logger = null,
         \Magento\Directory\Helper\Data $directoryHelper = null,
         \Magento\Payment\Helper\Data $paymentHelper = null,

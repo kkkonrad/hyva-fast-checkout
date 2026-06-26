@@ -1,6 +1,6 @@
 <?php
 
-namespace IWD\Opc\Block\Adminhtml\System\Config\Style;
+namespace Kkkonrad\Fastcheckout\Block\Adminhtml\System\Config\Style;
 
 use Magento\Config\Block\System\Config\Form\Field;
 

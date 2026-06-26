@@ -1,6 +1,6 @@
 <?php
 
-namespace IWD\Opc\Model;
+namespace Kkkonrad\Fastcheckout\Model;
 
 class Flag extends \Magento\Framework\Flag
 {

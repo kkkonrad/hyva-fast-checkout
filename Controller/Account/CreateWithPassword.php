@@ -4,7 +4,7 @@
  * See LICENSE.txt bundled with this module for license details.
  */
 
-namespace IWD\Opc\Controller\Account;
+namespace Kkkonrad\Fastcheckout\Controller\Account;
 
 use Magento\Framework\Exception\AlreadyExistsException;
 use Magento\Quote\Model\Quote\AddressFactory as QuoteAddressFactory;
@@ -14,7 +14,7 @@ use Magento\Customer\Model\Session as CustomerSession;
 
 /**
  * Class CreateWithPassword
- * @package IWD\Opc\Controller\Account
+ * @package Kkkonrad\Fastcheckout\Controller\Account
  */
 class CreateWithPassword extends \Magento\Framework\App\Action\Action
 {
@@ -28,7 +28,7 @@ class CreateWithPassword extends \Magento\Framework\App\Action\Action
     protected $resultJsonFactory;
 
     /**
-     * @var \IWD\Opc\Model\OrderCustomerExtractor
+     * @var \Kkkonrad\Fastcheckout\Model\OrderCustomerExtractor
      */
     protected $orderCustomerExtractor;
 
@@ -87,7 +87,7 @@ class CreateWithPassword extends \Magento\Framework\App\Action\Action
      * @param \Magento\Customer\Api\Data\RegionInterfaceFactory $regionFactory
      * @param \Magento\Customer\Model\CustomerFactory $customerFactory
      * @param \Magento\Sales\Api\OrderRepositoryInterface $orderRepository
-     * @param \IWD\Opc\Model\OrderCustomerExtractor $orderCustomerExtractor
+     * @param \Kkkonrad\Fastcheckout\Model\OrderCustomerExtractor $orderCustomerExtractor
      * @param QuoteAddressFactory $quoteAddressFactory
      * @param JsonFactory $resultJsonFactory
      * @param \Magento\Checkout\Model\Session $checkoutSession
@@ -105,7 +105,7 @@ class CreateWithPassword extends \Magento\Framework\App\Action\Action
         QuoteAddressFactory $quoteAddressFactory,
         JsonFactory $resultJsonFactory,
         \Magento\Checkout\Model\Session $checkoutSession,
-        \IWD\Opc\Model\OrderCustomerExtractor $orderCustomerExtractor,
+        \Kkkonrad\Fastcheckout\Model\OrderCustomerExtractor $orderCustomerExtractor,
         \Magento\Customer\Model\CustomerFactory $customerFactory,
         Encryptor $encryptor,
         CustomerSession $customerSession

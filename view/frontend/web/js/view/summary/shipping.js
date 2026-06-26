@@ -14,7 +14,7 @@ define([
 
     return Component.extend({
         defaults: {
-            template: 'IWD_Opc/summary/shipping'
+            template: 'Kkkonrad_Fastcheckout/summary/shipping'
         },
         quoteIsVirtual: quote.isVirtual(),
         totals: quote.getTotals(),

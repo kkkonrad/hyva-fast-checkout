@@ -1,12 +1,12 @@
 <?php
 
-namespace IWD\Opc\Block\Checkout;
+namespace Kkkonrad\Fastcheckout\Block\Checkout;
 
 use Magento\Framework\View\Element\Template;
-use IWD\Opc\Helper\Data as OpcHelper;
-use IWD\Opc\Helper\Design\Layout;
-use IWD\Opc\Helper\Design\Style;
-use IWD\Opc\Helper\Design\Breadcrumbs;
+use Kkkonrad\Fastcheckout\Helper\Data as OpcHelper;
+use Kkkonrad\Fastcheckout\Helper\Design\Layout;
+use Kkkonrad\Fastcheckout\Helper\Design\Style;
+use Kkkonrad\Fastcheckout\Helper\Design\Breadcrumbs;
 
 class Design extends Template
 {

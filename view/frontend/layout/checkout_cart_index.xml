@@ -5,7 +5,7 @@
         <referenceBlock name="page.main.title" remove="true" />
         <referenceBlock name="checkout.cart.empty">
             <action method="setTemplate" ifconfig="iwd_opc/general/enable">
-                <argument name="template" xsi:type="string">IWD_Opc::cart/empty.phtml</argument>
+                <argument name="template" xsi:type="string">Kkkonrad_Fastcheckout::cart/empty.phtml</argument>
             </action>
         </referenceBlock>
     </body>

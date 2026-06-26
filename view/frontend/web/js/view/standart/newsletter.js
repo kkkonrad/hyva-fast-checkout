@@ -10,7 +10,7 @@ define(
 
         return Component.extend({
             defaults: {
-                template: 'IWD_Opc/standart/newsletter'
+                template: 'Kkkonrad_Fastcheckout/standart/newsletter'
             },
             isShowSubscribe: quote.isShowSubscribe(),
             isSubscribe: ko.observable(checkoutData.getIsSubscribe()),

@@ -1,8 +1,8 @@
 <?php
 
-namespace IWD\Opc\Plugin\Checkout\Block\Cart;
+namespace Kkkonrad\Fastcheckout\Plugin\Checkout\Block\Cart;
 
-use IWD\Opc\Helper\Data as OpcHelper;
+use Kkkonrad\Fastcheckout\Helper\Data as OpcHelper;
 use Magento\Framework\UrlInterface;
 
 class Sidebar

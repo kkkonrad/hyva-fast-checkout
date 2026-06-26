@@ -1,6 +1,6 @@
 define([
     'underscore',
-    'IWD_Opc/js/model/default-post-code-resolver'
+    'Kkkonrad_Fastcheckout/js/model/default-post-code-resolver'
 ], function (_, DefaultPostCodeResolver) {
     'use strict';
 

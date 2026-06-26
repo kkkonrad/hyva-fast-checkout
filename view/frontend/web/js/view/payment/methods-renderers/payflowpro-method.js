@@ -8,7 +8,7 @@ define(
 
         return Component.extend({
             defaults: {
-                template: 'IWD_Opc/payment/methods-renderers/payflowpro-form',
+                template: 'Kkkonrad_Fastcheckout/payment/methods-renderers/payflowpro-form',
                 isCurrentlySecure: window.checkoutConfig.iwdOpcSettings.isCurrentlySecure
 
             }

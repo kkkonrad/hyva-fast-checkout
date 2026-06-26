@@ -1,6 +1,6 @@
 <?php
 
-namespace IWD\Opc\Setup\Patch\Data;
+namespace Kkkonrad\Fastcheckout\Setup\Patch\Data;
 
 use Magento\Framework\App\ResourceConnection;
 

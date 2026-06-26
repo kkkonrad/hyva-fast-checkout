@@ -3,15 +3,15 @@
       layout="1column"
       xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
     <head>
-        <script src="IWD_Opc::js/ga4.js"/>
+        <script src="Kkkonrad_Fastcheckout::js/ga4.js"/>
         <remove src="Tpay_Magento2::js/view/payment/success.js" />
-        <script src="IWD_Opc::js/view/payment/tpay-success.js" />
+        <script src="Kkkonrad_Fastcheckout::js/view/payment/tpay-success.js" />
     </head>
     <body>
         <referenceBlock name="page.main.title" remove="true" />
         <referenceBlock name="checkout.registration" remove="true" />
         <referenceContainer name="after.body.start">
-            <block class="IWD\Opc\Block\Checkout\GA" name="ga" template="IWD_Opc::page/ga.phtml" ifconfig="google/analytics/active"/>
+            <block class="Kkkonrad\Fastcheckout\Block\Checkout\GA" name="ga" template="Kkkonrad_Fastcheckout::page/ga.phtml" ifconfig="google/analytics/active"/>
         </referenceContainer>
     </body>
 </page>

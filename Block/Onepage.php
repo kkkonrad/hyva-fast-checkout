@@ -1,6 +1,6 @@
 <?php
 
-namespace IWD\Opc\Block;
+namespace Kkkonrad\Fastcheckout\Block;
 
 use Magento\Checkout\Block\Onepage as CheckoutOnepage;
 use Magento\Checkout\Model\Session as CheckoutSession;

@@ -2,13 +2,13 @@ define([
     'ko',
     'jquery',
     'uiComponent',
-    'IWD_Opc/js/model/login/messageList'
+    'Kkkonrad_Fastcheckout/js/model/login/messageList'
 ], function (ko, $, Component, messageList) {
     'use strict';
 
     return Component.extend({
         defaults: {
-            template: 'IWD_Opc/errors'
+            template: 'Kkkonrad_Fastcheckout/errors'
         },
 
         initialize: function () {

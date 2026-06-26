@@ -1,6 +1,6 @@
 <?php
 
-namespace IWD\Opc\Plugin;
+namespace Kkkonrad\Fastcheckout\Plugin;
 
 class AttributeMergerPlugin
 {

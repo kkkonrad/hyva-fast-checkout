@@ -5,8 +5,8 @@ define(
         'uiComponent',
         'Magento_Checkout/js/model/quote',
         'Magento_Catalog/js/price-utils',
-        'IWD_Opc/js/action/set-use-reward-points',
-        'IWD_Opc/js/action/remove-reward-points',
+        'Kkkonrad_Fastcheckout/js/action/set-use-reward-points',
+        'Kkkonrad_Fastcheckout/js/action/remove-reward-points',
         'Magento_Checkout/js/model/totals'
     ],
     function ($, ko, Component, quote, priceUtils, setUseRewardPointsAction, removeRewardPointsAction, totals) {
@@ -14,7 +14,7 @@ define(
 
         return Component.extend({
             defaults: {
-                template: 'IWD_Opc/payment/reward'
+                template: 'Kkkonrad_Fastcheckout/payment/reward'
             },
 
             isApplied: ko.observable(window.checkoutConfig.payment.reward.amountSubstracted),

@@ -3,7 +3,7 @@
  * Copyright © 2018 IWD Agency - All rights reserved.
  * See LICENSE.txt bundled with this module for license details.
  */
-namespace IWD\Opc\Observer\Downloadable;
+namespace Kkkonrad\Fastcheckout\Observer\Downloadable;
 
 use \Magento\Store\Model\ScopeInterface;
 

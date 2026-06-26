@@ -3,7 +3,7 @@ define(
         'jquery',
         'ko',
         'uiComponent',
-        'IWD_Opc/js/action/set-gift-card-information',
+        'Kkkonrad_Fastcheckout/js/action/set-gift-card-information',
         'Magento_GiftCardAccount/js/action/remove-gift-card-from-quote',
         'Magento_Checkout/js/model/totals',
         'Magento_Checkout/js/model/quote',
@@ -25,7 +25,7 @@ define(
         "use strict";
         return Component.extend({
             defaults: {
-                template: 'IWD_Opc/payment/gift-card-account',
+                template: 'Kkkonrad_Fastcheckout/payment/gift-card-account',
                 giftCardCode: ko.observable('')
             },
             isGiftCardsUsed: window.checkoutConfig.payment.giftCardAccount.hasUsage,

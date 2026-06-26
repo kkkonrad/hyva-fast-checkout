@@ -8,7 +8,7 @@ define(
 
         return Component.extend({
             defaults: {
-                template: 'IWD_Opc/payment/methods-renderers/authorizenet-directpost',
+                template: 'Kkkonrad_Fastcheckout/payment/methods-renderers/authorizenet-directpost',
                 isCurrentlySecure: window.checkoutConfig.iwdOpcSettings.isCurrentlySecure
             }
         });

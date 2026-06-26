@@ -5,15 +5,15 @@ define([
     'ko',
     'Magento_Customer/js/action/check-email-availability',
     'Magento_Customer/js/action/login',
-    'IWD_Opc/js/action/reset',
+    'Kkkonrad_Fastcheckout/js/action/reset',
     'Magento_Checkout/js/model/quote',
     'Magento_Checkout/js/checkout-data',
-    'IWD_Opc/js/model/login/messageList',
+    'Kkkonrad_Fastcheckout/js/model/login/messageList',
     'mage/translate',
     'mage/validation',
     'mage/storage',
     'Magento_Checkout/js/model/url-builder',
-    'IWD_Opc/js/ga4Events'
+    'Kkkonrad_Fastcheckout/js/ga4Events'
 ], function ($, Component, registry, ko, checkEmailAvailability, loginAction, resetAction, quote, checkoutData, messageContainer, $t, $v, storage, urlBuilder, ga4Events) {
     'use strict';
 
@@ -25,7 +25,7 @@ define([
 
     return Component.extend({
         defaults: {
-            template: 'IWD_Opc/form/element/email',
+            template: 'Kkkonrad_Fastcheckout/form/element/email',
             email: checkoutData.getInputFieldEmailValue(),
             emailFocused: false,
             passwordFocused: false,

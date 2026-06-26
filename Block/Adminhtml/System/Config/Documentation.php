@@ -1,6 +1,6 @@
 <?php
 
-namespace IWD\Opc\Block\Adminhtml\System\Config;
+namespace Kkkonrad\Fastcheckout\Block\Adminhtml\System\Config;
 
 use Magento\Framework\Data\Form\Element\AbstractElement;
 use Magento\Config\Block\System\Config\Form\Field;

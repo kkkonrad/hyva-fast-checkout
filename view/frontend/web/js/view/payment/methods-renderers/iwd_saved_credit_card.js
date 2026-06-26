@@ -8,7 +8,7 @@ define(
 
         return Component.extend({
             defaults: {
-                template: 'IWD_Opc/payment/methods-renderers/iwd_saved_credit_card',
+                template: 'Kkkonrad_Fastcheckout/payment/methods-renderers/iwd_saved_credit_card',
                 isCurrentlySecure: window.checkoutConfig.iwdOpcSettings.isCurrentlySecure
 
             }

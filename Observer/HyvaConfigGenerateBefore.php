@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace IWD\Opc\Observer;
+namespace Kkkonrad\Fastcheckout\Observer;
 
 use Magento\Framework\Component\ComponentRegistrar;
 use Magento\Framework\Event\Observer;
@@ -19,7 +19,7 @@ class HyvaConfigGenerateBefore implements ObserverInterface
     {
         $config = $event->getData('config');
         $extensions = $config->hasData('extensions') ? $config->getData('extensions') : [];
-        $moduleName = 'IWD_Opc';
+        $moduleName = 'Kkkonrad_Fastcheckout';
         $path = $this->componentRegistrar->getPath(ComponentRegistrar::MODULE, $moduleName);
 
         if ($path) {

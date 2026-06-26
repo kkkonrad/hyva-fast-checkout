@@ -105,7 +105,7 @@ define([
     return Abstract.extend({
         defaults: {
             customName: '${ $.parentName }.${ $.index }_input',
-            elementTmpl: 'IWD_Opc/form/element/select',
+            elementTmpl: 'Kkkonrad_Fastcheckout/form/element/select',
             caption: '',
             options: []
         },

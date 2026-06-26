@@ -1,11 +1,11 @@
 <?php
 
-namespace IWD\Opc\Observer;
+namespace Kkkonrad\Fastcheckout\Observer;
 
 use Exception;
 use Magento\Framework\Event\Observer;
 use Magento\Framework\Event\ObserverInterface;
-use IWD\Opc\Model\Order\SendOrderInformation as OrderInformation;
+use Kkkonrad\Fastcheckout\Model\Order\SendOrderInformation as OrderInformation;
 
 /**
  * Class TrackOrders
@@ -13,7 +13,7 @@ use IWD\Opc\Model\Order\SendOrderInformation as OrderInformation;
  * This class implements the ObserverInterface and is responsible
  * for tracking orders and sending order information using OrderInformation class.
  *
- * @package IWD\Opc\Observer
+ * @package Kkkonrad\Fastcheckout\Observer
  */
 class TrackOrders implements ObserverInterface
 {

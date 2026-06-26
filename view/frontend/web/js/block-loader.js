@@ -6,7 +6,7 @@ define([
 ], function (ko, $, templateLoader, template) {
     'use strict';
 
-    var blockLoaderTemplatePath = 'IWD_Opc/block-loader',
+    var blockLoaderTemplatePath = 'Kkkonrad_Fastcheckout/block-loader',
         blockContentLoadingClass = '_block-content-loading',
         iwdBlockLoader,
         blockLoaderClass;

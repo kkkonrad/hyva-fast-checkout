@@ -6,7 +6,7 @@ define([
     'underscore',
     'Magento_Checkout/js/model/quote',
     'Magento_Catalog/js/price-utils',
-    'IWD_Opc/js/action/gift-message',
+    'Kkkonrad_Fastcheckout/js/action/gift-message',
     'iwdOpcHelper'
 ], function (ko, $, Component, $t, _, quote, priceUtils, giftMessageAction) {
     'use strict';
@@ -20,7 +20,7 @@ define([
 
     return Component.extend({
         defaults: {
-            template: 'IWD_Opc/gift-message'
+            template: 'Kkkonrad_Fastcheckout/gift-message'
         },
 
         isLoading: ko.observable(false),

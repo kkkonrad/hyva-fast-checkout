@@ -1,6 +1,6 @@
 <?php
 
-namespace IWD\Opc\Helper;
+namespace Kkkonrad\Fastcheckout\Helper;
 
 use Magento\Store\Model\ScopeInterface;
 

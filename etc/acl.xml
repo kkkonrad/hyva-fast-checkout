@@ -6,7 +6,7 @@
                 <resource id="Magento_Backend::stores">
                     <resource id="Magento_Backend::stores_settings">
                         <resource id="Magento_Config::config">
-                            <resource id="IWD_Opc::system_config" title="IWD One Page Checkout" />
+                            <resource id="Kkkonrad_Fastcheckout::system_config" title="IWD One Page Checkout" />
                         </resource>
                     </resource>
                 </resource>

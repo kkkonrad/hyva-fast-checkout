@@ -1,6 +1,6 @@
 <?php
 
-namespace IWD\Opc\Model\Order;
+namespace Kkkonrad\Fastcheckout\Model\Order;
 
 use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Framework\HTTP\Client\Curl;
@@ -10,7 +10,7 @@ use Magento\Framework\Session\SessionManager;
 /**
  * Class SendOrderInformation
  *
- * @package IWD\Opc\Model\Order
+ * @package Kkkonrad\Fastcheckout\Model\Order
  */
 class SendOrderInformation
 {

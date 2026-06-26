@@ -6,7 +6,7 @@ define(
 
         return Component.extend({
             defaults: {
-                template: 'IWD_Opc/payment/methods-renderers/checkmo'
+                template: 'Kkkonrad_Fastcheckout/payment/methods-renderers/checkmo'
             }
         });
     }

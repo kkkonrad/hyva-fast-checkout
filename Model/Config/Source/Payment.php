@@ -1,13 +1,13 @@
 <?php
 
-namespace IWD\Opc\Model\Config\Source;
+namespace Kkkonrad\Fastcheckout\Model\Config\Source;
 
 use Magento\Payment\Model\Config\Source\Allmethods;
 
 /**
  * Class Payment
  *
- * @package IWD\Opc\Model\Config\Source
+ * @package Kkkonrad\Fastcheckout\Model\Config\Source
  */
 class Payment extends Allmethods
 {

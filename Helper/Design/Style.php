@@ -1,8 +1,8 @@
 <?php
 
-namespace IWD\Opc\Helper\Design;
+namespace Kkkonrad\Fastcheckout\Helper\Design;
 
-use IWD\Opc\Helper\Data;
+use Kkkonrad\Fastcheckout\Helper\Data;
 use Magento\Store\Model\ScopeInterface;
 
 class Style extends Data

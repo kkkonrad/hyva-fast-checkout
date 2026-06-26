@@ -4,12 +4,12 @@
  */
 
 use Hyva\Theme\ViewModel\HyvaCsp;
-use IWD\Opc\Block\Hyva\Checkout;
+use Kkkonrad\Fastcheckout\Block\Hyva\Checkout;
 use Magento\Framework\Escaper;
 
 /** @var Checkout $block */
 /** @var Escaper $escaper */
-/** @var \IWD\Opc\Magewire\Checkout $magewire */
+/** @var \Kkkonrad\Fastcheckout\Magewire\Checkout $magewire */
 /** @var HyvaCsp $hyvaCsp */
 $hyvaCsp = $block->getHyvaCsp();
 
@@ -730,7 +730,7 @@ function initOpcCheckout() {
                 if (paymentBridge && typeof paymentBridge.validate === 'function') {
                     if (!paymentBridge.validate()) {
                         if (window.console && typeof window.console.warn === 'function') {
-                            window.console.warn('IWD OPC: Order placement halted because Knockout payment validation failed.');
+                            window.console.warn('Kkkonrad OPC: Order placement halted because Knockout payment validation failed.');
                         }
                         if (selectedMethodEl) {
                             const optionContainer = selectedMethodEl.closest('[data-iwd-opc-payment-option]');

@@ -1,17 +1,17 @@
 <?php
 
-namespace IWD\Opc\Block\Checkout;
+namespace Kkkonrad\Fastcheckout\Block\Checkout;
 
 use Magento\Checkout\Block\Checkout\LayoutProcessorInterface;
 use Magento\Customer\Model\AttributeMetadataDataProvider;
 use Magento\Ui\Component\Form\AttributeMapper;
 use Magento\Checkout\Block\Checkout\AttributeMerger;
 use Magento\Checkout\Model\Session as CheckoutSession;
-use IWD\Opc\Helper\Data as OpcHelper;
+use Kkkonrad\Fastcheckout\Helper\Data as OpcHelper;
 
 /**
  * Class UpdateLayoutProcessor
- * @package IWD\Opc\Block\Checkout
+ * @package Kkkonrad\Fastcheckout\Block\Checkout
  */
 class UpdateLayoutProcessor implements LayoutProcessorInterface
 {
@@ -48,7 +48,7 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
     /**
      * @var string
      */
-    private $templateNonAutocomplete = 'IWD_Opc/form/element/inputNonAutocomplete';
+    private $templateNonAutocomplete = 'Kkkonrad_Fastcheckout/form/element/inputNonAutocomplete';
 
     /**
      * UpdateLayoutProcessor constructor.
@@ -330,11 +330,11 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
     public function getReplacedUiComponent($component)
     {
         $arrComponents = [
-            'Magento_Ui/js/form/element/region' => 'IWD_Opc/js/form/element/region',
-            'Magento_Ui/js/form/element/select' => 'IWD_Opc/js/form/element/select',
-            'Magento_Ui/js/form/element/textarea' => 'IWD_Opc/js/form/element/textarea',
-            'Magento_Ui/js/form/element/multiselect' => 'IWD_Opc/js/form/element/multiselect',
-            'Magento_Ui/js/form/element/post-code' => 'IWD_Opc/js/form/element/post-code',
+            'Magento_Ui/js/form/element/region' => 'Kkkonrad_Fastcheckout/js/form/element/region',
+            'Magento_Ui/js/form/element/select' => 'Kkkonrad_Fastcheckout/js/form/element/select',
+            'Magento_Ui/js/form/element/textarea' => 'Kkkonrad_Fastcheckout/js/form/element/textarea',
+            'Magento_Ui/js/form/element/multiselect' => 'Kkkonrad_Fastcheckout/js/form/element/multiselect',
+            'Magento_Ui/js/form/element/post-code' => 'Kkkonrad_Fastcheckout/js/form/element/post-code',
         ];
 
         if (isset($arrComponents[$component])) {
@@ -351,11 +351,11 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
     public function getReplacedUiTemplate($template)
     {
         $arrTemplates = [
-            'ui/form/field' => 'IWD_Opc/form/field',
-            'ui/form/element/input' => 'IWD_Opc/form/element/input',
-            'ui/form/element/select' => 'IWD_Opc/form/element/select',
-            'ui/form/element/textarea' => 'IWD_Opc/form/element/textarea',
-            'ui/form/element/multiselect' => 'IWD_Opc/form/element/multiselect',
+            'ui/form/field' => 'Kkkonrad_Fastcheckout/form/field',
+            'ui/form/element/input' => 'Kkkonrad_Fastcheckout/form/element/input',
+            'ui/form/element/select' => 'Kkkonrad_Fastcheckout/form/element/select',
+            'ui/form/element/textarea' => 'Kkkonrad_Fastcheckout/form/element/textarea',
+            'ui/form/element/multiselect' => 'Kkkonrad_Fastcheckout/form/element/multiselect',
         ];
 
         if (isset($arrTemplates[$template])) {
@@ -379,7 +379,7 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
                                 'shipping-step' => [
                                     'children' => [
                                         'shippingAddress' => [
-                                            'component' => 'IWD_Opc/js/view/shipping',
+                                            'component' => 'Kkkonrad_Fastcheckout/js/view/shipping',
                                             'children' => [
                                                 'shipping-address-fieldset' => [
                                                     'children' => [
@@ -388,7 +388,7 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
                                                             'sortOrder' => 10,
                                                             'placeholder' => false,
                                                             'config' => [
-                                                                'template' => 'IWD_Opc/form/field',
+                                                                'template' => 'Kkkonrad_Fastcheckout/form/field',
                                                                 'additionalClasses' => 'float-left'
                                                             ]
                                                         ],
@@ -396,28 +396,28 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
                                                             'label' => new \Magento\Framework\Phrase('Last Name *'),
                                                             'sortOrder' => 20,
                                                             'config' => [
-                                                                'template' => 'IWD_Opc/form/field',
+                                                                'template' => 'Kkkonrad_Fastcheckout/form/field',
                                                                 'additionalClasses' => 'float-right'
                                                             ]
                                                         ],
                                                         'street' => [
                                                             'sortOrder' => 30,
                                                             'config' => [
-                                                                'template' => 'IWD_Opc/group/group',
+                                                                'template' => 'Kkkonrad_Fastcheckout/group/group',
                                                             ],
                                                             'children' => [
                                                                 '0' => [
                                                                     'label' => new \Magento\Framework\Phrase('Street Address *'),
                                                                     'placeholder' => false,
                                                                     'config' => [
-                                                                        'template' => 'IWD_Opc/form/field',
+                                                                        'template' => 'Kkkonrad_Fastcheckout/form/field',
                                                                     ]
                                                                 ],
                                                                 '1' => [
                                                                     'label' => new \Magento\Framework\Phrase('Apartment / Suite / Building'),
                                                                     'placeholder' => false,
                                                                     'config' => [
-                                                                        'template' => 'IWD_Opc/form/field',
+                                                                        'template' => 'Kkkonrad_Fastcheckout/form/field',
                                                                         'validation' => [
                                                                             'required-entry' => false
                                                                         ],
@@ -430,7 +430,7 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
                                                             'sortOrder' => 40,
                                                             'placeholder' => __('Select Country *'),
                                                             'config' => [
-                                                                'template' => 'IWD_Opc/form/field',
+                                                                'template' => 'Kkkonrad_Fastcheckout/form/field',
                                                                 'additionalClasses' => 'float-left wd30-66 mr4',
                                                             ],
                                                             'validation' => ['required-entry' => true],
@@ -440,7 +440,7 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
                                                             'label' => new \Magento\Framework\Phrase(''),
                                                             'sortOrder' => 50,
                                                             'config' => [
-                                                                'template' => 'IWD_Opc/form/field',
+                                                                'template' => 'Kkkonrad_Fastcheckout/form/field',
                                                                 'additionalClasses' => 'float-left wd30-66 mr4'
                                                             ]
                                                         ],
@@ -448,7 +448,7 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
                                                             'sortOrder' => 50,
                                                             'placeholder' => __(''),
                                                             'config' => [
-                                                                'template' => 'IWD_Opc/form/field-region',
+                                                                'template' => 'Kkkonrad_Fastcheckout/form/field-region',
                                                                 'additionalClasses' => 'float-left wd30-66 mr4'
                                                             ]
                                                         ],
@@ -457,7 +457,7 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
                                                             'sortOrder' => 60,
                                                             'placeholder' => false,
                                                             'config' => [
-                                                                'template' => 'IWD_Opc/form/field',
+                                                                'template' => 'Kkkonrad_Fastcheckout/form/field',
                                                                 'additionalClasses' => 'float-left wd30-66'
                                                             ]
                                                         ],
@@ -466,7 +466,7 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
                                                             'sortOrder' => 70,
                                                             'placeholder' => false,
                                                             'config' => [
-                                                                'template' => 'IWD_Opc/form/field',
+                                                                'template' => 'Kkkonrad_Fastcheckout/form/field',
                                                                 'additionalClasses' => 'float-left wd30-66 mr4',
                                                             ]
                                                         ],
@@ -476,7 +476,7 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
                                                             'placeholder' => false,
                                                             'config' => [
                                                                 'tooltip' => false,
-                                                                'template' => 'IWD_Opc/form/field',
+                                                                'template' => 'Kkkonrad_Fastcheckout/form/field',
                                                                 'additionalClasses' => 'float-left wd30-66 mr4',
                                                             ],
                                                             'validation' => ['required-entry' => true, 'phone' => true],
@@ -487,20 +487,20 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
                                                     ],
                                                 ],
                                                 'customer-email' => [
-                                                    'component' => 'IWD_Opc/js/view/form/element/email',
+                                                    'component' => 'Kkkonrad_Fastcheckout/js/view/form/element/email',
                                                     'config' => [
-                                                        'template' => 'IWD_Opc/form/element/email',
+                                                        'template' => 'Kkkonrad_Fastcheckout/form/element/email',
                                                     ],
                                                     'children' => [
                                                         'errors' => [
-                                                            'component' => 'IWD_Opc/js/view/form/element/email/errors',
+                                                            'component' => 'Kkkonrad_Fastcheckout/js/view/form/element/email/errors',
                                                             'displayArea' => 'errors'
                                                         ],
                                                         'additional-login-form-fields' => [
                                                             'children' => [
                                                                 'captcha' => [
                                                                     'config' => [
-                                                                        'template' => 'IWD_Opc/captcha'
+                                                                        'template' => 'Kkkonrad_Fastcheckout/captcha'
                                                                     ]
                                                                 ]
                                                             ]
@@ -508,25 +508,25 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
                                                     ]
                                                 ],
                                                 'payment-buttons' => [
-                                                    'component' => 'IWD_Opc/js/view/payment-buttons',
+                                                    'component' => 'Kkkonrad_Fastcheckout/js/view/payment-buttons',
                                                     'displayArea' => 'payment-buttons',
                                                     'config' => [
-                                                        'template' => 'IWD_Opc/payment-buttons'
+                                                        'template' => 'Kkkonrad_Fastcheckout/payment-buttons'
                                                     ],
                                                 ],
                                                 'before-shipping-method-form' => [
                                                     'children' => [
                                                         'shipping_policy' => [
-                                                            'component' => 'IWD_Opc/js/view/shipping/shipping-policy',
+                                                            'component' => 'Kkkonrad_Fastcheckout/js/view/shipping/shipping-policy',
                                                             'config' => [
-                                                                'template' => 'IWD_Opc/shipping/shipping-policy'
+                                                                'template' => 'Kkkonrad_Fastcheckout/shipping/shipping-policy'
                                                             ]
                                                         ]
                                                     ]
                                                 ],
                                                 'gift-message' => [
                                                     'displayArea' => 'gift-message',
-                                                    'component' => 'IWD_Opc/js/view/gift-message',
+                                                    'component' => 'Kkkonrad_Fastcheckout/js/view/gift-message',
                                                     'componentDisabled' => $this->getQuote()->isVirtual(),
                                                 ]
                                             ]
@@ -556,23 +556,23 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
                                 'billing-step' => [
                                     'children' => [
                                         'payment' => [
-                                            'component' => 'IWD_Opc/js/view/payment',
+                                            'component' => 'Kkkonrad_Fastcheckout/js/view/payment',
                                             'children' => [
                                                 'customer-email' => [
-                                                    'component' => 'IWD_Opc/js/view/form/element/email',
+                                                    'component' => 'Kkkonrad_Fastcheckout/js/view/form/element/email',
                                                     'config' => [
-                                                        'template' => 'IWD_Opc/form/element/email',
+                                                        'template' => 'Kkkonrad_Fastcheckout/form/element/email',
                                                     ],
                                                     'children' => [
                                                         'errors' => [
-                                                            'component' => 'IWD_Opc/js/view/form/element/email/errors',
+                                                            'component' => 'Kkkonrad_Fastcheckout/js/view/form/element/email/errors',
                                                             'displayArea' => 'errors'
                                                         ],
                                                         'additional-login-form-fields' => [
                                                             'children' => [
                                                                 'captcha' => [
                                                                     'config' => [
-                                                                        'template' => 'IWD_Opc/captcha'
+                                                                        'template' => 'Kkkonrad_Fastcheckout/captcha'
                                                                     ]
                                                                 ]
                                                             ]
@@ -580,12 +580,12 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
                                                     ]
                                                 ],
                                                 'payments-list' => [
-                                                    'component' => 'IWD_Opc/js/view/payment/list',
+                                                    'component' => 'Kkkonrad_Fastcheckout/js/view/payment/list',
                                                     'children' => [
                                                         'before-place-order' => [
                                                             'children' => [
                                                                 'agreements' => [
-                                                                    'component' => 'IWD_Opc/js/view/checkout-agreements'
+                                                                    'component' => 'Kkkonrad_Fastcheckout/js/view/checkout-agreements'
                                                                 ],
                                                                 'gift-card-information' => [
                                                                     'componentDisabled' => true,
@@ -597,13 +597,13 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
                                                 'additional-payment-validators' => [
                                                     'children' => [
                                                         'shipping-information-validator' => [
-                                                            'component' => 'IWD_Opc/js/view/shipping/shipping-information-validation'
+                                                            'component' => 'Kkkonrad_Fastcheckout/js/view/shipping/shipping-information-validation'
                                                         ],
                                                         'payment-method-validator' => [
-                                                            'component' => 'IWD_Opc/js/view/payment/payment-method-validation'
+                                                            'component' => 'Kkkonrad_Fastcheckout/js/view/payment/payment-method-validation'
                                                         ],
                                                         'billing-address-validator' => [
-                                                            'component' => 'IWD_Opc/js/view/billing/address-validation'
+                                                            'component' => 'Kkkonrad_Fastcheckout/js/view/billing/address-validation'
                                                         ]
                                                     ]
                                                 ],
@@ -636,22 +636,22 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
         $afterMethods = $this->jsLayout['components']['checkout']['children']['steps']['children']['billing-step']
         ['children']['payment']['children']['afterMethods']['children'];
         if (isset($afterMethods['discount'])) {
-            $afterMethods['discount']['component'] = 'IWD_Opc/js/view/payment/discount';
-            $afterMethods['discount']['children']['errors']['component'] = 'IWD_Opc/js/view/payment/discount/errors';
+            $afterMethods['discount']['component'] = 'Kkkonrad_Fastcheckout/js/view/payment/discount';
+            $afterMethods['discount']['children']['errors']['component'] = 'Kkkonrad_Fastcheckout/js/view/payment/discount/errors';
         }
 
         if (isset($afterMethods['storeCredit'])) {
-            $afterMethods['storeCredit']['component'] = 'IWD_Opc/js/view/payment/customer-balance';
+            $afterMethods['storeCredit']['component'] = 'Kkkonrad_Fastcheckout/js/view/payment/customer-balance';
         }
 
         if (isset($afterMethods['giftCardAccount'])) {
-            $afterMethods['giftCardAccount']['component'] = 'IWD_Opc/js/view/payment/gift-card-account';
+            $afterMethods['giftCardAccount']['component'] = 'Kkkonrad_Fastcheckout/js/view/payment/gift-card-account';
             $afterMethods['giftCardAccount']['children']
-            ['errors']['component'] = 'IWD_Opc/js/view/payment/gift-card/errors';
+            ['errors']['component'] = 'Kkkonrad_Fastcheckout/js/view/payment/gift-card/errors';
         }
 
         if (isset($afterMethods['reward'])) {
-            $afterMethods['reward']['component'] = 'IWD_Opc/js/view/payment/reward';
+            $afterMethods['reward']['component'] = 'Kkkonrad_Fastcheckout/js/view/payment/reward';
         }
 
         $this->getBillingAddressFormForUpdatePayment($afterMethods);
@@ -660,12 +660,12 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
     public function getBillingAddressFormForUpdatePayment($afterMethods)
     {
         if (isset($afterMethods['billing-address-form'])) {
-            $afterMethods['billing-address-form']['component'] = 'IWD_Opc/js/view/billing-address';
+            $afterMethods['billing-address-form']['component'] = 'Kkkonrad_Fastcheckout/js/view/billing-address';
             $afterMethods['billing-address-form']['displayArea'] = 'billing-address-form';
             if ($this->getQuote()->isVirtual()) {
                 $this->jsLayout['components']['checkout']['children']['steps']['children']['billing-step-virtual'] =
                     [
-                        'component' => 'IWD_Opc/js/view/billing-step-virtual',
+                        'component' => 'Kkkonrad_Fastcheckout/js/view/billing-step-virtual',
                         'sortOrder' => '1',
                         'children' => [
                             'billing-address-form' => $afterMethods['billing-address-form']
@@ -685,7 +685,7 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
                         if (!isset($this->jsLayout['components']['checkout']['children']['steps']['children']['billing-step-virtual'])) {
                             $billingForm['displayArea'] = 'billing-address-form';
                             $billingForm['dataScopePrefix'] = 'billingAddressshared';
-                            $billingForm['component'] = 'IWD_Opc/js/view/billing-address';
+                            $billingForm['component'] = 'Kkkonrad_Fastcheckout/js/view/billing-address';
                             foreach ($billingForm['children']['form-fields']['children'] as $fieldCode => $fieldConfig) {
                                 $customScope = null;
                                 $customEntry = null;
@@ -768,15 +768,15 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
 
                             $this->jsLayout['components']['checkout']['children']['steps']['children']['billing-step-virtual'] =
                                 [
-                                    'component' => 'IWD_Opc/js/view/billing-step-virtual',
+                                    'component' => 'Kkkonrad_Fastcheckout/js/view/billing-step-virtual',
                                     'sortOrder' => '1',
                                     'children' => [
                                         'billing-address-form' => $billingForm,
                                         'payment-buttons' => [
-                                            'component' => 'IWD_Opc/js/view/payment-buttons',
+                                            'component' => 'Kkkonrad_Fastcheckout/js/view/payment-buttons',
                                             'displayArea' => 'payment-buttons',
                                             'config' => [
-                                                'template' => 'IWD_Opc/payment-buttons'
+                                                'template' => 'Kkkonrad_Fastcheckout/payment-buttons'
                                             ],
                                         ],
                                     ]
@@ -791,7 +791,7 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
                 foreach ($this->jsLayout['components']['checkout']['children']['steps']['children']['billing-step']
                          ['children']['payment']['children']['payments-list']['children'] as $paymentCode => $paymentMethod) {
                     if (isset($paymentMethod['children']['form-fields']['children'])) {
-                        $paymentMethod['component'] = 'IWD_Opc/js/view/billing-address';
+                        $paymentMethod['component'] = 'Kkkonrad_Fastcheckout/js/view/billing-address';
                         $this->jsLayout['components']['checkout']['children']['steps']['children']['billing-step']
                         ['children']['payment']['children']['payments-list']['children'][$paymentCode] = $paymentMethod;
                     }
@@ -825,54 +825,54 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
             $fieldConfig['label'] = new \Magento\Framework\Phrase('First Name *');
             $fieldConfig['sortOrder'] = '10';
             $fieldConfig['placeholder'] = false;
-            $fieldConfig['config']['template'] = 'IWD_Opc/form/field';
-            $fieldConfig['config']['elementTmpl'] = 'IWD_Opc/form/element/input';
+            $fieldConfig['config']['template'] = 'Kkkonrad_Fastcheckout/form/field';
+            $fieldConfig['config']['elementTmpl'] = 'Kkkonrad_Fastcheckout/form/element/input';
             $fieldConfig['config']['additionalClasses'] = 'float-left';
         } else if ($fieldCode === 'lastname') {
             $fieldConfig['label'] = new \Magento\Framework\Phrase('Last Name *');
             $fieldConfig['sortOrder'] = '20';
             $fieldConfig['placeholder'] = false;
-            $fieldConfig['config']['template'] = 'IWD_Opc/form/field';
-            $fieldConfig['config']['elementTmpl'] = 'IWD_Opc/form/element/input';
+            $fieldConfig['config']['template'] = 'Kkkonrad_Fastcheckout/form/field';
+            $fieldConfig['config']['elementTmpl'] = 'Kkkonrad_Fastcheckout/form/element/input';
             $fieldConfig['config']['additionalClasses'] = 'float-right';
         } else if ($fieldCode === 'street') {
             $fieldConfig['sortOrder'] = '30';
-            $fieldConfig['config']['template'] = 'IWD_Opc/group/group';
+            $fieldConfig['config']['template'] = 'Kkkonrad_Fastcheckout/group/group';
             $fieldConfig['children'][0]['visible'] = true;
             $fieldConfig['children'][0]['label'] = new \Magento\Framework\Phrase('Street Address *');
             $fieldConfig['children'][0]['placeholder'] = __('Street Address *');
-            $fieldConfig['children'][0]['config']['template'] = 'IWD_Opc/form/field';
-            $fieldConfig['children'][0]['config']['elementTmpl'] = 'IWD_Opc/form/element/input';
+            $fieldConfig['children'][0]['config']['template'] = 'Kkkonrad_Fastcheckout/form/field';
+            $fieldConfig['children'][0]['config']['elementTmpl'] = 'Kkkonrad_Fastcheckout/form/element/input';
             $fieldConfig['children'][1]['visible'] = true;
             $fieldConfig['children'][1]['label'] = new \Magento\Framework\Phrase('Apartment / Suite / Building');
             $fieldConfig['children'][1]['placeholder'] = __('Apartment / Suite / Building');
-            $fieldConfig['children'][1]['config']['template'] = 'IWD_Opc/form/field';
-            $fieldConfig['children'][1]['config']['elementTmpl'] = 'IWD_Opc/form/element/input';
+            $fieldConfig['children'][1]['config']['template'] = 'Kkkonrad_Fastcheckout/form/field';
+            $fieldConfig['children'][1]['config']['elementTmpl'] = 'Kkkonrad_Fastcheckout/form/element/input';
             $fieldConfig['children'][1]['config']['validation'] = ['required-entry' => false];
             $fieldConfig['children'][2]['visible'] = false;
         } else if ($fieldCode === 'country_id') {
             $fieldConfig['label'] = new \Magento\Framework\Phrase('Select Country *');
             $fieldConfig['sortOrder'] = '40';
             $fieldConfig['placeholder'] = __('Select Country *');
-            $fieldConfig['component'] = 'IWD_Opc/js/form/billing-address/element/select';
-            $fieldConfig['config']['template'] = 'IWD_Opc/form/field';
-            $fieldConfig['config']['elementTmpl'] = 'IWD_Opc/form/billing-address/element/select';
+            $fieldConfig['component'] = 'Kkkonrad_Fastcheckout/js/form/billing-address/element/select';
+            $fieldConfig['config']['template'] = 'Kkkonrad_Fastcheckout/form/field';
+            $fieldConfig['config']['elementTmpl'] = 'Kkkonrad_Fastcheckout/form/billing-address/element/select';
             $fieldConfig['config']['additionalClasses'] = 'float-left wd30-66 mr4';
             $fieldConfig['validation']['required-entry'] = true;
         } else if ($fieldCode === 'region') {
             $fieldConfig['label'] = new \Magento\Framework\Phrase('');
             $fieldConfig['visible'] = false;
             $fieldConfig['sortOrder'] = '50';
-            $fieldConfig['config']['template'] = 'IWD_Opc/form/field-region';
+            $fieldConfig['config']['template'] = 'Kkkonrad_Fastcheckout/form/field-region';
             $fieldConfig['config']['additionalClasses'] = 'float-left wd30-66 mr4';
-            $fieldConfig['config']['elementTmpl'] = 'IWD_Opc/form/element/input';
+            $fieldConfig['config']['elementTmpl'] = 'Kkkonrad_Fastcheckout/form/element/input';
         } else if ($fieldCode === 'region_id') {
             $fieldConfig['label'] = new \Magento\Framework\Phrase('');
             $fieldConfig['sortOrder'] = '50';
             $fieldConfig['placeholder'] = __('');
-            $fieldConfig['component'] = 'IWD_Opc/js/form/element/region';
-            $fieldConfig['config']['template'] = 'IWD_Opc/form/field-region';
-            $fieldConfig['config']['elementTmpl'] = 'IWD_Opc/form/element/select';
+            $fieldConfig['component'] = 'Kkkonrad_Fastcheckout/js/form/element/region';
+            $fieldConfig['config']['template'] = 'Kkkonrad_Fastcheckout/form/field-region';
+            $fieldConfig['config']['elementTmpl'] = 'Kkkonrad_Fastcheckout/form/element/select';
             $fieldConfig['config']['customEntry'] = 'billingAddressshared.region';
             $fieldConfig['config']['additionalClasses'] = 'float-left wd30-66 mr4';
             $fieldConfig['validation']['required-entry'] = true;
@@ -882,25 +882,25 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
             $fieldConfig['label'] = new \Magento\Framework\Phrase('Town / City *');
             $fieldConfig['sortOrder'] = '60';
             $fieldConfig['placeholder'] = __('Town / City *');
-            $fieldConfig['config']['template'] = 'IWD_Opc/form/field';
+            $fieldConfig['config']['template'] = 'Kkkonrad_Fastcheckout/form/field';
             $fieldConfig['config']['additionalClasses'] = 'float-left wd30-66';
-            $fieldConfig['config']['elementTmpl'] = 'IWD_Opc/form/element/input';
+            $fieldConfig['config']['elementTmpl'] = 'Kkkonrad_Fastcheckout/form/element/input';
         } else if ($fieldCode === 'postcode') {
             $fieldConfig['label'] = new \Magento\Framework\Phrase('Postcode / Zip *');
             $fieldConfig['sortOrder'] = '70';
             $fieldConfig['placeholder'] = __('Postcode / Zip *');
             $fieldConfig['component'] = 'Magento_Ui/js/form/element/post-code';
             $fieldConfig['validation']['required-entry'] = true;
-            $fieldConfig['config']['template'] = 'IWD_Opc/form/field';
-            $fieldConfig['config']['elementTmpl'] = 'IWD_Opc/form/element/input';
+            $fieldConfig['config']['template'] = 'Kkkonrad_Fastcheckout/form/field';
+            $fieldConfig['config']['elementTmpl'] = 'Kkkonrad_Fastcheckout/form/element/input';
             $fieldConfig['config']['additionalClasses'] = 'float-left wd30-66 mr4';
         } else if ($fieldCode === 'telephone') {
             $fieldConfig['label'] = new \Magento\Framework\Phrase('Phone *');
             $fieldConfig['sortOrder'] = '80';
             $fieldConfig['placeholder'] = __('Phone *');
             $fieldConfig['config']['tooltip'] = false;
-            $fieldConfig['config']['template'] = 'IWD_Opc/form/field';
-            $fieldConfig['config']['elementTmpl'] = 'IWD_Opc/form/element/input';
+            $fieldConfig['config']['template'] = 'Kkkonrad_Fastcheckout/form/field';
+            $fieldConfig['config']['elementTmpl'] = 'Kkkonrad_Fastcheckout/form/element/input';
             $fieldConfig['config']['additionalClasses'] = 'float-left wd30-66 mr4';
             $fieldConfig['validation'] = ['required-entry' => true, 'phone' => true];
         } else if ($fieldCode === 'company') {
@@ -943,7 +943,7 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
     public function updateLoginButton()
     {
         $this->jsLayout['components']['checkout']['children']['login-button'] = [
-            'component' => 'IWD_Opc/js/view/login-button',
+            'component' => 'Kkkonrad_Fastcheckout/js/view/login-button',
             'displayArea' => 'login-button',
         ];
     }
@@ -954,10 +954,10 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
     public function updatePaymentButtons()
     {
         $this->jsLayout['components']['checkout']['children']['payment-buttons'] = [
-            'component' => 'IWD_Opc/js/view/payment-buttons',
+            'component' => 'Kkkonrad_Fastcheckout/js/view/payment-buttons',
             'displayArea' => 'payment-buttons',
             'config' => [
-                'template' => 'IWD_Opc/payment-buttons'
+                'template' => 'Kkkonrad_Fastcheckout/payment-buttons'
             ],
         ];
     }
@@ -974,7 +974,7 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
                         'sidebar' => [
                             'component' => 'uiComponent',
                             'config' => [
-                                'template' => 'IWD_Opc/sidebar'
+                                'template' => 'Kkkonrad_Fastcheckout/sidebar'
                             ],
                         ]
                     ]
@@ -1094,11 +1094,11 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
                                     'summary' => [
                                         'children' => [
                                             'discount' => [
-                                                'component' => 'IWD_Opc/js/view/payment/discount',
+                                                'component' => 'Kkkonrad_Fastcheckout/js/view/payment/discount',
                                                 'children' => [
                                                     'errors' => [
                                                         'sortOrder' => 0,
-                                                        'component' => 'IWD_Opc/js/view/payment/discount/errors',
+                                                        'component' => 'Kkkonrad_Fastcheckout/js/view/payment/discount/errors',
                                                         'displayArea' => 'messages',
                                                     ],
                                                 ],
@@ -1126,11 +1126,11 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
                                     'children' => [
                                         'edit-cart' => [
                                             'sortOrder' => 10,
-                                            'component' => 'IWD_Opc/js/view/summary/edit-cart',
+                                            'component' => 'Kkkonrad_Fastcheckout/js/view/summary/edit-cart',
                                             'config' => [
                                                 'title' => __('Edit Cart'),
                                                 'link' => '/checkout/cart/',
-                                                'template' => 'IWD_Opc/summary/edit-cart',
+                                                'template' => 'Kkkonrad_Fastcheckout/summary/edit-cart',
                                             ],
                                         ],
                                     ],
@@ -1155,9 +1155,9 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
                                     'children' => [
                                         'place-order' => [
                                             'sortOrder' => 999,
-                                            'component' => 'IWD_Opc/js/view/summary/place-order',
+                                            'component' => 'Kkkonrad_Fastcheckout/js/view/summary/place-order',
                                             'config' => [
-                                                'template' => 'IWD_Opc/summary/place-order',
+                                                'template' => 'Kkkonrad_Fastcheckout/summary/place-order',
                                             ],
                                         ],
                                     ],
@@ -1180,9 +1180,9 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
                             'children' => [
                                 'info-block' => [
                                     'sortOrder' => 999,
-                                    'component' => 'IWD_Opc/js/view/info-block',
+                                    'component' => 'Kkkonrad_Fastcheckout/js/view/info-block',
                                     'config' => [
-                                        'template' => 'IWD_Opc/info-block',
+                                        'template' => 'Kkkonrad_Fastcheckout/info-block',
                                     ],
                                 ],
                                 'billing-step' => [
@@ -1192,7 +1192,7 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
                                                 'renders' => [
                                                     'children' => [
                                                         'braintree' => [
-                                                            'component' => 'IWD_Opc/js/view/payment/braintree'
+                                                            'component' => 'Kkkonrad_Fastcheckout/js/view/payment/braintree'
                                                         ]
                                                     ]
                                                 ]
@@ -1205,16 +1205,16 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
                         'sidebar' => [
                             'children' => [
                                 'summary' => [
-                                    'component' => 'IWD_Opc/js/view/summary',
+                                    'component' => 'Kkkonrad_Fastcheckout/js/view/summary',
                                     'config' => [
-                                        'template' => 'IWD_Opc/summary'
+                                        'template' => 'Kkkonrad_Fastcheckout/summary'
                                     ],
                                     'children' => [
                                         'cart_items' => [
-                                            'component' => 'IWD_Opc/js/view/summary/cart-items',
+                                            'component' => 'Kkkonrad_Fastcheckout/js/view/summary/cart-items',
                                             'children' => [
                                                 'details' => [
-                                                    'component' => 'IWD_Opc/js/view/summary/item/details'
+                                                    'component' => 'Kkkonrad_Fastcheckout/js/view/summary/item/details'
                                                 ]
                                             ],
                                             'sortOrder' => 970,
@@ -1225,26 +1225,26 @@ class UpdateLayoutProcessor implements LayoutProcessorInterface
                                         'totals' => [
                                             'children' => [
                                                 'subtotal' =>[
-                                                    'component' => 'IWD_Opc/js/view/summary/subtotal',
+                                                    'component' => 'Kkkonrad_Fastcheckout/js/view/summary/subtotal',
                                                     'config' => [
                                                         'title' => __('Subtotal'),
                                                     ],
                                                 ],
                                                 'discount' => [
-                                                    'component' => 'IWD_Opc/js/view/summary/discount',
+                                                    'component' => 'Kkkonrad_Fastcheckout/js/view/summary/discount',
                                                     'config' => [
                                                         'title' => __('Discount'),
                                                     ],
                                                 ],
                                                 'shipping' => [
-                                                    'component' => 'IWD_Opc/js/view/summary/shipping',
+                                                    'component' => 'Kkkonrad_Fastcheckout/js/view/summary/shipping',
                                                     'config' => [
                                                         'title' => __('Shipping'),
                                                         'notCalculatedMessage' => __('Not yet calculated')
                                                     ],
                                                 ],
                                                 'grand-total' => [
-                                                    'component' => 'IWD_Opc/js/view/summary/grand-total',
+                                                    'component' => 'Kkkonrad_Fastcheckout/js/view/summary/grand-total',
                                                     'config' => [
                                                         'title' => __('Total to pay')
                                                     ],

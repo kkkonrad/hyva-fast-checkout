@@ -5,7 +5,7 @@ define([
 
     return function (config) {
         if (window.console && typeof window.console.log === 'function') {
-            window.console.log('IWD OPC: payment-renderers JS initialized with config:', config);
+            window.console.log('Kkkonrad OPC: payment-renderers JS initialized with config:', config);
         }
         var scope = config.scope || 'iwdOpcHyvaPaymentRenderers',
             rendererComponents = config.rendererComponents || [];
@@ -69,7 +69,7 @@ define([
                     }, function (error) {
                         remaining -= 1;
                         if (window.console && typeof window.console.warn === 'function') {
-                            window.console.warn('IWD OPC: payment renderer could not be loaded', component, error);
+                            window.console.warn('Kkkonrad OPC: payment renderer could not be loaded', component, error);
                         }
                         if (remaining === 0) {
                             done();
@@ -95,11 +95,11 @@ define([
                             try {
                                 cdInitFunc(customerDataConfig);
                                 if (window.console && typeof window.console.log === 'function') {
-                                    window.console.log('IWD OPC: customerData initialized successfully');
+                                    window.console.log('Kkkonrad OPC: customerData initialized successfully');
                                 }
                             } catch (e) {
                                 if (window.console && typeof window.console.warn === 'function') {
-                                    window.console.warn('IWD OPC: customerData initialization error:', e);
+                                    window.console.warn('Kkkonrad OPC: customerData initialization error:', e);
                                 }
                             }
                         }
@@ -174,7 +174,7 @@ define([
 
                     if (quoteMethod && !domHasPaymentMethod(quoteMethod)) {
                         if (window.console && typeof window.console.log === 'function') {
-                            window.console.log('IWD OPC: clearing inactive quote payment method:', quoteMethod);
+                            window.console.log('Kkkonrad OPC: clearing inactive quote payment method:', quoteMethod);
                         }
                         selectPaymentMethodAction(null);
                         hidePaymentPlaceholders();
@@ -187,7 +187,7 @@ define([
                     lastMethodsJson = currentMethodsJson;
 
                     if (window.console && typeof window.console.log === 'function') {
-                        window.console.log('IWD OPC: syncPaymentMethods found methods:', methods);
+                        window.console.log('Kkkonrad OPC: syncPaymentMethods found methods:', methods);
                     }
 
                     if (methods.length > 0) {
@@ -210,7 +210,7 @@ define([
                             component: 'uiComponent',
                             children: {
                                 paymentList: {
-                                    component: 'IWD_Opc/js/hyva/payment-list',
+                                    component: 'Kkkonrad_Fastcheckout/js/hyva/payment-list',
                                     displayArea: 'payment-methods-list'
                                 }
                             }
@@ -219,7 +219,7 @@ define([
                             component: 'uiComponent',
                             children: {
                                 shippingList: {
-                                    component: 'IWD_Opc/js/hyva/shipping-list',
+                                    component: 'Kkkonrad_Fastcheckout/js/hyva/shipping-list',
                                     displayArea: 'shipping-methods-list'
                                 }
                             }
@@ -286,7 +286,7 @@ define([
                         }
 
                         if (window.console && typeof window.console.log === 'function') {
-                            window.console.log('IWD OPC: syncAddressToKnockout updating quote shippingAddress:', addressData);
+                            window.console.log('Kkkonrad OPC: syncAddressToKnockout updating quote shippingAddress:', addressData);
                         }
                         selectShippingAddress(newAddress);
                     });
@@ -308,7 +308,7 @@ define([
                             var active = quote.shippingMethod();
                             if (!active || active.carrier_code !== found.carrier_code || active.method_code !== found.method_code) {
                                 if (window.console && typeof window.console.log === 'function') {
-                                    window.console.log('IWD OPC: syncSelectedShippingMethodToKnockout setting active:', methodCode);
+                                    window.console.log('Kkkonrad OPC: syncSelectedShippingMethodToKnockout setting active:', methodCode);
                                 }
                                 selectShippingMethod(found);
                             }
@@ -341,7 +341,7 @@ define([
                         var wire = magewireEl.__livewire;
                         if (wire.shippingMethod !== methodCode) {
                             if (window.console && typeof window.console.log === 'function') {
-                                window.console.log('IWD OPC: quote.shippingMethod changed in KO, syncing to Magewire:', methodCode);
+                                window.console.log('Kkkonrad OPC: quote.shippingMethod changed in KO, syncing to Magewire:', methodCode);
                             }
                             wire.call('selectShippingMethod', methodCode);
                         }
@@ -363,7 +363,7 @@ define([
                     var domMethod = getCheckedDomPaymentMethod();
                     
                     if (window.console && typeof window.console.log === 'function') {
-                        window.console.log('IWD OPC: getSelectedMethodCode - quoteMethod:', quoteMethod, 'domMethod:', domMethod);
+                        window.console.log('Kkkonrad OPC: getSelectedMethodCode - quoteMethod:', quoteMethod, 'domMethod:', domMethod);
                     }
                     
                     if (domMethod) {
@@ -512,7 +512,7 @@ define([
 
                 function updateActiveRendererClass(methodCode, activeCode) {
                     if (window.console && typeof window.console.log === 'function') {
-                        window.console.log('IWD OPC: updateActiveRendererClass methodCode:', methodCode, 'activeCode:', activeCode);
+                        window.console.log('Kkkonrad OPC: updateActiveRendererClass methodCode:', methodCode, 'activeCode:', activeCode);
                     }
                     var root = document.getElementById('iwd-opc-ko-payment-root'),
                         activeElement = null,
@@ -523,14 +523,14 @@ define([
 
                     if (!root) {
                         if (window.console && typeof window.console.log === 'function') {
-                            window.console.log('IWD OPC: #iwd-opc-ko-payment-root not found!');
+                            window.console.log('Kkkonrad OPC: #iwd-opc-ko-payment-root not found!');
                         }
                         return false;
                     }
 
                     var allRenderers = document.querySelectorAll('.payment-method');
                     if (window.console && typeof window.console.log === 'function') {
-                        window.console.log('IWD OPC: allRenderers count:', allRenderers.length);
+                        window.console.log('Kkkonrad OPC: allRenderers count:', allRenderers.length);
                     }
 
                     allRenderers.forEach(function (element) {
@@ -546,7 +546,7 @@ define([
 
                     if (activeElement) {
                         if (window.console && typeof window.console.log === 'function') {
-                            window.console.log('IWD OPC: found activeElement for method:', methodCode);
+                            window.console.log('Kkkonrad OPC: found activeElement for method:', methodCode);
                         }
                         activeElement.classList.add('_active');
                         activeElement.setAttribute('data-iwd-active', 'true');
@@ -554,7 +554,7 @@ define([
                         var target = document.querySelector('[data-iwd-payment-method-ko-target="' + methodCode + '"]');
                         if (target) {
                             if (window.console && typeof window.console.log === 'function') {
-                                window.console.log('IWD OPC: moving activeElement to target placeholder:', methodCode, 'hasVisibleContent:', hasVisibleContent(activeElement));
+                                window.console.log('Kkkonrad OPC: moving activeElement to target placeholder:', methodCode, 'hasVisibleContent:', hasVisibleContent(activeElement));
                             }
                             target.appendChild(activeElement);
                             target.classList.remove('hidden');
@@ -562,12 +562,12 @@ define([
                             movedToTarget = true;
                         } else {
                             if (window.console && typeof window.console.log === 'function') {
-                                window.console.log('IWD OPC: target placeholder NOT found for method:', methodCode);
+                                window.console.log('Kkkonrad OPC: target placeholder NOT found for method:', methodCode);
                             }
                         }
                     } else {
                         if (window.console && typeof window.console.log === 'function') {
-                            window.console.log('IWD OPC: activeElement NOT found for method:', methodCode);
+                            window.console.log('Kkkonrad OPC: activeElement NOT found for method:', methodCode);
                         }
                     }
 
@@ -576,7 +576,7 @@ define([
 
                 function applySelectedMethod(methodCode) {
                     if (window.console && typeof window.console.log === 'function') {
-                        window.console.log('IWD OPC: applySelectedMethod called for:', methodCode);
+                        window.console.log('Kkkonrad OPC: applySelectedMethod called for:', methodCode);
                     }
                     var method,
                         renderer,
@@ -594,7 +594,7 @@ define([
                     patchRenderer(renderer);
                     activeCode = getRendererCode(renderer, methodCode);
                     if (window.console && typeof window.console.log === 'function') {
-                        window.console.log('IWD OPC: applySelectedMethod renderer found:', !!renderer, 'activeCode:', activeCode);
+                        window.console.log('Kkkonrad OPC: applySelectedMethod renderer found:', !!renderer, 'activeCode:', activeCode);
                     }
                     activeMethod = getMethod(activeCode) || {method: activeCode, title: method.title};
                     quote.paymentMethod(activeMethod);
@@ -643,7 +643,7 @@ define([
 
                 function setSelectedMethod(methodCode) {
                     if (window.console && typeof window.console.log === 'function') {
-                        window.console.log('IWD OPC: setSelectedMethod called with:', methodCode);
+                        window.console.log('Kkkonrad OPC: setSelectedMethod called with:', methodCode);
                     }
                     syncPaymentMethods();
 
@@ -657,7 +657,7 @@ define([
                         pendingSelectedMethodCode = '';
                         hidePaymentPlaceholders();
                         if (window.console && typeof window.console.log === 'function') {
-                            window.console.log('IWD OPC: selected payment method is no longer available:', methodCode);
+                            window.console.log('Kkkonrad OPC: selected payment method is no longer available:', methodCode);
                         }
                         return;
                     }
@@ -743,7 +743,7 @@ define([
                         if (component && typeof component.validate === 'function') {
                             var isValid = component.validate();
                             if (window.console && typeof window.console.log === 'function') {
-                                window.console.log('IWD OPC: Knockout component validation result:', isValid);
+                                window.console.log('Kkkonrad OPC: Knockout component validation result:', isValid);
                             }
                             return isValid;
                         }
@@ -793,7 +793,7 @@ define([
                 function moveRenderersBackToRoot() {
                     var root = document.getElementById('iwd-opc-ko-payment-root');
                     if (window.console && typeof window.console.log === 'function') {
-                        window.console.log('IWD OPC: moveRenderersBackToRoot called, root exists:', !!root);
+                        window.console.log('Kkkonrad OPC: moveRenderersBackToRoot called, root exists:', !!root);
                     }
                     hidePaymentPlaceholders();
                     if (root) {
@@ -805,7 +805,7 @@ define([
                             }
                         });
                         if (window.console && typeof window.console.log === 'function') {
-                            window.console.log('IWD OPC: moved back to root count:', count);
+                            window.console.log('Kkkonrad OPC: moved back to root count:', count);
                         }
                     }
                 }
@@ -818,7 +818,7 @@ define([
                         syncPaymentMethods();
                         var code = getSelectedMethodCode();
                         if (window.console && typeof window.console.log === 'function') {
-                            window.console.log('IWD OPC: Livewire message.processed triggered, getSelectedMethodCode:', code);
+                            window.console.log('Kkkonrad OPC: Livewire message.processed triggered, getSelectedMethodCode:', code);
                         }
                         patchRenderers();
                         setSelectedMethod(code);

@@ -6,7 +6,7 @@ define([
 
     return Component.extend({
         defaults: {
-            template: 'IWD_Opc/payment/methods-renderers/braintree/form',
+            template: 'Kkkonrad_Fastcheckout/payment/methods-renderers/braintree/form',
             isCurrentlySecure: window.checkoutConfig.iwdOpcSettings.isCurrentlySecure
         },
         getHostedFields: function () {

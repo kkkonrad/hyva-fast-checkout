@@ -1,8 +1,8 @@
 <?php
 
-namespace IWD\Opc\Model;
+namespace Kkkonrad\Fastcheckout\Model;
 
-use IWD\Opc\Api\BalanceManagementInterface;
+use Kkkonrad\Fastcheckout\Api\BalanceManagementInterface;
 use Magento\Quote\Api\CartRepositoryInterface;
 
 class BalanceManagement implements BalanceManagementInterface

@@ -2,7 +2,7 @@ define(
     [
         'uiComponent',
         'Magento_Checkout/js/model/payment/additional-validators',
-        'IWD_Opc/js/model/shipping/shipping-information-validator',
+        'Kkkonrad_Fastcheckout/js/model/shipping/shipping-information-validator',
         'Magento_Checkout/js/model/quote'
     ],
     function (Component, additionalValidators, shippingValidator, quote) {

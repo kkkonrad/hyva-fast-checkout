@@ -1,6 +1,6 @@
 <?php
 
-namespace IWD\Opc\Block\Rewrite\Paypal;
+namespace Kkkonrad\Fastcheckout\Block\Rewrite\Paypal;
 
 class Button extends \PayPal\Braintree\Block\Paypal\Button
 {

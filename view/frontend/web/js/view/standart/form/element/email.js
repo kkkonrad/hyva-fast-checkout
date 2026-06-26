@@ -20,7 +20,7 @@ define([
 
     return Component.extend({
         defaults: {
-            template: 'IWD_Opc/standart/form/element/email',
+            template: 'Kkkonrad_Fastcheckout/standart/form/element/email',
             email: checkoutData.getInputFieldEmailValue(),
             emailFocused: false,
             passwordFocused: false,

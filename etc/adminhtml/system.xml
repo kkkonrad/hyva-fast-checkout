@@ -8,7 +8,7 @@
         <section id="iwd_opc" translate="label" sortOrder="1" showInDefault="1" showInWebsite="1" showInStore="1">
             <label>Checkout</label>
             <tab>dominate</tab>
-            <resource>IWD_Opc::system_config</resource>
+            <resource>Kkkonrad_Fastcheckout::system_config</resource>
             <group id="general" translate="label" type="text"
                    sortOrder="1" showInDefault="1" showInWebsite="1" showInStore="1">
                 <label>General</label>
@@ -43,17 +43,17 @@
                 <field id="default_shipping_method" translate="label comment" type="select"
                        sortOrder="9" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Default Shipping Method</label>
-                    <source_model>IWD\Opc\Model\Config\Source\Shipping</source_model>
+                    <source_model>Kkkonrad\Fastcheckout\Model\Config\Source\Shipping</source_model>
                 </field>
                 <field id="default_payment_method" translate="label" type="select"
                        sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Default Payment Method</label>
-                    <source_model>IWD\Opc\Model\Config\Source\Payment</source_model>
+                    <source_model>Kkkonrad\Fastcheckout\Model\Config\Source\Payment</source_model>
                 </field>
                 <field id="shipping_payment_mapping" translate="label" type="text"
                        sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Payment Methods by Shipping Method</label>
-                    <frontend_model>IWD\Opc\Block\Adminhtml\System\Config\ShippingPaymentMapping</frontend_model>
+                    <frontend_model>Kkkonrad\Fastcheckout\Block\Adminhtml\System\Config\ShippingPaymentMapping</frontend_model>
                     <backend_model>Magento\Config\Model\Config\Backend\Serialized\ArraySerialized</backend_model>
                 </field>
             </group>

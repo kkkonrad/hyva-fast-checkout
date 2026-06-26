@@ -39,7 +39,7 @@ define([
 
     return Component.extend({
         defaults: {
-            template: 'IWD_Opc/payment/methods-renderers/paypal',
+            template: 'Kkkonrad_Fastcheckout/payment/methods-renderers/paypal',
             code: 'braintree_paypal',
             active: false,
             paypalInstance: null,

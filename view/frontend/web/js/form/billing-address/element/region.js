@@ -1,8 +1,8 @@
 define([
     'underscore',
     'uiRegistry',
-    'IWD_Opc/js/form/billing-address/element/select',
-    'IWD_Opc/js/model/default-post-code-resolver'
+    'Kkkonrad_Fastcheckout/js/form/billing-address/element/select',
+    'Kkkonrad_Fastcheckout/js/model/default-post-code-resolver'
 ], function (_, registry, Select, defaultPostCodeResolver) {
     'use strict';
 

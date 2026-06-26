@@ -7,7 +7,7 @@ define(
 
         return ccFormComponent.extend({
             defaults: {
-                template: 'IWD_Opc/payment/methods-renderers/eway-direct-form'
+                template: 'Kkkonrad_Fastcheckout/payment/methods-renderers/eway-direct-form'
             }
         });
     }

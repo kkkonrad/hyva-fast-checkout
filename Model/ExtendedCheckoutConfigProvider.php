@@ -1,9 +1,9 @@
 <?php
 
-namespace IWD\Opc\Model;
+namespace Kkkonrad\Fastcheckout\Model;
 
 use Magento\Checkout\Model\ConfigProviderInterface;
-use IWD\Opc\Helper\Data as OpcHelper;
+use Kkkonrad\Fastcheckout\Helper\Data as OpcHelper;
 use Magento\Checkout\Model\Session as CheckoutSession;
 use Magento\Framework\UrlInterface;
 use Magento\Framework\View\Asset\Repository;
@@ -51,8 +51,8 @@ class ExtendedCheckoutConfigProvider implements ConfigProviderInterface
         $settings['isReloadShippingOnDiscount'] = $this->opcHelper->isReloadShippingOnDiscount();
         $settings['paymentTitleType'] = $this->opcHelper->getPaymentTitleType();
         $settings['paymentLogosImages'] = [
-            'paypal' => $this->getViewUrl('IWD_Opc::images/paypal_logo.png'),
-            'apple_pay' => $this->getViewUrl('IWD_Opc::images/apple_pay_logo.png'),
+            'paypal' => $this->getViewUrl('Kkkonrad_Fastcheckout::images/paypal_logo.png'),
+            'apple_pay' => $this->getViewUrl('Kkkonrad_Fastcheckout::images/apple_pay_logo.png'),
         ];
         $settings['isCurrentlySecure'] = $this->opcHelper->isCurrentlySecure();
         $settings['isShowComment'] = $this->opcHelper->isShowComment();

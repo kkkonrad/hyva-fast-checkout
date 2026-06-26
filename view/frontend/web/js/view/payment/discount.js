@@ -11,7 +11,7 @@ define([
     'Magento_SalesRule/js/action/set-coupon-code',
     'Magento_SalesRule/js/action/cancel-coupon',
     'Magento_SalesRule/js/model/coupon',
-    'IWD_Opc/js/ga4Events'
+    'Kkkonrad_Fastcheckout/js/ga4Events'
 ], function ($, ko, Component, quote, setCouponCodeAction, cancelCouponAction, coupon, ga4Events) {
     'use strict';
 
@@ -26,7 +26,7 @@ define([
 
     return Component.extend({
         defaults: {
-            template: 'IWD_Opc/payment/discount'
+            template: 'Kkkonrad_Fastcheckout/payment/discount'
         },
         couponCode: couponCode,
 

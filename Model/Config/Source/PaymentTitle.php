@@ -1,6 +1,6 @@
 <?php
 
-namespace IWD\Opc\Model\Config\Source;
+namespace Kkkonrad\Fastcheckout\Model\Config\Source;
 
 use \Magento\Framework\Option\ArrayInterface;
 

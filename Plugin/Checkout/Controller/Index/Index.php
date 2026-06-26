@@ -1,8 +1,8 @@
 <?php
 
-namespace IWD\Opc\Plugin\Checkout\Controller\Index;
+namespace Kkkonrad\Fastcheckout\Plugin\Checkout\Controller\Index;
 
-use IWD\Opc\Helper\Data as OpcHelper;
+use Kkkonrad\Fastcheckout\Helper\Data as OpcHelper;
 use Magento\Framework\Controller\Result\RedirectFactory;
 use Magento\Framework\UrlInterface;
 

@@ -6,14 +6,14 @@ define(
         'Magento_Checkout/js/model/quote',
         'Magento_Checkout/js/model/totals',
         'Magento_Catalog/js/price-utils',
-        'IWD_Opc/js/action/use-balance',
-        'IWD_Opc/js/action/remove-balance'
+        'Kkkonrad_Fastcheckout/js/action/use-balance',
+        'Kkkonrad_Fastcheckout/js/action/remove-balance'
     ],
     function ($, ko, component, quote, totals, priceUtils, useBalanceAction, removeBalanceAction) {
 
         return component.extend({
             defaults: {
-                template: 'IWD_Opc/payment/customer-balance'
+                template: 'Kkkonrad_Fastcheckout/payment/customer-balance'
             },
 
             isApplied: ko.observable(window.checkoutConfig.payment.customerBalance.amountSubstracted), //isCustomerBalanceUsed

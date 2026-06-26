@@ -52,7 +52,7 @@ define(defineArray,
 
     return Component.extend({
         defaults: {
-            template: 'IWD_Opc/payment-methods/custom-payment-list',
+            template: 'Kkkonrad_Fastcheckout/payment-methods/custom-payment-list',
             visible: paymentMethods().length > 0,
             configDefaultGroup: {
                 name: 'methodGroup',
@@ -61,39 +61,39 @@ define(defineArray,
             paymentGroupsList: ko.observable([]),
             defaultGroupTitle: $t('Select a new payment method'),
             paymentRenderersMap: {
-                iwd_saved_credit_card: 'IWD_Opc/js/view/payment/methods-renderers/iwd_saved_credit_card',
-                free: 'IWD_Opc/js/view/payment/methods-renderers/free-method',
-                checkmo: 'IWD_Opc/js/view/payment/methods-renderers/checkmo-method',
-                banktransfer: 'IWD_Opc/js/view/payment/methods-renderers/banktransfer-method',
-                cashondelivery: 'IWD_Opc/js/view/payment/methods-renderers/cashondelivery-method',
-                purchaseorder: 'IWD_Opc/js/view/payment/methods-renderers/purchaseorder-method',
-                braintree_paypal: 'IWD_Opc/js/view/payment/methods-renderers/paypal',
-                braintree: 'IWD_Opc/js/view/payment/methods-renderers/braintree/hosted-fields',
-                authorizenet_directpost: 'IWD_Opc/js/view/payment/methods-renderers/authorizenet-directpost',
-                paypal_express_bml: 'IWD_Opc/js/view/payment/methods-renderers/paypal-express-bml',
+                iwd_saved_credit_card: 'Kkkonrad_Fastcheckout/js/view/payment/methods-renderers/iwd_saved_credit_card',
+                free: 'Kkkonrad_Fastcheckout/js/view/payment/methods-renderers/free-method',
+                checkmo: 'Kkkonrad_Fastcheckout/js/view/payment/methods-renderers/checkmo-method',
+                banktransfer: 'Kkkonrad_Fastcheckout/js/view/payment/methods-renderers/banktransfer-method',
+                cashondelivery: 'Kkkonrad_Fastcheckout/js/view/payment/methods-renderers/cashondelivery-method',
+                purchaseorder: 'Kkkonrad_Fastcheckout/js/view/payment/methods-renderers/purchaseorder-method',
+                braintree_paypal: 'Kkkonrad_Fastcheckout/js/view/payment/methods-renderers/paypal',
+                braintree: 'Kkkonrad_Fastcheckout/js/view/payment/methods-renderers/braintree/hosted-fields',
+                authorizenet_directpost: 'Kkkonrad_Fastcheckout/js/view/payment/methods-renderers/authorizenet-directpost',
+                paypal_express_bml: 'Kkkonrad_Fastcheckout/js/view/payment/methods-renderers/paypal-express-bml',
 
                 paypal_express: (window.checkoutConfig.payment.paypalExpress && window.checkoutConfig.payment.paypalExpress.isContextCheckout) ?
-                    'IWD_Opc/js/view/payment/methods-renderers/in-context/checkout-express' : 'IWD_Opc/js/view/payment/methods-renderers/paypal-express',
+                    'Kkkonrad_Fastcheckout/js/view/payment/methods-renderers/in-context/checkout-express' : 'Kkkonrad_Fastcheckout/js/view/payment/methods-renderers/paypal-express',
 
                 eway: (window.checkoutConfig.payment.eway && window.checkoutConfig.payment.eway.connectionType) ?
-                    'IWD_Opc/js/view/payment/methods-renderers/eway/' + window.checkoutConfig.payment.eway.connectionType : '',
+                    'Kkkonrad_Fastcheckout/js/view/payment/methods-renderers/eway/' + window.checkoutConfig.payment.eway.connectionType : '',
 
                 iwd_authcim: (window.checkoutConfig.payment.iwd_authcim && window.checkoutConfig.payment.iwd_authcim.isAcceptjsEnabled) ?
-                    'IWD_Opc/js/view/payment/methods-renderers/iwd_authcim/acceptjs' : 'IWD_Opc/js/view/payment/methods-renderers/iwd_authcim/iframe',
+                    'Kkkonrad_Fastcheckout/js/view/payment/methods-renderers/iwd_authcim/acceptjs' : 'Kkkonrad_Fastcheckout/js/view/payment/methods-renderers/iwd_authcim/iframe',
 
-                worldpay: 'IWD_Opc/js/view/payment/methods-renderers/worldpay',
-                cybersource: 'IWD_Opc/js/view/payment/methods-renderers/cybersource',
+                worldpay: 'Kkkonrad_Fastcheckout/js/view/payment/methods-renderers/worldpay',
+                cybersource: 'Kkkonrad_Fastcheckout/js/view/payment/methods-renderers/cybersource',
 
-                payflow_express_bml: 'IWD_Opc/js/view/payment/methods-renderers/payflow-express-bml',
-                payflow_express: 'IWD_Opc/js/view/payment/methods-renderers/payflow-express',
-                payflow_link: 'IWD_Opc/js/view/payment/methods-renderers/iframe-methods',
-                payflow_advanced: 'IWD_Opc/js/view/payment/methods-renderers/iframe-methods',
-                hosted_pro: 'IWD_Opc/js/view/payment/methods-renderers/iframe-methods',
-                payflowpro: 'IWD_Opc/js/view/payment/methods-renderers/payflowpro-method',
-                paypal_billing_agreement: 'IWD_Opc/js/view/payment/methods-renderers/paypal-billing-agreement',
+                payflow_express_bml: 'Kkkonrad_Fastcheckout/js/view/payment/methods-renderers/payflow-express-bml',
+                payflow_express: 'Kkkonrad_Fastcheckout/js/view/payment/methods-renderers/payflow-express',
+                payflow_link: 'Kkkonrad_Fastcheckout/js/view/payment/methods-renderers/iframe-methods',
+                payflow_advanced: 'Kkkonrad_Fastcheckout/js/view/payment/methods-renderers/iframe-methods',
+                hosted_pro: 'Kkkonrad_Fastcheckout/js/view/payment/methods-renderers/iframe-methods',
+                payflowpro: 'Kkkonrad_Fastcheckout/js/view/payment/methods-renderers/payflowpro-method',
+                paypal_billing_agreement: 'Kkkonrad_Fastcheckout/js/view/payment/methods-renderers/paypal-billing-agreement',
 
-                iwd_applepay: 'IWD_Opc/js/view/payment/methods-renderers/apple_pay',
-                opg_square: 'IWD_Opc/js/view/payment/methods-renderers/opg_square'
+                iwd_applepay: 'Kkkonrad_Fastcheckout/js/view/payment/methods-renderers/apple_pay',
+                opg_square: 'Kkkonrad_Fastcheckout/js/view/payment/methods-renderers/opg_square'
             },
             paymentImagesMap: {
                 braintree_paypal: 'paypal',

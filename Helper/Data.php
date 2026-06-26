@@ -1,6 +1,6 @@
 <?php
 
-namespace IWD\Opc\Helper;
+namespace Kkkonrad\Fastcheckout\Helper;
 
 use Magento\Framework\App\Helper\Context;
 use Magento\Store\Model\StoreManagerInterface;
@@ -8,7 +8,7 @@ use Magento\Framework\HTTP\Adapter\CurlFactory;
 use Magento\Framework\Message\Session as Session;
 use Magento\Framework\App\Config\ConfigResource\ConfigInterface;
 use Magento\Customer\Model\Session as CustomerSession;
-use IWD\Opc\Model\FlagFactory;
+use Kkkonrad\Fastcheckout\Model\FlagFactory;
 use Magento\Framework\Json\Helper\Data as JsonHelper;
 use Magento\Framework\App\Helper\AbstractHelper;
 use Magento\Framework\UrlInterface;
@@ -117,7 +117,7 @@ class Data extends AbstractHelper
     {
         return $this->_getRequest()->getModuleName() === 'onepage'
             && $this->isEnable()
-            && $this->isModuleOutputEnabled('IWD_Opc');
+            && $this->isModuleOutputEnabled('Kkkonrad_Fastcheckout');
     }
 
     public function isCurrentlySecure()
@@ -211,7 +211,7 @@ class Data extends AbstractHelper
 
     public function canUseHyvaNativeCheckout()
     {
-        if (!$this->isEnable() || !$this->isModuleOutputEnabled('IWD_Opc')) {
+        if (!$this->isEnable() || !$this->isModuleOutputEnabled('Kkkonrad_Fastcheckout')) {
             return false;
         }
 
@@ -277,7 +277,7 @@ class Data extends AbstractHelper
 
     public function changeModuleOutput($outputDisabled)
     {
-        $this->resourceConfig->saveConfig('advanced/modules_disable_output/IWD_Opc', $outputDisabled, 'default', 0);
+        $this->resourceConfig->saveConfig('advanced/modules_disable_output/Kkkonrad_Fastcheckout', $outputDisabled, 'default', 0);
     }
 
     public function getLicensingInformation()
