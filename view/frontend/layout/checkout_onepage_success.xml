@@ -5,6 +5,6 @@
     <body>
         <referenceBlock name="page.main.title" remove="true" />
         <referenceBlock name="checkout.registration" remove="true" />
-        <referenceBlock name="checkout.tpay.order_status" template="Kkkonrad_Fastcheckout::compat/tpay/success.phtml" />
+        <referenceBlock name="tpay_success_status" remove="true" />
     </body>
 </page>

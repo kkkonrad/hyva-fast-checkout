@@ -1,0 +1,52 @@
+<?php
+/**
+ * @var $block \Magento\Checkout\Block\Onepage\Failure
+ */
+?>
+<div class="max-w-md mx-auto my-12 p-8 bg-white border border-gray-200 shadow-md rounded-lg text-center space-y-6">
+    <!-- Failure Red Cross/Exclamation SVG -->
+    <div class="mx-auto w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center animate-pulse">
+        <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+        </svg>
+    </div>
+
+    <!-- Title and Info -->
+    <div class="space-y-3">
+        <h1 class="text-3xl font-extrabold text-gray-900 tracking-tight"><?= $block->escapeHtml(__('Payment Failed')) ?></h1>
+        <p class="text-sm text-gray-500 leading-relaxed">
+            <?= $block->escapeHtml(__('Something went wrong while processing your payment. Please try again.')) ?>
+        </p>
+
+        <?php if ($block->getErrorMessage()): ?>
+            <div class="mt-4 p-4 bg-red-50 border border-red-100 rounded-md text-sm text-red-700 text-left">
+                <span class="font-semibold block mb-1"><?= $block->escapeHtml(__('Reason:')) ?></span>
+                <?= $block->escapeHtml($block->getErrorMessage()) ?>
+            </div>
+        <?php endif; ?>
+
+        <?php if ($block->getRealOrderId()): ?>
+            <p class="text-xs text-gray-400">
+                <?= $block->escapeHtml(__('Order:')) ?> <span class="font-mono font-semibold">#<?= $block->escapeHtml($block->getRealOrderId()) ?></span>
+            </p>
+        <?php endif; ?>
+
+        <div class="mt-2 p-3 bg-blue-50 border border-blue-100 rounded-md text-xs text-blue-700">
+            <?= $block->escapeHtml(__('Good news: We have restored your cart items so you can retry checkout without adding products again.')) ?>
+        </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="pt-2 flex flex-col gap-3">
+        <a href="<?= $block->escapeUrl($block->getUrl('checkout')) ?>"
+           class="btn btn-primary w-full"
+           title="<?= $block->escapeHtmlAttr(__('Retry Checkout')) ?>">
+            <?= $block->escapeHtml(__('Retry Checkout')) ?>
+        </a>
+        <a href="<?= $block->escapeUrl($block->getUrl('checkout/cart')) ?>"
+           class="btn btn-secondary w-full"
+           title="<?= $block->escapeHtmlAttr(__('Back to Cart')) ?>">
+            <?= $block->escapeHtml(__('Back to Cart')) ?>
+        </a>
+    </div>
+</div>
