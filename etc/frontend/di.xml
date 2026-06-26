@@ -30,6 +30,10 @@
         <plugin name="fastcheckout_checkout_failure"
                 type="Kkkonrad\Fastcheckout\Plugin\Checkout\Controller\Onepage\Failure"/>
     </type>
+    <type name="Magento\Checkout\Controller\Onepage\Success">
+        <plugin name="fastcheckout_checkout_success"
+                type="Kkkonrad\Fastcheckout\Plugin\Checkout\Controller\Onepage\Success"/>
+    </type>
     <type name="Magento\Checkout\Model\DefaultConfigProvider">
         <plugin name="fastcheckout_get_checkout_url_dcp"
                 type="Kkkonrad\Fastcheckout\Plugin\Checkout\DefaultConfigProvider"/>
