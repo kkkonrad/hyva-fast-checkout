@@ -32,6 +32,7 @@ $block->ensureRequireJsAssets();
 
 <div id="iwd-opc-ko-payment-root"
      class="iwd-opc-ko-payment-root mt-4"
+     style="display: none !important;"
      wire:ignore
      data-bind="scope: 'iwdOpcHyvaPaymentRenderers'">
     <!-- ko foreach: getRegion('payment-methods-list') -->

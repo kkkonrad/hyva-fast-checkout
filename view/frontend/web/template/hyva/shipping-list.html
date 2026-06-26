@@ -1,0 +1,31 @@
+<div class="grid gap-3">
+    <!-- ko foreach: { data: rates(), as: 'method' } -->
+        <div class="border rounded p-4 transition-all duration-200"
+             data-bind="css: $parent.selectedMethodCode() === (method.carrier_code + '_' + method.method_code) ? 'border-blue-500 bg-blue-50/10 shadow-sm ring-1 ring-blue-500' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50/50'">
+            <label class="flex items-center justify-between cursor-pointer mb-0 w-full">
+                <div class="flex items-center min-w-0">
+                    <input type="radio" 
+                           class="form-radio h-4 w-4 text-blue-600 focus:ring-blue-500 mr-4 shrink-0" 
+                           name="shipping_method" 
+                           data-bind="checked: $parent.selectedMethodCode, value: method.carrier_code + '_' + method.method_code" />
+                    <div class="min-w-0 pl-4">
+                        <span class="block text-sm font-semibold text-gray-900 leading-tight"
+                              data-bind="text: method.method_title">
+                        </span>
+                        <span class="block text-xs text-gray-500 mt-1"
+                              data-bind="text: method.carrier_title">
+                        </span>
+                    </div>
+                </div>
+                <div class="text-sm font-bold text-gray-900 shrink-0 pl-3"
+                     data-bind="text: $parent.formatPrice(method.amount)">
+                </div>
+            </label>
+        </div>
+    <!-- /ko -->
+    
+    <!-- ko ifnot: rates().length -->
+        <p class="text-sm text-gray-500" data-bind="i18n: 'Please enter your shipping address details to estimate shipping rates.'">
+        </p>
+    <!-- /ko -->
+</div>

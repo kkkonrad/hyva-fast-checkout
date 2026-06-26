@@ -40,7 +40,9 @@ define([
             'Magento_Checkout/js/model/quote',
             'Magento_Checkout/js/action/select-payment-method',
             'uiRegistry',
-            'Magento_Customer/js/customer-data'
+            'Magento_Customer/js/customer-data',
+            'Magento_Checkout/js/model/shipping-service',
+            'Magento_Checkout/js/model/shipping-rate-service'
         ], function (
             app,
             paymentService,
@@ -49,7 +51,8 @@ define([
             quote,
             selectPaymentMethodAction,
             registry,
-            customerData
+            customerData,
+            shippingService
         ) {
             function loadRendererComponents(done) {
                 var remaining = rendererComponents.length;
@@ -143,6 +146,146 @@ define([
                                     displayArea: 'payment-methods-list'
                                 }
                             }
+                        },
+                        'iwdOpcHyvaShippingRenderers': {
+                            component: 'uiComponent',
+                            children: {
+                                shippingList: {
+                                    component: 'IWD_Opc/js/hyva/shipping-list',
+                                    displayArea: 'shipping-methods-list'
+                                }
+                            }
+                        }
+                    }
+                });
+
+                function getProperty(wire, name) {
+                    if (!wire) return '';
+                    if (typeof wire[name] !== 'undefined') {
+                        return wire[name];
+                    }
+                    if (typeof wire.get === 'function') {
+                        return wire.get(name);
+                    }
+                    if (wire.data && typeof wire.data[name] !== 'undefined') {
+                        return wire.data[name];
+                    }
+                    return '';
+                }
+
+                function syncAddressToKnockout(magewire) {
+                    if (!magewire) return;
+
+                    var street = [];
+                    var street1 = getProperty(magewire, 'street1');
+                    var street2 = getProperty(magewire, 'street2');
+                    if (street1) street.push(street1);
+                    if (street2) street.push(street2);
+
+                    var addressData = {
+                        firstname: getProperty(magewire, 'firstname'),
+                        lastname: getProperty(magewire, 'lastname'),
+                        company: getProperty(magewire, 'company'),
+                        street: street,
+                        city: getProperty(magewire, 'city'),
+                        postcode: getProperty(magewire, 'postcode'),
+                        countryId: getProperty(magewire, 'countryId'),
+                        regionId: getProperty(magewire, 'regionId') ? parseInt(getProperty(magewire, 'regionId'), 10) : '',
+                        region: getProperty(magewire, 'region'),
+                        telephone: getProperty(magewire, 'telephone'),
+                        saveInAddressBook: 0
+                    };
+
+                    require([
+                        'Magento_Checkout/js/action/select-shipping-address',
+                        'Magento_Checkout/js/model/address-converter'
+                    ], function (selectShippingAddress, addressConverter) {
+                        var newAddress = addressConverter.formAddressDataToQuoteAddress(addressData);
+                        var currentAddress = quote.shippingAddress();
+                        
+                        if (currentAddress &&
+                            currentAddress.countryId === newAddress.countryId &&
+                            currentAddress.postcode === newAddress.postcode &&
+                            currentAddress.city === newAddress.city &&
+                            JSON.stringify(currentAddress.street) === JSON.stringify(newAddress.street) &&
+                            currentAddress.regionId == newAddress.regionId &&
+                            currentAddress.region === newAddress.region &&
+                            currentAddress.firstname === newAddress.firstname &&
+                            currentAddress.lastname === newAddress.lastname &&
+                            currentAddress.telephone === newAddress.telephone
+                        ) {
+                            return;
+                        }
+
+                        if (window.console && typeof window.console.log === 'function') {
+                            window.console.log('IWD OPC: syncAddressToKnockout updating quote shippingAddress:', addressData);
+                        }
+                        selectShippingAddress(newAddress);
+                    });
+                }
+
+                function syncSelectedShippingMethodToKnockout(methodCode) {
+                    if (!methodCode) {
+                        quote.shippingMethod(null);
+                        return;
+                    }
+                    require([
+                        'Magento_Checkout/js/action/select-shipping-method'
+                    ], function (selectShippingMethod) {
+                        var rates = shippingService.getShippingRates()();
+                        var found = rates.filter(function (rate) {
+                            return (rate.carrier_code + '_' + rate.method_code) === methodCode;
+                        })[0];
+                        if (found) {
+                            var active = quote.shippingMethod();
+                            if (!active || active.carrier_code !== found.carrier_code || active.method_code !== found.method_code) {
+                                if (window.console && typeof window.console.log === 'function') {
+                                    window.console.log('IWD OPC: syncSelectedShippingMethodToKnockout setting active:', methodCode);
+                                }
+                                selectShippingMethod(found);
+                            }
+                        }
+                    });
+                }
+
+                window.iwdOpcHyvaShipping = {
+                    syncAddress: syncAddressToKnockout,
+                    syncShippingMethod: syncSelectedShippingMethodToKnockout
+                };
+
+                // Initial sync once Knockout is ready
+                var magewireEl = document.querySelector('[wire\\:id]');
+                if (magewireEl && magewireEl.__livewire) {
+                    var wire = magewireEl.__livewire;
+                    syncAddressToKnockout(wire);
+                    var initMethod = wire.shippingMethod || getProperty(wire, 'shippingMethod');
+                    if (initMethod) {
+                        syncSelectedShippingMethodToKnockout(initMethod);
+                    }
+                }
+
+                quote.shippingMethod.subscribe(function (method) {
+                    if (!method) return;
+                    var methodCode = method.carrier_code + '_' + method.method_code;
+                    
+                    var magewireEl = document.querySelector('[wire\\:id]');
+                    if (magewireEl && magewireEl.__livewire) {
+                        var wire = magewireEl.__livewire;
+                        if (wire.shippingMethod !== methodCode) {
+                            if (window.console && typeof window.console.log === 'function') {
+                                window.console.log('IWD OPC: quote.shippingMethod changed in KO, syncing to Magewire:', methodCode);
+                            }
+                            wire.call('selectShippingMethod', methodCode);
+                        }
+                    }
+                });
+
+                shippingService.getShippingRates().subscribe(function () {
+                    var magewireEl = document.querySelector('[wire\\:id]');
+                    if (magewireEl && magewireEl.__livewire) {
+                        var wire = magewireEl.__livewire;
+                        if (wire.shippingMethod) {
+                            syncSelectedShippingMethodToKnockout(wire.shippingMethod);
                         }
                     }
                 });
@@ -562,6 +705,16 @@ define([
                         syncPaymentMethods();
                         patchRenderers();
                         setSelectedMethod(code);
+
+                        var magewireEl = document.querySelector('[wire\\:id]');
+                        if (magewireEl && magewireEl.__livewire) {
+                            var wire = magewireEl.__livewire;
+                            syncAddressToKnockout(wire);
+                            var currentMethod = wire.shippingMethod || getProperty(wire, 'shippingMethod');
+                            if (currentMethod) {
+                                syncSelectedShippingMethodToKnockout(currentMethod);
+                            }
+                        }
                     });
                 }
 

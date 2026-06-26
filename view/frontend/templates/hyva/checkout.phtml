@@ -245,43 +245,14 @@ $paymentMethods = $magewire->getPaymentMethods();
                     </div>
                 </div>
 
-                <?php if (empty($shippingMethods)): ?>
-                    <p class="text-sm text-gray-500">
-                        <?= $escaper->escapeHtml(__('Please enter your shipping address details to estimate shipping rates.')) ?>
-                    </p>
-                <?php else: ?>
-                    <div class="grid gap-3">
-                        <?php foreach ($shippingMethods as $carrierCode => $rates): ?>
-                            <?php foreach ($rates as $rate): ?>
-                                <?php $isSelected = ($magewire->shippingMethod === $rate->getCode()); ?>
-                                <div class="border rounded p-4 transition-all duration-200 <?= $isSelected ? 'border-blue-500 bg-blue-50/10 shadow-sm ring-1 ring-blue-500' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50/50' ?>">
-                                    <label class="flex items-center justify-between cursor-pointer mb-0 w-full"
-                                           wire:click="selectShippingMethod('<?= $escaper->escapeHtmlAttr($rate->getCode()) ?>')">
-                                        <div class="flex items-center min-w-0">
-                                            <input type="radio" 
-                                                   class="form-radio h-4 w-4 text-blue-600 focus:ring-blue-500 mr-4 shrink-0" 
-                                                   name="shipping_method" 
-                                                   value="<?= $escaper->escapeHtmlAttr($rate->getCode()) ?>" 
-                                                   <?= $isSelected ? 'checked' : '' ?> 
-                                                   required/>
-                                            <div class="min-w-0">
-                                                <span class="block text-sm font-semibold text-gray-900 leading-tight">
-                                                    <?= $escaper->escapeHtml($rate->getMethodTitle()) ?>
-                                                </span>
-                                                <span class="block text-xs text-gray-500 mt-1">
-                                                    <?= $escaper->escapeHtml($rate->getCarrierTitle()) ?>
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <div class="text-sm font-bold text-gray-900 shrink-0 pl-3">
-                                            <?= /* @noEscape */ $block->formatPrice($rate->getPrice()) ?>
-                                        </div>
-                                    </label>
-                                </div>
-                            <?php endforeach; ?>
-                        <?php endforeach; ?>
-                    </div>
-                <?php endif; ?>
+                <div id="iwd-opc-ko-shipping-root"
+                     class="iwd-opc-ko-shipping-root"
+                     wire:ignore
+                     data-bind="scope: 'iwdOpcHyvaShippingRenderers'">
+                    <!-- ko foreach: getRegion('shipping-methods-list') -->
+                        <!-- ko template: getTemplate() --><!-- /ko -->
+                    <!-- /ko -->
+                </div>
             </div>
         </div>
 
@@ -658,6 +629,17 @@ $paymentMethods = $magewire->getPaymentMethods();
 function initOpcCheckout() {
     return {
         _debounceTimers: {},
+
+        init() {
+            this.$nextTick(() => {
+                if (window.iwdOpcHyvaShipping && typeof window.iwdOpcHyvaShipping.syncAddress === 'function') {
+                    window.iwdOpcHyvaShipping.syncAddress(this.$wire);
+                    if (this.$wire.shippingMethod) {
+                        window.iwdOpcHyvaShipping.syncShippingMethod(this.$wire.shippingMethod);
+                    }
+                }
+            });
+        },
 
         /**
          * Debounced field save — called from @input.
