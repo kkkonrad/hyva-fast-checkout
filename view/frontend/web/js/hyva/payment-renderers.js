@@ -750,6 +750,48 @@ define([
                         return true;
                     },
 
+                    afterPlaceOrder: function () {
+                        var component = getActiveRenderer();
+                        if (window.console && typeof window.console.log === 'function') {
+                            window.console.log('Kkkonrad OPC: afterPlaceOrder triggered for component:', component);
+                        }
+
+                        if (component) {
+                            // Check if the component has custom post-place order data (like PayU)
+                            if (component.postPlaceOrderData) {
+                                require(['mage/url', 'jquery'], function (url, $) {
+                                    $.getJSON(url.build(component.postPlaceOrderData), function (response) {
+                                        if (response.success && response.redirectUri) {
+                                            window.location.replace(response.redirectUri);
+                                        } else {
+                                            window.location.replace(url.build('checkout/onepage/success'));
+                                        }
+                                    }).fail(function () {
+                                        window.location.replace(url.build('checkout/onepage/success'));
+                                    });
+                                });
+                                return;
+                            }
+
+                            // If the component overrides standard afterPlaceOrder (like Tpay)
+                            if (typeof component.afterPlaceOrder === 'function' && component.redirectAfterPlaceOrder === false) {
+                                try {
+                                    component.afterPlaceOrder();
+                                    return;
+                                } catch (e) {
+                                    if (window.console && typeof window.console.error === 'function') {
+                                        window.console.error('Kkkonrad OPC: error executing afterPlaceOrder:', e);
+                                    }
+                                }
+                            }
+                        }
+
+                        // Default success redirect
+                        require(['mage/url'], function (url) {
+                            window.location.replace(url.build('checkout/onepage/success'));
+                        });
+                    },
+
                     selectPaymentMethod: setSelectedMethod
                 };
 

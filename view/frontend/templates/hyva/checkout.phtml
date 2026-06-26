@@ -929,7 +929,16 @@ window.addEventListener('alpine:init', () => Alpine.data('initOpcCheckout', init
         setTimeout(function () {
             const wire = getWire();
             if (wire) restore(wire);
-            window.addEventListener('magewire:order-placed', clearStorage);
+            window.addEventListener('magewire:order-placed', function (event) {
+                clearStorage();
+                if (window.iwdOpcHyvaPayment && typeof window.iwdOpcHyvaPayment.afterPlaceOrder === 'function') {
+                    window.iwdOpcHyvaPayment.afterPlaceOrder();
+                } else {
+                    require(['mage/url'], function (url) {
+                        window.location.replace(url.build('checkout/onepage/success'));
+                    });
+                }
+            });
             if (window.location.href.includes('/checkout/onepage/success')) {
                 clearStorage();
             }

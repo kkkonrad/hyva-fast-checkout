@@ -17,23 +17,6 @@ use Magewirephp\Magewire\Component;
 class Checkout extends Component
 {
     private const GENERIC_PAYMENT_METHOD_PREFIX = 'generic-';
-    private const REDIRECT_ADDITIONAL_INFORMATION_KEYS = [
-        'redirect_url',
-        'redirect_uri',
-        'redirectUrl',
-        'redirectUri',
-        'transaction_url',
-        'transactionUrl',
-        'payu_redirect_uri',
-        'order_place_redirect_url',
-        'checkout_redirect_url'
-    ];
-    private const REDIRECT_METHODS = [
-        'getOrderPlaceRedirectUrl',
-        'getCheckoutRedirectUrl',
-        'getPaymentRedirectUrl',
-        'getRedirectUrl'
-    ];
 
     /**
      * Shipping address fields
@@ -838,13 +821,11 @@ class Checkout extends Component
 
             $this->checkoutSession->clearHelperData();
 
-            $redirectUrl = '';
             try {
                 if ($this->orderFactory !== null) {
                     $order = $this->orderFactory->create()->load($orderId);
                     $this->checkoutSession->setLastRealOrderId($order->getIncrementId());
                     $this->checkoutSession->setLastOrderStatus($order->getStatus());
-                    $redirectUrl = $this->resolvePaymentRedirectUrl($order);
                 }
                 $this->checkoutSession->setLastQuoteId($quoteId);
                 $this->checkoutSession->setLastSuccessQuoteId($quoteId);
@@ -856,7 +837,10 @@ class Checkout extends Component
                     // Ignore
                 }
             }
-            $this->redirect($redirectUrl ?: 'checkout/onepage/success');
+            $this->dispatchBrowserEvent('magewire:order-placed', [
+                'method' => $this->paymentMethod,
+                'orderId' => $orderId
+            ]);
         } catch (\Exception $e) {
             $this->orderError = $e->getMessage();
         }
@@ -1102,94 +1086,4 @@ class Checkout extends Component
         ];
     }
 
-    private function resolvePaymentRedirectUrl($order): string
-    {
-        if (!$order || !method_exists($order, 'getPayment')) {
-            return '';
-        }
-
-        $payment = $order->getPayment();
-        if (!$payment) {
-            return '';
-        }
-
-        $redirectUrl = $this->getRedirectUrlFromAdditionalInformation($payment);
-        if ($redirectUrl !== '') {
-            return $redirectUrl;
-        }
-
-        foreach (self::REDIRECT_METHODS as $method) {
-            if (method_exists($payment, $method)) {
-                $redirectUrl = (string)$payment->{$method}();
-                if ($redirectUrl !== '') {
-                    return $redirectUrl;
-                }
-            }
-        }
-
-        if (method_exists($payment, 'getMethodInstance')) {
-            try {
-                $methodInstance = $payment->getMethodInstance();
-                foreach (self::REDIRECT_METHODS as $method) {
-                    if (method_exists($methodInstance, $method)) {
-                        $redirectUrl = (string)$methodInstance->{$method}();
-                        if ($redirectUrl !== '') {
-                            return $redirectUrl;
-                        }
-                    }
-                }
-            } catch (\Exception $e) {
-                return '';
-            }
-        }
-
-        return '';
-    }
-
-    private function getRedirectUrlFromAdditionalInformation($payment): string
-    {
-        if (!method_exists($payment, 'getAdditionalInformation')) {
-            return '';
-        }
-
-        foreach (self::REDIRECT_ADDITIONAL_INFORMATION_KEYS as $key) {
-            $value = $payment->getAdditionalInformation($key);
-            if (is_string($value) && $value !== '') {
-                return $value;
-            }
-        }
-
-        // Fallback heuristic for any new/unknown payment modules
-        $info = $payment->getAdditionalInformation();
-        if (is_array($info)) {
-            foreach ($info as $key => $value) {
-                if (is_string($value) && (strpos($value, 'http://') === 0 || strpos($value, 'https://') === 0)) {
-                    $lowerKey = strtolower($key);
-                    $hasKeyword = false;
-                    foreach (['url', 'uri', 'link', 'redirect', 'href', 'pay', 'transaction'] as $kw) {
-                        if (strpos($lowerKey, $kw) !== false) {
-                            $hasKeyword = true;
-                            break;
-                        }
-                    }
-                    if ($hasKeyword) {
-                        // Exclude image URLs
-                        $lowerVal = strtolower($value);
-                        $isImage = false;
-                        foreach (['.png', '.jpg', '.jpeg', '.gif', '.svg'] as $ext) {
-                            if (substr($lowerVal, -strlen($ext)) === $ext) {
-                                $isImage = true;
-                                break;
-                            }
-                        }
-                        if (!$isImage) {
-                            return $value;
-                        }
-                    }
-                }
-            }
-        }
-
-        return '';
-    }
 }
