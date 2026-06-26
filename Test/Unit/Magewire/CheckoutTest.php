@@ -488,6 +488,47 @@ class CheckoutTest extends TestCase
         }, $methods));
     }
 
+    public function testGetPaymentMethodsFiltersMethodsByShippingMapping(): void
+    {
+        $this->quoteMock->expects($this->any())
+            ->method('getId')
+            ->willReturn(42);
+
+        $shippingAddressMock = $this->createAddressMock();
+        $shippingAddressMock->expects($this->any())
+            ->method('getShippingMethod')
+            ->willReturn('flatrate_flatrate');
+
+        $this->quoteMock->expects($this->any())
+            ->method('getShippingAddress')
+            ->willReturn($shippingAddressMock);
+
+        $this->paymentMethodManagementMock->expects($this->once())
+            ->method('getList')
+            ->with(42)
+            ->willReturn([
+                $this->createPaymentMethodMock('checkmo'),
+                $this->createPaymentMethodMock('cashondelivery'),
+                $this->createPaymentMethodMock('payu_gateway'),
+            ]);
+
+        $mapping = [
+            '_1' => ['shipping_method' => 'flatrate_flatrate', 'payment_method' => 'cashondelivery'],
+            '_2' => ['shipping_method' => 'flatrate_flatrate', 'payment_method' => 'payu_gateway'],
+            '_3' => ['shipping_method' => 'tablerate_bestway', 'payment_method' => 'checkmo'],
+        ];
+
+        $this->opcHelperMock->expects($this->once())
+            ->method('getShippingPaymentMapping')
+            ->willReturn($mapping);
+
+        $methods = $this->checkoutComponent->getPaymentMethods();
+
+        $this->assertSame(['cashondelivery', 'payu_gateway'], array_map(static function (PaymentMethodInterface $method): string {
+            return $method->getCode();
+        }, $methods));
+    }
+
     public function testApplyCoupon(): void
     {
         $this->checkoutComponent->couponCode = 'SALE10';

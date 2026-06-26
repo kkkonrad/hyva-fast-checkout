@@ -531,14 +531,39 @@ class Checkout extends Component
         }
     }
 
-    /**
-     * Get available payment methods
-     */
     public function getPaymentMethods(): array
     {
         $quote = $this->checkoutSession->getQuote();
         try {
-            return $this->paymentMethodManagement->getList($quote->getId());
+            $methods = $this->paymentMethodManagement->getList($quote->getId());
+            
+            $shippingAddress = $quote->getShippingAddress();
+            $shippingMethod = $shippingAddress ? $shippingAddress->getShippingMethod() : null;
+            if (!$shippingMethod) {
+                $shippingMethod = $this->shippingMethod;
+            }
+
+            if ($shippingMethod) {
+                $mapping = $this->opcHelper->getShippingPaymentMapping();
+                if (!empty($mapping)) {
+                    $mappedPayments = [];
+                    foreach ($mapping as $rule) {
+                        if (isset($rule['shipping_method']) && $rule['shipping_method'] === $shippingMethod) {
+                            if (isset($rule['payment_method'])) {
+                                $mappedPayments[] = $rule['payment_method'];
+                            }
+                        }
+                    }
+                    if (!empty($mappedPayments)) {
+                        $methods = array_filter($methods, function ($method) use ($mappedPayments) {
+                            return in_array($method->getCode(), $mappedPayments);
+                        });
+                        $methods = array_values($methods);
+                    }
+                }
+            }
+
+            return $methods;
         } catch (\Exception $e) {
             return [];
         }

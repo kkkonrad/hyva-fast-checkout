@@ -422,9 +422,7 @@ $paymentMethods = $magewire->getPaymentMethods();
                         <?= $escaper->escapeHtml(__('No payment methods available.')) ?>
                     </p>
                 <?php else: ?>
-                    <?php /* wire:ignore — payment section is stable client-side; selection is passed
-                             directly to placeOrder() so no Magewire request fires on radio change. */ ?>
-                    <div class="grid gap-3" wire:ignore>
+                    <div class="grid gap-3">
                         <?php foreach ($paymentMethods as $method): ?>
                             <div class="border border-gray-200 rounded transition-colors"
                                  data-iwd-opc-payment-option="<?= $escaper->escapeHtmlAttr($method->getCode()) ?>">

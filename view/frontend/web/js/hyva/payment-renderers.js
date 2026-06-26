@@ -190,7 +190,7 @@ define([
                         city: getProperty(magewire, 'city'),
                         postcode: getProperty(magewire, 'postcode'),
                         countryId: getProperty(magewire, 'countryId'),
-                        regionId: getProperty(magewire, 'regionId') ? parseInt(getProperty(magewire, 'regionId'), 10) : '',
+                        regionId: (getProperty(magewire, 'regionId') && parseInt(getProperty(magewire, 'regionId'), 10) > 0) ? parseInt(getProperty(magewire, 'regionId'), 10) : null,
                         region: getProperty(magewire, 'region'),
                         telephone: getProperty(magewire, 'telephone'),
                         saveInAddressBook: 0
