@@ -170,9 +170,7 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                     <label class="block">
                         <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Country')) ?> *</span>
                         <select class="form-select mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                wire:model.defer="countryId"
-                                data-wire-field="countryId"
-                                @change="onSelectChange" autocomplete="country" required>
+                                wire:model.blur="countryId" @change="onSelectChange" autocomplete="country" required>
                             <?php foreach ($countries as $country): ?>
                                 <option value="<?= $escaper->escapeHtmlAttr($country['value']) ?>">
                                     <?= $escaper->escapeHtml($country['label']) ?>
@@ -186,10 +184,7 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                         <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('State/Province')) ?><?= $isRegionRequired ? ' *' : '' ?></span>
                         <?php $regions = $magewire->getRegions(); ?>
                         <?php if ($regions): ?>
-                            <select name="region_id" class="form-select mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                    wire:model.defer="regionId"
-                                    data-wire-field="regionId"
-                                    @change="onSelectChange" autocomplete="address-level1" <?= $isRegionRequired ? 'required' : '' ?>>
+                            <select name="region_id" class="form-select mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" wire:model.blur="regionId" autocomplete="address-level1" <?= $isRegionRequired ? 'required' : '' ?>>
                                 <?php foreach ($regions as $regionOption): ?>
                                     <option value="<?= $escaper->escapeHtmlAttr($regionOption['value']) ?>">
                                         <?= $escaper->escapeHtml($regionOption['label']) ?>
@@ -345,8 +340,7 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                             <label class="block">
                                 <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Country')) ?> *</span>
                                 <select class="form-select mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                        wire:model.defer="billingCountryId"
-                                        data-wire-field="billingCountryId"
+                                        wire:model.blur="billingCountryId"
                                         @change="onSelectChange" autocomplete="country"
                                         required>
                                     <?php foreach ($countries as $country): ?>
@@ -364,8 +358,7 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                                 <?php if ($billingRegions): ?>
                                     <select name="billing_region_id"
                                             class="form-select mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                            wire:model.defer="billingRegionId"
-                                            data-wire-field="billingRegionId"
+                                            wire:model.blur="billingRegionId"
                                             @change="onSelectChange" autocomplete="address-level1"
                                             <?= $isBillingRegionRequired ? 'required' : '' ?>>
                                         <?php foreach ($billingRegions as $regionOption): ?>
@@ -641,9 +634,9 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                 <div class="pt-2">
                     <button class="btn btn-primary w-full py-3 flex items-center justify-center gap-2" 
                             type="submit" 
-                            wire:loading.attr="disabled"
-                            wire:loading.class="opacity-50 cursor-not-allowed pointer-events-none">
-                        <span wire:loading wire:target="placeOrder">
+                            :disabled="isProcessing"
+                            :class="isProcessing ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''">
+                        <span x-show="isProcessing" x-cloak>
                             <svg class="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -692,9 +685,9 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
             <button class="btn btn-primary w-full py-3 flex items-center justify-center gap-2" 
                     type="submit" 
                     form="co-checkout-form"
-                    wire:loading.attr="disabled"
-                    wire:loading.class="opacity-50 cursor-not-allowed pointer-events-none">
-                <span wire:loading wire:target="placeOrder">
+                    :disabled="isProcessing"
+                    :class="isProcessing ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''">
+                <span x-show="isProcessing" x-cloak>
                     <svg class="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -715,6 +708,8 @@ function initOpcCheckout() {
     return {
         _debounceTimers: {},
         _blurTimers: {},
+        isProcessing: false,
+        _processingTimer: null,
 
         init() {
             this.$nextTick(() => {
@@ -725,6 +720,19 @@ function initOpcCheckout() {
                     }
                 }
             });
+
+            if (window.Livewire && typeof window.Livewire.hook === 'function') {
+                window.Livewire.hook('message.sent', () => {
+                    clearTimeout(this._processingTimer);
+                    this.isProcessing = true;
+                });
+                window.Livewire.hook('message.processed', () => {
+                    clearTimeout(this._processingTimer);
+                    this._processingTimer = setTimeout(() => {
+                        this.isProcessing = false;
+                    }, 400); // 400ms delay to bridge successive calls (like country/region change -> estimate -> selectShippingMethod)
+                });
+            }
         },
 
         /**
@@ -806,15 +814,10 @@ function initOpcCheckout() {
         },
 
         /**
-         * Validate and save select on change.
+         * Validate select on change.
          */
         onSelectChange() {
-            const el = this.$el;
-            this._validateEl(el);
-            const field = el.dataset.wireField;
-            if (field) {
-                this.$wire.set(field, el.value);
-            }
+            this._validateEl(this.$el);
         },
 
         /**
