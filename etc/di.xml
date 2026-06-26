@@ -9,10 +9,10 @@
 
 
     <type name="Magento\Customer\Model\Address\AbstractAddress">
-        <plugin name="iwd_opc_customer_address" type="Kkkonrad\Fastcheckout\Plugin\Customer\Model\Address\AbstractAddress"/>
+        <plugin name="fastcheckout_customer_address" type="Kkkonrad\Fastcheckout\Plugin\Customer\Model\Address\AbstractAddress"/>
     </type>
     <type name="Magento\Payment\Model\InfoInterface">
-        <plugin name="iwd_opc_unset_extension_attributes" type="Kkkonrad\Fastcheckout\Plugin\Payments\Info"/>
+        <plugin name="fastcheckout_unset_extension_attributes" type="Kkkonrad\Fastcheckout\Plugin\Payments\Info"/>
     </type>
 
 </config>

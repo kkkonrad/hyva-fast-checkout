@@ -16,7 +16,7 @@ use Psr\Log\LoggerInterface;
 
 class RequireJsAssets
 {
-    public const XML_PATH_AUTO_GENERATE = 'iwd_opc/hyva/auto_generate_requirejs_assets';
+    public const XML_PATH_AUTO_GENERATE = 'fastcheckout/hyva/auto_generate_requirejs_assets';
 
     /**
      * @var ScopeConfigInterface

@@ -21,27 +21,23 @@ use Magento\Theme\Model\ThemeFactory;
 class Data extends AbstractHelper
 {
 
-    const XML_PATH_ENABLE = 'iwd_opc/general/enable';
+    const XML_PATH_ENABLE = 'fastcheckout/general/enable';
 
-    const XML_PATH_TITLE = 'iwd_opc/extended/title';
-    const XML_PATH_IWD_EXPERIENCE = 'iwd_opc/extended/use_iwd_checkout_experience';
-    const XML_PATH_DISCOUNT_VISIBILITY = 'iwd_opc/extended/show_discount';
-    const XML_PATH_COMMENT_VISIBILITY = 'iwd_opc/extended/show_comment';
-    const XML_PATH_GIFT_MESSAGE_VISIBILITY = 'iwd_opc/extended/show_gift_message';
-    const XML_PATH_SUBSCRIBE_VISIBILITY = 'iwd_opc/extended/show_subscribe';
-    const XML_PATH_SUBSCRIBE_BY_DEFAULT = 'iwd_opc/extended/subscribe_by_default';
-    const XML_PATH_RELOAD_SHIPPING_ON_DISCOUNT = 'iwd_opc/extended/reload_shipping_methods_on_discount';
-    const XML_PATH_DEFAULT_SHIPPING_METHOD = 'iwd_opc/extended/default_shipping_method';
-    const XML_PATH_DEFAULT_PAYMENT_METHOD = 'iwd_opc/extended/default_payment_method';
-    const XML_PATH_PAYMENT_TITLE_TYPE = 'iwd_opc/extended/payment_title_type';
-    const XML_PATH_DISPLAY_ALL_METHODS = 'iwd_opc/extended/show_all_ship_methods';
-    const XML_PATH_SHIPPING_PAYMENT_MAPPING = 'iwd_opc/extended/shipping_payment_mapping';
+    const XML_PATH_TITLE = 'fastcheckout/extended/title';
+    const XML_PATH_DISCOUNT_VISIBILITY = 'fastcheckout/extended/show_discount';
+    const XML_PATH_COMMENT_VISIBILITY = 'fastcheckout/extended/show_comment';
+    const XML_PATH_GIFT_MESSAGE_VISIBILITY = 'fastcheckout/extended/show_gift_message';
+    const XML_PATH_SUBSCRIBE_VISIBILITY = 'fastcheckout/extended/show_subscribe';
+    const XML_PATH_SUBSCRIBE_BY_DEFAULT = 'fastcheckout/extended/subscribe_by_default';
+    const XML_PATH_RELOAD_SHIPPING_ON_DISCOUNT = 'fastcheckout/extended/reload_shipping_methods_on_discount';
+    const XML_PATH_DEFAULT_SHIPPING_METHOD = 'fastcheckout/extended/default_shipping_method';
+    const XML_PATH_DEFAULT_PAYMENT_METHOD = 'fastcheckout/extended/default_payment_method';
+    const XML_PATH_PAYMENT_TITLE_TYPE = 'fastcheckout/extended/payment_title_type';
+    const XML_PATH_DISPLAY_ALL_METHODS = 'fastcheckout/extended/show_all_ship_methods';
+    const XML_PATH_SHIPPING_PAYMENT_MAPPING = 'fastcheckout/extended/shipping_payment_mapping';
 
-    const XML_PATH_RESTRICT_PAYMENT_ENABLE = 'iwd_opc/restrict_payment/enable';
-    const XML_PATH_RESTRICT_PAYMENT_METHODS = 'iwd_opc/restrict_payment/methods';
-
-    const XML_PATH_GM_AUTOCOMPLETE_ENABLE = 'iwd_opc/extended/gm_autocomplete';
-    const XML_PATH_GM_APIKEY = 'iwd_opc/extended/gm_apikey';
+    const XML_PATH_RESTRICT_PAYMENT_ENABLE = 'fastcheckout/restrict_payment/enable';
+    const XML_PATH_RESTRICT_PAYMENT_METHODS = 'fastcheckout/restrict_payment/methods';
 
     public $storeManager;
     public $session;
@@ -84,21 +80,6 @@ class Data extends AbstractHelper
     public function isEnable()
     {
         return (bool)$this->scopeConfig->getValue(self::XML_PATH_ENABLE, ScopeInterface::SCOPE_STORE);
-    }
-
-    public function isLoginAccountCreationEnabled()
-    {
-        return (bool)$this->scopeConfig->getValue(self::XML_PATH_IWD_EXPERIENCE, ScopeInterface::SCOPE_STORE);
-    }
-
-    public function isGmAutocompleteEnabled()
-    {
-        return $this->scopeConfig->getValue(self::XML_PATH_GM_AUTOCOMPLETE_ENABLE, ScopeInterface::SCOPE_STORE);
-    }
-
-    public function getGmApikey()
-    {
-        return $this->scopeConfig->getValue(self::XML_PATH_GM_APIKEY, ScopeInterface::SCOPE_STORE);
     }
 
     public function isCheckoutPage()

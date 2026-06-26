@@ -5,7 +5,7 @@
     <type name="Magento\Checkout\Model\CompositeConfigProvider">
         <arguments>
             <argument name="configProviders" xsi:type="array">
-                <item name="iwd_opc_extended_checkout_config"
+                <item name="fastcheckout_extended_checkout_config"
                       xsi:type="object">Kkkonrad\Fastcheckout\Model\ExtendedCheckoutConfigProvider</item>
             </argument>
         </arguments>
@@ -19,31 +19,31 @@
         </arguments>
     </type>
     <type name="Magento\Directory\Model\ResourceModel\Country\Collection">
-        <plugin name="iwd_opc_country_collection"
+        <plugin name="fastcheckout_country_collection"
                 type="Kkkonrad\Fastcheckout\Plugin\Country\Collection"/>
     </type>
     <type name="Magento\Checkout\Controller\Index\Index">
-        <plugin name="iwd_opc_checkout_controller"
+        <plugin name="fastcheckout_checkout_controller"
                 type="Kkkonrad\Fastcheckout\Plugin\Checkout\Controller\Index\Index"/>
     </type>
     <type name="Magento\Checkout\Model\DefaultConfigProvider">
-        <plugin name="iwd_opc_get_checkout_url_dcp"
+        <plugin name="fastcheckout_get_checkout_url_dcp"
                 type="Kkkonrad\Fastcheckout\Plugin\Checkout\DefaultConfigProvider"/>
     </type>
     <type name="Magento\Checkout\Block\Onepage\Link">
-        <plugin name="iwd_opc_get_checkout_url_onepage_link"
+        <plugin name="fastcheckout_get_checkout_url_onepage_link"
                 type="Kkkonrad\Fastcheckout\Plugin\Checkout\Block\Onepage\Link"/>
     </type>
     <type name="Magento\Checkout\Block\Cart\Sidebar">
-        <plugin name="iwd_opc_get_checkout_url_cart_sidebar"
+        <plugin name="fastcheckout_get_checkout_url_cart_sidebar"
                 type="Kkkonrad\Fastcheckout\Plugin\Checkout\Block\Cart\Sidebar"/>
     </type>
     <type name="Magento\Checkout\Block\Link">
-        <plugin name="iwd_opc_get_checkout_url_link"
+        <plugin name="fastcheckout_get_checkout_url_link"
                 type="Kkkonrad\Fastcheckout\Plugin\Checkout\Block\Link"/>
     </type>
     <type name="Magento\Checkout\Block\Cart">
-        <plugin name="iwd_opc_get_checkout_url_cart"
+        <plugin name="fastcheckout_get_checkout_url_cart"
                 type="Kkkonrad\Fastcheckout\Plugin\Checkout\Block\Cart"/>
     </type>
 

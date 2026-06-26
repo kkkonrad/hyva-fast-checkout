@@ -9,7 +9,6 @@ use Magento\Framework\Event\ObserverInterface;
 use Kkkonrad\Fastcheckout\Helper\Data as OpcHelper;
 use Magento\Customer\Model\CustomerFactory;
 use Psr\Log\LoggerInterface;
-use Magento\Newsletter\Model\Subscriber;
 use Magento\Sales\Api\OrderRepositoryInterface;
 use Magento\Sales\Model\Order;
 use Magento\Store\Model\StoreManagerInterface;
@@ -30,7 +29,6 @@ class QuoteSubmitSuccess implements ObserverInterface
     public $checkoutSession;
     public $historyFactory;
     public $logger;
-    public $subscriber;
     public $orderRepository;
     public $storeManager;
     public $objManager;
@@ -41,19 +39,9 @@ class QuoteSubmitSuccess implements ObserverInterface
     private $saveDownloadableOrderItemObserver;
 
     /**
-     * @var \Magento\Framework\Registry
-     */
-    protected $registry;
-
-    /**
      * @var CustomerSession
      */
     public $customerSession;
-
-    /**
-     * @var \Magento\Sales\Api\OrderCustomerManagementInterface
-     */
-    protected $orderCustomerService;
 
     public function __construct(
         OpcHelper $opcHelper,
@@ -61,14 +49,11 @@ class QuoteSubmitSuccess implements ObserverInterface
         CheckoutSession $checkoutSession,
         HistoryFactory $historyFactory,
         LoggerInterface $logger,
-        Subscriber $subscriber,
         OrderRepositoryInterface $orderRepository,
         StoreManagerInterface $storeManager,
         Encryptor $encryptor,
         PurchasedFactory $downloadLink,
         CustomerSession $customerSession,
-        \Magento\Framework\Registry $registry,
-        \Magento\Sales\Api\OrderCustomerManagementInterface $orderCustomerService,
         SaveDownloadableOrderItemObserver $saveDownloadableOrderItemObserver
     ) {
         $this->opcHelper = $opcHelper;
@@ -76,14 +61,11 @@ class QuoteSubmitSuccess implements ObserverInterface
         $this->checkoutSession = $checkoutSession;
         $this->historyFactory = $historyFactory;
         $this->logger = $logger;
-        $this->subscriber = $subscriber;
         $this->orderRepository = $orderRepository;
         $this->storeManager = $storeManager;
         $this->encryptor = $encryptor;
         $this->downloadLink = $downloadLink;
         $this->customerSession = $customerSession;
-        $this->registry = $registry;
-        $this->orderCustomerService = $orderCustomerService;
         $this->saveDownloadableOrderItemObserver = $saveDownloadableOrderItemObserver;
     }
 
@@ -113,20 +95,7 @@ class QuoteSubmitSuccess implements ObserverInterface
             $this->assignOrderToCustomer($order, $customer);
         }
 
-        if ($this->opcHelper->isEnable()) {
-            if ($this->opcHelper->isLoginAccountCreationEnabled()
-                && !$this->customerSession->isLoggedIn()
-                && !is_array($customerCandidate)
-                && !$customerCandidate->getId()) {
-                $this->createCustomerAccount($order);
-                /* Assign customer to first order */
-                $customer = $this->customerFactory->create()->setWebsiteId($order->getStore()->getWebsiteId())->loadByEmail($customerEmail);
-                $this->assignOrderToCustomer($order, $customer);
-            }
-        }
-
         $this->saveComment($order);
-        $this->saveSubscribe($order);
 
         /* Assign Downloadable product links to Customer Account */
         $items = $order->getAllItems();
@@ -152,38 +121,6 @@ class QuoteSubmitSuccess implements ObserverInterface
         }
 
         return $this;
-    }
-
-    /**
-     * @param $order
-     * @return \Magento\Customer\Api\Data\CustomerInterface
-     * @throws \Magento\Framework\Exception\AlreadyExistsException
-     */
-    private function createCustomerAccount($order)
-    {
-        $this->registry->register('isIWDcreateAccount', true);
-        $this->customerSession->setIsIWDcreateAccount(true);
-
-        $account = $this->orderCustomerService->create($order->getId());
-        return $account;
-    }
-
-
-    /**
-     * @param Order $order
-     */
-    private function saveSubscribe(Order $order)
-    {
-        if ($this->opcHelper->isShowSubscribe()) {
-            $subscribe = $this->checkoutSession->getIwdOpcSubscribe();
-            if ($subscribe) {
-                try {
-                    $this->subscriber->subscribe($order->getCustomerEmail());
-                } catch (\Exception $e) {
-                    $this->logger->error($e->getMessage());
-                }
-            }
-        }
     }
 
     /**

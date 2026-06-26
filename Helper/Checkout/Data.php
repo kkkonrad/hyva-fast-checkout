@@ -10,8 +10,6 @@ namespace Kkkonrad\Fastcheckout\Helper\Checkout;
 class Data extends \Magento\Checkout\Helper\Data
 {
 
-    const XML_PATH_IWD_EXPERIENCE = 'iwd_opc/extended/use_iwd_checkout_experience';
-
     /**
      * Get onepage checkout availability
      *
@@ -25,14 +23,6 @@ class Data extends \Magento\Checkout\Helper\Data
         );
     }
     
-    /**
-     * Check is allowed Guest Checkout
-     * Use config settings and observer
-     *
-     * @param \Magento\Quote\Model\Quote $quote
-     * @param int|Store $store
-     * @return bool
-     */
     public function isAllowedGuestCheckout(\Magento\Quote\Model\Quote $quote, $store = null)
     {
         if ($store === null) {
@@ -43,15 +33,9 @@ class Data extends \Magento\Checkout\Helper\Data
             \Magento\Store\Model\ScopeInterface::SCOPE_STORE,
             $store
         );
-        $iwdExperience = $this->scopeConfig->isSetFlag(
-            self::XML_PATH_IWD_EXPERIENCE
-        );
     
-        if ($iwdExperience) {
-            $guestCheckout = true;
-        }
         if ($guestCheckout) {
-            $result = \Magento\Framework\App\ObjectManager::getInstance()->get(\Magento\Framework\DataObject::class);
+            $result = new \Magento\Framework\DataObject();
             $result->setIsAllowed($guestCheckout);
             $this->_eventManager->dispatch(
                 'checkout_allow_guest',
