@@ -133,4 +133,14 @@ class CheckoutTest extends TestCase
 
         $this->assertEquals('$100.00', $this->checkoutBlock->formatPrice(100));
     }
+
+    public function testGetCheckoutLayoutAssetsReturnsEmptyWhenDepsNull(): void
+    {
+        $this->assertEquals(['css' => [], 'scripts' => []], $this->checkoutBlock->getCheckoutLayoutAssets());
+    }
+
+    public function testGetCheckoutLayoutScriptsReturnsEmptyWhenDepsNull(): void
+    {
+        $this->assertEquals(['modules' => [], 'external' => []], $this->checkoutBlock->getCheckoutLayoutScripts());
+    }
 }

@@ -15,6 +15,7 @@ define([
 
         rates: shippingService.getShippingRates(),
         isLoading: shippingService.isLoading,
+        errorValidationMessage: ko.observable(false),
 
         initialize: function () {
             this._super();
@@ -67,6 +68,7 @@ define([
         selectShippingMethod: function (method) {
             if (method) {
                 this.selectedMethodCode(method.carrier_code + '_' + method.method_code);
+                this.errorValidationMessage(false);
             }
             return true;
         },

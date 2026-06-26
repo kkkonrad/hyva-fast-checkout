@@ -12,13 +12,17 @@ if (!is_array($paymentMethods) || $paymentMethods === []) {
     $paymentMethods = $checkoutConfig['paymentMethods'] ?? [];
 }
 $rendererComponents = $block->getPaymentRendererComponents();
-if (empty($rendererComponents)) {
+$layoutScripts = $block->getCheckoutLayoutScripts();
+
+if (empty($rendererComponents) && empty($layoutScripts['modules']) && empty($layoutScripts['external'])) {
     return;
 }
+
 $mageInitConfig = [
     'checkoutConfig' => $checkoutConfig,
     'paymentMethods' => $paymentMethods,
     'rendererComponents' => $rendererComponents,
+    'layoutScripts' => $layoutScripts['modules'] ?? [],
     'scope' => 'iwdOpcHyvaPaymentRenderers'
 ];
 $block->ensureRequireJsAssets();
@@ -33,6 +37,17 @@ $block->ensureRequireJsAssets();
         display: none !important;
     }
 </style>
+
+<?php
+$layoutAssets = $block->getCheckoutLayoutAssets();
+foreach ($layoutAssets['css'] as $cssAsset) {
+    $url = ($cssAsset['src_type'] === 'url') ? $cssAsset['src'] : $block->getViewFileUrl($cssAsset['src']);
+    echo '<link rel="stylesheet" type="text/css" href="' . $escaper->escapeUrl($url) . '" />';
+}
+foreach ($layoutScripts['external'] as $externalScript) {
+    echo '<script src="' . $escaper->escapeUrl($externalScript) . '"></script>';
+}
+?>
 
 <div id="iwd-opc-ko-payment-root"
      class="iwd-opc-ko-payment-root mt-4"

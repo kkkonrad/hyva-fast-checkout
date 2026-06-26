@@ -839,6 +839,16 @@ function initOpcCheckout() {
          */
         handleSubmit() {
             if (this._validateAll()) {
+                // Invoke shipping method validation first if available
+                if (window.iwdOpcHyvaShipping && typeof window.iwdOpcHyvaShipping.validate === 'function') {
+                    if (!window.iwdOpcHyvaShipping.validate()) {
+                        if (window.console && typeof window.console.warn === 'function') {
+                            window.console.warn('Kkkonrad OPC: Order placement halted because shipping validation failed.');
+                        }
+                        return;
+                    }
+                }
+
                 const paymentBridge = window.iwdOpcHyvaPayment;
 
                 // Read selected payment method directly from DOM (no Magewire state needed)

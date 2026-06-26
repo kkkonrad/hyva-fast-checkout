@@ -12,10 +12,10 @@ define([
 
         window.checkoutConfig = config.checkoutConfig || {};
         window.checkoutConfig.payment = window.checkoutConfig.payment || {};
-        window.checkoutConfig.payment.payuGateway = window.checkoutConfig.payment.payuGateway || {isActive: false};
-        window.checkoutConfig.payment.payuGatewayCard = window.checkoutConfig.payment.payuGatewayCard || {isActive: false};
-        window.checkoutConfig.payment.payuConfig = window.checkoutConfig.payment.payuConfig || {payMethods: {}};
-        
+        window.checkoutConfig.payment.payuGateway = window.checkoutConfig.payment.payuGateway || { isActive: false };
+        window.checkoutConfig.payment.payuGatewayCard = window.checkoutConfig.payment.payuGatewayCard || { isActive: false };
+        window.checkoutConfig.payment.payuConfig = window.checkoutConfig.payment.payuConfig || { payMethods: {} };
+
         window.isCustomerLoggedIn = window.checkoutConfig.isCustomerLoggedIn;
         window.customerData = window.checkoutConfig.customerData;
         rendererComponents = rendererComponents.filter(function (component) {
@@ -41,7 +41,9 @@ define([
             'Magento_Checkout/js/action/select-payment-method',
             'uiRegistry',
             'Magento_Checkout/js/model/shipping-service',
-            'Magento_Checkout/js/model/shipping-rate-service'
+            'Magento_Checkout/js/model/shipping-rate-service',
+            'Magento_Checkout/js/checkout-data',
+            'mage/translate'
         ], function (
             app,
             paymentService,
@@ -50,7 +52,10 @@ define([
             quote,
             selectPaymentMethodAction,
             registry,
-            shippingService
+            shippingService,
+            shippingRateService,
+            checkoutData,
+            $t
         ) {
             function loadRendererComponents(done) {
                 var remaining = rendererComponents.length;
@@ -270,7 +275,7 @@ define([
                     ], function (selectShippingAddress, addressConverter) {
                         var newAddress = addressConverter.formAddressDataToQuoteAddress(addressData);
                         var currentAddress = quote.shippingAddress();
-                        
+
                         if (currentAddress &&
                             currentAddress.countryId === newAddress.countryId &&
                             currentAddress.postcode === newAddress.postcode &&
@@ -318,7 +323,101 @@ define([
 
                 window.iwdOpcHyvaShipping = {
                     syncAddress: syncAddressToKnockout,
-                    syncShippingMethod: syncSelectedShippingMethodToKnockout
+                    syncShippingMethod: syncSelectedShippingMethodToKnockout,
+                    validate: function () {
+                        try {
+                            var activeMethod = quote.shippingMethod();
+                            if (window.console && typeof window.console.log === 'function') {
+                                window.console.log('Kkkonrad OPC: Shipping validation starting. activeMethod:', activeMethod);
+                            }
+
+                            if (!activeMethod) {
+                                if (window.console && typeof window.console.log === 'function') {
+                                    window.console.log('Kkkonrad OPC: No active shipping method selected on quote.');
+                                }
+                                return true;
+                            }
+
+                            var carrierCode = activeMethod.carrier_code || '';
+                            var methodCode = activeMethod.method_code || '';
+
+                            if (window.console && typeof window.console.log === 'function') {
+                                window.console.log('Kkkonrad OPC: Shipping carrier:', carrierCode, 'method:', methodCode);
+                            }
+
+                            // InPost locker method validation (checks if carrier is inpost and carrier/method contains locker/paczkomat)
+                            var isInPostLocker = (carrierCode.indexOf('inpost') !== -1) && (
+                                carrierCode.indexOf('locker') !== -1 || 
+                                methodCode.indexOf('locker') !== -1 || 
+                                methodCode.indexOf('paczkomat') !== -1
+                            );
+                            if (isInPostLocker) {
+                                var pointData = null;
+                                if (checkoutData && typeof checkoutData.getShippingInPostPoint === 'function') {
+                                    pointData = checkoutData.getShippingInPostPoint();
+                                }
+
+                                if (window.console && typeof window.console.log === 'function') {
+                                    window.console.log('Kkkonrad OPC: InPost locker validation. pointData:', pointData);
+                                }
+
+                                if (!pointData || !pointData.name || pointData.name.length === 0) {
+                                    var msg = $t('Please select a pickup point');
+                                    var shippingList = registry.get('iwdOpcHyvaShippingRenderers.shippingList');
+                                    if (shippingList && typeof shippingList.errorValidationMessage === 'function') {
+                                        shippingList.errorValidationMessage(msg);
+                                    } else {
+                                        alert(msg);
+                                    }
+                                    var el = document.getElementById('label_method_' + methodCode + '_' + carrierCode) ||
+                                        document.getElementById('iwd-opc-ko-shipping-root') ||
+                                        document.querySelector('[name="shipping_method"]');
+                                    if (el) {
+                                        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                    }
+                                    return false;
+                                }
+
+                                var fullMethodCode = methodCode + '_' + carrierCode;
+                                if (fullMethodCode.indexOf('cod') !== -1) {
+                                    if (pointData.type && !pointData.type.includes('parcel_locker')) {
+                                        var msgCod = $t('The selected point does not support the cash on delivery method');
+                                        var shippingList = registry.get('iwdOpcHyvaShippingRenderers.shippingList');
+                                        if (shippingList && typeof shippingList.errorValidationMessage === 'function') {
+                                            shippingList.errorValidationMessage(msgCod);
+                                        } else {
+                                            alert(msgCod);
+                                        }
+                                        return false;
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            if (window.console && typeof window.console.error === 'function') {
+                                window.console.error('Kkkonrad OPC: Error in shipping validation:', e);
+                            }
+                        }
+
+                        // Run dynamic/custom shipping validators if registered
+                        if (window.iwdOpcCustomShippingValidators && window.iwdOpcCustomShippingValidators.length > 0) {
+                            for (var i = 0; i < window.iwdOpcCustomShippingValidators.length; i++) {
+                                var validator = window.iwdOpcCustomShippingValidators[i];
+                                if (typeof validator === 'function') {
+                                    try {
+                                        if (!validator(activeMethod)) {
+                                            return false;
+                                        }
+                                    } catch (err) {
+                                        if (window.console && typeof window.console.error === 'function') {
+                                            window.console.error('Kkkonrad OPC: Custom shipping validator error:', err);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        return true;
+                    }
                 };
 
                 // Initial sync once Knockout is ready
@@ -335,7 +434,7 @@ define([
                 quote.shippingMethod.subscribe(function (method) {
                     if (!method) return;
                     var methodCode = method.carrier_code + '_' + method.method_code;
-                    
+
                     var magewireEl = document.querySelector('[wire\\:id]');
                     if (magewireEl && magewireEl.__livewire) {
                         var wire = magewireEl.__livewire;
@@ -361,11 +460,11 @@ define([
                 function getSelectedMethodCode() {
                     var quoteMethod = (quote && typeof quote.paymentMethod === 'function' && quote.paymentMethod()) ? quote.paymentMethod().method : '';
                     var domMethod = getCheckedDomPaymentMethod();
-                    
+
                     if (window.console && typeof window.console.log === 'function') {
                         window.console.log('Kkkonrad OPC: getSelectedMethodCode - quoteMethod:', quoteMethod, 'domMethod:', domMethod);
                     }
-                    
+
                     if (domMethod) {
                         return domMethod;
                     }
@@ -413,8 +512,8 @@ define([
                     component.iwdOpcHyvaPatched = true;
                     component.selectPaymentMethod = function () {
                         var paymentData = typeof component.getData === 'function'
-                                ? component.getData()
-                                : {method: component.item ? component.item.method : null},
+                            ? component.getData()
+                            : { method: component.item ? component.item.method : null },
                             rendererCode = getRendererCode(component, paymentData.method);
 
                         if (paymentData && paymentData.method) {
@@ -474,7 +573,7 @@ define([
 
                     // 2. Clone the content to inspect remaining elements/text
                     var clone = content.cloneNode(true);
-                    
+
                     // Remove components we explicitly hide or handle globally
                     var selectorsToRemove = [
                         '.payment-method-title',
@@ -587,7 +686,7 @@ define([
                         return false;
                     }
 
-                    method = getMethod(methodCode) || {method: methodCode};
+                    method = getMethod(methodCode) || { method: methodCode };
                     selectPaymentMethodAction(method);
                     patchRenderers();
                     renderer = getRendererByMethod(methodCode);
@@ -596,7 +695,7 @@ define([
                     if (window.console && typeof window.console.log === 'function') {
                         window.console.log('Kkkonrad OPC: applySelectedMethod renderer found:', !!renderer, 'activeCode:', activeCode);
                     }
-                    activeMethod = getMethod(activeCode) || {method: activeCode, title: method.title};
+                    activeMethod = getMethod(activeCode) || { method: activeCode, title: method.title };
                     quote.paymentMethod(activeMethod);
                     if (renderer && typeof renderer.selectPaymentMethod === 'function') {
                         renderer.selectPaymentMethod();
@@ -852,7 +951,7 @@ define([
                     }
                 }
 
-                 if (window.Livewire && typeof window.Livewire.hook === 'function') {
+                if (window.Livewire && typeof window.Livewire.hook === 'function') {
                     window.Livewire.hook('element.updating', function (fromEl, toEl) {
                         if (fromEl.getAttribute('wire:key') === 'checkout-payment-methods-card') {
                             var fromCodes = Array.from(fromEl.querySelectorAll('[data-iwd-opc-payment-option]')).map(function (el) {
@@ -895,6 +994,22 @@ define([
                                 syncSelectedShippingMethodToKnockout(currentMethod);
                             }
                         }
+                    });
+                }
+
+                // Load discovered layout scripts dynamically via RequireJS
+                var layoutScripts = config.layoutScripts || [];
+                if (layoutScripts.length > 0) {
+                    layoutScripts.forEach(function (scriptModule) {
+                        require([scriptModule], function () {
+                            if (window.console && typeof window.console.log === 'function') {
+                                window.console.log('Kkkonrad OPC: Loaded layout script:', scriptModule);
+                            }
+                        }, function (err) {
+                            if (window.console && typeof window.console.warn === 'function') {
+                                window.console.warn('Kkkonrad OPC: Could not load layout script:', scriptModule, err);
+                            }
+                        });
                     });
                 }
 

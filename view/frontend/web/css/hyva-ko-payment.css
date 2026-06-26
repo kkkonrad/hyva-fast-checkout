@@ -229,4 +229,130 @@ textarea.msg__error:focus,
     box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
 }
 
+/* InPost Paczkomaty / Locker Widget Styles */
+.inpost-carrier-wrapper {
+    margin-top: 0.75rem;
+    font-size: 0.875rem;
+}
+
+.inpost-carrier-wrapper .point-data {
+    margin-bottom: 0.75rem;
+    padding: 0.75rem 1rem;
+    background-color: #fef9c3; /* Yellow 100 */
+    border-left: 4px solid #facc15; /* Yellow 400 */
+    border-radius: 0.375rem;
+    font-size: 0.8125rem;
+    color: #854d0e; /* Yellow 800 */
+    font-weight: 500;
+}
+
+.inpost-carrier-wrapper .point-data p:first-child {
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.25rem;
+}
+
+.inpost-carrier-wrapper button[data-inpost-select-point] {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #ffca08; /* InPost Yellow */
+    color: #111827; /* Dark Gray / Black */
+    font-weight: 700;
+    font-size: 0.75rem;
+    letter-spacing: 0.025em;
+    text-transform: uppercase;
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    transition: background-color 0.2s, transform 0.1s;
+    border: none;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.inpost-carrier-wrapper button[data-inpost-select-point]:hover {
+    background-color: #e5b400; /* Darker InPost Yellow */
+}
+
+.inpost-carrier-wrapper button[data-inpost-select-point]:active {
+    transform: scale(0.98);
+}
+
+/* InPost Geowidget Modal Style Overrides for Hyva compat */
+.inpost-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, .6);
+    backdrop-filter: blur(4px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
+
+.inpost-modal__container {
+    position: relative;
+    background: #fff;
+    max-width: 90%;
+    max-height: 85%;
+    width: 100%;
+    height: 100%;
+    margin: 20px;
+    padding: 60px 15px 15px;
+    border-radius: 0.75rem;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    overflow: hidden;
+}
+
+.inpost-modal__container inpost-geowidget {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.inpost-modal__container .btn-close {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background-color: #f3f4f6; /* Gray 100 */
+    border: none;
+    cursor: pointer;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s;
+}
+
+.inpost-modal__container .btn-close:hover {
+    background-color: #e5e7eb; /* Gray 200 */
+}
+
+.inpost-modal__container .btn-close::after,
+.inpost-modal__container .btn-close::before {
+    position: absolute;
+    content: '';
+    background: #4b5563; /* Gray 600 */
+    width: 14px;
+    height: 2px;
+    border-radius: 1px;
+}
+
+.inpost-modal__container .btn-close::after {
+    transform: rotate(45deg);
+}
+
+.inpost-modal__container .btn-close::before {
+    transform: rotate(-45deg);
+}
+
+
 

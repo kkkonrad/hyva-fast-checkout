@@ -13,7 +13,7 @@
                               data-bind="text: method.method_title">
                         </span>
                         <span class="block text-xs text-gray-500 mt-1"
-                              data-bind="text: method.carrier_title">
+                              data-bind="text: method.carrier_title, attr: { id: 'label_carrier_' + method.method_code + '_' + method.carrier_code }">
                         </span>
                     </div>
                 </div>
@@ -21,9 +21,16 @@
                      data-bind="text: $parent.formatPrice(method.amount)">
                 </div>
             </label>
+            <!-- InPost widget container placeholder -->
+            <div data-bind="attr: { id: 'label_method_' + method.method_code + '_' + method.carrier_code }"></div>
         </div>
     <!-- /ko -->
-    
+
+    <!-- ko if: errorValidationMessage() -->
+    <div class="text-xs text-red-600 font-medium mt-2 border border-red-200 bg-red-50 p-3 rounded" 
+         data-bind="text: errorValidationMessage"></div>
+    <!-- /ko -->
+
     <!-- ko ifnot: rates().length -->
         <p class="text-sm text-gray-500" data-bind="i18n: 'Please enter your shipping address details to estimate shipping rates.'">
         </p>

@@ -241,6 +241,109 @@ class Checkout extends Template
     }
 
     /**
+     * Return custom layout assets declared in the standard Magento checkout layout (checkout_index_index.xml)
+     * of active modules.
+     *
+     * @return array
+     */
+    public function getCheckoutLayoutAssets()
+    {
+        $moduleList = $this->getModuleList();
+        $componentRegistrar = $this->getComponentRegistrar();
+        if ($moduleList === null || $componentRegistrar === null) {
+            return ['css' => [], 'scripts' => []];
+        }
+
+        $css = [];
+        $scripts = [];
+
+        foreach ($moduleList->getNames() as $moduleName) {
+            if ($moduleName === 'Kkkonrad_Fastcheckout') {
+                continue;
+            }
+
+            $modulePath = $componentRegistrar->getPath(ComponentRegistrar::MODULE, $moduleName);
+            if (!$modulePath) {
+                continue;
+            }
+
+            $layoutFile = $modulePath . '/view/frontend/layout/checkout_index_index.xml';
+            if (!is_file($layoutFile)) {
+                continue;
+            }
+
+            $dom = new \DOMDocument();
+            $previous = libxml_use_internal_errors(true);
+
+            try {
+                if ($dom->load($layoutFile)) {
+                    $xpath = new \DOMXPath($dom);
+
+                    // Find all <css> elements
+                    $cssNodes = $xpath->query('//head/css');
+                    foreach ($cssNodes as $node) {
+                        $src = $node->getAttribute('src');
+                        if ($src) {
+                            $srcType = $node->getAttribute('src_type');
+                            $css[] = [
+                                'src' => $src,
+                                'src_type' => $srcType ?: null
+                            ];
+                        }
+                    }
+
+                    // Find all <script> elements
+                    $scriptNodes = $xpath->query('//head/script');
+                    foreach ($scriptNodes as $node) {
+                        $src = $node->getAttribute('src');
+                        if ($src) {
+                            $scripts[] = $src;
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+                // Ignore parsing errors
+            } finally {
+                libxml_clear_errors();
+                libxml_use_internal_errors($previous);
+            }
+        }
+
+        return [
+            'css' => array_values(array_unique($css, SORT_REGULAR)),
+            'scripts' => array_values(array_unique($scripts))
+        ];
+    }
+
+    /**
+     * @return array
+     */
+    public function getCheckoutLayoutScripts()
+    {
+        $assets = $this->getCheckoutLayoutAssets();
+        $requireModules = [];
+        $externalScripts = [];
+
+        foreach ($assets['scripts'] as $scriptSrc) {
+            if (strpos($scriptSrc, 'http://') === 0 || strpos($scriptSrc, 'https://') === 0 || strpos($scriptSrc, '//') === 0) {
+                $externalScripts[] = $scriptSrc;
+            } else {
+                $clean = $scriptSrc;
+                if (substr($clean, -3) === '.js') {
+                    $clean = substr($clean, 0, -3);
+                }
+                $clean = str_replace('::', '/', $clean);
+                $requireModules[] = $clean;
+            }
+        }
+
+        return [
+            'modules' => $requireModules,
+            'external' => $externalScripts
+        ];
+    }
+
+    /**
      * @param string $layoutFile
      * @return string[]
      */
