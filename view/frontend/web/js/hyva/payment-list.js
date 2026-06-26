@@ -24,7 +24,10 @@ define([
         },
 
         initialize: function () {
+            this.pendingRendererCodes = {};
             this._super().initDefaulGroup().initChildren();
+            window.iwdOpcHyvaPaymentList = this;
+
             paymentMethods.subscribe(function (changes) {
                 _.each(changes, function (change) {
                     if (change.status === 'deleted') {
@@ -37,6 +40,8 @@ define([
                         this.createRenderer(change.value);
                     }
                 }, this);
+
+                this.syncRenderers();
             }, this, 'arrayChange');
 
             return this;
@@ -90,6 +95,10 @@ define([
             var isRendererForMethod = false,
                 currentGroup;
 
+            if (this.hasRenderer(paymentMethodData.method) || this.pendingRendererCodes[paymentMethodData.method]) {
+                return;
+            }
+
             registry.get(this.configDefaultGroup.name, function (defaultGroup) {
                 _.each(rendererList(), function (renderer) {
                     if (renderer.hasOwnProperty('typeComparatorCallback') &&
@@ -103,6 +112,7 @@ define([
                     if (isRendererForMethod) {
                         currentGroup = renderer.group ? renderer.group : defaultGroup;
                         this.collectPaymentGroups(currentGroup);
+                        this.pendingRendererCodes[paymentMethodData.method] = true;
 
                         layout([
                             this.createComponent({
@@ -114,6 +124,10 @@ define([
                                 displayArea: currentGroup.displayArea
                             })
                         ]);
+
+                        window.setTimeout(function () {
+                            delete this.pendingRendererCodes[paymentMethodData.method];
+                        }.bind(this), 0);
                     }
                 }.bind(this));
             }.bind(this));
@@ -157,11 +171,45 @@ define([
                 items = this.getRegion(group.displayArea);
 
                 _.find(items(), function (value) {
-                    if (value.item.method.indexOf(paymentMethodCode) === 0) {
+                    if (value.item && value.item.method === paymentMethodCode) {
                         value.disposeSubscriptions();
                         value.destroy();
                     }
                 });
+            }, this);
+        }
+
+        ,
+        hasRenderer: function (paymentMethodCode) {
+            var found = false;
+
+            _.each(this.paymentGroupsList(), function (group) {
+                _.each(this.getRegion(group.displayArea)(), function (value) {
+                    if (value.item && value.item.method === paymentMethodCode) {
+                        found = true;
+                    }
+                });
+            }, this);
+
+            return found;
+        },
+
+        syncRenderers: function () {
+            var availableMethods = _.pluck(paymentMethods(), 'method');
+
+            _.each(this.paymentGroupsList(), function (group) {
+                _.each(this.getRegion(group.displayArea)(), function (value) {
+                    if (value.item && availableMethods.indexOf(value.item.method) === -1) {
+                        value.disposeSubscriptions();
+                        value.destroy();
+                    }
+                });
+            }, this);
+
+            _.each(paymentMethods(), function (paymentMethodData) {
+                if (!this.hasRenderer(paymentMethodData.method) && !this.pendingRendererCodes[paymentMethodData.method]) {
+                    this.createRenderer(paymentMethodData);
+                }
             }, this);
         }
     });

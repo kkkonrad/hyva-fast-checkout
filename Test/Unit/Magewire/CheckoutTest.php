@@ -488,7 +488,7 @@ class CheckoutTest extends TestCase
         }, $methods));
     }
 
-    public function testGetPaymentMethodsFiltersMethodsByShippingMapping(): void
+    public function testGetAllowedPaymentMethodsFiltersMethodsByShippingMapping(): void
     {
         $this->quoteMock->expects($this->any())
             ->method('getId')
@@ -503,7 +503,7 @@ class CheckoutTest extends TestCase
             ->method('getShippingAddress')
             ->willReturn($shippingAddressMock);
 
-        $this->paymentMethodManagementMock->expects($this->once())
+        $this->paymentMethodManagementMock->expects($this->exactly(2))
             ->method('getList')
             ->with(42)
             ->willReturn([
@@ -523,6 +523,12 @@ class CheckoutTest extends TestCase
             ->willReturn($mapping);
 
         $methods = $this->checkoutComponent->getPaymentMethods();
+
+        $this->assertSame(['checkmo', 'cashondelivery', 'payu_gateway'], array_map(static function (PaymentMethodInterface $method): string {
+            return $method->getCode();
+        }, $methods));
+
+        $methods = $this->checkoutComponent->getAllowedPaymentMethods();
 
         $this->assertSame(['cashondelivery', 'payu_gateway'], array_map(static function (PaymentMethodInterface $method): string {
             return $method->getCode();

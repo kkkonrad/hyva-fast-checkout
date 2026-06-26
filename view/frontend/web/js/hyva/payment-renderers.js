@@ -105,20 +105,81 @@ define([
 
                 var lastMethodsJson = '';
 
-                function syncPaymentMethods() {
+                function getDomPaymentMethods() {
                     var methods = [];
+
                     document.querySelectorAll('input[name="payment_method"]').forEach(function (input) {
                         var label = input.closest('label');
                         var titleElement = label ? label.querySelector('span') : null;
+
                         methods.push({
                             method: input.value,
-                            title: titleElement ? titleElement.textContent.trim() : ''
+                            title: titleElement ? titleElement.textContent.trim() : '',
+                            checked: !!input.checked,
+                            disabled: !!input.disabled
                         });
                     });
 
+                    return methods;
+                }
+
+                function domHasPaymentMethod(methodCode) {
+                    var found = false;
+
+                    if (!methodCode) {
+                        return false;
+                    }
+
+                    getDomPaymentMethods().forEach(function (method) {
+                        if (method.method === methodCode && !method.disabled) {
+                            found = true;
+                        }
+                    });
+
+                    return found;
+                }
+
+                function getCheckedDomPaymentMethod() {
+                    var selected = document.querySelector('input[name="payment_method"]:checked:not(:disabled)');
+
+                    return selected ? selected.value : '';
+                }
+
+                function hidePaymentPlaceholders() {
+                    document.querySelectorAll('.iwd-opc-payment-method-ko-container').forEach(function (placeholder) {
+                        placeholder.classList.add('hidden');
+                        placeholder.style.display = 'none';
+                    });
+                }
+
+                function syncKoPaymentRenderers() {
+                    if (window.iwdOpcHyvaPaymentList && typeof window.iwdOpcHyvaPaymentList.syncRenderers === 'function') {
+                        window.iwdOpcHyvaPaymentList.syncRenderers();
+                    }
+                }
+
+                function syncPaymentMethods() {
+                    var domMethods = getDomPaymentMethods();
+                    var methods = domMethods.map(function (method) {
+                        return {
+                            method: method.method,
+                            title: method.title
+                        };
+                    });
                     var currentMethodsJson = JSON.stringify(methods);
+                    var quoteMethod = (quote && typeof quote.paymentMethod === 'function' && quote.paymentMethod()) ? quote.paymentMethod().method : '';
+
+                    if (quoteMethod && !domHasPaymentMethod(quoteMethod)) {
+                        if (window.console && typeof window.console.log === 'function') {
+                            window.console.log('IWD OPC: clearing inactive quote payment method:', quoteMethod);
+                        }
+                        selectPaymentMethodAction(null);
+                        hidePaymentPlaceholders();
+                    }
+
                     if (currentMethodsJson === lastMethodsJson) {
-                        return;
+                        syncKoPaymentRenderers();
+                        return domMethods;
                     }
                     lastMethodsJson = currentMethodsJson;
 
@@ -132,6 +193,10 @@ define([
                         var fallbackMethods = methodConverter(config.paymentMethods || window.checkoutConfig.paymentMethods || []);
                         paymentService.setPaymentMethods(fallbackMethods);
                     }
+
+                    window.setTimeout(syncKoPaymentRenderers, 0);
+
+                    return domMethods;
                 }
 
                 syncPaymentMethods();
@@ -292,14 +357,17 @@ define([
 
                 function getSelectedMethodCode() {
                     var quoteMethod = (quote && typeof quote.paymentMethod === 'function' && quote.paymentMethod()) ? quote.paymentMethod().method : '';
-                    var selected = document.querySelector('input[name="payment_method"]:checked');
-                    var domMethod = selected ? selected.value : '';
+                    var domMethod = getCheckedDomPaymentMethod();
                     
                     if (window.console && typeof window.console.log === 'function') {
                         window.console.log('IWD OPC: getSelectedMethodCode - quoteMethod:', quoteMethod, 'domMethod:', domMethod);
                     }
                     
-                    return quoteMethod || domMethod;
+                    if (domMethod) {
+                        return domMethod;
+                    }
+
+                    return domHasPaymentMethod(quoteMethod) ? quoteMethod : '';
                 }
 
                 function getMethod(methodCode) {
@@ -408,8 +476,7 @@ define([
                     var selectorsToRemove = [
                         '.payment-method-title',
                         '.actions-toolbar',
-                        '.payment-method-billing-address',
-                        '.checkout-agreements-block'
+                        '.payment-method-billing-address'
                     ];
                     selectorsToRemove.forEach(function (selector) {
                         clone.querySelectorAll(selector).forEach(function (el) {
@@ -445,13 +512,11 @@ define([
                         window.console.log('IWD OPC: updateActiveRendererClass methodCode:', methodCode, 'activeCode:', activeCode);
                     }
                     var root = document.getElementById('iwd-opc-ko-payment-root'),
-                        activeElement = null;
+                        activeElement = null,
+                        movedToTarget = false;
 
                     // Always hide all target placeholders first
-                    document.querySelectorAll('.iwd-opc-payment-method-ko-container').forEach(function (placeholder) {
-                        placeholder.classList.add('hidden');
-                        placeholder.style.display = 'none';
-                    });
+                    hidePaymentPlaceholders();
 
                     if (!root) {
                         if (window.console && typeof window.console.log === 'function') {
@@ -483,24 +548,18 @@ define([
                         activeElement.classList.add('_active');
                         activeElement.setAttribute('data-iwd-active', 'true');
 
-                        // Only move and display the container if there is visible content to show
-                        if (hasVisibleContent(activeElement)) {
-                            var target = document.querySelector('[data-iwd-payment-method-ko-target="' + methodCode + '"]');
-                            if (target) {
-                                if (window.console && typeof window.console.log === 'function') {
-                                    window.console.log('IWD OPC: moving activeElement to target placeholder:', methodCode);
-                                }
-                                target.appendChild(activeElement);
-                                target.classList.remove('hidden');
-                                target.style.display = 'block';
-                            } else {
-                                if (window.console && typeof window.console.log === 'function') {
-                                    window.console.log('IWD OPC: target placeholder NOT found for method:', methodCode);
-                                }
+                        var target = document.querySelector('[data-iwd-payment-method-ko-target="' + methodCode + '"]');
+                        if (target) {
+                            if (window.console && typeof window.console.log === 'function') {
+                                window.console.log('IWD OPC: moving activeElement to target placeholder:', methodCode, 'hasVisibleContent:', hasVisibleContent(activeElement));
                             }
+                            target.appendChild(activeElement);
+                            target.classList.remove('hidden');
+                            target.style.display = 'block';
+                            movedToTarget = true;
                         } else {
                             if (window.console && typeof window.console.log === 'function') {
-                                window.console.log('IWD OPC: activeElement has no visible content to display for method:', methodCode);
+                                window.console.log('IWD OPC: target placeholder NOT found for method:', methodCode);
                             }
                         }
                     } else {
@@ -509,7 +568,7 @@ define([
                         }
                     }
 
-                    return !!activeElement;
+                    return movedToTarget;
                 }
 
                 function applySelectedMethod(methodCode) {
@@ -543,25 +602,73 @@ define([
                 }
 
                 var readyDispatched = false;
+                var pendingSelectedMethodCode = '';
+                var paymentRendererObserver = null;
+
                 function dispatchReadyEvent() {
                     if (readyDispatched) { return; }
                     readyDispatched = true;
                     document.dispatchEvent(new CustomEvent('iwd-opc:ready'));
                 }
 
+                function retryPendingSelectedMethod() {
+                    if (!pendingSelectedMethodCode || !domHasPaymentMethod(pendingSelectedMethodCode)) {
+                        return;
+                    }
+
+                    patchRenderers();
+                    if (applySelectedMethod(pendingSelectedMethodCode)) {
+                        pendingSelectedMethodCode = '';
+                    }
+                }
+
+                function observePaymentRendererRoot() {
+                    var root = document.getElementById('iwd-opc-ko-payment-root');
+
+                    if (paymentRendererObserver || !root || typeof window.MutationObserver !== 'function') {
+                        return;
+                    }
+
+                    paymentRendererObserver = new MutationObserver(function () {
+                        window.setTimeout(retryPendingSelectedMethod, 0);
+                    });
+                    paymentRendererObserver.observe(root, {
+                        childList: true,
+                        subtree: true
+                    });
+                }
+
                 function setSelectedMethod(methodCode) {
                     if (window.console && typeof window.console.log === 'function') {
                         window.console.log('IWD OPC: setSelectedMethod called with:', methodCode);
                     }
+                    syncPaymentMethods();
+
                     if (!methodCode) {
+                        pendingSelectedMethodCode = '';
+                        hidePaymentPlaceholders();
                         return;
                     }
 
-                    applySelectedMethod(methodCode);
+                    if (!domHasPaymentMethod(methodCode)) {
+                        pendingSelectedMethodCode = '';
+                        hidePaymentPlaceholders();
+                        if (window.console && typeof window.console.log === 'function') {
+                            window.console.log('IWD OPC: selected payment method is no longer available:', methodCode);
+                        }
+                        return;
+                    }
 
-                    [50, 150, 350, 750].forEach(function (delay) {
+                    pendingSelectedMethodCode = methodCode;
+                    if (applySelectedMethod(methodCode)) {
+                        pendingSelectedMethodCode = '';
+                    }
+
+                    [50, 150, 350, 750, 1500, 2500].forEach(function (delay) {
                         window.setTimeout(function () {
-                            applySelectedMethod(methodCode);
+                            if (pendingSelectedMethodCode === methodCode) {
+                                retryPendingSelectedMethod();
+                            }
                         }, delay);
                     });
 
@@ -644,6 +751,7 @@ define([
                 };
 
                 patchRenderers();
+                observePaymentRendererRoot();
                 setSelectedMethod(getSelectedMethodCode());
 
                 document.addEventListener('change', function (event) {
@@ -662,14 +770,19 @@ define([
                         input;
 
                     if (event.target && event.target.name === 'payment_method') {
-                        setSelectedMethod(event.target.value);
+                        window.setTimeout(function () {
+                            setSelectedMethod(event.target.value);
+                        }, 0);
                         return;
                     }
 
                     if (option) {
                         input = option.querySelector('input[name="payment_method"]');
-                        if (input) {
-                            setSelectedMethod(input.value);
+                        if (input && !input.disabled) {
+                            input.checked = true;
+                            window.setTimeout(function () {
+                                setSelectedMethod(input.value);
+                            }, 0);
                         }
                     }
                 }, true);
@@ -679,6 +792,7 @@ define([
                     if (window.console && typeof window.console.log === 'function') {
                         window.console.log('IWD OPC: moveRenderersBackToRoot called, root exists:', !!root);
                     }
+                    hidePaymentPlaceholders();
                     if (root) {
                         var count = 0;
                         document.querySelectorAll('.payment-method').forEach(function (element) {
@@ -698,11 +812,11 @@ define([
                         moveRenderersBackToRoot();
                     });
                     window.Livewire.hook('message.processed', function () {
+                        syncPaymentMethods();
                         var code = getSelectedMethodCode();
                         if (window.console && typeof window.console.log === 'function') {
                             window.console.log('IWD OPC: Livewire message.processed triggered, getSelectedMethodCode:', code);
                         }
-                        syncPaymentMethods();
                         patchRenderers();
                         setSelectedMethod(code);
 

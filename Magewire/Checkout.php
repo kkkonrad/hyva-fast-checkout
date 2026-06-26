@@ -270,7 +270,7 @@ class Checkout extends Component
 
         // Validate initially loaded payment method based on shipping method mapping
         if ($this->paymentMethod !== '') {
-            $allowedPaymentMethods = $this->getPaymentMethods();
+            $allowedPaymentMethods = $this->getAllowedPaymentMethods();
             $paymentAllowed = false;
             foreach ($allowedPaymentMethods as $method) {
                 if ($method->getCode() === $this->paymentMethod) {
@@ -505,7 +505,7 @@ class Checkout extends Component
 
             // Check if the currently selected payment method is still valid under new shipping method
             if ($this->paymentMethod !== '') {
-                $allowedPaymentMethods = $this->getPaymentMethods();
+                $allowedPaymentMethods = $this->getAllowedPaymentMethods();
                 $paymentAllowed = false;
                 foreach ($allowedPaymentMethods as $method) {
                     if ($method->getCode() === $this->paymentMethod) {
@@ -535,38 +535,52 @@ class Checkout extends Component
     {
         $quote = $this->checkoutSession->getQuote();
         try {
-            $methods = $this->paymentMethodManagement->getList($quote->getId());
-            
-            $shippingAddress = $quote->getShippingAddress();
-            $shippingMethod = $shippingAddress ? $shippingAddress->getShippingMethod() : null;
-            if (!$shippingMethod) {
-                $shippingMethod = $this->shippingMethod;
-            }
-
-            if ($shippingMethod) {
-                $mapping = $this->opcHelper->getShippingPaymentMapping();
-                if (!empty($mapping)) {
-                    $mappedPayments = [];
-                    foreach ($mapping as $rule) {
-                        if (isset($rule['shipping_method']) && $rule['shipping_method'] === $shippingMethod) {
-                            if (isset($rule['payment_method'])) {
-                                $mappedPayments[] = $rule['payment_method'];
-                            }
-                        }
-                    }
-                    if (!empty($mappedPayments)) {
-                        $methods = array_filter($methods, function ($method) use ($mappedPayments) {
-                            return in_array($method->getCode(), $mappedPayments);
-                        });
-                        $methods = array_values($methods);
-                    }
-                }
-            }
-
-            return $methods;
+            return $this->paymentMethodManagement->getList($quote->getId());
         } catch (\Exception $e) {
             return [];
         }
+    }
+
+    public function getAllowedPaymentMethods(): array
+    {
+        $methods = $this->getPaymentMethods();
+        $allowedCodes = $this->getAllowedPaymentMethodCodes();
+
+        if (empty($allowedCodes)) {
+            return $methods;
+        }
+
+        return array_values(array_filter($methods, function ($method) use ($allowedCodes) {
+            return in_array($method->getCode(), $allowedCodes, true);
+        }));
+    }
+
+    public function getAllowedPaymentMethodCodes(): array
+    {
+        $quote = $this->checkoutSession->getQuote();
+        $shippingAddress = $quote->getShippingAddress();
+        $shippingMethod = $shippingAddress ? $shippingAddress->getShippingMethod() : null;
+        if (!$shippingMethod) {
+            $shippingMethod = $this->shippingMethod;
+        }
+
+        if (!$shippingMethod) {
+            return [];
+        }
+
+        $mapping = $this->opcHelper->getShippingPaymentMapping();
+        if (empty($mapping)) {
+            return [];
+        }
+
+        $mappedPayments = [];
+        foreach ($mapping as $rule) {
+            if (isset($rule['shipping_method']) && $rule['shipping_method'] === $shippingMethod && isset($rule['payment_method'])) {
+                $mappedPayments[] = $rule['payment_method'];
+            }
+        }
+
+        return array_values(array_unique($mappedPayments));
     }
 
     /**
@@ -611,7 +625,7 @@ class Checkout extends Component
     {
         $quote = $this->checkoutSession->getQuote();
         $methodAvailable = false;
-        foreach ($this->getPaymentMethods() as $method) {
+        foreach ($this->getAllowedPaymentMethods() as $method) {
             if ($method->getCode() === $methodCode) {
                 $methodAvailable = true;
                 break;
@@ -738,7 +752,7 @@ class Checkout extends Component
         }
 
         $paymentAllowed = false;
-        foreach ($this->getPaymentMethods() as $method) {
+        foreach ($this->getAllowedPaymentMethods() as $method) {
             if ($method->getCode() === $this->paymentMethod) {
                 $paymentAllowed = true;
                 break;
