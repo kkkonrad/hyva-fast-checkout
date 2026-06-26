@@ -161,17 +161,23 @@ class Checkout extends Template
         return $this->quote;
     }
 
-    /**
-     * @return array
-     */
     public function getCheckoutConfig()
     {
+        $quote = $this->getQuote();
+        if (!$quote || !$quote->getId() || !$quote->hasItems()) {
+            return [];
+        }
+
         $configProvider = $this->getConfigProvider();
         if ($configProvider === null) {
             return [];
         }
 
-        return $configProvider->getConfig();
+        try {
+            return $configProvider->getConfig();
+        } catch (\Throwable $exception) {
+            return [];
+        }
     }
 
     /**

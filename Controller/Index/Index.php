@@ -52,20 +52,18 @@ class Index extends Action
         $quote = $this->onepage->getQuote();
         
         if ($this->isHyvaOpcRequest()) {
-            if ($quote->hasItems() && ($quote->getHasError() || !$quote->validateMinimumAmount())) {
+            if (!$quote->hasItems() || $quote->getHasError() || !$quote->validateMinimumAmount()) {
                 return $this->resultRedirectFactory->create()->setPath('checkout/cart');
             }
             
-            if ($quote->hasItems()) {
-                if (!$this->customerSession->isLoggedIn() && !$this->checkoutHelper->isAllowedGuestCheckout($quote)) {
-                    $this->messageManager->addErrorMessage(__('Guest checkout is disabled. Please Login or Create an Account'));
-                    return $this->resultRedirectFactory->create()->setPath('checkout/cart');
-                }
-
-                $this->customerSession->regenerateId();
-                $this->checkoutSession->setCartWasUpdated(false);
-                $this->onepage->initCheckout();
+            if (!$this->customerSession->isLoggedIn() && !$this->checkoutHelper->isAllowedGuestCheckout($quote)) {
+                $this->messageManager->addErrorMessage(__('Guest checkout is disabled. Please Login or Create an Account'));
+                return $this->resultRedirectFactory->create()->setPath('checkout/cart');
             }
+
+            $this->customerSession->regenerateId();
+            $this->checkoutSession->setCartWasUpdated(false);
+            $this->onepage->initCheckout();
         } else {
             if (!$quote->hasItems() || $quote->getHasError() || !$quote->validateMinimumAmount()) {
                 return $this->resultRedirectFactory->create()->setPath('checkout/cart');
