@@ -40,7 +40,6 @@ define([
             'Magento_Checkout/js/model/quote',
             'Magento_Checkout/js/action/select-payment-method',
             'uiRegistry',
-            'Magento_Customer/js/customer-data',
             'Magento_Checkout/js/model/shipping-service',
             'Magento_Checkout/js/model/shipping-rate-service'
         ], function (
@@ -51,7 +50,6 @@ define([
             quote,
             selectPaymentMethodAction,
             registry,
-            customerData,
             shippingService
         ) {
             function loadRendererComponents(done) {
@@ -81,27 +79,32 @@ define([
             }
 
             loadRendererComponents(function () {
-                // Initialize customerData if not already initialized
-                if (customerData && typeof customerData['Magento_Customer/js/customer-data'] === 'function') {
-                    var customerDataConfig = $.extend({
-                        cookieLifeTime: '3600',
-                        expirableSectionNames: ['cart'],
-                        expirableSectionLifetime: 60,
-                        cookieDomain: '',
-                        isLoggedIn: window.isCustomerLoggedIn,
-                        sectionLoadUrl: (window.BASE_URL || '/') + 'customer/section/load/'
-                    }, window.checkoutConfig.customerData || {});
-                    try {
-                        customerData['Magento_Customer/js/customer-data'](customerDataConfig);
-                        if (window.console && typeof window.console.log === 'function') {
-                            window.console.log('IWD OPC: customerData initialized successfully');
-                        }
-                    } catch (e) {
-                        if (window.console && typeof window.console.warn === 'function') {
-                            window.console.warn('IWD OPC: customerData initialization error:', e);
+                // Initialize customerData dynamically if available
+                require(['Magento_Customer/js/customer-data'], function (customerData) {
+                    if (customerData) {
+                        var cdInitFunc = typeof customerData === 'function' ? customerData : customerData['Magento_Customer/js/customer-data'];
+                        if (typeof cdInitFunc === 'function') {
+                            var customerDataConfig = $.extend({
+                                cookieLifeTime: '3600',
+                                expirableSectionNames: ['cart'],
+                                expirableSectionLifetime: 60,
+                                cookieDomain: '',
+                                isLoggedIn: window.isCustomerLoggedIn,
+                                sectionLoadUrl: (window.BASE_URL || '/') + 'customer/section/load/'
+                            }, window.checkoutConfig.customerData || {});
+                            try {
+                                cdInitFunc(customerDataConfig);
+                                if (window.console && typeof window.console.log === 'function') {
+                                    window.console.log('IWD OPC: customerData initialized successfully');
+                                }
+                            } catch (e) {
+                                if (window.console && typeof window.console.warn === 'function') {
+                                    window.console.warn('IWD OPC: customerData initialization error:', e);
+                                }
+                            }
                         }
                     }
-                }
+                });
 
                 var lastMethodsJson = '';
 

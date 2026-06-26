@@ -11,10 +11,14 @@ $paymentMethods = $block->getData('payment_methods');
 if (!is_array($paymentMethods) || $paymentMethods === []) {
     $paymentMethods = $checkoutConfig['paymentMethods'] ?? [];
 }
+$rendererComponents = $block->getPaymentRendererComponents();
+if (empty($rendererComponents)) {
+    return;
+}
 $mageInitConfig = [
     'checkoutConfig' => $checkoutConfig,
     'paymentMethods' => $paymentMethods,
-    'rendererComponents' => $block->getPaymentRendererComponents(),
+    'rendererComponents' => $rendererComponents,
     'scope' => 'iwdOpcHyvaPaymentRenderers'
 ];
 $block->ensureRequireJsAssets();
