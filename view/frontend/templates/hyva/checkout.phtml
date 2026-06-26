@@ -110,9 +110,10 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                         <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Email Address')) ?> *</span>
                         <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                                type="email" autocomplete="email"
-                               wire:model.blur="email"
+                               wire:model.defer="email"
                                data-wire-field="email"
-                               @blur="onFieldBlurValidateOnly"
+                               @input="onFieldInput"
+                               @blur="onFieldBlur"
                                required/>
                     </label>
 
@@ -192,7 +193,10 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                             </select>
                         <?php else: ?>
                             <input name="region" class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                   type="text" wire:model.blur="region" autocomplete="address-level1"
+                                   type="text" wire:model.defer="region" autocomplete="address-level1"
+                                   data-wire-field="region"
+                                   @input="onFieldInput"
+                                   @blur="onFieldBlur"
                                    placeholder="<?= $escaper->escapeHtmlAttr(__('Enter state/province')) ?>" <?= $isRegionRequired ? 'required' : '' ?>/>
                         <?php endif; ?>
                     </label>
@@ -367,8 +371,10 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                                     <input name="billing_region"
                                            class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                                            type="text" autocomplete="address-level1"
-                                           wire:model.blur="billingRegion"
-                                           @blur="onFieldBlurValidateOnly"
+                                           wire:model.defer="billingRegion"
+                                           data-wire-field="billingRegion"
+                                           @input="onFieldInput"
+                                           @blur="onFieldBlur"
                                            placeholder="<?= $escaper->escapeHtmlAttr(__('Enter state/province')) ?>"
                                            <?= $isBillingRegionRequired ? 'required' : '' ?>/>
                                 <?php endif; ?>
@@ -699,6 +705,7 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
 function initOpcCheckout() {
     return {
         _debounceTimers: {},
+        _blurTimers: {},
 
         init() {
             this.$nextTick(() => {
@@ -719,12 +726,18 @@ function initOpcCheckout() {
             const el = this.$el;
             const field = el.dataset.wireField;
             if (!field) return;
-            if (field !== 'postcode' && field !== 'billingPostcode') return;
-            const value = el.value;
-            clearTimeout(this._debounceTimers[field]);
-            this._debounceTimers[field] = setTimeout(() => {
-                this.$wire.set(field, value);
-            }, 1000);
+            const fieldsToSync = ['postcode', 'billingPostcode', 'email', 'region', 'billingRegion'];
+            if (!fieldsToSync.includes(field)) return;
+
+            // If a blur timer is already active (meaning we just blurred and are now autofilling/updating),
+            // re-schedule the blur timer to save the newly entered/autofilled value.
+            if (this._blurTimers && this._blurTimers[field]) {
+                clearTimeout(this._blurTimers[field]);
+                this._blurTimers[field] = setTimeout(() => {
+                    this.$wire.set(field, el.value);
+                    delete this._blurTimers[field];
+                }, 150);
+            }
         },
 
         /**
@@ -734,9 +747,19 @@ function initOpcCheckout() {
             const el = this.$el;
             const field = el.dataset.wireField;
             if (field) {
-                clearTimeout(this._debounceTimers[field]);
-                if (field === 'postcode' || field === 'billingPostcode') {
-                    this.$wire.set(field, el.value);
+                const fieldsToSync = ['postcode', 'billingPostcode', 'email', 'region', 'billingRegion'];
+                if (fieldsToSync.includes(field)) {
+                    // Delay the blur update slightly so autocomplete events can override/re-schedule it
+                    if (!this._blurTimers) {
+                        this._blurTimers = {};
+                    }
+                    if (this._blurTimers[field]) {
+                        clearTimeout(this._blurTimers[field]);
+                    }
+                    this._blurTimers[field] = setTimeout(() => {
+                        this.$wire.set(field, el.value);
+                        delete this._blurTimers[field];
+                    }, 150);
                 }
             }
             this._validateEl(el);
@@ -749,15 +772,25 @@ function initOpcCheckout() {
             const el = this.$el;
             const field = el.dataset.wireField;
             if (field) {
-                clearTimeout(this._debounceTimers[field]);
-                if (field === 'postcode' || field === 'billingPostcode') {
-                    this.$wire.set(field, el.value);
+                const fieldsToSync = ['postcode', 'billingPostcode', 'email', 'region', 'billingRegion'];
+                if (fieldsToSync.includes(field)) {
+                    // Delay the blur update slightly so autocomplete events can override/re-schedule it
+                    if (!this._blurTimers) {
+                        this._blurTimers = {};
+                    }
+                    if (this._blurTimers[field]) {
+                        clearTimeout(this._blurTimers[field]);
+                    }
+                    this._blurTimers[field] = setTimeout(() => {
+                        this.$wire.set(field, el.value);
+                        delete this._blurTimers[field];
+                    }, 150);
                 }
             }
         },
 
         /**
-         * Validation only — for fields using wire:model.blur (email).
+         * Validation only — for fields using wire:model.blur.
          */
         onFieldBlurValidateOnly() {
             this._validateEl(this.$el);

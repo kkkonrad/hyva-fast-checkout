@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Kkkonrad\Fastcheckout\Test\Unit\Block\Hyva;
 
 use Kkkonrad\Fastcheckout\Block\Hyva\Checkout;
+use Kkkonrad\Fastcheckout\Helper\Data as OpcHelper;
 use Hyva\Theme\Model\ViewModelRegistry;
 use Magento\Catalog\Helper\Image as ImageHelper;
 use Magento\Catalog\Helper\Product\Configuration as ProductConfiguration;
@@ -54,6 +55,11 @@ class CheckoutTest extends TestCase
     private $viewModelRegistryMock;
 
     /**
+     * @var OpcHelper|MockObject
+     */
+    private $opcHelperMock;
+
+    /**
      * @var Quote|MockObject
      */
     private $quoteMock;
@@ -71,6 +77,7 @@ class CheckoutTest extends TestCase
         $this->imageHelperMock = $this->createMock(ImageHelper::class);
         $this->productConfigurationMock = $this->createMock(ProductConfiguration::class);
         $this->viewModelRegistryMock = $this->createMock(ViewModelRegistry::class);
+        $this->opcHelperMock = $this->createMock(OpcHelper::class);
         $this->quoteMock = $this->createMock(Quote::class);
 
         $this->checkoutSessionMock->expects($this->any())
@@ -84,6 +91,11 @@ class CheckoutTest extends TestCase
             $this->imageHelperMock,
             $this->productConfigurationMock,
             $this->viewModelRegistryMock,
+            $this->opcHelperMock,
+            null,
+            null,
+            null,
+            null,
             []
         );
     }
