@@ -168,20 +168,6 @@ class QuoteSubmitSuccess implements ObserverInterface
         return $account;
     }
 
-    /**
-     * @param $order
-     * @param $quote
-     * @return $this
-     */
-    private function orderShippingAddressFields($order, $quote)
-    {
-        $order->getShippingAddress()->setData(
-            'daimond_shape',
-            $quote->getShippingAddress()->getData('daimond_shape')
-        )->save();
-
-        return $this;
-    }
 
     /**
      * @param Order $order

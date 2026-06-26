@@ -18,9 +18,7 @@
     <type name="Magento\Quote\Api\PaymentMethodManagementInterface">
         <plugin name="iwd_opc_save_comment_subscribe" type="Kkkonrad\Fastcheckout\Plugin\Checkout\PaymentMethodManagement"/>
     </type>
-    <type name="Magento\Paypal\Model\AbstractConfig">
-        <plugin name="iwd_opc_paypal_config" type="Kkkonrad\Fastcheckout\Plugin\Payments\Paypal\Config"/>
-    </type>
+
     <type name="Magento\Customer\Model\Address\AbstractAddress">
         <plugin name="iwd_opc_customer_address" type="Kkkonrad\Fastcheckout\Plugin\Customer\Model\Address\AbstractAddress"/>
     </type>

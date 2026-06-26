@@ -4,9 +4,8 @@ namespace Kkkonrad\Fastcheckout\Helper;
 
 use Magento\Framework\App\Helper\Context;
 use Magento\Store\Model\StoreManagerInterface;
-use Magento\Framework\HTTP\Adapter\CurlFactory;
 use Magento\Framework\Message\Session as Session;
-use Magento\Framework\App\Config\ConfigResource\ConfigInterface;
+
 use Magento\Customer\Model\Session as CustomerSession;
 use Magento\Framework\Json\Helper\Data as JsonHelper;
 use Magento\Framework\App\Helper\AbstractHelper;
@@ -45,13 +44,12 @@ class Data extends AbstractHelper
     const XML_PATH_GM_APIKEY = 'iwd_opc/extended/gm_apikey';
 
     public $storeManager;
-    public $resourceConfig;
-    public $curlFactory;
     public $session;
     public $customerSession;
     public $response = null;
     public $jsonHelper;
     public $request;
+
 
     protected $cart;
     protected $quoteFactory;
@@ -63,9 +61,7 @@ class Data extends AbstractHelper
         Context $context,
         StoreManagerInterface $storeManager,
         CustomerSession $customerSession,
-        CurlFactory $curlFactory,
         Session $session,
-        ConfigInterface $resourceConfig,
         JsonHelper $jsonHelper,
         Cart $cart,
         QuoteFactory $quoteFactory,
@@ -74,9 +70,7 @@ class Data extends AbstractHelper
         ThemeFactory $themeFactory
     ) {
         parent::__construct($context);
-        $this->resourceConfig = $resourceConfig;
         $this->storeManager = $storeManager;
-        $this->curlFactory = $curlFactory;
         $this->session = $session;
         $this->customerSession = $customerSession;
         $this->jsonHelper = $jsonHelper;
@@ -259,27 +253,6 @@ class Data extends AbstractHelper
         return $this->scopeConfig->getValue(self::XML_PATH_PAYMENT_TITLE_TYPE, ScopeInterface::SCOPE_STORE);
     }
 
-    public function getClientEmail()
-    {
-        return trim($this->scopeConfig->getValue('iwd_opc/general/license_email'));
-    }
-
-    public function setModuleActive($isActive)
-    {
-        $this->resourceConfig->saveConfig(self::XML_PATH_ENABLE, (int)$isActive, 'default', 0);
-    }
-
-    public function changeModuleOutput($outputDisabled)
-    {
-        $this->resourceConfig->saveConfig('advanced/modules_disable_output/Kkkonrad_Fastcheckout', $outputDisabled, 'default', 0);
-    }
-
-    public function getLicensingInformation()
-    {
-        return '<a href="https://www.iwdagency.com/help/general-information/managing-your-product-license">
-                    licensing information
-                </a>';
-    }
 
     public function getBaseUrl()
     {
