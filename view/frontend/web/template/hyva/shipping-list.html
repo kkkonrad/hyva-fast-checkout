@@ -7,6 +7,7 @@
                     <input type="radio" 
                            class="form-radio h-4 w-4 text-blue-600 focus:ring-blue-500 mr-4 shrink-0" 
                            name="shipping_method" 
+                           required
                            data-bind="checked: $parent.selectedMethodCode, value: method.carrier_code + '_' + method.method_code" />
                     <div class="min-w-0 pl-4">
                         <span class="block text-sm font-semibold text-gray-900 leading-tight"
@@ -24,11 +25,6 @@
             <!-- InPost widget container placeholder -->
             <div data-bind="attr: { id: 'label_method_' + method.method_code + '_' + method.carrier_code }"></div>
         </div>
-    <!-- /ko -->
-
-    <!-- ko if: errorValidationMessage() -->
-    <div class="text-xs text-red-600 font-medium mt-2 border border-red-200 bg-red-50 p-3 rounded" 
-         data-bind="text: errorValidationMessage"></div>
     <!-- /ko -->
 
     <!-- ko ifnot: rates().length -->

@@ -327,48 +327,26 @@ define([
                     validate: function () {
                         try {
                             var activeMethod = quote.shippingMethod();
-                            if (window.console && typeof window.console.log === 'function') {
-                                window.console.log('Kkkonrad OPC: Shipping validation starting. activeMethod:', activeMethod);
-                            }
-
                             if (!activeMethod) {
-                                if (window.console && typeof window.console.log === 'function') {
-                                    window.console.log('Kkkonrad OPC: No active shipping method selected on quote.');
-                                }
                                 return true;
                             }
 
                             var carrierCode = activeMethod.carrier_code || '';
                             var methodCode = activeMethod.method_code || '';
 
-                            if (window.console && typeof window.console.log === 'function') {
-                                window.console.log('Kkkonrad OPC: Shipping carrier:', carrierCode, 'method:', methodCode);
-                            }
-
-                            // InPost locker method validation (checks if carrier is inpost and carrier/method contains locker/paczkomat)
-                            var isInPostLocker = (carrierCode.indexOf('inpost') !== -1) && (
-                                carrierCode.indexOf('locker') !== -1 || 
-                                methodCode.indexOf('locker') !== -1 || 
-                                methodCode.indexOf('paczkomat') !== -1
-                            );
+                            // InPost locker point selection validation
+                            var fullMethodCode = (methodCode + '_' + carrierCode).toLowerCase();
+                            var isInPostLocker = fullMethodCode.indexOf('inpostlocker') !== -1 || 
+                                                 fullMethodCode.indexOf('paczkomat') !== -1 || 
+                                                 (fullMethodCode.indexOf('inpost') !== -1 && (fullMethodCode.indexOf('locker') !== -1 || fullMethodCode.indexOf('box') !== -1 || fullMethodCode.indexOf('point') !== -1));
                             if (isInPostLocker) {
                                 var pointData = null;
                                 if (checkoutData && typeof checkoutData.getShippingInPostPoint === 'function') {
                                     pointData = checkoutData.getShippingInPostPoint();
                                 }
 
-                                if (window.console && typeof window.console.log === 'function') {
-                                    window.console.log('Kkkonrad OPC: InPost locker validation. pointData:', pointData);
-                                }
-
                                 if (!pointData || !pointData.name || pointData.name.length === 0) {
-                                    var msg = $t('Please select a pickup point');
-                                    var shippingList = window.iwdOpcHyvaShippingListInstance || registry.get('iwdOpcHyvaShippingRenderers.shippingList');
-                                    if (shippingList && typeof shippingList.errorValidationMessage === 'function') {
-                                        shippingList.errorValidationMessage(msg);
-                                    } else {
-                                        alert(msg);
-                                    }
+                                    alert($t('Please select a pickup point'));
                                     var el = document.getElementById('label_method_' + methodCode + '_' + carrierCode) ||
                                         document.getElementById('iwd-opc-ko-shipping-root') ||
                                         document.querySelector('[name="shipping_method"]');
@@ -378,16 +356,10 @@ define([
                                     return false;
                                 }
 
-                                var fullMethodCode = methodCode + '_' + carrierCode;
-                                if (fullMethodCode.indexOf('cod') !== -1) {
+                                var fullMethodCodeRaw = methodCode + '_' + carrierCode;
+                                if (fullMethodCodeRaw.indexOf('cod') !== -1) {
                                     if (pointData.type && !pointData.type.includes('parcel_locker')) {
-                                        var msgCod = $t('The selected point does not support the cash on delivery method');
-                                        var shippingList = window.iwdOpcHyvaShippingListInstance || registry.get('iwdOpcHyvaShippingRenderers.shippingList');
-                                        if (shippingList && typeof shippingList.errorValidationMessage === 'function') {
-                                            shippingList.errorValidationMessage(msgCod);
-                                        } else {
-                                            alert(msgCod);
-                                        }
+                                        alert($t('The selected point does not support the cash on delivery method'));
                                         return false;
                                     }
                                 }

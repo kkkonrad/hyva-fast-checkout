@@ -839,7 +839,7 @@ function initOpcCheckout() {
          */
         handleSubmit() {
             if (this._validateAll()) {
-                // Invoke shipping method validation first if available
+                // Invoke shipping locker validation if available
                 if (window.iwdOpcHyvaShipping && typeof window.iwdOpcHyvaShipping.validate === 'function') {
                     if (!window.iwdOpcHyvaShipping.validate()) {
                         if (window.console && typeof window.console.warn === 'function') {

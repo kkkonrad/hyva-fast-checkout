@@ -17,9 +17,7 @@ define([
         isLoading: shippingService.isLoading,
 
         initObservable: function () {
-            this._super().observe({
-                errorValidationMessage: ''
-            });
+            this._super();
             return this;
         },
 
@@ -75,7 +73,6 @@ define([
         selectShippingMethod: function (method) {
             if (method) {
                 this.selectedMethodCode(method.carrier_code + '_' + method.method_code);
-                this.errorValidationMessage('');
             }
             return true;
         },
