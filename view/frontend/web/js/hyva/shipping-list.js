@@ -15,10 +15,17 @@ define([
 
         rates: shippingService.getShippingRates(),
         isLoading: shippingService.isLoading,
-        errorValidationMessage: ko.observable(false),
+
+        initObservable: function () {
+            this._super().observe({
+                errorValidationMessage: ''
+            });
+            return this;
+        },
 
         initialize: function () {
             this._super();
+            window.iwdOpcHyvaShippingListInstance = this;
             if (window.console && typeof window.console.log === 'function') {
                 window.console.log('Kkkonrad OPC: shipping-list JS component initialized');
             }
@@ -68,7 +75,7 @@ define([
         selectShippingMethod: function (method) {
             if (method) {
                 this.selectedMethodCode(method.carrier_code + '_' + method.method_code);
-                this.errorValidationMessage(false);
+                this.errorValidationMessage('');
             }
             return true;
         },

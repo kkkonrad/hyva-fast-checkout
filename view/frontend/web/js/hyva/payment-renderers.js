@@ -363,7 +363,7 @@ define([
 
                                 if (!pointData || !pointData.name || pointData.name.length === 0) {
                                     var msg = $t('Please select a pickup point');
-                                    var shippingList = registry.get('iwdOpcHyvaShippingRenderers.shippingList');
+                                    var shippingList = window.iwdOpcHyvaShippingListInstance || registry.get('iwdOpcHyvaShippingRenderers.shippingList');
                                     if (shippingList && typeof shippingList.errorValidationMessage === 'function') {
                                         shippingList.errorValidationMessage(msg);
                                     } else {
@@ -382,7 +382,7 @@ define([
                                 if (fullMethodCode.indexOf('cod') !== -1) {
                                     if (pointData.type && !pointData.type.includes('parcel_locker')) {
                                         var msgCod = $t('The selected point does not support the cash on delivery method');
-                                        var shippingList = registry.get('iwdOpcHyvaShippingRenderers.shippingList');
+                                        var shippingList = window.iwdOpcHyvaShippingListInstance || registry.get('iwdOpcHyvaShippingRenderers.shippingList');
                                         if (shippingList && typeof shippingList.errorValidationMessage === 'function') {
                                             shippingList.errorValidationMessage(msgCod);
                                         } else {

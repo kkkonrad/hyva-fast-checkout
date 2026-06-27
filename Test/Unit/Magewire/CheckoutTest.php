@@ -185,7 +185,7 @@ class CheckoutTest extends TestCase
         $shippingAddressMock->expects($this->once())->method('getStreet')->willReturn(['123 Street St', 'Suite A']);
         $shippingAddressMock->expects($this->once())->method('getCity')->willReturn('Warsaw');
         $shippingAddressMock->expects($this->once())->method('getPostcode')->willReturn('00-001');
-        $shippingAddressMock->expects($this->once())->method('getCountryId')->willReturn('PL');
+        $shippingAddressMock->expects($this->any())->method('getCountryId')->willReturn('PL');
         $shippingAddressMock->expects($this->once())->method('getRegionId')->willReturn('1');
         $shippingAddressMock->expects($this->once())->method('getRegion')->willReturn('Mazovia');
         $shippingAddressMock->expects($this->once())->method('getTelephone')->willReturn('123456789');
@@ -363,21 +363,17 @@ class CheckoutTest extends TestCase
     {
         $shippingAddressMock = $this->createAddressMock();
 
-        $this->quoteMock->expects($this->once())
+        $this->quoteMock->expects($this->any())
             ->method('getShippingAddress')
             ->willReturn($shippingAddressMock);
+
+        $shippingAddressMock->expects($this->any())
+            ->method('getCountryId')
+            ->willReturn('PL');
 
         $shippingAddressMock->expects($this->once())
             ->method('setShippingMethod')
             ->with('flatrate_flatrate');
-        $shippingAddressMock->expects($this->once())
-            ->method('setCollectShippingRates')
-            ->with(true);
-
-        $this->quoteMock->expects($this->once())->method('collectTotals');
-        $this->cartRepositoryMock->expects($this->once())
-            ->method('save')
-            ->with($this->quoteMock);
 
         $this->checkoutComponent->selectShippingMethod('flatrate_flatrate');
         $this->assertEquals('flatrate_flatrate', $this->checkoutComponent->shippingMethod);

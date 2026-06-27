@@ -224,6 +224,9 @@ class Checkout extends Component
             $this->city = (string) $shippingAddress->getCity();
             $this->postcode = (string) $shippingAddress->getPostcode();
             $this->countryId = (string) ($shippingAddress->getCountryId() ?: $this->getDefaultCountry());
+            if (!$shippingAddress->getCountryId()) {
+                $shippingAddress->setCountryId($this->countryId);
+            }
             $regionIdVal = $shippingAddress->getRegionId();
             $this->regionId = (int)$regionIdVal > 0 ? (string)$regionIdVal : '';
             $this->region = (string) $shippingAddress->getRegion();
@@ -514,40 +517,48 @@ class Checkout extends Component
      */
     public function selectShippingMethod(string $methodCode): void
     {
-        $quote = $this->checkoutSession->getQuote();
-        $shippingAddress = $quote->getShippingAddress();
-        if ($shippingAddress) {
-            $shippingAddress->setShippingMethod($methodCode);
-            $shippingAddress->setCollectShippingRates(true);
-            $quote->collectTotals();
-            $this->cartRepository->save($quote);
-            $this->shippingMethod = $methodCode;
-
-            // Check if the currently selected payment method is still valid under new shipping method
-            if ($this->paymentMethod !== '') {
-                $allowedPaymentMethods = $this->getAllowedPaymentMethods();
-                $paymentAllowed = false;
-                foreach ($allowedPaymentMethods as $method) {
-                    if ($method->getCode() === $this->paymentMethod) {
-                        $paymentAllowed = true;
-                        break;
-                    }
+        try {
+            $this->saveShippingAddress(true, false, false);
+            $quote = $this->checkoutSession->getQuote();
+            $shippingAddress = $quote->getShippingAddress();
+            if ($shippingAddress) {
+                if (!$shippingAddress->getCountryId()) {
+                    $shippingAddress->setCountryId($this->countryId ?: $this->getDefaultCountry());
                 }
-                if (!$paymentAllowed) {
-                    if (!empty($allowedPaymentMethods)) {
-                        $firstMethod = reset($allowedPaymentMethods);
-                        $this->selectPaymentMethod($firstMethod->getCode());
-                    } else {
-                        $this->paymentMethod = '';
-                        $payment = $quote->getPayment();
-                        if ($payment) {
-                            $payment->setMethod('');
-                            $quote->collectTotals();
-                            $this->cartRepository->save($quote);
+                $shippingAddress->setShippingMethod($methodCode);
+                $shippingAddress->setCollectShippingRates(true);
+                $quote->collectTotals();
+                $this->cartRepository->save($quote);
+                $this->shippingMethod = $methodCode;
+
+                // Check if the currently selected payment method is still valid under new shipping method
+                if ($this->paymentMethod !== '') {
+                    $allowedPaymentMethods = $this->getAllowedPaymentMethods();
+                    $paymentAllowed = false;
+                    foreach ($allowedPaymentMethods as $method) {
+                        if ($method->getCode() === $this->paymentMethod) {
+                            $paymentAllowed = true;
+                            break;
+                        }
+                    }
+                    if (!$paymentAllowed) {
+                        if (!empty($allowedPaymentMethods)) {
+                            $firstMethod = reset($allowedPaymentMethods);
+                            $this->selectPaymentMethod($firstMethod->getCode());
+                        } else {
+                            $this->paymentMethod = '';
+                            $payment = $quote->getPayment();
+                            if ($payment) {
+                                $payment->setMethod('');
+                                $quote->collectTotals();
+                                $this->cartRepository->save($quote);
+                            }
                         }
                     }
                 }
             }
+        } catch (\Exception $e) {
+            $this->logger->error('IWD OPC selectShippingMethod Error: ' . $e->getMessage(), ['exception' => $e]);
         }
     }
 
@@ -643,29 +654,39 @@ class Checkout extends Component
      */
     public function selectPaymentMethod(string $methodCode): void
     {
-        $quote = $this->checkoutSession->getQuote();
-        $methodAvailable = false;
-        foreach ($this->getAllowedPaymentMethods() as $method) {
-            if ($method->getCode() === $methodCode) {
-                $methodAvailable = true;
-                break;
+        try {
+            $this->saveShippingAddress(true, false, false);
+            $quote = $this->checkoutSession->getQuote();
+            $shippingAddress = $quote->getShippingAddress();
+            if ($shippingAddress && !$shippingAddress->getCountryId()) {
+                $shippingAddress->setCountryId($this->countryId ?: $this->getDefaultCountry());
             }
-        }
 
-        if (!$methodAvailable) {
-            $this->paymentMethod = '';
-            return;
-        }
-
-        $payment = $quote->getPayment();
-        if ($payment) {
-            $this->importPaymentData($payment, $methodCode);
-            if ($methodCode === 'purchaseorder' && method_exists($payment, 'setPoNumber')) {
-                $payment->setPoNumber($this->poNumber);
+            $methodAvailable = false;
+            foreach ($this->getAllowedPaymentMethods() as $method) {
+                if ($method->getCode() === $methodCode) {
+                    $methodAvailable = true;
+                    break;
+                }
             }
-            $quote->collectTotals();
-            $this->cartRepository->save($quote);
-            $this->paymentMethod = $methodCode;
+
+            if (!$methodAvailable) {
+                $this->paymentMethod = '';
+                return;
+            }
+
+            $payment = $quote->getPayment();
+            if ($payment) {
+                $this->importPaymentData($payment, $methodCode);
+                if ($methodCode === 'purchaseorder' && method_exists($payment, 'setPoNumber')) {
+                    $payment->setPoNumber($this->poNumber);
+                }
+                $quote->collectTotals();
+                $this->cartRepository->save($quote);
+                $this->paymentMethod = $methodCode;
+            }
+        } catch (\Exception $e) {
+            $this->logger->error('IWD OPC selectPaymentMethod Error: ' . $e->getMessage(), ['exception' => $e]);
         }
     }
 
