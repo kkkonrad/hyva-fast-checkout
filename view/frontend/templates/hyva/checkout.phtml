@@ -242,22 +242,27 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                     <h2 class="text-xl font-semibold text-gray-900">
                         <?= $escaper->escapeHtml(__('Shipping Method')) ?>
                     </h2>
-                    <div wire:loading wire:target="selectShippingMethod" class="text-xs text-blue-600 animate-pulse flex items-center gap-1.5">
-                        <svg class="animate-spin h-3.5 w-3.5 text-blue-600 inline" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        <span class="hidden md:inline"><?= $escaper->escapeHtml(__('Updating rates...')) ?></span>
-                    </div>
                 </div>
 
-                <div id="iwd-opc-ko-shipping-root"
-                     class="iwd-opc-ko-shipping-root"
-                     wire:ignore
-                     data-bind="scope: 'iwdOpcHyvaShippingRenderers'">
-                    <!-- ko foreach: getRegion('shipping-methods-list') -->
-                        <!-- ko template: getTemplate() --><!-- /ko -->
-                    <!-- /ko -->
+                <div class="relative min-h-[50px]">
+                    <div wire:loading.flex
+                         wire:target="countryId,regionId,region,postcode,city,street1,street2,fillFromSavedAddress"
+                         class="absolute inset-0 bg-white/70 backdrop-blur-[1px] z-20 rounded items-center justify-center transition-all duration-200">
+                        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center">
+                            <svg class="animate-spin h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                    <div id="iwd-opc-ko-shipping-root"
+                         class="iwd-opc-ko-shipping-root"
+                         wire:ignore
+                         data-bind="scope: 'iwdOpcHyvaShippingRenderers'">
+                        <!-- ko foreach: getRegion('shipping-methods-list') -->
+                            <!-- ko template: getTemplate() --><!-- /ko -->
+                        <!-- /ko -->
+                    </div>
                 </div>
             </div>
         </div>
@@ -429,7 +434,17 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                         <?= $escaper->escapeHtml(__('No payment methods available.')) ?>
                     </p>
                 <?php else: ?>
-	                    <div class="grid gap-3" wire:key="checkout-payment-methods-grid">
+	                    <div class="grid gap-3 relative min-h-[50px]" wire:key="checkout-payment-methods-grid">
+	                        <div wire:loading.flex
+                                 wire:target="countryId,regionId,region,postcode,city,street1,street2,fillFromSavedAddress,selectShippingMethod"
+                                 class="absolute inset-0 bg-white/70 backdrop-blur-[1px] z-20 rounded items-center justify-center transition-all duration-200">
+                                <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center">
+                                    <svg class="animate-spin h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                </div>
+                            </div>
 	                        <?php foreach ($paymentMethods as $method): ?>
                                 <?php
                                 $methodCode = $method->getCode();
@@ -632,11 +647,14 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
 
                 <!-- Place Order Button -->
                 <div class="pt-2">
-                    <button class="btn btn-primary w-full py-3 flex items-center justify-center gap-2" 
+                    <button class="btn btn-primary w-full py-3 flex items-center justify-center gap-2 transition-all duration-200" 
                             type="submit" 
                             :disabled="isProcessing"
-                            :class="isProcessing ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''">
-                        <span x-show="isProcessing" x-cloak>
+                            :class="isProcessing ? 'opacity-80 cursor-not-allowed pointer-events-none' : ''"
+                            wire:loading.attr="disabled"
+                            wire:loading.class="opacity-80 cursor-not-allowed pointer-events-none"
+                            wire:target="placeOrder">
+                        <span x-show="isProcessing" wire:loading wire:target="placeOrder" x-cloak>
                             <svg class="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -682,12 +700,15 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                     <span><?= $escaper->escapeHtml(__('Secure SSL Checkout')) ?></span>
                 </div>
             </div>
-            <button class="btn btn-primary w-full py-3 flex items-center justify-center gap-2" 
+            <button class="btn btn-primary w-full py-3 flex items-center justify-center gap-2 transition-all duration-200" 
                     type="submit" 
                     form="co-checkout-form"
                     :disabled="isProcessing"
-                    :class="isProcessing ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''">
-                <span x-show="isProcessing" x-cloak>
+                    :class="isProcessing ? 'opacity-80 cursor-not-allowed pointer-events-none' : ''"
+                    wire:loading.attr="disabled"
+                    wire:loading.class="opacity-80 cursor-not-allowed pointer-events-none"
+                    wire:target="placeOrder">
+                <span x-show="isProcessing" wire:loading wire:target="placeOrder" x-cloak>
                     <svg class="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
