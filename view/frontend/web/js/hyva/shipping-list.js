@@ -17,7 +17,10 @@ define([
         isLoading: shippingService.isLoading,
 
         initObservable: function () {
-            this._super();
+            this._super().observe({
+                errorMethodCode: '',
+                errorValidationMessage: ''
+            });
             return this;
         },
 
@@ -28,6 +31,36 @@ define([
                 window.console.log('Kkkonrad OPC: shipping-list JS component initialized');
             }
             return this;
+        },
+
+        setError: function (methodCode, message) {
+            var self = this;
+            if (this._errorTimer) {
+                clearTimeout(this._errorTimer);
+                this._errorTimer = null;
+            }
+            this.errorMethodCode(methodCode);
+            this.errorValidationMessage(message);
+
+            this._errorTimer = setTimeout(function () {
+                self.clearError();
+            }, 4000);
+        },
+
+        clearError: function () {
+            if (this._errorTimer) {
+                clearTimeout(this._errorTimer);
+                this._errorTimer = null;
+            }
+            this.errorMethodCode('');
+            this.errorValidationMessage('');
+        },
+
+        hasError: function (method) {
+            var fullCode = method.carrier_code + '_' + method.method_code;
+            var altCode = method.method_code + '_' + method.carrier_code;
+            var err = this.errorMethodCode();
+            return err && (err === fullCode || err === altCode);
         },
 
         isSelectedVal: function (method) {
@@ -52,6 +85,7 @@ define([
                     return (rate.carrier_code + '_' + rate.method_code) === value;
                 })[0];
                 if (found) {
+                    this.clearError();
                     selectShippingMethodAction(found);
 
                     // Sync the selected shipping method back to Magewire

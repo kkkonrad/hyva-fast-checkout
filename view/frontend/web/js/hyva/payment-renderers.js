@@ -321,47 +321,36 @@ define([
                     });
                 }
 
+                function getShippingListComponent() {
+                    return window.iwdOpcHyvaShippingListInstance || (typeof registry !== 'undefined' && registry.get('iwdOpcHyvaShippingRenderers.shippingList')) || null;
+                }
+
                 function clearShippingFieldError() {
-                    var errors = document.querySelectorAll('.shipping-field-error');
-                    for (var i = 0; i < errors.length; i++) {
-                        errors[i].remove();
-                    }
-                    var highlighted = document.querySelectorAll('.shipping-method-error-highlight');
-                    for (var j = 0; j < highlighted.length; j++) {
-                        highlighted[j].classList.remove('border-red-400', 'ring-1', 'ring-red-400', 'shipping-method-error-highlight');
+                    var component = getShippingListComponent();
+                    if (component && typeof component.clearError === 'function') {
+                        component.clearError();
                     }
                 }
 
                 function showShippingFieldError(methodCode, carrierCode, errorMessage) {
-                    clearShippingFieldError();
-                    var targetPlaceholder = document.getElementById('label_method_' + methodCode + '_' + carrierCode);
-                    var methodContainer = targetPlaceholder ? targetPlaceholder.closest('.border') : null;
-                    var radioInput = document.querySelector('input[name="shipping_method"][value="' + carrierCode + '_' + methodCode + '"]') ||
-                        document.querySelector('input[name="shipping_method"][value="' + methodCode + '_' + carrierCode + '"]') ||
-                        document.querySelector('input[name="shipping_method"]:checked');
-
-                    if (!methodContainer && radioInput) {
-                        methodContainer = radioInput.closest('.border');
+                    var component = getShippingListComponent();
+                    if (component && typeof component.setError === 'function') {
+                        component.setError(carrierCode + '_' + methodCode, errorMessage);
                     }
-
-                    var wrapper = targetPlaceholder || (radioInput ? radioInput.closest('label') : null) || methodContainer;
-
-                    if (methodContainer) {
-                        methodContainer.classList.add('border-red-400', 'ring-1', 'ring-red-400', 'shipping-method-error-highlight');
-                    }
-
-                    if (wrapper) {
-                        var msg = document.createElement('span');
-                        msg.className = 'field-error shipping-field-error mt-2 text-xs text-red-600 block font-medium';
-                        msg.textContent = errorMessage;
-                        wrapper.appendChild(msg);
-                        wrapper.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    var el = document.getElementById('label_method_' + methodCode + '_' + carrierCode) ||
+                             document.getElementById('iwd-opc-ko-shipping-root') ||
+                             document.querySelector('[name="shipping_method"]');
+                    if (el) {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     }
                 }
 
                 window.iwdOpcHyvaShipping = {
                     syncAddress: syncAddressToKnockout,
                     syncShippingMethod: syncSelectedShippingMethodToKnockout,
+                    setError: function (methodCode, message) {
+                        showShippingFieldError(methodCode, '', message);
+                    },
                     clearError: clearShippingFieldError,
                     validate: function () {
                         try {

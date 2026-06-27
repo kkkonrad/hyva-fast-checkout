@@ -1,7 +1,11 @@
 <div class="grid gap-3">
     <!-- ko foreach: { data: rates(), as: 'method' } -->
         <div class="border rounded p-4 transition-all duration-200"
-             data-bind="css: $parent.selectedMethodCode() === (method.carrier_code + '_' + method.method_code) ? 'border-blue-500 bg-blue-50/10 shadow-sm ring-1 ring-blue-500' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50/50'">
+             data-bind="css: {
+                 'border-blue-500 bg-blue-50/10 shadow-sm ring-1 ring-blue-500': $parent.selectedMethodCode() === (method.carrier_code + '_' + method.method_code) && !$parent.hasError(method),
+                 'border-red-400 ring-1 ring-red-400 bg-red-50/10': $parent.hasError(method),
+                 'border-gray-200 hover:border-gray-300 hover:bg-gray-50/50': $parent.selectedMethodCode() !== (method.carrier_code + '_' + method.method_code) && !$parent.hasError(method)
+             }">
             <label class="flex items-center justify-between cursor-pointer mb-0 w-full">
                 <div class="flex items-center min-w-0">
                     <input type="radio" 
@@ -24,6 +28,11 @@
             </label>
             <!-- InPost widget container placeholder -->
             <div data-bind="attr: { id: 'label_method_' + method.method_code + '_' + method.carrier_code }"></div>
+
+            <!-- ko if: $parent.hasError(method) -->
+            <span class="field-error shipping-field-error mt-2 text-xs text-red-600 block font-medium"
+                  data-bind="text: $parent.errorValidationMessage"></span>
+            <!-- /ko -->
         </div>
     <!-- /ko -->
 
