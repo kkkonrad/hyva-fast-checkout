@@ -57,6 +57,44 @@ define([
             checkoutData,
             $t
         ) {
+            if (checkoutData) {
+                var cacheKey = 'checkout-data';
+                var getLocalData = function () {
+                    try {
+                        var raw = window.localStorage ? window.localStorage.getItem(cacheKey) : null;
+                        return raw ? JSON.parse(raw) : {};
+                    } catch (e) { return {}; }
+                };
+                var saveLocalData = function (data) {
+                    try { if (window.localStorage) window.localStorage.setItem(cacheKey, JSON.stringify(data)); } catch (e) {}
+                };
+
+                if (typeof checkoutData.setShippingInPostPoint !== 'function') {
+                    checkoutData.setShippingInPostPoint = function (data) {
+                        var obj = getLocalData();
+                        obj.shippingInPostPointData = data;
+                        saveLocalData(obj);
+                    };
+                }
+                if (typeof checkoutData.getShippingInPostPoint !== 'function') {
+                    checkoutData.getShippingInPostPoint = function () {
+                        return getLocalData().shippingInPostPointData || null;
+                    };
+                }
+                if (typeof checkoutData.setShippingInPostMode !== 'function') {
+                    checkoutData.setShippingInPostMode = function (data) {
+                        var obj = getLocalData();
+                        obj.shippingInPostModeData = data;
+                        saveLocalData(obj);
+                    };
+                }
+                if (typeof checkoutData.getShippingInPostMode !== 'function') {
+                    checkoutData.getShippingInPostMode = function () {
+                        return getLocalData().shippingInPostModeData || null;
+                    };
+                }
+            }
+
             function loadRendererComponents(done) {
                 var remaining = rendererComponents.length;
 
@@ -160,13 +198,50 @@ define([
                     });
                 }
 
+                function syncQuoteCustomerData() {
+                    if (!quote) return;
+                    var emailEl = document.querySelector('input[name="email"]') || 
+                                  document.querySelector('input[type="email"]') ||
+                                  document.querySelector('[data-wire-field="email"]');
+                    var emailVal = emailEl ? emailEl.value : '';
+                    if (!emailVal && window.checkoutConfig && window.checkoutConfig.customerData) {
+                        emailVal = window.checkoutConfig.customerData.email || '';
+                    }
+                    if (!emailVal && window.checkoutConfig && window.checkoutConfig.quoteData) {
+                        emailVal = window.checkoutConfig.quoteData.customer_email || '';
+                    }
+                    if (emailVal) {
+                        if (typeof quote.guestEmail === 'function') {
+                            quote.guestEmail(emailVal);
+                        }
+                        var billing = typeof quote.billingAddress === 'function' ? quote.billingAddress() : null;
+                        if (!billing) {
+                            billing = {};
+                            if (typeof quote.billingAddress === 'function') {
+                                quote.billingAddress(billing);
+                            }
+                        }
+                        if (billing) {
+                            billing.email = emailVal;
+                        }
+                    }
+                }
+
+                document.addEventListener('input', function (e) {
+                    if (e.target && (e.target.name === 'email' || e.target.type === 'email' || e.target.getAttribute('data-wire-field') === 'email')) {
+                        syncQuoteCustomerData();
+                    }
+                });
+
                 function syncKoPaymentRenderers() {
+                    syncQuoteCustomerData();
                     if (window.iwdOpcHyvaPaymentList && typeof window.iwdOpcHyvaPaymentList.syncRenderers === 'function') {
                         window.iwdOpcHyvaPaymentList.syncRenderers();
                     }
                 }
 
                 function syncPaymentMethods() {
+                    syncQuoteCustomerData();
                     var domMethods = getDomPaymentMethods();
                     var methods = domMethods.map(function (method) {
                         return {
@@ -355,13 +430,24 @@ define([
                     validate: function () {
                         try {
                             clearShippingFieldError();
+                            var checkedDomRadio = document.querySelector('input[name="shipping_method"]:checked');
                             var activeMethod = quote.shippingMethod();
-                            if (!activeMethod) {
-                                return true;
+
+                            var carrierCode = '';
+                            var methodCode = '';
+
+                            if (checkedDomRadio && checkedDomRadio.value) {
+                                var parts = checkedDomRadio.value.split('_');
+                                carrierCode = parts[0] || '';
+                                methodCode = parts[1] || parts[0] || '';
+                            } else if (activeMethod) {
+                                carrierCode = activeMethod.carrier_code || '';
+                                methodCode = activeMethod.method_code || '';
                             }
 
-                            var carrierCode = activeMethod.carrier_code || '';
-                            var methodCode = activeMethod.method_code || '';
+                            if (!carrierCode) {
+                                return true;
+                            }
 
                             // InPost locker point selection validation
                             var fullMethodCode = (methodCode + '_' + carrierCode).toLowerCase();
@@ -507,6 +593,7 @@ define([
 
                     component.iwdOpcHyvaPatched = true;
                     component.selectPaymentMethod = function () {
+                        syncQuoteCustomerData();
                         var paymentData = typeof component.getData === 'function'
                             ? component.getData()
                             : { method: component.item ? component.item.method : null },

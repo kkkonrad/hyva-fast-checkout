@@ -17,75 +17,46 @@ define([
         isLoading: shippingService.isLoading,
 
         initObservable: function () {
+            var self = this;
             this._super().observe({
                 errorMethodCode: '',
                 errorValidationMessage: ''
             });
-            return this;
-        },
 
-        initialize: function () {
-            this._super();
-            window.iwdOpcHyvaShippingListInstance = this;
-            if (window.console && typeof window.console.log === 'function') {
-                window.console.log('Kkkonrad OPC: shipping-list JS component initialized');
-            }
-            return this;
-        },
+            this.selectedMethodCode = ko.pureComputed({
+                read: function () {
+                    var active = quote.shippingMethod();
+                    if (!active) {
+                        var checkedDomRadio = document.querySelector('input[name="shipping_method"]:checked');
+                        return checkedDomRadio ? checkedDomRadio.value : null;
+                    }
+                    return active.carrier_code + '_' + active.method_code;
+                },
+                write: function (value) {
+                    if (!value) {
+                        return;
+                    }
+                    if (self && typeof self.clearError === 'function') {
+                        self.clearError();
+                    }
+                    var rates = shippingService.getShippingRates()();
+                    var found = rates.filter(function (rate) {
+                        var c1 = rate.carrier_code + '_' + rate.method_code;
+                        var c2 = rate.method_code + '_' + rate.carrier_code;
+                        return c1 === value || c2 === value || rate.carrier_code === value || rate.method_code === value;
+                    })[0];
 
-        setError: function (methodCode, message) {
-            var self = this;
-            if (this._errorTimer) {
-                clearTimeout(this._errorTimer);
-                this._errorTimer = null;
-            }
-            this.errorMethodCode(methodCode);
-            this.errorValidationMessage(message);
+                    if (!found) {
+                        var parts = value.split('_');
+                        found = {
+                            carrier_code: parts[0],
+                            method_code: parts[1] || parts[0],
+                            carrier_title: '',
+                            method_title: '',
+                            amount: 0
+                        };
+                    }
 
-            this._errorTimer = setTimeout(function () {
-                self.clearError();
-            }, 4000);
-        },
-
-        clearError: function () {
-            if (this._errorTimer) {
-                clearTimeout(this._errorTimer);
-                this._errorTimer = null;
-            }
-            this.errorMethodCode('');
-            this.errorValidationMessage('');
-        },
-
-        hasError: function (method) {
-            var fullCode = method.carrier_code + '_' + method.method_code;
-            var altCode = method.method_code + '_' + method.carrier_code;
-            var err = this.errorMethodCode();
-            return err && (err === fullCode || err === altCode);
-        },
-
-        isSelectedVal: function (method) {
-            var active = quote.shippingMethod();
-            if (!active) {
-                return false;
-            }
-            return (active.carrier_code + '_' + active.method_code) === (method.carrier_code + '_' + method.method_code);
-        },
-
-        selectedMethodCode: ko.pureComputed({
-            read: function () {
-                var active = quote.shippingMethod();
-                return active ? active.carrier_code + '_' + active.method_code : null;
-            },
-            write: function (value) {
-                if (!value) {
-                    return;
-                }
-                var rates = shippingService.getShippingRates()();
-                var found = rates.filter(function (rate) {
-                    return (rate.carrier_code + '_' + rate.method_code) === value;
-                })[0];
-                if (found) {
-                    this.clearError();
                     selectShippingMethodAction(found);
 
                     // Sync the selected shipping method back to Magewire
@@ -101,12 +72,97 @@ define([
                         }
                     }
                 }
+            }, this);
+
+            return this;
+        },
+
+        initialize: function () {
+            this._super();
+            window.iwdOpcHyvaShippingListInstance = this;
+            if (window.console && typeof window.console.log === 'function') {
+                window.console.log('Kkkonrad OPC: shipping-list JS component initialized');
             }
-        }),
+            return this;
+        },
+
+        setError: function (methodCode, message) {
+            var self = this.errorMethodCode ? this : (window.iwdOpcHyvaShippingListInstance || this);
+            if (self._errorTimer) {
+                clearTimeout(self._errorTimer);
+                self._errorTimer = null;
+            }
+            if (typeof self.errorMethodCode === 'function') {
+                self.errorMethodCode(methodCode);
+                self.errorValidationMessage(message);
+            }
+
+            self._errorTimer = setTimeout(function () {
+                self.clearError();
+            }, 4000);
+        },
+
+        clearError: function () {
+            var self = this.errorMethodCode ? this : (window.iwdOpcHyvaShippingListInstance || this);
+            if (self._errorTimer) {
+                clearTimeout(self._errorTimer);
+                self._errorTimer = null;
+            }
+            if (typeof self.errorMethodCode === 'function') {
+                self.errorMethodCode('');
+                self.errorValidationMessage('');
+            }
+        },
+
+        hasError: function (method) {
+            var self = this.errorMethodCode ? this : (window.iwdOpcHyvaShippingListInstance || this);
+            var fullCode = method.carrier_code + '_' + method.method_code;
+            var altCode = method.method_code + '_' + method.carrier_code;
+            var err = (typeof self.errorMethodCode === 'function') ? self.errorMethodCode() : '';
+            return err && (err === fullCode || err === altCode);
+        },
+
+        getMethodCss: function (method) {
+            var self = this.selectedMethodCode ? this : (window.iwdOpcHyvaShippingListInstance || this);
+            var fullCode = method.carrier_code + '_' + method.method_code;
+            var altCode = method.method_code + '_' + method.carrier_code;
+
+            var currentSelected = (typeof self.selectedMethodCode === 'function') ? self.selectedMethodCode() : null;
+            var active = quote.shippingMethod();
+            var activeFull = active ? active.carrier_code + '_' + active.method_code : null;
+            var activeAlt = active ? active.method_code + '_' + active.carrier_code : null;
+
+            var isSelected = (currentSelected === fullCode || currentSelected === altCode) ||
+                             (activeFull === fullCode || activeFull === altCode) ||
+                             (activeAlt === fullCode || activeAlt === altCode);
+
+            var hasErr = self.hasError ? self.hasError(method) : false;
+
+            if (hasErr) {
+                return 'border-red-400 ring-1 ring-red-400 bg-red-50/10';
+            }
+            if (isSelected) {
+                return 'border-blue-500 bg-blue-50/10 shadow-sm ring-1 ring-blue-500';
+            }
+            return 'border-gray-200 hover:border-gray-300 hover:bg-gray-50/50';
+        },
+
+        isSelectedVal: function (method) {
+            var active = quote.shippingMethod();
+            if (!active) {
+                return false;
+            }
+            var fullCode = method.carrier_code + '_' + method.method_code;
+            var altCode = method.method_code + '_' + method.carrier_code;
+            var activeFull = active.carrier_code + '_' + active.method_code;
+            var activeAlt = active.method_code + '_' + active.carrier_code;
+            return activeFull === fullCode || activeFull === altCode || activeAlt === fullCode || activeAlt === altCode;
+        },
 
         selectShippingMethod: function (method) {
-            if (method) {
-                this.selectedMethodCode(method.carrier_code + '_' + method.method_code);
+            var self = this.selectedMethodCode ? this : (window.iwdOpcHyvaShippingListInstance || this);
+            if (method && typeof self.selectedMethodCode === 'function') {
+                self.selectedMethodCode(method.carrier_code + '_' + method.method_code);
             }
             return true;
         },

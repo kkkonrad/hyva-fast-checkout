@@ -64,6 +64,7 @@ foreach ($layoutScripts['external'] as $externalScript) {
     var config = <?= /* @noEscape */ \Laminas\Json\Json::encode($mageInitConfig) ?>;
     var requireJsUrl = '<?= $escaper->escapeJs($block->getViewFileUrl('requirejs/require.js')) ?>';
     var requireJsConfigUrl = '<?= $escaper->escapeJs($block->getViewFileUrl('requirejs-config.js')) ?>';
+    var mixinsUrl = '<?= $escaper->escapeJs($block->getViewFileUrl('mage/requirejs/mixins.js')) ?>';
     var staticBaseUrl = '<?= $escaper->escapeJs($block->getViewFileUrl('/')) ?>';
     var started = false;
 
@@ -101,12 +102,22 @@ foreach ($layoutScripts['external'] as $externalScript) {
 
     function loadRequireJs() {
         if (typeof window.require === 'function') {
+            window.require.config({
+                baseUrl: staticBaseUrl
+            });
             initPaymentRenderers();
             return;
         }
 
         loadScript(requireJsUrl, function () {
-            loadScript(requireJsConfigUrl, initPaymentRenderers);
+            if (typeof window.require === 'function') {
+                window.require.config({
+                    baseUrl: staticBaseUrl
+                });
+            }
+            loadScript(requireJsConfigUrl, function () {
+                loadScript(mixinsUrl, initPaymentRenderers);
+            });
         });
     }
 
