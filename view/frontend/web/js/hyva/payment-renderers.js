@@ -321,11 +321,51 @@ define([
                     });
                 }
 
+                function clearShippingFieldError() {
+                    var errors = document.querySelectorAll('.shipping-field-error');
+                    for (var i = 0; i < errors.length; i++) {
+                        errors[i].remove();
+                    }
+                    var highlighted = document.querySelectorAll('.shipping-method-error-highlight');
+                    for (var j = 0; j < highlighted.length; j++) {
+                        highlighted[j].classList.remove('border-red-400', 'ring-1', 'ring-red-400', 'shipping-method-error-highlight');
+                    }
+                }
+
+                function showShippingFieldError(methodCode, carrierCode, errorMessage) {
+                    clearShippingFieldError();
+                    var targetPlaceholder = document.getElementById('label_method_' + methodCode + '_' + carrierCode);
+                    var methodContainer = targetPlaceholder ? targetPlaceholder.closest('.border') : null;
+                    var radioInput = document.querySelector('input[name="shipping_method"][value="' + carrierCode + '_' + methodCode + '"]') ||
+                        document.querySelector('input[name="shipping_method"][value="' + methodCode + '_' + carrierCode + '"]') ||
+                        document.querySelector('input[name="shipping_method"]:checked');
+
+                    if (!methodContainer && radioInput) {
+                        methodContainer = radioInput.closest('.border');
+                    }
+
+                    var wrapper = targetPlaceholder || (radioInput ? radioInput.closest('label') : null) || methodContainer;
+
+                    if (methodContainer) {
+                        methodContainer.classList.add('border-red-400', 'ring-1', 'ring-red-400', 'shipping-method-error-highlight');
+                    }
+
+                    if (wrapper) {
+                        var msg = document.createElement('span');
+                        msg.className = 'field-error shipping-field-error mt-2 text-xs text-red-600 block font-medium';
+                        msg.textContent = errorMessage;
+                        wrapper.appendChild(msg);
+                        wrapper.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }
+
                 window.iwdOpcHyvaShipping = {
                     syncAddress: syncAddressToKnockout,
                     syncShippingMethod: syncSelectedShippingMethodToKnockout,
+                    clearError: clearShippingFieldError,
                     validate: function () {
                         try {
+                            clearShippingFieldError();
                             var activeMethod = quote.shippingMethod();
                             if (!activeMethod) {
                                 return true;
@@ -346,20 +386,14 @@ define([
                                 }
 
                                 if (!pointData || !pointData.name || pointData.name.length === 0) {
-                                    alert($t('Please select a pickup point'));
-                                    var el = document.getElementById('label_method_' + methodCode + '_' + carrierCode) ||
-                                        document.getElementById('iwd-opc-ko-shipping-root') ||
-                                        document.querySelector('[name="shipping_method"]');
-                                    if (el) {
-                                        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                    }
+                                    showShippingFieldError(methodCode, carrierCode, $t('Please select a pickup point'));
                                     return false;
                                 }
 
                                 var fullMethodCodeRaw = methodCode + '_' + carrierCode;
                                 if (fullMethodCodeRaw.indexOf('cod') !== -1) {
                                     if (pointData.type && !pointData.type.includes('parcel_locker')) {
-                                        alert($t('The selected point does not support the cash on delivery method'));
+                                        showShippingFieldError(methodCode, carrierCode, $t('The selected point does not support the cash on delivery method'));
                                         return false;
                                     }
                                 }
@@ -404,6 +438,7 @@ define([
                 }
 
                 quote.shippingMethod.subscribe(function (method) {
+                    clearShippingFieldError();
                     if (!method) return;
                     var methodCode = method.carrier_code + '_' + method.method_code;
 
