@@ -67,4 +67,9 @@
 
     <preference for="Magento\Directory\Model\ResourceModel\Region\Collection" type="Kkkonrad\Fastcheckout\Model\ResourceModel\Region\Collection" />
 
+    <type name="Magento\Framework\View\Model\Layout\Merge">
+        <plugin name="fastcheckout_hyva_layout_merge_fix"
+                type="Kkkonrad\Fastcheckout\Plugin\Layout\MergePlugin"/>
+    </type>
+
 </config>
