@@ -949,12 +949,98 @@ define([
                     },
 
                     syncPaymentData: function (wire) {
-                        var paymentData = this.getActivePaymentData(),
-                            additionalData = paymentData.additional_data || {};
-
                         if (!wire || typeof wire.set !== 'function') {
                             return Promise.resolve();
                         }
+
+                        var component = getActiveRenderer();
+                        var self = this;
+                        self.syncWire = wire;
+                        self.syncResolve = null;
+                        self.syncReject = null;
+
+                        // If the active payment component has a custom placeOrder method (e.g. PayU card, Tpay card, Braintree, etc.)
+                        // we delegate the order placement flow to it, so it can perform custom validation & tokenization.
+                        // Once tokenization succeeds, it calls placeOrderAction, which our mixin intercepts.
+                        if (component && typeof component.placeOrder === 'function') {
+                            return new Promise(function (resolve, reject) {
+                                self.syncResolve = resolve;
+                                self.syncReject = reject;
+
+                                // 1. Run local validation checks before triggering placeOrder
+                                var canProceed = true;
+                                if (typeof component.validate === 'function' && !component.validate()) {
+                                    canProceed = false;
+                                }
+                                if (typeof component.isPlaceOrderActionAllowed === 'function' && !component.isPlaceOrderActionAllowed()) {
+                                    canProceed = false;
+                                }
+
+                                if (!canProceed) {
+                                    self.syncResolve = null;
+                                    self.syncReject = null;
+                                    reject(new Error('Payment method validation failed'));
+                                    return;
+                                }
+
+                                if (window.console && typeof window.console.log === 'function') {
+                                    window.console.log('Kkkonrad OPC: Delegating order submission to Knockout component placeOrder()');
+                                }
+
+                                // 2. Subscribe to secureFormError if available to catch async errors immediately
+                                var errorSubscription = null;
+                                if (component.secureFormError && typeof component.secureFormError.subscribe === 'function') {
+                                    errorSubscription = component.secureFormError.subscribe(function (newValue) {
+                                        if (newValue && self.syncReject) {
+                                            var rejectFn = self.syncReject;
+                                            self.syncResolve = null;
+                                            self.syncReject = null;
+                                            if (errorSubscription) {
+                                                errorSubscription.dispose();
+                                            }
+                                            rejectFn(new Error(newValue));
+                                        }
+                                    });
+                                }
+
+                                try {
+                                    var data = typeof component.getData === 'function' ? component.getData() : { method: getSelectedMethodCode() };
+                                    var result = component.placeOrder(data, new Event('submit'));
+                                    
+                                    // If placeOrder returns false or void, it means it is doing async processing (like tokenize).
+                                    // We set a safety timeout to reset the loading state in Alpine if nothing happens.
+                                    if (result === false || result === undefined) {
+                                        setTimeout(function() {
+                                            if (self.syncResolve) {
+                                                if (window.console && typeof window.console.log === 'function') {
+                                                    window.console.log('Kkkonrad OPC: safety timeout reached, resetting checkout button');
+                                                }
+                                                self.syncResolve = null;
+                                                self.syncReject = null;
+                                                if (errorSubscription) {
+                                                    errorSubscription.dispose();
+                                                }
+                                                reject(new Error('Validation or tokenization timeout'));
+                                            }
+                                        }, 10000);
+                                    }
+                                } catch (e) {
+                                    if (window.console && typeof window.console.error === 'function') {
+                                        window.console.error('Kkkonrad OPC: component placeOrder thrown exception:', e);
+                                    }
+                                    self.syncResolve = null;
+                                    self.syncReject = null;
+                                    if (errorSubscription) {
+                                        errorSubscription.dispose();
+                                    }
+                                    reject(e);
+                                }
+                            });
+                        }
+
+                        // Default Handling for basic payment methods (cashondelivery, checkmo, etc.)
+                        var paymentData = this.getActivePaymentData(),
+                            additionalData = paymentData.additional_data || {};
 
                         // Extract PO number for purchaseorder
                         if (paymentData && (paymentData.method === 'purchaseorder' || getSelectedMethodCode() === 'purchaseorder')) {
@@ -969,6 +1055,50 @@ define([
                         }
 
                         return Promise.resolve(wire.set('paymentAdditionalData', additionalData));
+                    },
+
+                    onPlaceOrderAction: function (paymentData, messageContainer, originalAction) {
+                        var additionalData = paymentData.additional_data || {};
+                        var methodCode = paymentData.method || getSelectedMethodCode();
+
+                        if (window.console && typeof window.console.log === 'function') {
+                            window.console.log('Kkkonrad OPC: placeOrderAction intercepted. Method:', methodCode, 'Data:', paymentData);
+                        }
+
+                        // Sync payment data to Magewire
+                        if (this.syncResolve) {
+                            var resolveFn = this.syncResolve;
+                            var rejectFn = this.syncReject;
+                            this.syncResolve = null;
+                            this.syncReject = null;
+
+                            this.syncWire.set('paymentAdditionalData', additionalData)
+                                .then(function () {
+                                    if (window.console && typeof window.console.log === 'function') {
+                                        window.console.log('Kkkonrad OPC: Magewire paymentAdditionalData updated successfully.');
+                                    }
+                                    resolveFn(true);
+                                })
+                                .catch(function (err) {
+                                    if (window.console && typeof window.console.error === 'function') {
+                                        window.console.error('Kkkonrad OPC: failed to set paymentAdditionalData:', err);
+                                    }
+                                    rejectFn(err);
+                                });
+                        } else {
+                            // Fallback if triggered outside handleSubmit Promise context (e.g. direct SDK placeOrder)
+                            var wire = this.syncWire || (window.Livewire ? window.Livewire.find(document.querySelector('[wire\\:id]').getAttribute('wire:id')) : null);
+                            if (wire) {
+                                wire.set('paymentAdditionalData', additionalData)
+                                    .then(function () {
+                                        wire.call('placeOrder', methodCode);
+                                    });
+                            }
+                        }
+
+                        // Return a dummy jQuery Deferred object to satisfy the Knockout component (preventing errors in done/fail calls)
+                        var deferred = $.Deferred();
+                        return deferred.promise();
                     },
 
                     validate: function () {

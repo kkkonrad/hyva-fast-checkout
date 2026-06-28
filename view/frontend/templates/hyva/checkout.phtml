@@ -902,10 +902,17 @@ function initOpcCheckout() {
                             this.$wire.call('placeOrder', selectedMethod);
                         })
                         .catch((err) => {
-                            if (window.console && typeof window.console.error === 'function') {
-                                window.console.error('Kkkonrad OPC: syncPaymentData failed:', err);
-                            }
                             this.isProcessing = false;
+
+                            // Smoothly scroll to the selected payment method container so errors are visible
+                            if (selectedMethodEl) {
+                                const optionContainer = selectedMethodEl.closest('[data-iwd-opc-payment-option]');
+                                if (optionContainer) {
+                                    optionContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                } else {
+                                    selectedMethodEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                }
+                            }
                         });
                     return;
                 }
