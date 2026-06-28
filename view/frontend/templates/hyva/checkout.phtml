@@ -59,13 +59,12 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
           class="contents">
 
 
-    <!-- Two Column Layout -->
-    <div class="grid gap-8 lg:grid-cols-2 lg:items-start w-full">
+    <!-- Three Column Layout for Desktop -->
+
+    <!-- Three Column Layout for Desktop -->
+    <div class="grid gap-6 lg:grid-cols-3 grid-cols-1 items-start w-full">
         
-        <!-- Left Column: Shipping Address & Shipping Methods -->
         <div class="space-y-6 min-w-0 w-full">
-            
-            <!-- Shipping Address Form -->
             <div class="card bg-white p-4 md:p-6 shadow rounded-lg border border-gray-200 relative">
                 <div class="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
                     <h2 class="text-xl font-semibold text-gray-900">
@@ -235,38 +234,6 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                     </label>
                 </div>
             </div>
-
-            <!-- Shipping Methods Section -->
-            <div class="card bg-white p-4 md:p-6 shadow rounded-lg border border-gray-200 relative">
-                <div class="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
-                    <h2 class="text-xl font-semibold text-gray-900">
-                        <?= $escaper->escapeHtml(__('Shipping Method')) ?>
-                    </h2>
-                </div>
-
-                <div class="relative min-h-[50px]">
-                    <div wire:loading.flex
-                         wire:target="countryId,regionId,region,postcode,city,street1,street2,fillFromSavedAddress"
-                         class="absolute inset-0 bg-white/80 backdrop-blur-[1px] z-20 rounded flex-col gap-3 p-4 justify-center transition-all duration-200"
-                         style="display: none;">
-                        <div class="h-10 bg-gray-150 rounded animate-pulse w-full"></div>
-                        <div class="h-10 bg-gray-150 rounded animate-pulse w-full"></div>
-                    </div>
-                    <div id="fastcheckout-ko-shipping-root"
-                         class="fastcheckout-ko-shipping-root"
-                         wire:ignore
-                         data-bind="scope: 'fastcheckoutHyvaShippingRenderers'">
-                        <!-- ko foreach: getRegion('shipping-methods-list') -->
-                            <!-- ko template: getTemplate() --><!-- /ko -->
-                        <!-- /ko -->
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Right Column: Billing, Payment, Coupon & Summary -->
-        <div class="space-y-6 min-w-0 w-full">
-
             <!-- Billing Address same as Shipping toggle -->
             <div class="card bg-white p-4 md:p-6 shadow rounded-lg border border-gray-200">
                 <label class="flex items-center gap-3 cursor-pointer mb-0">
@@ -418,6 +385,36 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                     </div>
                 <?php endif; ?>
             </div>
+                  </div>
+
+        <!-- Column 2: Shipping & Payment Methods -->
+        <div class="space-y-6 min-w-0 w-full">
+            <!-- Shipping Methods Section -->
+            <div class="card bg-white p-4 md:p-6 shadow rounded-lg border border-gray-200 relative">
+                <div class="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
+                    <h2 class="text-xl font-semibold text-gray-900">
+                        <?= $escaper->escapeHtml(__('Shipping Method')) ?>
+                    </h2>
+                </div>
+
+                <div class="relative min-h-[50px]">
+                    <div wire:loading.flex
+                         wire:target="countryId,regionId,region,postcode,city,street1,street2,fillFromSavedAddress"
+                         class="absolute inset-0 bg-white/80 backdrop-blur-[1px] z-20 rounded flex-col gap-3 p-4 justify-center transition-all duration-200"
+                         style="display: none;">
+                        <div class="h-10 bg-gray-150 rounded animate-pulse w-full"></div>
+                        <div class="h-10 bg-gray-150 rounded animate-pulse w-full"></div>
+                    </div>
+                    <div id="fastcheckout-ko-shipping-root"
+                         class="fastcheckout-ko-shipping-root"
+                         wire:ignore
+                         data-bind="scope: 'fastcheckoutHyvaShippingRenderers'">
+                        <!-- ko foreach: getRegion('shipping-methods-list') -->
+                            <!-- ko template: getTemplate() --><!-- /ko -->
+                        <!-- /ko -->
+                    </div>
+                </div>
+            </div>
             <!-- Payment Methods Section -->
             <div class="card bg-white p-4 md:p-6 shadow rounded-lg border border-gray-200 relative" wire:key="checkout-payment-methods-card">
                 <div class="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
@@ -443,8 +440,9 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                                 <?php
                                 $methodCode = $method->getCode();
                                 $isPaymentMethodAllowed = !$hasPaymentMethodFilter || in_array($methodCode, $allowedPaymentMethodCodes, true);
+                                $isSelectedPayment = $isPaymentMethodAllowed && $magewire->paymentMethod === $methodCode;
                                 ?>
- 	                            <div class="border border-gray-200 rounded transition-colors"
+ 	                            <div class="border rounded transition-all duration-200 <?= $isSelectedPayment ? 'border-blue-600 bg-blue-50/40 ring-1 ring-blue-600 shadow-sm' : 'border-gray-200 hover:border-gray-300' ?>"
  	                                 wire:key="payment-method-item-<?= $escaper->escapeHtmlAttr($methodCode) ?>"
  	                                 data-fastcheckout-payment-option="<?= $escaper->escapeHtmlAttr($methodCode) ?>"
                                      data-fastcheckout-payment-allowed="<?= $isPaymentMethodAllowed ? '1' : '0' ?>"
@@ -470,7 +468,10 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                     </div>
                 <?php endif; ?>
             </div>
+        </div>
 
+        <!-- Column 3: Order Summary, Coupon & Place Order -->
+        <div class="space-y-6 min-w-0 w-full">
             <!-- Discount/Coupon Form -->
             <div class="card bg-white p-4 md:p-6 shadow rounded-lg border border-gray-200 relative">
                 <h2 class="text-xl font-semibold text-gray-900 border-b border-gray-200 pb-4 mb-4">
@@ -513,7 +514,6 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                     </div>
                 <?php endif; ?>
             </div>
-
             <!-- Order Summary Sidebar -->
             <div class="card bg-white p-4 md:p-6 shadow rounded-lg border border-gray-200 sticky top-6 space-y-6 transition-all duration-200 relative"
                  wire:key="checkout-totals-card">
@@ -689,7 +689,7 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
     </div>
     </form>
     <?php if ($items): ?>
-        <!-- Sticky Place Order Bar on Mobile -->
+    <!-- Sticky Place Order Bar on Mobile -->
         <div class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 p-4 mb-0 shadow-2xl flex flex-col gap-3 transition-all duration-200"
              style="margin-bottom: 0 !important;"
              wire:key="mobile-sticky-order-bar">
