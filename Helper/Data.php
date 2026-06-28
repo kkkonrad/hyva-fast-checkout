@@ -112,7 +112,18 @@ class Data extends AbstractHelper
     public function getShippingPaymentMapping()
     {
         $mapping = $this->scopeConfig->getValue(self::XML_PATH_SHIPPING_PAYMENT_MAPPING, ScopeInterface::SCOPE_STORE);
-        return $mapping ? $this->jsonHelper->jsonDecode($mapping) : [];
+
+        if (empty($mapping)) {
+            return [];
+        }
+
+        try {
+            $decoded = $this->jsonHelper->jsonDecode($mapping);
+            return is_array($decoded) ? $decoded : [];
+        } catch (\Exception $e) {
+            $this->_logger->warning('Invalid fastcheckout shipping/payment mapping', ['exception' => $e]);
+            return [];
+        }
     }
 
     public function getRestrictPaymentMethods()

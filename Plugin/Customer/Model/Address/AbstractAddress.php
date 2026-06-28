@@ -32,22 +32,41 @@ class AbstractAddress
      */
     public function afterValidate(ParentClass $subject, $result)
     {
-        //If only 1 mistake with regionId field
-        if (is_array($result) && count($result) == 1 && $result[0] instanceof Phrase && $result[0]->getArguments()) {
-            $arguments = $result[0]->getArguments();
-            $countryId = $subject->getCountryId();
-            if (empty($arguments['fieldName']) || $arguments['fieldName'] != 'regionId' || empty($countryId)) {
-                return $result;
-            }
+        if (!is_array($result) || count($result) !== 1) {
+            return $result;
+        }
+
+        $firstError = $result[0] ?? null;
+        if (!$firstError instanceof Phrase || !$firstError->getArguments()) {
+            return $result;
+        }
+
+        $arguments = $firstError->getArguments();
+        $countryId = (string)$subject->getCountryId();
+        if (empty($arguments['fieldName']) || $arguments['fieldName'] !== 'regionId' || $countryId === '') {
+            return $result;
+        }
+
+        try {
             $isRegionRequired = $this->directoryData->isRegionRequired($countryId);
             $countryModel = $subject->getCountryModel();
+            if (!$countryModel || !method_exists($countryModel, 'getRegionCollection')) {
+                return $result;
+            }
+
             $regionCollection = $countryModel->getRegionCollection();
+            if (!$regionCollection || !method_exists($regionCollection, 'getAllIds')) {
+                return $result;
+            }
+
             $regionId = (string)$subject->getRegionId();
             $allowedRegions = $regionCollection->getAllIds();
-            //If region not required && regionId exists
-            if (!$isRegionRequired && $regionId && !in_array($regionId, $allowedRegions, true)) {
+
+            if (!$isRegionRequired && $regionId !== '' && !in_array($regionId, $allowedRegions, true)) {
                 return true;
             }
+        } catch (\Exception $e) {
+            return $result;
         }
 
         return $result;

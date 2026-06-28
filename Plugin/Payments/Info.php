@@ -19,6 +19,10 @@ class Info
         $key,
         $value = null
     ) {
-        return is_object($value) ? $subject : $proceed($key, $value);
+        if (is_object($value) && !($value instanceof \Stringable)) {
+            return $subject;
+        }
+
+        return $proceed($key, $value);
     }
 }

@@ -81,10 +81,6 @@ class CheckoutTest extends TestCase
         $this->checkoutSessionMock = $this->getMockBuilder(CheckoutSession::class)
             ->disableOriginalConstructor()
             ->onlyMethods(['getQuote', 'clearHelperData'])
-            ->addMethods([
-                'setLastQuoteId', 'setLastSuccessQuoteId', 'setLastOrderId',
-                'setLastRealOrderId', 'setLastOrderStatus'
-            ])
             ->getMock();
 
         $this->cartRepositoryMock = $this->createMock(CartRepositoryInterface::class);
@@ -594,6 +590,41 @@ class CheckoutTest extends TestCase
         $this->checkoutComponent->cancelCoupon();
         $this->assertEquals('Coupon code canceled.', $this->checkoutComponent->couponSuccess);
         $this->assertEquals('', $this->checkoutComponent->couponCode);
+    }
+
+    public function testPlaceOrderRejectsDuplicateIdempotencyKey(): void
+    {
+        $sessionStub = new class extends CheckoutSession {
+            public function __construct() {}
+
+            public function getData($key = '', $default = null)
+            {
+                return ['duplicate-key'];
+            }
+
+            public function setData($key, $value)
+            {
+                return $this;
+            }
+        };
+
+        $component = new Checkout(
+            $sessionStub,
+            $this->cartRepositoryMock,
+            $this->shippingMethodManagementMock,
+            $this->paymentMethodManagementMock,
+            $this->cartManagementMock,
+            $this->countryCollectionFactoryMock,
+            $this->regionCollectionFactoryMock,
+            $this->subscriberFactoryMock,
+            $this->helperMock,
+            $this->createMock(\Psr\Log\LoggerInterface::class)
+        );
+
+        $component->idempotencyKey = 'duplicate-key';
+        $component->placeOrder();
+
+        $this->assertStringContainsString('already being processed', $component->orderError);
     }
 
     public function testPlaceOrderSuccess(): void

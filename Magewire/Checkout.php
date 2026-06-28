@@ -759,13 +759,15 @@ class Checkout extends Component
     {
         // Idempotency check to prevent duplicate order submissions
         if (!empty($this->idempotencyKey)) {
-            $usedKeys = $this->checkoutSession->getFastcheckoutUsedIdempotencyKeys() ?: [];
-            if (in_array($this->idempotencyKey, $usedKeys)) {
+            $usedKeys = $this->getStoredIdempotencyKeys();
+
+            if (in_array($this->idempotencyKey, $usedKeys, true)) {
                 $this->orderError = (string)__('This order is already being processed. Please wait.');
                 return;
             }
+
             $usedKeys[] = $this->idempotencyKey;
-            $this->checkoutSession->setFastcheckoutUsedIdempotencyKeys($usedKeys);
+            $this->persistIdempotencyKeys($usedKeys);
         }
 
         // Payment method passed directly from client DOM — no wire:click request needed
@@ -857,17 +859,23 @@ class Checkout extends Component
             // Place order
             $orderId = $this->cartManagement->placeOrder($quoteId);
 
-            $this->checkoutSession->clearHelperData();
+            try {
+                if (is_callable([$this->checkoutSession, 'clearHelperData'])) {
+                    $this->checkoutSession->clearHelperData();
+                }
+            } catch (\Exception $e) {
+                $this->logger->warning('Fastcheckout checkout session clearHelperData failed', ['exception' => $e]);
+            }
 
             try {
                 if ($this->orderFactory !== null) {
                     $order = $this->orderFactory->create()->load($orderId);
-                    $this->checkoutSession->setLastRealOrderId($order->getIncrementId());
-                    $this->checkoutSession->setLastOrderStatus($order->getStatus());
+                    $this->setSessionValue('last_real_order_id', $order->getIncrementId());
+                    $this->setSessionValue('last_order_status', $order->getStatus());
                 }
-                $this->checkoutSession->setLastQuoteId($quoteId);
-                $this->checkoutSession->setLastSuccessQuoteId($quoteId);
-                $this->checkoutSession->setLastOrderId($orderId);
+                $this->setSessionValue('last_quote_id', $quoteId);
+                $this->setSessionValue('last_success_quote_id', $quoteId);
+                $this->setSessionValue('last_order_id', $orderId);
             } catch (\Exception $e) {
                 try {
                     $this->logger->error('Kkkonrad Fastcheckout placeOrder load order Error: ' . $e->getMessage(), ['exception' => $e]);
@@ -883,6 +891,43 @@ class Checkout extends Component
             $this->orderError = $e->getMessage();
             // Regenerate idempotency key on failure so the user can submit again
             $this->idempotencyKey = bin2hex(random_bytes(16));
+        }
+    }
+
+    private function getStoredIdempotencyKeys(): array
+    {
+        try {
+            if (is_callable([$this->checkoutSession, 'getData'])) {
+                $storedKeys = $this->checkoutSession->getData('fastcheckout_used_idempotency_keys');
+                return is_array($storedKeys) ? $storedKeys : [];
+            }
+        } catch (\Exception $e) {
+            $this->logger->warning('Fastcheckout idempotency session read failed', ['exception' => $e]);
+        }
+
+        return [];
+    }
+
+    private function persistIdempotencyKeys(array $keys): void
+    {
+        try {
+            if (is_callable([$this->checkoutSession, 'setData'])) {
+                $this->checkoutSession->setData('fastcheckout_used_idempotency_keys', $keys);
+            }
+        } catch (\Exception $e) {
+            $this->logger->warning('Fastcheckout idempotency session write failed', ['exception' => $e]);
+        }
+    }
+
+    private function setSessionValue(string $key, $value): void
+    {
+        try {
+            $method = 'set' . str_replace('_', '', ucwords($key, '_'));
+            if (method_exists($this->checkoutSession, $method)) {
+                $this->checkoutSession->{$method}($value);
+            }
+        } catch (\Exception $e) {
+            $this->logger->warning('Fastcheckout session value write failed', ['exception' => $e]);
         }
     }
 

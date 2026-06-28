@@ -40,6 +40,30 @@
                     <label>Show Subscribe to Newsletter?</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                 </field>
+                <field id="subscribe_by_default" translate="label" type="select"
+                       sortOrder="8" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Subscribe by Default?</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="show_gift_message" translate="label" type="select"
+                       sortOrder="8" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Show Gift Message?</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="reload_shipping_methods_on_discount" translate="label" type="select"
+                       sortOrder="9" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Reload Shipping Methods After Discount Change?</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="show_all_ship_methods" translate="label" type="select"
+                       sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Show All Shipping Methods?</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="payment_title_type" translate="label" type="text"
+                       sortOrder="11" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Payment Title Type</label>
+                </field>
                 <field id="default_shipping_method" translate="label comment" type="select"
                        sortOrder="9" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Default Shipping Method</label>
@@ -54,11 +78,26 @@
                        sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Payment Methods by Shipping Method</label>
                     <frontend_model>Kkkonrad\Fastcheckout\Block\Adminhtml\System\Config\ShippingPaymentMapping</frontend_model>
-                    <backend_model>Magento\Config\Model\Config\Backend\Serialized\ArraySerialized</backend_model>
+                    <backend_model>Kkkonrad\Fastcheckout\Model\Config\Backend\Json</backend_model>
+                </field>
+            </group>
+            <group id="restrict_payment" translate="label" type="text"
+                   sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Restrict Payment Methods</label>
+                <field id="enable" translate="label" type="select"
+                       sortOrder="1" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable Payment Method Restrictions?</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="methods" translate="label comment" type="text"
+                       sortOrder="2" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Restricted Payment Methods</label>
+                    <comment>Provide JSON array of allowed payment methods, for example: ["checkmo","banktransfer"]</comment>
+                    <backend_model>Kkkonrad\Fastcheckout\Model\Config\Backend\Json</backend_model>
                 </field>
             </group>
             <group id="hyva" translate="label" type="text"
-                   sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
+                   sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="1">
                 <label>Hyva Compatibility</label>
                 <field id="auto_generate_requirejs_assets" translate="label comment" type="select"
                        sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">

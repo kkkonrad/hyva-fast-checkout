@@ -4,7 +4,6 @@
 
     <preference for="Magento\Downloadable\Observer\IsAllowedGuestCheckoutObserver" type="Kkkonrad\Fastcheckout\Observer\Downloadable\IsAllowedGuestCheckoutObserver"/>
     <preference for="Magento\Checkout\Helper\Data" type="Kkkonrad\Fastcheckout\Helper\Checkout\Data"/>
-    <preference for="Magento\Customer\Model\AccountManagement" type="Kkkonrad\Fastcheckout\Model\Customer\AccountManagement" />
 
 
 
