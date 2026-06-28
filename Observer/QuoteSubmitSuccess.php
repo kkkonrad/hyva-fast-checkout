@@ -121,7 +121,7 @@ class QuoteSubmitSuccess implements ObserverInterface
             try {
                 $customerData = $this->customerRepository->get($customerEmail, (int)$order->getStore()->getWebsiteId());
                 if ($customerData && $customerData->getId()) {
-                    $customer = $this->customerFactory->create()->load($customerData->getId());
+                    $customer = $customerData;
                     $this->assignOrderToCustomer($order, $customer);
                 }
             } catch (NoSuchEntityException $e) {

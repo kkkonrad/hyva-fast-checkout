@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Kkkonrad\Fastcheckout\Helper;
 
 use Magento\Framework\App\Helper\Context;
@@ -281,10 +283,14 @@ class Data extends AbstractHelper
         return $this->scopeConfig->getValue(self::XML_PATH_DEFAULT_PAYMENT_METHOD, ScopeInterface::SCOPE_STORE);
     }
 
-    public function getPreSelectedBillingAddressId () {
+    public function getPreSelectedBillingAddressId()
+    {
         try {
-            $quote = $this->quoteFactory->create()->load($this->cart->getQuote()->getId());
-            return $quote->getBillingAddress()->getCustomerAddressId();
+            $quote = $this->cart->getQuote();
+            if ($quote && $quote->getBillingAddress()) {
+                return $quote->getBillingAddress()->getCustomerAddressId();
+            }
+            return '';
         } catch (\Exception $e) {
             return '';
         }
