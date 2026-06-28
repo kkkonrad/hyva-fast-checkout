@@ -1,17 +1,14 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Kkkonrad\Fastcheckout\Plugin\Payments;
 
 class Info
 {
     /**
-     * We can't storing objects
-     * prevent standard error message
-     *
-     * @param $subject
-     * @param callable $proceed
-     * @param $key
-     * @param null $value
-     * @return mixed
+     * Reject non-scalar additional payment information values to avoid Magento errors
+     * when payment extensions try to store unsupported objects.
      */
     public function aroundSetAdditionalInformation(
         $subject,

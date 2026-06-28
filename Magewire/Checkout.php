@@ -777,14 +777,25 @@ class Checkout extends Component
 
         $this->orderError = '';
         $quote = $this->checkoutSession->getQuote();
+        $isVirtual = (bool)$quote->isVirtual();
+
+        $this->logger->info('Fastcheckout placeOrder started', [
+            'quote_id' => $quote->getId(),
+            'email_provided' => $this->email !== '',
+            'shipping_method' => $this->shippingMethod,
+            'payment_method' => $this->paymentMethod,
+            'is_virtual' => $isVirtual,
+        ]);
 
         if (!$quote->hasItems()) {
             $this->orderError = (string)__('Your cart is empty.');
+            $this->logger->info('Fastcheckout placeOrder blocked: empty cart', ['quote_id' => $quote->getId()]);
             return;
         }
 
         if (empty($this->email)) {
             $this->orderError = (string)__('Please enter your email address.');
+            $this->logger->info('Fastcheckout placeOrder blocked: missing email', ['quote_id' => $quote->getId()]);
             return;
         }
 
@@ -801,13 +812,15 @@ class Checkout extends Component
             return;
         }
         
-        if (!$quote->isVirtual() && empty($this->shippingMethod)) {
+        if (!$isVirtual && empty($this->shippingMethod)) {
             $this->orderError = (string)__('Please select a shipping method.');
+            $this->logger->info('Fastcheckout placeOrder blocked: missing shipping method', ['quote_id' => $quote->getId()]);
             return;
         }
 
         if (empty($this->paymentMethod)) {
             $this->orderError = (string)__('Please select a payment method.');
+            $this->logger->info('Fastcheckout placeOrder blocked: missing payment method', ['quote_id' => $quote->getId()]);
             return;
         }
 
@@ -821,6 +834,10 @@ class Checkout extends Component
 
         if (!$paymentAllowed) {
             $this->orderError = (string)__('The selected payment method is not available for this checkout.');
+            $this->logger->info('Fastcheckout placeOrder blocked: payment method not allowed', [
+                'quote_id' => $quote->getId(),
+                'payment_method' => $this->paymentMethod,
+            ]);
             return;
         }
 
@@ -830,6 +847,7 @@ class Checkout extends Component
 
         if ($this->paymentMethod === 'purchaseorder' && empty($this->poNumber)) {
             $this->orderError = (string)__('Purchase Order Number is a required field.');
+            $this->logger->info('Fastcheckout placeOrder blocked: missing purchase order number', ['quote_id' => $quote->getId()]);
             return;
         }
 
@@ -883,12 +901,22 @@ class Checkout extends Component
                     // Ignore
                 }
             }
+            $this->logger->info('Fastcheckout order placed successfully', [
+                'quote_id' => $quoteId,
+                'order_id' => $orderId,
+                'payment_method' => $this->paymentMethod,
+            ]);
             $this->dispatchBrowserEvent('magewire:order-placed', [
                 'method' => $this->paymentMethod,
                 'orderId' => $orderId
             ]);
         } catch (\Exception $e) {
             $this->orderError = $e->getMessage();
+            $this->logger->error('Fastcheckout placeOrder failed', [
+                'quote_id' => $quote->getId(),
+                'payment_method' => $this->paymentMethod,
+                'exception' => $e,
+            ]);
             // Regenerate idempotency key on failure so the user can submit again
             $this->idempotencyKey = bin2hex(random_bytes(16));
         }

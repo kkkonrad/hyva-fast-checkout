@@ -16,7 +16,7 @@ const selectors = {
     useSavedAddressBtn: 'button[data-select-id="saved-address-select"]',
     placeOrderBtn: 'button[form="co-checkout-form"]',
     orderError: '#messages .message-error, #messages .message.error',
-    cartItemsList: 'ul.divide-y.divide-gray-150',
+    cartItemsList: 'ul.space-y-3',
     couponInput: 'input[wire\\:model\\.defer="couponCode"]',
     couponApplyBtn: 'button[wire\\:click="applyCoupon"]',
     couponSuccess: '.text-green-700',

@@ -1,35 +1,34 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Kkkonrad\Fastcheckout\Plugin\Customer\Model\Address;
 
 use Magento\Customer\Model\Address\AbstractAddress as ParentClass;
+use Magento\Directory\Helper\Data as DirectoryHelper;
 use Magento\Framework\Phrase;
+use Psr\Log\LoggerInterface;
 
-/**
- * Class AbstractAddress
- * @package Kkkonrad\Fastcheckout\Plugin\Customer\Model\Address
- */
 class AbstractAddress
 {
     /**
-     * @var \Magento\Directory\Helper\Data
+     * @var DirectoryHelper
      */
     private $directoryData;
 
     /**
-     * AbstractAddress constructor.
-     * @param \Magento\Directory\Helper\Data $directoryData
+     * @var LoggerInterface|null
      */
-    public function __construct(\Magento\Directory\Helper\Data $directoryData)
-    {
+    private $logger;
+
+    public function __construct(
+        DirectoryHelper $directoryData,
+        ?LoggerInterface $logger = null
+    ) {
         $this->directoryData = $directoryData;
+        $this->logger = $logger;
     }
 
-    /**
-     * Fix validation when region not required
-     * @param ParentClass $subject
-     * @param $result
-     * @return bool
-     */
     public function afterValidate(ParentClass $subject, $result)
     {
         if (!is_array($result) || count($result) !== 1) {
@@ -63,9 +62,18 @@ class AbstractAddress
             $allowedRegions = $regionCollection->getAllIds();
 
             if (!$isRegionRequired && $regionId !== '' && !in_array($regionId, $allowedRegions, true)) {
+                if ($this->logger) {
+                    $this->logger->info('Fastcheckout address validation bypassed for non-required region', [
+                        'country_id' => $countryId,
+                        'region_id' => $regionId,
+                    ]);
+                }
                 return true;
             }
         } catch (\Exception $e) {
+            if ($this->logger) {
+                $this->logger->warning('Fastcheckout address validation plugin failed', ['exception' => $e]);
+            }
             return $result;
         }
 

@@ -546,9 +546,9 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                         </span>
                     </div>
 
-                    <ul class="divide-y divide-gray-150 max-h-60 overflow-y-auto pr-1">
+                    <ul class="space-y-3 max-h-60 overflow-y-auto pr-1">
                         <?php foreach ($items as $item): ?>
-                            <li class="flex gap-3 py-3">
+                            <li class="flex gap-3 py-1">
                                 <img class="h-14 w-14 shrink-0 rounded border border-gray-200 object-contain bg-gray-50"
                                      src="<?= $escaper->escapeUrl($block->getItemImageUrl($item)) ?>"
                                      alt="<?= $escaper->escapeHtmlAttr($item->getName()) ?>"
