@@ -14,5 +14,8 @@
     <type name="Magento\Payment\Model\InfoInterface">
         <plugin name="fastcheckout_unset_extension_attributes" type="Kkkonrad\Fastcheckout\Plugin\Payments\Info"/>
     </type>
+    <type name="Magento\Quote\Api\CartRepositoryInterface">
+        <plugin name="fastcheckout_preserve_inpost_locker" type="Kkkonrad\Fastcheckout\Plugin\Quote\PreserveInpostLocker"/>
+    </type>
 
 </config>

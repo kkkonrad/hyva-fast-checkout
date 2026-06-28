@@ -353,6 +353,10 @@ textarea.msg__error:focus,
 .inpost-modal__container .btn-close::before {
     transform: rotate(-45deg);
 }
-
-
-
+/* Persistent submitting spinner & button rules */
+body.checkout-submitting .place-order-spinner {
+    display: inline-block !important;
+}
+body.checkout-submitting .btn-primary {
+    pointer-events: none !important;
+}

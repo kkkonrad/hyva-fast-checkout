@@ -1072,27 +1072,24 @@ define([
                             this.syncResolve = null;
                             this.syncReject = null;
 
-                            this.syncWire.set('paymentAdditionalData', additionalData)
-                                .then(function () {
-                                    if (window.console && typeof window.console.log === 'function') {
-                                        window.console.log('Kkkonrad Fastcheckout: Magewire paymentAdditionalData updated successfully.');
-                                    }
-                                    resolveFn(true);
-                                })
-                                .catch(function (err) {
-                                    if (window.console && typeof window.console.error === 'function') {
-                                        window.console.error('Kkkonrad Fastcheckout: failed to set paymentAdditionalData:', err);
-                                    }
-                                    rejectFn(err);
-                                });
+                            try {
+                                this.syncWire.set('paymentAdditionalData', additionalData);
+                                if (window.console && typeof window.console.log === 'function') {
+                                    window.console.log('Kkkonrad Fastcheckout: Magewire paymentAdditionalData updated.');
+                                }
+                                resolveFn(true);
+                            } catch (err) {
+                                if (window.console && typeof window.console.error === 'function') {
+                                    window.console.error('Kkkonrad Fastcheckout: failed to set paymentAdditionalData:', err);
+                                }
+                                rejectFn(err);
+                            }
                         } else {
                             // Fallback if triggered outside handleSubmit Promise context (e.g. direct SDK placeOrder)
                             var wire = this.syncWire || (window.Livewire ? window.Livewire.find(document.querySelector('[wire\\:id]').getAttribute('wire:id')) : null);
                             if (wire) {
-                                wire.set('paymentAdditionalData', additionalData)
-                                    .then(function () {
-                                        wire.call('placeOrder', methodCode);
-                                    });
+                                wire.set('paymentAdditionalData', additionalData);
+                                wire.call('placeOrder', methodCode);
                             }
                         }
 

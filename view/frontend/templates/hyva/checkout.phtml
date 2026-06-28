@@ -218,7 +218,7 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                                type="text" autocomplete="postal-code"
                                wire:model.defer="postcode"
                                data-wire-field="postcode"
-                               @input="onFieldInput"
+                               @input="onFieldInput(); formatPostcode($el, false);"
                                @blur="onFieldBlur"
                                required/>
                     </label>
@@ -229,7 +229,7 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                                type="tel" autocomplete="tel"
                                wire:model.defer="telephone"
                                data-wire-field="telephone"
-                               @input="onFieldInput"
+                               @input="onFieldInput(); formatTelephone($el);"
                                @blur="onFieldBlur"
                                required/>
                     </label>
@@ -247,13 +247,10 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                 <div class="relative min-h-[50px]">
                     <div wire:loading.flex
                          wire:target="countryId,regionId,region,postcode,city,street1,street2,fillFromSavedAddress"
-                         class="absolute inset-0 bg-white/70 backdrop-blur-[1px] z-20 rounded items-center justify-center transition-all duration-200">
-                        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center">
-                            <svg class="animate-spin h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                        </div>
+                         class="absolute inset-0 bg-white/80 backdrop-blur-[1px] z-20 rounded flex-col gap-3 p-4 justify-center transition-all duration-200"
+                         style="display: none;">
+                        <div class="h-10 bg-gray-150 rounded animate-pulse w-full"></div>
+                        <div class="h-10 bg-gray-150 rounded animate-pulse w-full"></div>
                     </div>
                     <div id="fastcheckout-ko-shipping-root"
                          class="fastcheckout-ko-shipping-root"
@@ -402,7 +399,7 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                                        type="text" autocomplete="postal-code"
                                        wire:model.defer="billingPostcode"
                                        data-wire-field="billingPostcode"
-                                       @input="onFieldInput"
+                                       @input="onFieldInput(); formatPostcode($el, true);"
                                        @blur="onFieldBlur"
                                        required/>
                             </label>
@@ -413,7 +410,7 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                                        type="tel" autocomplete="tel"
                                        wire:model.defer="billingTelephone"
                                        data-wire-field="billingTelephone"
-                                       @input="onFieldInput"
+                                       @input="onFieldInput(); formatTelephone($el);"
                                        @blur="onFieldBlur"
                                        required/>
                             </label>
@@ -435,15 +432,12 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                     </p>
                 <?php else: ?>
 	                    <div class="grid gap-3 relative min-h-[50px]" wire:key="checkout-payment-methods-grid">
-	                        <div wire:loading.flex
+                            <div wire:loading.flex
                                  wire:target="countryId,regionId,region,postcode,city,street1,street2,fillFromSavedAddress,selectShippingMethod"
-                                 class="absolute inset-0 bg-white/70 backdrop-blur-[1px] z-20 rounded items-center justify-center transition-all duration-200">
-                                <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center">
-                                    <svg class="animate-spin h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24">
-                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
-                                </div>
+                                 class="absolute inset-0 bg-white/80 backdrop-blur-[1px] z-20 rounded flex-col gap-3 p-4 justify-center transition-all duration-200"
+                                 style="display: none;">
+                                <div class="h-12 bg-gray-150 rounded animate-pulse w-full"></div>
+                                <div class="h-12 bg-gray-150 rounded animate-pulse w-full"></div>
                             </div>
 	                        <?php foreach ($paymentMethods as $method): ?>
                                 <?php
@@ -521,8 +515,25 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
             </div>
 
             <!-- Order Summary Sidebar -->
-            <div class="card bg-white p-4 md:p-6 shadow rounded-lg border border-gray-200 sticky top-6 space-y-6 transition-all duration-200"
-                 wire:loading.class="opacity-60 pointer-events-none">
+            <div class="card bg-white p-4 md:p-6 shadow rounded-lg border border-gray-200 sticky top-6 space-y-6 transition-all duration-200 relative"
+                 wire:key="checkout-totals-card">
+                 
+                 <!-- Skeleton Loader Overlay for Order Summary -->
+                 <div wire:loading.flex
+                      wire:target="countryId,regionId,region,postcode,city,street1,street2,fillFromSavedAddress,selectShippingMethod,applyCoupon,cancelCoupon"
+                      class="absolute inset-0 bg-white/80 backdrop-blur-[1px] z-20 rounded flex-col gap-4 p-6 justify-center transition-all duration-200"
+                      style="display: none;">
+                      <div class="h-6 bg-gray-150 rounded animate-pulse w-1/3 mb-2"></div>
+                      <div class="space-y-3">
+                          <div class="h-4 bg-gray-150 rounded animate-pulse w-full"></div>
+                          <div class="h-4 bg-gray-150 rounded animate-pulse w-5/6"></div>
+                          <div class="h-4 bg-gray-150 rounded animate-pulse w-2/3"></div>
+                      </div>
+                      <div class="border-t border-gray-200 pt-4 mt-2 space-y-3">
+                          <div class="h-4 bg-gray-150 rounded animate-pulse w-full"></div>
+                          <div class="h-4 bg-gray-150 rounded animate-pulse w-full"></div>
+                      </div>
+                 </div>
                 
                 <!-- Order Items list -->
                 <div>
@@ -649,12 +660,8 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                 <div class="pt-2">
                     <button class="btn btn-primary w-full py-3 flex items-center justify-center gap-2 transition-all duration-200" 
                             type="submit" 
-                            :disabled="isProcessing"
-                            :class="isProcessing ? 'opacity-80 cursor-not-allowed pointer-events-none' : ''"
-                            wire:loading.attr="disabled"
-                            wire:loading.class="opacity-80 cursor-not-allowed pointer-events-none"
-                            wire:target="placeOrder">
-                        <span x-show="isProcessing" wire:loading wire:target="placeOrder" x-cloak>
+                            :class="isProcessing ? 'pointer-events-none' : ''">
+                        <span class="place-order-spinner" x-show="isProcessing" x-cloak>
                             <svg class="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -703,12 +710,8 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
             <button class="btn btn-primary w-full py-3 flex items-center justify-center gap-2 transition-all duration-200" 
                     type="submit" 
                     form="co-checkout-form"
-                    :disabled="isProcessing"
-                    :class="isProcessing ? 'opacity-80 cursor-not-allowed pointer-events-none' : ''"
-                    wire:loading.attr="disabled"
-                    wire:loading.class="opacity-80 cursor-not-allowed pointer-events-none"
-                    wire:target="placeOrder">
-                <span x-show="isProcessing" wire:loading wire:target="placeOrder" x-cloak>
+                    :class="isProcessing ? 'pointer-events-none' : ''">
+                <span class="place-order-spinner" x-show="isProcessing" x-cloak>
                     <svg class="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -742,17 +745,23 @@ function initCheckout() {
             });
 
             if (window.Livewire && typeof window.Livewire.hook === 'function') {
-                const handleProcessed = (message) => {
+                window.Livewire.hook('message.processed', (message) => {
                     const updates = message.updateQueue || (message.payload && message.payload.updates) || [];
                     const isPlacingOrder = updates.some(update => 
                         update.type === 'callMethod' && update.payload && update.payload.method === 'placeOrder'
                     );
                     if (isPlacingOrder) {
-                        this.isProcessing = false;
+                        const hasError = this.$wire.orderError || (typeof this.$wire.get === 'function' ? this.$wire.get('orderError') : '');
+                        if (hasError) {
+                            this.isProcessing = false;
+                            document.body.classList.remove('checkout-submitting');
+                        }
                     }
-                };
-                window.Livewire.hook('message.processed', handleProcessed);
-                window.Livewire.hook('message.failed', handleProcessed);
+                });
+                window.Livewire.hook('message.failed', () => {
+                    this.isProcessing = false;
+                    document.body.classList.remove('checkout-submitting');
+                });
             }
         },
 
@@ -895,6 +904,7 @@ function initCheckout() {
                 }
 
                 this.isProcessing = true;
+                document.body.classList.add('checkout-submitting');
 
                 if (paymentBridge && typeof paymentBridge.syncPaymentData === 'function') {
                     Promise.resolve(paymentBridge.syncPaymentData(this.$wire))
@@ -903,6 +913,7 @@ function initCheckout() {
                         })
                         .catch((err) => {
                             this.isProcessing = false;
+                            document.body.classList.remove('checkout-submitting');
 
                             // Smoothly scroll to the selected payment method container so errors are visible
                             if (selectedMethodEl) {
@@ -935,23 +946,103 @@ function initCheckout() {
             });
         },
 
+        formatPostcode(el, isBilling = false) {
+            const countryId = isBilling ? this.$wire.billingCountryId : this.$wire.countryId;
+            if (countryId === 'PL') {
+                let value = el.value.replace(/\D/g, '');
+                if (value.length > 5) value = value.slice(0, 5);
+                let formatted = value;
+                if (value.length > 2) {
+                    formatted = value.slice(0, 2) + '-' + value.slice(2);
+                }
+                if (el.value !== formatted) {
+                    el.value = formatted;
+                    el.dispatchEvent(new Event('input'));
+                }
+            }
+        },
+
+        formatTelephone(el) {
+            let value = el.value.replace(/[^\d+]/g, ''); // keep only digits and +
+            let formatted = el.value;
+            if (value.startsWith('+')) {
+                let digits = value.slice(1).replace(/\D/g, '');
+                if (digits.startsWith('48')) {
+                    let parts = ['+48'];
+                    let rest = digits.slice(2);
+                    if (rest.length > 0) parts.push(rest.slice(0, 3));
+                    if (rest.length > 3) parts.push(rest.slice(3, 6));
+                    if (rest.length > 6) parts.push(rest.slice(6, 9));
+                    formatted = parts.join(' ');
+                } else {
+                    formatted = '+' + digits.slice(0, 15);
+                }
+            } else {
+                let digits = value.replace(/\D/g, '');
+                if (digits.length > 9) digits = digits.slice(0, 9);
+                let parts = [];
+                if (digits.length > 0) parts.push(digits.slice(0, 3));
+                if (digits.length > 3) parts.push(digits.slice(3, 6));
+                if (digits.length > 6) parts.push(digits.slice(6, 9));
+                formatted = parts.join(' ');
+            }
+            if (el.value !== formatted) {
+                el.value = formatted;
+                el.dispatchEvent(new Event('input'));
+            }
+        },
+
         /* ── Private helpers ────────────────────────────────────────────── */
 
         _validateEl(el) {
             const wrapper = el.closest('label');
             let msg = wrapper ? wrapper.querySelector('.field-error') : null;
+            const errorId = (el.id || el.name || el.dataset.wireField || Math.random().toString(36).substring(2, 9)) + '-error';
+
+            // Custom validation rules
+            if (el.dataset.wireField) {
+                const fieldName = el.dataset.wireField;
+                if (fieldName === 'postcode' || fieldName === 'billingPostcode') {
+                    const countryId = fieldName === 'billingPostcode' ? this.$wire.billingCountryId : this.$wire.countryId;
+                    if (countryId === 'PL') {
+                        const plPostcodeRegex = /^\d{2}-\d{3}$/;
+                        if (!plPostcodeRegex.test(el.value)) {
+                            el.setCustomValidity('Kod pocztowy musi mieć format XX-XXX (np. 00-950)');
+                        } else {
+                            el.setCustomValidity('');
+                        }
+                    } else {
+                        el.setCustomValidity('');
+                    }
+                } else if (fieldName === 'telephone' || fieldName === 'billingTelephone') {
+                    const digits = el.value.replace(/\D/g, '');
+                    if (digits.length < 9) {
+                        el.setCustomValidity('Numer telefonu musi mieć co najmniej 9 cyfr');
+                    } else {
+                        el.setCustomValidity('');
+                    }
+                }
+            }
+
             if (!el.validity.valid) {
                 el.classList.add('border-red-400', 'ring-1', 'ring-red-400');
                 el.classList.remove('border-gray-300');
+                el.setAttribute('aria-invalid', 'true');
+                el.setAttribute('aria-describedby', errorId);
+
                 if (!msg && wrapper) {
                     msg = document.createElement('span');
+                    msg.id = errorId;
                     msg.className = 'field-error mt-1 text-xs text-red-600 block';
+                    msg.setAttribute('role', 'alert');
                     wrapper.appendChild(msg);
                 }
                 if (msg) msg.textContent = el.validationMessage;
             } else {
                 el.classList.remove('border-red-400', 'ring-1', 'ring-red-400');
                 el.classList.add('border-gray-300');
+                el.removeAttribute('aria-invalid');
+                el.removeAttribute('aria-describedby');
                 if (msg) msg.remove();
             }
         },
