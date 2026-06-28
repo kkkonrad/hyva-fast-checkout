@@ -1,12 +1,12 @@
-.iwd-opc-ko-payment-root {
+.fastcheckout-ko-payment-root {
     display: block;
 }
 
-.iwd-opc-ko-payment-root:empty {
+.fastcheckout-ko-payment-root:empty {
     display: none;
 }
 
-.iwd-opc-ko-payment-root .payment-method {
+.fastcheckout-ko-payment-root .payment-method {
     display: none;
     margin-top: 1rem;
     border: 1px solid #e5e7eb;
@@ -14,48 +14,48 @@
     background: #f9fafb;
 }
 
-.iwd-opc-ko-payment-root .payment-method._active,
-.iwd-opc-payment-method-ko-container .payment-method {
+.fastcheckout-ko-payment-root .payment-method._active,
+.fastcheckout-payment-method-ko-container .payment-method {
     display: block;
 }
 
-.iwd-opc-ko-payment-root .payment-method-title,
-.iwd-opc-ko-payment-root .actions-toolbar,
-.iwd-opc-ko-payment-root .payment-method-billing-address,
-.iwd-opc-payment-method-ko-container .payment-method-title,
-.iwd-opc-payment-method-ko-container .actions-toolbar,
-.iwd-opc-payment-method-ko-container .payment-method-billing-address {
+.fastcheckout-ko-payment-root .payment-method-title,
+.fastcheckout-ko-payment-root .actions-toolbar,
+.fastcheckout-ko-payment-root .payment-method-billing-address,
+.fastcheckout-payment-method-ko-container .payment-method-title,
+.fastcheckout-payment-method-ko-container .actions-toolbar,
+.fastcheckout-payment-method-ko-container .payment-method-billing-address {
     display: none !important;
 }
 
-.iwd-opc-ko-payment-root .payment-method-content,
-.iwd-opc-payment-method-ko-container .payment-method-content {
+.fastcheckout-ko-payment-root .payment-method-content,
+.fastcheckout-payment-method-ko-container .payment-method-content {
     display: block;
     padding: 1rem;
     font-size: 0.875rem;
 }
 
-.iwd-opc-ko-payment-root img,
-.iwd-opc-payment-method-ko-container img {
+.fastcheckout-ko-payment-root img,
+.fastcheckout-payment-method-ko-container img {
     max-width: 100%;
     height: auto;
 }
 
-.iwd-opc-ko-payment-root .field,
-.iwd-opc-payment-method-ko-container .field {
+.fastcheckout-ko-payment-root .field,
+.fastcheckout-payment-method-ko-container .field {
     margin-bottom: 1rem;
 }
 
-.iwd-opc-ko-payment-root input[type='text'],
-.iwd-opc-ko-payment-root input[type='tel'],
-.iwd-opc-ko-payment-root input[type='number'],
-.iwd-opc-ko-payment-root input[type='password'],
-.iwd-opc-ko-payment-root select,
-.iwd-opc-payment-method-ko-container input[type='text'],
-.iwd-opc-payment-method-ko-container input[type='tel'],
-.iwd-opc-payment-method-ko-container input[type='number'],
-.iwd-opc-payment-method-ko-container input[type='password'],
-.iwd-opc-payment-method-ko-container select {
+.fastcheckout-ko-payment-root input[type='text'],
+.fastcheckout-ko-payment-root input[type='tel'],
+.fastcheckout-ko-payment-root input[type='number'],
+.fastcheckout-ko-payment-root input[type='password'],
+.fastcheckout-ko-payment-root select,
+.fastcheckout-payment-method-ko-container input[type='text'],
+.fastcheckout-payment-method-ko-container input[type='tel'],
+.fastcheckout-payment-method-ko-container input[type='number'],
+.fastcheckout-payment-method-ko-container input[type='password'],
+.fastcheckout-payment-method-ko-container select {
     width: 100%;
     max-width: 100%;
     border: 1px solid #d1d5db;
@@ -64,33 +64,33 @@
     padding: 0.5rem 0.75rem;
 }
 
-.iwd-opc-ko-payment-root .checkout-agreements-block,
-.iwd-opc-ko-payment-root .payu-text,
-.iwd-opc-ko-payment-root .TpayRegulations,
-.iwd-opc-payment-method-ko-container .checkout-agreements-block,
-.iwd-opc-payment-method-ko-container .payu-text,
-.iwd-opc-payment-method-ko-container .TpayRegulations {
+.fastcheckout-ko-payment-root .checkout-agreements-block,
+.fastcheckout-ko-payment-root .payu-text,
+.fastcheckout-ko-payment-root .TpayRegulations,
+.fastcheckout-payment-method-ko-container .checkout-agreements-block,
+.fastcheckout-payment-method-ko-container .payu-text,
+.fastcheckout-payment-method-ko-container .TpayRegulations {
     color: #374151;
     font-size: 0.875rem;
     line-height: 1.5;
 }
 
-.iwd-opc-ko-payment-root a,
-.iwd-opc-payment-method-ko-container a {
+.fastcheckout-ko-payment-root a,
+.fastcheckout-payment-method-ko-container a {
     color: #2563eb;
     text-decoration: underline;
 }
 
 /* Active payment option highlight — pure CSS, no Magewire re-render needed */
-[data-iwd-opc-payment-option]:has(input[name="payment_method"]:checked) {
+[data-fastcheckout-payment-option]:has(input[name="payment_method"]:checked) {
     border-color: #3b82f6 !important;
     background-color: rgba(239, 246, 255, 0.08);
 }
 
 /* Premium styles for original offline payment contents (checkmo, banktransfer, cashondelivery) */
-.iwd-opc-payment-method-ko-container .payment-method-note,
-.iwd-opc-payment-method-ko-container .payment-method-content > p,
-.iwd-opc-ko-payment-root .payment-method-content > p {
+.fastcheckout-payment-method-ko-container .payment-method-note,
+.fastcheckout-payment-method-ko-container .payment-method-content > p,
+.fastcheckout-ko-payment-root .payment-method-content > p {
     display: block;
     padding: 0.75rem 1rem;
     background-color: #eff6ff; /* Blue 50 */
@@ -104,8 +104,8 @@
 }
 
 /* Premium styling for Check / Money Order instructions (checkmo) */
-.iwd-opc-payment-method-ko-container .items.check.payable,
-.iwd-opc-ko-payment-root .items.check.payable {
+.fastcheckout-payment-method-ko-container .items.check.payable,
+.fastcheckout-ko-payment-root .items.check.payable {
     display: block;
     padding: 1rem;
     background-color: #eff6ff; /* Blue 50 */
@@ -118,46 +118,46 @@
     box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
-.iwd-opc-payment-method-ko-container .items.check.payable dt,
-.iwd-opc-ko-payment-root .items.check.payable dt {
+.fastcheckout-payment-method-ko-container .items.check.payable dt,
+.fastcheckout-ko-payment-root .items.check.payable dt {
     font-weight: 600;
     color: #1e3a8a;
     margin-top: 0.5rem;
 }
 
-.iwd-opc-payment-method-ko-container .items.check.payable dt:first-child,
-.iwd-opc-ko-payment-root .items.check.payable dt:first-child {
+.fastcheckout-payment-method-ko-container .items.check.payable dt:first-child,
+.fastcheckout-ko-payment-root .items.check.payable dt:first-child {
     margin-top: 0;
 }
 
-.iwd-opc-payment-method-ko-container .items.check.payable dd,
-.iwd-opc-ko-payment-root .items.check.payable dd {
+.fastcheckout-payment-method-ko-container .items.check.payable dd,
+.fastcheckout-ko-payment-root .items.check.payable dd {
     margin-left: 0;
     margin-bottom: 0.5rem;
     color: #374151; /* Gray 700 */
 }
 
-.iwd-opc-payment-method-ko-container .items.check.payable dd:last-child,
-.iwd-opc-ko-payment-root .items.check.payable dd:last-child {
+.fastcheckout-payment-method-ko-container .items.check.payable dd:last-child,
+.fastcheckout-ko-payment-root .items.check.payable dd:last-child {
     margin-bottom: 0;
 }
 
-.iwd-opc-payment-method-ko-container .items.check.payable address,
-.iwd-opc-ko-payment-root .items.check.payable address {
+.fastcheckout-payment-method-ko-container .items.check.payable address,
+.fastcheckout-ko-payment-root .items.check.payable address {
     font-style: normal;
 }
 
-.iwd-opc-payment-method-ko-container .fieldset {
+.fastcheckout-payment-method-ko-container .fieldset {
     border: none;
     padding: 0;
     margin: 0;
 }
 
-.iwd-opc-payment-method-ko-container .field {
+.fastcheckout-payment-method-ko-container .field {
     margin-bottom: 1.25rem;
 }
 
-.iwd-opc-payment-method-ko-container .field .label {
+.fastcheckout-payment-method-ko-container .field .label {
     display: block;
     margin-bottom: 0.375rem;
     font-size: 0.875rem;
@@ -165,8 +165,8 @@
     color: #374151; /* Gray 700 */
 }
 
-.iwd-opc-payment-method-ko-container input.input-text,
-.iwd-opc-payment-method-ko-container select {
+.fastcheckout-payment-method-ko-container input.input-text,
+.fastcheckout-payment-method-ko-container select {
     width: 100%;
     max-width: 100%;
     border: 1px solid #d1d5db;
@@ -179,8 +179,8 @@
     transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
 }
 
-.iwd-opc-payment-method-ko-container input.input-text:focus,
-.iwd-opc-payment-method-ko-container select:focus {
+.fastcheckout-payment-method-ko-container input.input-text:focus,
+.fastcheckout-payment-method-ko-container select:focus {
     outline: none;
     border-color: #3b82f6;
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
@@ -189,10 +189,10 @@
 /* Styling for jQuery validation / Knockout error messages and invalid input states */
 .mage-error,
 .msg__error,
-.iwd-opc-payment-method-ko-container .mage-error,
-.iwd-opc-ko-payment-root .mage-error,
-.iwd-opc-payment-method-ko-container .msg__error,
-.iwd-opc-ko-payment-root .msg__error {
+.fastcheckout-payment-method-ko-container .mage-error,
+.fastcheckout-ko-payment-root .mage-error,
+.fastcheckout-payment-method-ko-container .msg__error,
+.fastcheckout-ko-payment-root .msg__error {
     display: block;
     color: #ef4444 !important; /* Red 500 */
     font-size: 0.7rem !important;
@@ -206,10 +206,10 @@ textarea.mage-error,
 input.msg__error,
 select.msg__error,
 textarea.msg__error,
-.iwd-opc-payment-method-ko-container input.mage-error,
-.iwd-opc-payment-method-ko-container select.mage-error,
-.iwd-opc-payment-method-ko-container input.error,
-.iwd-opc-payment-method-ko-container select.error {
+.fastcheckout-payment-method-ko-container input.mage-error,
+.fastcheckout-payment-method-ko-container select.mage-error,
+.fastcheckout-payment-method-ko-container input.error,
+.fastcheckout-payment-method-ko-container select.error {
     border-color: #f87171 !important; /* Red 400 */
     background-color: #fef2f2 !important; /* Red 50 */
 }
@@ -220,10 +220,10 @@ textarea.mage-error:focus,
 input.msg__error:focus,
 select.msg__error:focus,
 textarea.msg__error:focus,
-.iwd-opc-payment-method-ko-container input.mage-error:focus,
-.iwd-opc-payment-method-ko-container select.mage-error:focus,
-.iwd-opc-payment-method-ko-container input.error:focus,
-.iwd-opc-payment-method-ko-container select.error:focus {
+.fastcheckout-payment-method-ko-container input.mage-error:focus,
+.fastcheckout-payment-method-ko-container select.mage-error:focus,
+.fastcheckout-payment-method-ko-container input.error:focus,
+.fastcheckout-payment-method-ko-container select.error:focus {
     outline: none;
     border-color: #ef4444 !important;
     box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;

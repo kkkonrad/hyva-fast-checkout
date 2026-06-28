@@ -6,7 +6,7 @@ use Magento\Framework\Event\Observer as EventObserver;
 use Magento\Checkout\Model\Session as CheckoutSession;
 use Magento\Sales\Model\Order\Status\HistoryFactory;
 use Magento\Framework\Event\ObserverInterface;
-use Kkkonrad\Fastcheckout\Helper\Data as OpcHelper;
+use Kkkonrad\Fastcheckout\Helper\Data as Helper;
 use Magento\Customer\Model\CustomerFactory;
 use Psr\Log\LoggerInterface;
 use Magento\Sales\Api\OrderRepositoryInterface;
@@ -24,7 +24,7 @@ use Magento\Downloadable\Observer\SaveDownloadableOrderItemObserver;
 class QuoteSubmitSuccess implements ObserverInterface
 {
 
-    public $opcHelper;
+    public $helper;
     public $customerFactory;
     public $checkoutSession;
     public $historyFactory;
@@ -44,7 +44,7 @@ class QuoteSubmitSuccess implements ObserverInterface
     public $customerSession;
 
     public function __construct(
-        OpcHelper $opcHelper,
+        Helper $helper,
         CustomerFactory $customerFactory,
         CheckoutSession $checkoutSession,
         HistoryFactory $historyFactory,
@@ -56,7 +56,7 @@ class QuoteSubmitSuccess implements ObserverInterface
         CustomerSession $customerSession,
         SaveDownloadableOrderItemObserver $saveDownloadableOrderItemObserver
     ) {
-        $this->opcHelper = $opcHelper;
+        $this->helper = $helper;
         $this->customerFactory = $customerFactory;
         $this->checkoutSession = $checkoutSession;
         $this->historyFactory = $historyFactory;
@@ -81,7 +81,7 @@ class QuoteSubmitSuccess implements ObserverInterface
          */
 
         $order = $observer->getEvent()->getOrder();
-        if (!$order || !$this->opcHelper->isEnable()) {
+        if (!$order || !$this->helper->isEnable()) {
             return $this;
         }
 
@@ -128,8 +128,8 @@ class QuoteSubmitSuccess implements ObserverInterface
      */
     private function saveComment(Order $order)
     {
-        if ($this->opcHelper->isShowComment()) {
-            $comment = $this->checkoutSession->getIwdOpcComment();
+        if ($this->helper->isShowComment()) {
+            $comment = $this->checkoutSession->getFastcheckoutComment();
             if ($comment) {
                 try {
                     $history = $this->historyFactory->create();
@@ -153,7 +153,7 @@ class QuoteSubmitSuccess implements ObserverInterface
      */
     private function assignOrderToCustomer(Order $order, $customer)
     {
-        if ($this->opcHelper->isAssignOrderToCustomer()) {
+        if ($this->helper->isAssignOrderToCustomer()) {
             try {
                 if (!$order->getCustomerId()) {
                     if ($customer->getId()) {

@@ -108,7 +108,7 @@ class RequireJsAssets
             return $generated;
         } catch (\Throwable $exception) {
             $this->logger->warning(
-                'Kkkonrad OPC: could not generate RequireJS static assets.',
+                'Kkkonrad Fastcheckout: could not generate RequireJS static assets.',
                 ['exception' => $exception]
             );
         }

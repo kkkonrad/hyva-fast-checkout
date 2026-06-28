@@ -69,7 +69,7 @@ class CheckoutTest extends TestCase
     /**
      * @var \Kkkonrad\Fastcheckout\Helper\Data|MockObject
      */
-    private $opcHelperMock;
+    private $helperMock;
 
     /**
      * @var Quote|MockObject
@@ -100,7 +100,7 @@ class CheckoutTest extends TestCase
         $this->subscriberFactoryMock = $this->getMockBuilder(SubscriberFactory::class)
             ->disableOriginalConstructor()
             ->getMock();
-        $this->opcHelperMock = $this->createMock(\Kkkonrad\Fastcheckout\Helper\Data::class);
+        $this->helperMock = $this->createMock(\Kkkonrad\Fastcheckout\Helper\Data::class);
 
         $this->quoteMock = $this->getMockBuilder(Quote::class)
             ->disableOriginalConstructor()
@@ -113,7 +113,7 @@ class CheckoutTest extends TestCase
             ->willReturn($this->quoteMock);
 
         $loggerMock = $this->createMock(\Psr\Log\LoggerInterface::class);
-        $this->opcHelperMock->method('isHyvaNativePaymentMethodSupported')
+        $this->helperMock->method('isHyvaNativePaymentMethodSupported')
             ->willReturnCallback(static function ($methodCode): bool {
                 return in_array($methodCode, ['free', 'checkmo', 'banktransfer', 'cashondelivery', 'purchaseorder'], true);
             });
@@ -127,7 +127,7 @@ class CheckoutTest extends TestCase
             $this->countryCollectionFactoryMock,
             $this->regionCollectionFactoryMock,
             $this->subscriberFactoryMock,
-            $this->opcHelperMock,
+            $this->helperMock,
             $loggerMock
         );
     }
@@ -514,7 +514,7 @@ class CheckoutTest extends TestCase
             '_3' => ['shipping_method' => 'tablerate_bestway', 'payment_method' => 'checkmo'],
         ];
 
-        $this->opcHelperMock->expects($this->once())
+        $this->helperMock->expects($this->once())
             ->method('getShippingPaymentMapping')
             ->willReturn($mapping);
 
@@ -544,7 +544,7 @@ class CheckoutTest extends TestCase
             ->method('setCouponCode')
             ->with('SALE10');
 
-        $this->opcHelperMock->expects($this->once())
+        $this->helperMock->expects($this->once())
             ->method('isReloadShippingOnDiscount')
             ->willReturn(true);
 
@@ -578,7 +578,7 @@ class CheckoutTest extends TestCase
             ->method('setCouponCode')
             ->with('');
 
-        $this->opcHelperMock->expects($this->once())
+        $this->helperMock->expects($this->once())
             ->method('isReloadShippingOnDiscount')
             ->willReturn(true);
 
@@ -767,7 +767,7 @@ class CheckoutTest extends TestCase
             $this->countryCollectionFactoryMock,
             $this->regionCollectionFactoryMock,
             $this->subscriberFactoryMock,
-            $this->opcHelperMock,
+            $this->helperMock,
             $loggerMock,
             null, null, null,
             $customerSessionMock,
@@ -847,7 +847,7 @@ class CheckoutTest extends TestCase
             $this->countryCollectionFactoryMock,
             $this->regionCollectionFactoryMock,
             $this->subscriberFactoryMock,
-            $this->opcHelperMock,
+            $this->helperMock,
             $loggerMock,
             null, null, null,
             $customerSessionMock,

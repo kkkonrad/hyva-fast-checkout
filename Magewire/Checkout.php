@@ -92,7 +92,7 @@ class Checkout extends Component
     private $countryCollectionFactory;
     private $regionCollectionFactory;
     private $subscriberFactory;
-    private $opcHelper;
+    private $helper;
     private $logger;
     private $directoryHelper;
     private $paymentHelper;
@@ -112,7 +112,7 @@ class Checkout extends Component
      * @param \Magento\Directory\Model\ResourceModel\Country\CollectionFactory $countryCollectionFactory
      * @param \Magento\Directory\Model\ResourceModel\Region\CollectionFactory $regionCollectionFactory
      * @param \Magento\Newsletter\Model\SubscriberFactory $subscriberFactory
-     * @param \Kkkonrad\Fastcheckout\Helper\Data $opcHelper
+     * @param \Kkkonrad\Fastcheckout\Helper\Data $helper
      * @param \Psr\Log\LoggerInterface|null $logger
      * @param \Magento\Directory\Helper\Data|null $directoryHelper
      * @param \Magento\Payment\Helper\Data|null $paymentHelper
@@ -130,7 +130,7 @@ class Checkout extends Component
         \Magento\Directory\Model\ResourceModel\Country\CollectionFactory $countryCollectionFactory,
         \Magento\Directory\Model\ResourceModel\Region\CollectionFactory $regionCollectionFactory,
         \Magento\Newsletter\Model\SubscriberFactory $subscriberFactory,
-        \Kkkonrad\Fastcheckout\Helper\Data $opcHelper,
+        \Kkkonrad\Fastcheckout\Helper\Data $helper,
         \Psr\Log\LoggerInterface $logger = null,
         \Magento\Directory\Helper\Data $directoryHelper = null,
         \Magento\Payment\Helper\Data $paymentHelper = null,
@@ -149,7 +149,7 @@ class Checkout extends Component
         $this->countryCollectionFactory = $countryCollectionFactory;
         $this->regionCollectionFactory = $regionCollectionFactory;
         $this->subscriberFactory = $subscriberFactory;
-        $this->opcHelper = $opcHelper;
+        $this->helper = $helper;
         try {
             $this->logger = $logger ?? \Magento\Framework\App\ObjectManager::getInstance()->get(\Psr\Log\LoggerInterface::class);
         } catch (\Exception $e) {
@@ -235,7 +235,7 @@ class Checkout extends Component
             if ($shippingAddress->getShippingMethod()) {
                 $this->shippingMethod = $shippingAddress->getShippingMethod();
             } else {
-                $defaultShipping = $this->opcHelper->getDefaultShippingMethod();
+                $defaultShipping = $this->helper->getDefaultShippingMethod();
                 if ($defaultShipping) {
                     $this->selectShippingMethod($defaultShipping);
                 }
@@ -268,7 +268,7 @@ class Checkout extends Component
                 $this->poNumber = (string) $payment->getPoNumber();
             }
         } else {
-            $defaultPayment = $this->opcHelper->getDefaultPaymentMethod();
+            $defaultPayment = $this->helper->getDefaultPaymentMethod();
             if ($defaultPayment) {
                 $this->selectPaymentMethod($defaultPayment);
             }
@@ -300,7 +300,7 @@ class Checkout extends Component
             }
         }
 
-        if ($this->opcHelper->isShowGiftMessage() && $this->giftMessageRepository !== null) {
+        if ($this->helper->isShowGiftMessage() && $this->giftMessageRepository !== null) {
             $giftMessageId = $quote->getGiftMessageId();
             if ($giftMessageId) {
                 try {
@@ -361,7 +361,7 @@ class Checkout extends Component
                 $this->cartRepository->save($quote);
             } catch (\Exception $e) {
                 try {
-                    $this->logger->error('IWD OPC Save Shipping Error: ' . $e->getMessage() . "\n" . $e->getTraceAsString(), ['exception' => $e]);
+                    $this->logger->error('Kkkonrad Fastcheckout Save Shipping Error: ' . $e->getMessage() . "\n" . $e->getTraceAsString(), ['exception' => $e]);
                 } catch (\Exception $logEx) {
                     // ignore
                 }
@@ -425,7 +425,7 @@ class Checkout extends Component
                 $this->cartRepository->save($quote);
             } catch (\Exception $e) {
                 try {
-                    $this->logger->error('IWD OPC Save Billing Error: ' . $e->getMessage() . "\n" . $e->getTraceAsString(), ['exception' => $e]);
+                    $this->logger->error('Kkkonrad Fastcheckout Save Billing Error: ' . $e->getMessage() . "\n" . $e->getTraceAsString(), ['exception' => $e]);
                 } catch (\Exception $logEx) {
                     // ignore
                 }
@@ -484,7 +484,7 @@ class Checkout extends Component
             return $this->directoryHelper->isRegionRequired($countryId);
         } catch (\Exception $e) {
             try {
-                $this->logger->error('IWD OPC isRegionRequired Error: ' . $e->getMessage(), ['exception' => $e]);
+                $this->logger->error('Kkkonrad Fastcheckout isRegionRequired Error: ' . $e->getMessage(), ['exception' => $e]);
             } catch (\Exception $ex) {
                 // ignore
             }
@@ -558,7 +558,7 @@ class Checkout extends Component
                 }
             }
         } catch (\Exception $e) {
-            $this->logger->error('IWD OPC selectShippingMethod Error: ' . $e->getMessage(), ['exception' => $e]);
+            $this->logger->error('Kkkonrad Fastcheckout selectShippingMethod Error: ' . $e->getMessage(), ['exception' => $e]);
         }
     }
 
@@ -599,7 +599,7 @@ class Checkout extends Component
             return [];
         }
 
-        $mapping = $this->opcHelper->getShippingPaymentMapping();
+        $mapping = $this->helper->getShippingPaymentMapping();
         if (empty($mapping)) {
             return [];
         }
@@ -639,7 +639,7 @@ class Checkout extends Component
                 $details['mailing_address'] = (string) $methodInstance->getConfigData('mailing_address');
             } catch (\Exception $e) {
                 try {
-                    $this->logger->error('IWD OPC getPaymentMethodDetails Error: ' . $e->getMessage(), ['exception' => $e]);
+                    $this->logger->error('Kkkonrad Fastcheckout getPaymentMethodDetails Error: ' . $e->getMessage(), ['exception' => $e]);
                 } catch (\Exception $ex) {
                     // ignore
                 }
@@ -686,7 +686,7 @@ class Checkout extends Component
                 $this->paymentMethod = $methodCode;
             }
         } catch (\Exception $e) {
-            $this->logger->error('IWD OPC selectPaymentMethod Error: ' . $e->getMessage(), ['exception' => $e]);
+            $this->logger->error('Kkkonrad Fastcheckout selectPaymentMethod Error: ' . $e->getMessage(), ['exception' => $e]);
         }
     }
 
@@ -706,7 +706,7 @@ class Checkout extends Component
         $quote = $this->checkoutSession->getQuote();
         try {
             $quote->setCouponCode($this->couponCode);
-            if ($this->opcHelper->isReloadShippingOnDiscount()) {
+            if ($this->helper->isReloadShippingOnDiscount()) {
                 $quote->getShippingAddress()->setCollectShippingRates(true);
             }
             $quote->collectTotals();
@@ -734,7 +734,7 @@ class Checkout extends Component
         $quote = $this->checkoutSession->getQuote();
         try {
             $quote->setCouponCode('');
-            if ($this->opcHelper->isReloadShippingOnDiscount()) {
+            if ($this->helper->isReloadShippingOnDiscount()) {
                 $quote->getShippingAddress()->setCollectShippingRates(true);
             }
             $quote->collectTotals();
@@ -825,7 +825,7 @@ class Checkout extends Component
 
             // Save comment to session so QuoteSubmitSuccess observer can persist it to order history
             if (!empty(trim($this->comment))) {
-                $this->checkoutSession->setIwdOpcComment(trim($this->comment));
+                $this->checkoutSession->setFastcheckoutComment(trim($this->comment));
             }
 
             if ($this->subscribe && !empty($this->email)) {
@@ -853,7 +853,7 @@ class Checkout extends Component
                 $this->checkoutSession->setLastOrderId($orderId);
             } catch (\Exception $e) {
                 try {
-                    $this->logger->error('IWD OPC placeOrder load order Error: ' . $e->getMessage(), ['exception' => $e]);
+                    $this->logger->error('Kkkonrad Fastcheckout placeOrder load order Error: ' . $e->getMessage(), ['exception' => $e]);
                 } catch (\Exception $ex) {
                     // Ignore
                 }
@@ -932,7 +932,7 @@ class Checkout extends Component
      */
     public function saveGiftMessage(): void
     {
-        if (!$this->opcHelper->isShowGiftMessage() || $this->giftMessageRepository === null || $this->giftMessageFactory === null) {
+        if (!$this->helper->isShowGiftMessage() || $this->giftMessageRepository === null || $this->giftMessageFactory === null) {
             return;
         }
 
@@ -996,7 +996,7 @@ class Checkout extends Component
             }
             return $result;
         } catch (\Exception $e) {
-            $this->logger->error('IWD OPC getSavedAddresses Error: ' . $e->getMessage(), ['exception' => $e]);
+            $this->logger->error('Kkkonrad Fastcheckout getSavedAddresses Error: ' . $e->getMessage(), ['exception' => $e]);
             return [];
         }
     }
@@ -1031,7 +1031,7 @@ class Checkout extends Component
 
             $this->saveShippingAddress(true, true, true);
         } catch (\Exception $e) {
-            $this->logger->error('IWD OPC fillFromSavedAddress Error: ' . $e->getMessage(), ['exception' => $e]);
+            $this->logger->error('Kkkonrad Fastcheckout fillFromSavedAddress Error: ' . $e->getMessage(), ['exception' => $e]);
         }
     }
 

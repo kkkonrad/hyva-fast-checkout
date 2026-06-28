@@ -77,7 +77,7 @@ export class CheckoutPage {
     }
 }
 
-test.describe('IWD Magewire Checkout E2E Tests', () => {
+test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
 
     test('should validate input validation rules on blur', async ({ page }) => {
         const checkout = new CheckoutPage(page);

@@ -26,7 +26,7 @@ define([
         initialize: function () {
             this.pendingRendererCodes = {};
             this._super().initDefaulGroup().initChildren();
-            window.iwdOpcHyvaPaymentList = this;
+            window.fastcheckoutHyvaPaymentList = this;
 
             paymentMethods.subscribe(function (changes) {
                 _.each(changes, function (change) {

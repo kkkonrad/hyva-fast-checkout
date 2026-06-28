@@ -3,7 +3,7 @@
 namespace Kkkonrad\Fastcheckout\Block\Onepage;
 
 use Magento\Checkout\Block\Onepage\Success as CheckoutSuccess;
-use Kkkonrad\Fastcheckout\Helper\Data as OpcHelper;
+use Kkkonrad\Fastcheckout\Helper\Data as Helper;
 use Magento\Framework\View\Element\Template\Context;
 use Magento\Checkout\Model\Session as CheckoutSession;
 use Magento\Sales\Model\Order\Config;
@@ -31,8 +31,8 @@ class Success extends CheckoutSuccess
     /** @var OrderRepositoryInterface */
     public $orderRepository;
 
-    /** @var OpcHelper */
-    public $opcHelper;
+    /** @var Helper */
+    public $helper;
 
     public function __construct(
         Context $context,
@@ -44,7 +44,7 @@ class Success extends CheckoutSuccess
         CustomerSession $customerSession,
         Validator $addressValidator,
         OrderRepositoryInterface $orderRepository,
-        OpcHelper $opcHelper,
+        Helper $helper,
         array $data = []
     ) {
         $data['module_name'] = 'Magento_Checkout';
@@ -54,13 +54,13 @@ class Success extends CheckoutSuccess
         $this->customerSession = $customerSession;
         $this->addressValidator = $addressValidator;
         $this->orderRepository = $orderRepository;
-        $this->opcHelper = $opcHelper;
+        $this->helper = $helper;
     }
 
     protected function _toHtml()
     {
-        if ($this->opcHelper->isEnable() &&
-            $this->opcHelper->isModuleOutputEnabled('Kkkonrad_Fastcheckout')) {
+        if ($this->helper->isEnable() &&
+            $this->helper->isModuleOutputEnabled('Kkkonrad_Fastcheckout')) {
             $this->setTemplate('Kkkonrad_Fastcheckout::success/success.phtml');
             if ($this->getNameInLayout() === 'checkout.success.print.button') {
                 return '';

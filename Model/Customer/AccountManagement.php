@@ -25,7 +25,7 @@ class AccountManagement extends \Magento\Customer\Model\AccountManagement
             } elseif ($hash == '') {
                 $templateType = self::NEW_ACCOUNT_EMAIL_REGISTERED_NO_PASSWORD;
             }
-            if (!$registry->registry('isIWDcreateAccount')) {
+            if (!$registry->registry('isKkkonradCreateAccount')) {
                 $method = new \ReflectionMethod($this,'getEmailNotification');
                 $method->setAccessible(true);
                 $method->invoke($this)->newAccount($customer, $templateType, $redirectUrl, $customer->getStoreId());

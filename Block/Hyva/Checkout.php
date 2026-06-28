@@ -18,7 +18,7 @@ use Magento\Framework\View\Element\Template;
 use Magento\Framework\View\Element\Template\Context;
 use Magento\Quote\Model\Quote;
 use Magento\Quote\Model\Quote\Item;
-use Kkkonrad\Fastcheckout\Helper\Data as OpcHelper;
+use Kkkonrad\Fastcheckout\Helper\Data as Helper;
 use Kkkonrad\Fastcheckout\Model\Hyva\RequireJsAssets;
 
 
@@ -80,9 +80,9 @@ class Checkout extends Template
     private $objectManager;
 
     /**
-     * @var OpcHelper
+     * @var Helper
      */
-    private $opcHelper;
+    private $helper;
 
 
     /**
@@ -105,7 +105,7 @@ class Checkout extends Template
         ImageHelper $imageHelper,
         ProductConfiguration $productConfiguration,
         ViewModelRegistry $viewModelRegistry,
-        OpcHelper $opcHelper,
+        Helper $helper,
         $configProvider = null,
         ModuleListInterface $moduleList = null,
         ComponentRegistrarInterface $componentRegistrar = null,
@@ -122,7 +122,7 @@ class Checkout extends Template
         $this->imageHelper = $imageHelper;
         $this->productConfiguration = $productConfiguration;
         $this->viewModelRegistry = $viewModelRegistry;
-        $this->opcHelper = $opcHelper;
+        $this->helper = $helper;
         $this->configProvider = $configProvider instanceof CompositeConfigProvider ? $configProvider : null;
         $this->moduleList = $moduleList;
         $this->componentRegistrar = $componentRegistrar;
@@ -136,7 +136,7 @@ class Checkout extends Template
      */
     public function isShowComment(): bool
     {
-        return $this->opcHelper->isShowComment();
+        return $this->helper->isShowComment();
     }
 
     /**
@@ -144,7 +144,7 @@ class Checkout extends Template
      */
     public function isShowGiftMessage(): bool
     {
-        return $this->opcHelper->isShowGiftMessage();
+        return $this->helper->isShowGiftMessage();
     }
 
     /**

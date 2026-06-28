@@ -66,7 +66,7 @@ define([
                         var currentMethod = wire.shippingMethod || (typeof wire.get === 'function' ? wire.get('shippingMethod') : (wire.data ? wire.data.shippingMethod : ''));
                         if (currentMethod !== value) {
                             if (window.console && typeof window.console.log === 'function') {
-                                window.console.log('Kkkonrad OPC: KO selected shipping method, syncing to Magewire:', value);
+                                window.console.log('Kkkonrad Fastcheckout: KO selected shipping method, syncing to Magewire:', value);
                             }
                             wire.call('selectShippingMethod', value);
                         }
@@ -79,15 +79,15 @@ define([
 
         initialize: function () {
             this._super();
-            window.iwdOpcHyvaShippingListInstance = this;
+            window.fastcheckoutHyvaShippingListInstance = this;
             if (window.console && typeof window.console.log === 'function') {
-                window.console.log('Kkkonrad OPC: shipping-list JS component initialized');
+                window.console.log('Kkkonrad Fastcheckout: shipping-list JS component initialized');
             }
             return this;
         },
 
         setError: function (methodCode, message) {
-            var self = this.errorMethodCode ? this : (window.iwdOpcHyvaShippingListInstance || this);
+            var self = this.errorMethodCode ? this : (window.fastcheckoutHyvaShippingListInstance || this);
             if (self._errorTimer) {
                 clearTimeout(self._errorTimer);
                 self._errorTimer = null;
@@ -103,7 +103,7 @@ define([
         },
 
         clearError: function () {
-            var self = this.errorMethodCode ? this : (window.iwdOpcHyvaShippingListInstance || this);
+            var self = this.errorMethodCode ? this : (window.fastcheckoutHyvaShippingListInstance || this);
             if (self._errorTimer) {
                 clearTimeout(self._errorTimer);
                 self._errorTimer = null;
@@ -115,7 +115,7 @@ define([
         },
 
         hasError: function (method) {
-            var self = this.errorMethodCode ? this : (window.iwdOpcHyvaShippingListInstance || this);
+            var self = this.errorMethodCode ? this : (window.fastcheckoutHyvaShippingListInstance || this);
             var fullCode = method.carrier_code + '_' + method.method_code;
             var altCode = method.method_code + '_' + method.carrier_code;
             var err = (typeof self.errorMethodCode === 'function') ? self.errorMethodCode() : '';
@@ -123,7 +123,7 @@ define([
         },
 
         getMethodCss: function (method) {
-            var self = this.selectedMethodCode ? this : (window.iwdOpcHyvaShippingListInstance || this);
+            var self = this.selectedMethodCode ? this : (window.fastcheckoutHyvaShippingListInstance || this);
             var fullCode = method.carrier_code + '_' + method.method_code;
             var altCode = method.method_code + '_' + method.carrier_code;
 
@@ -160,7 +160,7 @@ define([
         },
 
         selectShippingMethod: function (method) {
-            var self = this.selectedMethodCode ? this : (window.iwdOpcHyvaShippingListInstance || this);
+            var self = this.selectedMethodCode ? this : (window.fastcheckoutHyvaShippingListInstance || this);
             if (method && typeof self.selectedMethodCode === 'function') {
                 self.selectedMethodCode(method.carrier_code + '_' + method.method_code);
             }

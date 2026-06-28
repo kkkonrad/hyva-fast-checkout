@@ -5,9 +5,9 @@ define([
 
     return function (config) {
         if (window.console && typeof window.console.log === 'function') {
-            window.console.log('Kkkonrad OPC: payment-renderers JS initialized with config:', config);
+            window.console.log('Kkkonrad Fastcheckout: payment-renderers JS initialized with config:', config);
         }
-        var scope = config.scope || 'iwdOpcHyvaPaymentRenderers',
+        var scope = config.scope || 'fastcheckoutHyvaPaymentRenderers',
             rendererComponents = config.rendererComponents || [];
 
         window.checkoutConfig = config.checkoutConfig || {};
@@ -164,7 +164,7 @@ define([
                     }, function (error) {
                         remaining -= 1;
                         if (window.console && typeof window.console.warn === 'function') {
-                            window.console.warn('Kkkonrad OPC: payment renderer could not be loaded', component, error);
+                            window.console.warn('Kkkonrad Fastcheckout: payment renderer could not be loaded', component, error);
                         }
                         if (remaining === 0) {
                             done();
@@ -190,11 +190,11 @@ define([
                             try {
                                 cdInitFunc(customerDataConfig);
                                 if (window.console && typeof window.console.log === 'function') {
-                                    window.console.log('Kkkonrad OPC: customerData initialized successfully');
+                                    window.console.log('Kkkonrad Fastcheckout: customerData initialized successfully');
                                 }
                             } catch (e) {
                                 if (window.console && typeof window.console.warn === 'function') {
-                                    window.console.warn('Kkkonrad OPC: customerData initialization error:', e);
+                                    window.console.warn('Kkkonrad Fastcheckout: customerData initialization error:', e);
                                 }
                             }
                         }
@@ -244,7 +244,7 @@ define([
                 }
 
                 function hidePaymentPlaceholders() {
-                    document.querySelectorAll('.iwd-opc-payment-method-ko-container').forEach(function (placeholder) {
+                    document.querySelectorAll('.fastcheckout-payment-method-ko-container').forEach(function (placeholder) {
                         placeholder.classList.add('hidden');
                         placeholder.style.display = 'none';
                     });
@@ -281,8 +281,8 @@ define([
 
                 function syncKoPaymentRenderers() {
                     syncQuoteCustomerData();
-                    if (window.iwdOpcHyvaPaymentList && typeof window.iwdOpcHyvaPaymentList.syncRenderers === 'function') {
-                        window.iwdOpcHyvaPaymentList.syncRenderers();
+                    if (window.fastcheckoutHyvaPaymentList && typeof window.fastcheckoutHyvaPaymentList.syncRenderers === 'function') {
+                        window.fastcheckoutHyvaPaymentList.syncRenderers();
                     }
                 }
 
@@ -300,7 +300,7 @@ define([
 
                     if (quoteMethod && !domHasPaymentMethod(quoteMethod)) {
                         if (window.console && typeof window.console.log === 'function') {
-                            window.console.log('Kkkonrad OPC: clearing inactive quote payment method:', quoteMethod);
+                            window.console.log('Kkkonrad Fastcheckout: clearing inactive quote payment method:', quoteMethod);
                         }
                         selectPaymentMethodAction(null);
                         hidePaymentPlaceholders();
@@ -313,7 +313,7 @@ define([
                     lastMethodsJson = currentMethodsJson;
 
                     if (window.console && typeof window.console.log === 'function') {
-                        window.console.log('Kkkonrad OPC: syncPaymentMethods found methods:', methods);
+                        window.console.log('Kkkonrad Fastcheckout: syncPaymentMethods found methods:', methods);
                     }
 
                     if (methods.length > 0) {
@@ -341,7 +341,7 @@ define([
                                 }
                             }
                         },
-                        'iwdOpcHyvaShippingRenderers': {
+                        'fastcheckoutHyvaShippingRenderers': {
                             component: 'uiComponent',
                             children: {
                                 shippingList: {
@@ -412,7 +412,7 @@ define([
                         }
 
                         if (window.console && typeof window.console.log === 'function') {
-                            window.console.log('Kkkonrad OPC: syncAddressToKnockout updating quote shippingAddress:', addressData);
+                            window.console.log('Kkkonrad Fastcheckout: syncAddressToKnockout updating quote shippingAddress:', addressData);
                         }
                         selectShippingAddress(newAddress);
                     });
@@ -434,7 +434,7 @@ define([
                             var active = quote.shippingMethod();
                             if (!active || active.carrier_code !== found.carrier_code || active.method_code !== found.method_code) {
                                 if (window.console && typeof window.console.log === 'function') {
-                                    window.console.log('Kkkonrad OPC: syncSelectedShippingMethodToKnockout setting active:', methodCode);
+                                    window.console.log('Kkkonrad Fastcheckout: syncSelectedShippingMethodToKnockout setting active:', methodCode);
                                 }
                                 selectShippingMethod(found);
                             }
@@ -443,7 +443,7 @@ define([
                 }
 
                 function getShippingListComponent() {
-                    return window.iwdOpcHyvaShippingListInstance || (typeof registry !== 'undefined' && registry.get('iwdOpcHyvaShippingRenderers.shippingList')) || null;
+                    return window.fastcheckoutHyvaShippingListInstance || (typeof registry !== 'undefined' && registry.get('fastcheckoutHyvaShippingRenderers.shippingList')) || null;
                 }
 
                 function clearShippingFieldError() {
@@ -459,14 +459,14 @@ define([
                         component.setError(carrierCode + '_' + methodCode, errorMessage);
                     }
                     var el = document.getElementById('label_method_' + methodCode + '_' + carrierCode) ||
-                             document.getElementById('iwd-opc-ko-shipping-root') ||
+                             document.getElementById('fastcheckout-ko-shipping-root') ||
                              document.querySelector('[name="shipping_method"]');
                     if (el) {
                         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     }
                 }
 
-                window.iwdOpcHyvaShipping = {
+                window.fastcheckoutHyvaShipping = {
                     syncAddress: syncAddressToKnockout,
                     syncShippingMethod: syncSelectedShippingMethodToKnockout,
                     setError: function (methodCode, message) {
@@ -521,14 +521,14 @@ define([
                             }
                         } catch (e) {
                             if (window.console && typeof window.console.error === 'function') {
-                                window.console.error('Kkkonrad OPC: Error in shipping validation:', e);
+                                window.console.error('Kkkonrad Fastcheckout: Error in shipping validation:', e);
                             }
                         }
 
                         // Run dynamic/custom shipping validators if registered
-                        if (window.iwdOpcCustomShippingValidators && window.iwdOpcCustomShippingValidators.length > 0) {
-                            for (var i = 0; i < window.iwdOpcCustomShippingValidators.length; i++) {
-                                var validator = window.iwdOpcCustomShippingValidators[i];
+                        if (window.fastcheckoutCustomShippingValidators && window.fastcheckoutCustomShippingValidators.length > 0) {
+                            for (var i = 0; i < window.fastcheckoutCustomShippingValidators.length; i++) {
+                                var validator = window.fastcheckoutCustomShippingValidators[i];
                                 if (typeof validator === 'function') {
                                     try {
                                         if (!validator(activeMethod)) {
@@ -536,7 +536,7 @@ define([
                                         }
                                     } catch (err) {
                                         if (window.console && typeof window.console.error === 'function') {
-                                            window.console.error('Kkkonrad OPC: Custom shipping validator error:', err);
+                                            window.console.error('Kkkonrad Fastcheckout: Custom shipping validator error:', err);
                                         }
                                     }
                                 }
@@ -568,7 +568,7 @@ define([
                         var wire = magewireEl.__livewire;
                         if (wire.shippingMethod !== methodCode) {
                             if (window.console && typeof window.console.log === 'function') {
-                                window.console.log('Kkkonrad OPC: quote.shippingMethod changed in KO, syncing to Magewire:', methodCode);
+                                window.console.log('Kkkonrad Fastcheckout: quote.shippingMethod changed in KO, syncing to Magewire:', methodCode);
                             }
                             wire.call('selectShippingMethod', methodCode);
                         }
@@ -590,7 +590,7 @@ define([
                     var domMethod = getCheckedDomPaymentMethod();
 
                     if (window.console && typeof window.console.log === 'function') {
-                        window.console.log('Kkkonrad OPC: getSelectedMethodCode - quoteMethod:', quoteMethod, 'domMethod:', domMethod);
+                        window.console.log('Kkkonrad Fastcheckout: getSelectedMethodCode - quoteMethod:', quoteMethod, 'domMethod:', domMethod);
                     }
 
                     if (domMethod) {
@@ -633,11 +633,11 @@ define([
                 }
 
                 function patchRenderer(component) {
-                    if (!component || component.iwdOpcHyvaPatched) {
+                    if (!component || component.fastcheckoutHyvaPatched) {
                         return;
                     }
 
-                    component.iwdOpcHyvaPatched = true;
+                    component.fastcheckoutHyvaPatched = true;
                     component.selectPaymentMethod = function () {
                         syncQuoteCustomerData();
                         var paymentData = typeof component.getData === 'function'
@@ -745,9 +745,9 @@ define([
 
                 function updateActiveRendererClass(methodCode, activeCode) {
                     if (window.console && typeof window.console.log === 'function') {
-                        window.console.log('Kkkonrad OPC: updateActiveRendererClass methodCode:', methodCode, 'activeCode:', activeCode);
+                        window.console.log('Kkkonrad Fastcheckout: updateActiveRendererClass methodCode:', methodCode, 'activeCode:', activeCode);
                     }
-                    var root = document.getElementById('iwd-opc-ko-payment-root'),
+                    var root = document.getElementById('fastcheckout-ko-payment-root'),
                         activeElement = null,
                         movedToTarget = false;
 
@@ -756,19 +756,19 @@ define([
 
                     if (!root) {
                         if (window.console && typeof window.console.log === 'function') {
-                            window.console.log('Kkkonrad OPC: #iwd-opc-ko-payment-root not found!');
+                            window.console.log('Kkkonrad Fastcheckout: #fastcheckout-ko-payment-root not found!');
                         }
                         return false;
                     }
 
                     var allRenderers = document.querySelectorAll('.payment-method');
                     if (window.console && typeof window.console.log === 'function') {
-                        window.console.log('Kkkonrad OPC: allRenderers count:', allRenderers.length);
+                        window.console.log('Kkkonrad Fastcheckout: allRenderers count:', allRenderers.length);
                     }
 
                     allRenderers.forEach(function (element) {
                         element.classList.remove('_active');
-                        element.removeAttribute('data-iwd-active');
+                        element.removeAttribute('data-fastcheckout-active');
                     });
 
                     allRenderers.forEach(function (element) {
@@ -779,15 +779,15 @@ define([
 
                     if (activeElement) {
                         if (window.console && typeof window.console.log === 'function') {
-                            window.console.log('Kkkonrad OPC: found activeElement for method:', methodCode);
+                            window.console.log('Kkkonrad Fastcheckout: found activeElement for method:', methodCode);
                         }
                         activeElement.classList.add('_active');
-                        activeElement.setAttribute('data-iwd-active', 'true');
+                        activeElement.setAttribute('data-fastcheckout-active', 'true');
 
-                        var target = document.querySelector('[data-iwd-payment-method-ko-target="' + methodCode + '"]');
+                        var target = document.querySelector('[data-fastcheckout-payment-method-ko-target="' + methodCode + '"]');
                         if (target) {
                             if (window.console && typeof window.console.log === 'function') {
-                                window.console.log('Kkkonrad OPC: moving activeElement to target placeholder:', methodCode, 'hasVisibleContent:', hasVisibleContent(activeElement));
+                                window.console.log('Kkkonrad Fastcheckout: moving activeElement to target placeholder:', methodCode, 'hasVisibleContent:', hasVisibleContent(activeElement));
                             }
                             target.appendChild(activeElement);
                             target.classList.remove('hidden');
@@ -795,12 +795,12 @@ define([
                             movedToTarget = true;
                         } else {
                             if (window.console && typeof window.console.log === 'function') {
-                                window.console.log('Kkkonrad OPC: target placeholder NOT found for method:', methodCode);
+                                window.console.log('Kkkonrad Fastcheckout: target placeholder NOT found for method:', methodCode);
                             }
                         }
                     } else {
                         if (window.console && typeof window.console.log === 'function') {
-                            window.console.log('Kkkonrad OPC: activeElement NOT found for method:', methodCode);
+                            window.console.log('Kkkonrad Fastcheckout: activeElement NOT found for method:', methodCode);
                         }
                     }
 
@@ -809,7 +809,7 @@ define([
 
                 function applySelectedMethod(methodCode) {
                     if (window.console && typeof window.console.log === 'function') {
-                        window.console.log('Kkkonrad OPC: applySelectedMethod called for:', methodCode);
+                        window.console.log('Kkkonrad Fastcheckout: applySelectedMethod called for:', methodCode);
                     }
                     var method,
                         renderer,
@@ -827,7 +827,7 @@ define([
                     patchRenderer(renderer);
                     activeCode = getRendererCode(renderer, methodCode);
                     if (window.console && typeof window.console.log === 'function') {
-                        window.console.log('Kkkonrad OPC: applySelectedMethod renderer found:', !!renderer, 'activeCode:', activeCode);
+                        window.console.log('Kkkonrad Fastcheckout: applySelectedMethod renderer found:', !!renderer, 'activeCode:', activeCode);
                     }
                     activeMethod = getMethod(activeCode) || { method: activeCode, title: method.title };
                     quote.paymentMethod(activeMethod);
@@ -844,7 +844,7 @@ define([
                 function dispatchReadyEvent() {
                     if (readyDispatched) { return; }
                     readyDispatched = true;
-                    document.dispatchEvent(new CustomEvent('iwd-opc:ready'));
+                    document.dispatchEvent(new CustomEvent('fastcheckout:ready'));
                 }
 
                 function retryPendingSelectedMethod() {
@@ -859,7 +859,7 @@ define([
                 }
 
                 function observePaymentRendererRoot() {
-                    var root = document.getElementById('iwd-opc-ko-payment-root');
+                    var root = document.getElementById('fastcheckout-ko-payment-root');
 
                     if (paymentRendererObserver || !root || typeof window.MutationObserver !== 'function') {
                         return;
@@ -876,7 +876,7 @@ define([
 
                 function setSelectedMethod(methodCode) {
                     if (window.console && typeof window.console.log === 'function') {
-                        window.console.log('Kkkonrad OPC: setSelectedMethod called with:', methodCode);
+                        window.console.log('Kkkonrad Fastcheckout: setSelectedMethod called with:', methodCode);
                     }
                     syncPaymentMethods();
 
@@ -890,7 +890,7 @@ define([
                         pendingSelectedMethodCode = '';
                         hidePaymentPlaceholders();
                         if (window.console && typeof window.console.log === 'function') {
-                            window.console.log('Kkkonrad OPC: selected payment method is no longer available:', methodCode);
+                            window.console.log('Kkkonrad Fastcheckout: selected payment method is no longer available:', methodCode);
                         }
                         return;
                     }
@@ -934,7 +934,7 @@ define([
                     return found;
                 }
 
-                window.iwdOpcHyvaPayment = {
+                window.fastcheckoutHyvaPayment = {
                     getActivePaymentData: function () {
                         var component = getActiveRenderer();
 
@@ -984,7 +984,7 @@ define([
                                 }
 
                                 if (window.console && typeof window.console.log === 'function') {
-                                    window.console.log('Kkkonrad OPC: Delegating order submission to Knockout component placeOrder()');
+                                    window.console.log('Kkkonrad Fastcheckout: Delegating order submission to Knockout component placeOrder()');
                                 }
 
                                 // 2. Subscribe to secureFormError if available to catch async errors immediately
@@ -1013,7 +1013,7 @@ define([
                                         setTimeout(function() {
                                             if (self.syncResolve) {
                                                 if (window.console && typeof window.console.log === 'function') {
-                                                    window.console.log('Kkkonrad OPC: safety timeout reached, resetting checkout button');
+                                                    window.console.log('Kkkonrad Fastcheckout: safety timeout reached, resetting checkout button');
                                                 }
                                                 self.syncResolve = null;
                                                 self.syncReject = null;
@@ -1026,7 +1026,7 @@ define([
                                     }
                                 } catch (e) {
                                     if (window.console && typeof window.console.error === 'function') {
-                                        window.console.error('Kkkonrad OPC: component placeOrder thrown exception:', e);
+                                        window.console.error('Kkkonrad Fastcheckout: component placeOrder thrown exception:', e);
                                     }
                                     self.syncResolve = null;
                                     self.syncReject = null;
@@ -1062,7 +1062,7 @@ define([
                         var methodCode = paymentData.method || getSelectedMethodCode();
 
                         if (window.console && typeof window.console.log === 'function') {
-                            window.console.log('Kkkonrad OPC: placeOrderAction intercepted. Method:', methodCode, 'Data:', paymentData);
+                            window.console.log('Kkkonrad Fastcheckout: placeOrderAction intercepted. Method:', methodCode, 'Data:', paymentData);
                         }
 
                         // Sync payment data to Magewire
@@ -1075,13 +1075,13 @@ define([
                             this.syncWire.set('paymentAdditionalData', additionalData)
                                 .then(function () {
                                     if (window.console && typeof window.console.log === 'function') {
-                                        window.console.log('Kkkonrad OPC: Magewire paymentAdditionalData updated successfully.');
+                                        window.console.log('Kkkonrad Fastcheckout: Magewire paymentAdditionalData updated successfully.');
                                     }
                                     resolveFn(true);
                                 })
                                 .catch(function (err) {
                                     if (window.console && typeof window.console.error === 'function') {
-                                        window.console.error('Kkkonrad OPC: failed to set paymentAdditionalData:', err);
+                                        window.console.error('Kkkonrad Fastcheckout: failed to set paymentAdditionalData:', err);
                                     }
                                     rejectFn(err);
                                 });
@@ -1106,7 +1106,7 @@ define([
                         if (component && typeof component.validate === 'function') {
                             var isValid = component.validate();
                             if (window.console && typeof window.console.log === 'function') {
-                                window.console.log('Kkkonrad OPC: Knockout component validation result:', isValid);
+                                window.console.log('Kkkonrad Fastcheckout: Knockout component validation result:', isValid);
                             }
                             return isValid;
                         }
@@ -1116,7 +1116,7 @@ define([
                     afterPlaceOrder: function () {
                         var component = getActiveRenderer();
                         if (window.console && typeof window.console.log === 'function') {
-                            window.console.log('Kkkonrad OPC: afterPlaceOrder triggered for component:', component);
+                            window.console.log('Kkkonrad Fastcheckout: afterPlaceOrder triggered for component:', component);
                         }
 
                         if (component) {
@@ -1143,7 +1143,7 @@ define([
                                     return;
                                 } catch (e) {
                                     if (window.console && typeof window.console.error === 'function') {
-                                        window.console.error('Kkkonrad OPC: error executing afterPlaceOrder:', e);
+                                        window.console.error('Kkkonrad Fastcheckout: error executing afterPlaceOrder:', e);
                                     }
                                 }
                             }
@@ -1170,11 +1170,11 @@ define([
 
                 document.addEventListener('click', function (event) {
                     // Ignore clicks inside the Knockout payment form container to prevent inputs from losing focus
-                    if (event.target && event.target.closest('.iwd-opc-payment-method-ko-container')) {
+                    if (event.target && event.target.closest('.fastcheckout-payment-method-ko-container')) {
                         return;
                     }
 
-                    var option = event.target ? event.target.closest('[data-iwd-opc-payment-option]') : null,
+                    var option = event.target ? event.target.closest('[data-fastcheckout-payment-option]') : null,
                         input;
 
                     if (event.target && event.target.name === 'payment_method') {
@@ -1196,9 +1196,9 @@ define([
                 }, true);
 
                 function moveRenderersBackToRoot() {
-                    var root = document.getElementById('iwd-opc-ko-payment-root');
+                    var root = document.getElementById('fastcheckout-ko-payment-root');
                     if (window.console && typeof window.console.log === 'function') {
-                        window.console.log('Kkkonrad OPC: moveRenderersBackToRoot called, root exists:', !!root);
+                        window.console.log('Kkkonrad Fastcheckout: moveRenderersBackToRoot called, root exists:', !!root);
                     }
                     hidePaymentPlaceholders();
                     if (root) {
@@ -1210,7 +1210,7 @@ define([
                             }
                         });
                         if (window.console && typeof window.console.log === 'function') {
-                            window.console.log('Kkkonrad OPC: moved back to root count:', count);
+                            window.console.log('Kkkonrad Fastcheckout: moved back to root count:', count);
                         }
                     }
                 }
@@ -1218,23 +1218,23 @@ define([
                 if (window.Livewire && typeof window.Livewire.hook === 'function') {
                     window.Livewire.hook('element.updating', function (fromEl, toEl) {
                         if (fromEl.getAttribute('wire:key') === 'checkout-payment-methods-card') {
-                            var fromCodes = Array.from(fromEl.querySelectorAll('[data-iwd-opc-payment-option]')).map(function (el) {
-                                return el.getAttribute('data-iwd-opc-payment-option');
+                            var fromCodes = Array.from(fromEl.querySelectorAll('[data-fastcheckout-payment-option]')).map(function (el) {
+                                return el.getAttribute('data-fastcheckout-payment-option');
                             }).sort().join(',');
 
-                            var toCodes = Array.from(toEl.querySelectorAll('[data-iwd-opc-payment-option]')).map(function (el) {
-                                return el.getAttribute('data-iwd-opc-payment-option');
+                            var toCodes = Array.from(toEl.querySelectorAll('[data-fastcheckout-payment-option]')).map(function (el) {
+                                return el.getAttribute('data-fastcheckout-payment-option');
                             }).sort().join(',');
 
                             if (fromCodes === toCodes) {
                                 if (window.console && typeof window.console.log === 'function') {
-                                    window.console.log('Kkkonrad OPC: Payment methods list did not change, ignoring DOM update.');
+                                    window.console.log('Kkkonrad Fastcheckout: Payment methods list did not change, ignoring DOM update.');
                                 }
                                 return false;
                             }
 
                             if (window.console && typeof window.console.log === 'function') {
-                                window.console.log('Kkkonrad OPC: Payment methods list changed, moving renderers to root before update.');
+                                window.console.log('Kkkonrad Fastcheckout: Payment methods list changed, moving renderers to root before update.');
                             }
                             moveRenderersBackToRoot();
                         }
@@ -1244,7 +1244,7 @@ define([
                         syncPaymentMethods();
                         var code = getSelectedMethodCode();
                         if (window.console && typeof window.console.log === 'function') {
-                            window.console.log('Kkkonrad OPC: Livewire message.processed triggered, getSelectedMethodCode:', code);
+                            window.console.log('Kkkonrad Fastcheckout: Livewire message.processed triggered, getSelectedMethodCode:', code);
                         }
                         patchRenderers();
                         setSelectedMethod(code);
@@ -1267,11 +1267,11 @@ define([
                     layoutScripts.forEach(function (scriptModule) {
                         require([scriptModule], function () {
                             if (window.console && typeof window.console.log === 'function') {
-                                window.console.log('Kkkonrad OPC: Loaded layout script:', scriptModule);
+                                window.console.log('Kkkonrad Fastcheckout: Loaded layout script:', scriptModule);
                             }
                         }, function (err) {
                             if (window.console && typeof window.console.warn === 'function') {
-                                window.console.warn('Kkkonrad OPC: Could not load layout script:', scriptModule, err);
+                                window.console.warn('Kkkonrad Fastcheckout: Could not load layout script:', scriptModule, err);
                             }
                         });
                     });

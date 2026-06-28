@@ -9,7 +9,7 @@
         <referenceBlock name="page.main.title" remove="true"/>
         <referenceContainer name="content">
             <block class="Kkkonrad\Fastcheckout\Block\Hyva\Checkout"
-                   name="iwd.opc.hyva.checkout"
+                   name="kkkonrad.fastcheckout.hyva.checkout"
                    template="Kkkonrad_Fastcheckout::hyva/checkout.phtml"
                    cacheable="false">
                 <arguments>
@@ -17,7 +17,7 @@
                 </arguments>
             </block>
             <block class="Kkkonrad\Fastcheckout\Block\Hyva\Checkout"
-                   name="iwd.opc.hyva.checkout.ko_payment_renderers"
+                   name="kkkonrad.fastcheckout.hyva.checkout.ko_payment_renderers"
                    as="ko_payment_renderers"
                    template="Kkkonrad_Fastcheckout::hyva/knockout/payment-renderers.phtml"
                    cacheable="false"/>

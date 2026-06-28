@@ -2,25 +2,25 @@
 
 namespace Kkkonrad\Fastcheckout\Plugin\Checkout\Block\Cart;
 
-use Kkkonrad\Fastcheckout\Helper\Data as OpcHelper;
+use Kkkonrad\Fastcheckout\Helper\Data as Helper;
 use Magento\Framework\UrlInterface;
 
 class Sidebar
 {
-    public $opcHelper;
+    public $helper;
     public $url;
 
     public function __construct(
-        OpcHelper $opcHelper,
+        Helper $helper,
         UrlInterface $url
     ) {
-        $this->opcHelper = $opcHelper;
+        $this->helper = $helper;
         $this->url = $url;
     }
 
     public function afterGetCheckoutUrl($subject, $result)
     {
-        if ($this->opcHelper->canUseHyvaNativeCheckout()) {
+        if ($this->helper->canUseHyvaNativeCheckout()) {
             $result = $this->url->getUrl('fast-checkout', ['_secure' => true]);
         }
 

@@ -2,29 +2,29 @@
 
 namespace Kkkonrad\Fastcheckout\Plugin\Checkout\Controller\Index;
 
-use Kkkonrad\Fastcheckout\Helper\Data as OpcHelper;
+use Kkkonrad\Fastcheckout\Helper\Data as Helper;
 use Magento\Framework\Controller\Result\RedirectFactory;
 use Magento\Framework\UrlInterface;
 
 class Index
 {
-    private $opcHelper;
+    private $helper;
     private $url;
     private $redirectFactory;
 
     public function __construct(
-        OpcHelper $opcHelper,
+        Helper $helper,
         RedirectFactory $redirectFactory,
         UrlInterface $url
     ) {
-        $this->opcHelper = $opcHelper;
+        $this->helper = $helper;
         $this->redirectFactory = $redirectFactory;
         $this->url = $url;
     }
 
     public function aroundExecute($subject, callable $proceed)
     {
-        if ($this->opcHelper->canUseHyvaNativeCheckout()) {
+        if ($this->helper->canUseHyvaNativeCheckout()) {
             return $this->redirectFactory->create()
                 ->setUrl($this->url->getUrl('fast-checkout', ['_secure' => true]));
         }

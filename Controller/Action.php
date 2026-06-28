@@ -10,7 +10,7 @@ use Magento\Customer\Model\Session as CustomerSession;
 use Magento\Framework\App\Action\Context;
 use Magento\Framework\Controller\Result\RawFactory;
 use Magento\Checkout\Model\Type\Onepage;
-use Kkkonrad\Fastcheckout\Helper\Data as OpcHelper;
+use Kkkonrad\Fastcheckout\Helper\Data as Helper;
 use Magento\Checkout\Helper\Data as CheckoutHelper;
 use Magento\Checkout\Model\Session as CheckoutSession;
 use Magento\Framework\View\Result\PageFactory;
@@ -26,7 +26,7 @@ abstract class Action extends MagentoAction
     public $resultRawFactory;
     public $checkoutSession;
     public $resultPageFactory;
-    public $opcHelper;
+    public $helper;
 
     public function __construct(
         Context $context,
@@ -37,10 +37,10 @@ abstract class Action extends MagentoAction
         RawFactory $resultRawFactory,
         CheckoutSession $checkoutSession,
         PageFactory $resultPageFactory,
-        OpcHelper $opcHelper,
+        Helper $helper,
         AccountManagementInterface $accountManagement
     ) {
-        $this->opcHelper = $opcHelper;
+        $this->helper = $helper;
         $this->resultPageFactory = $resultPageFactory;
         $this->checkoutSession = $checkoutSession;
         $this->customerSession = $customerSession;

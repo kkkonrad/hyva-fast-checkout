@@ -23,17 +23,17 @@ $mageInitConfig = [
     'paymentMethods' => $paymentMethods,
     'rendererComponents' => $rendererComponents,
     'layoutScripts' => $layoutScripts['modules'] ?? [],
-    'scope' => 'iwdOpcHyvaPaymentRenderers'
+    'scope' => 'fastcheckoutHyvaPaymentRenderers'
 ];
 $block->ensureRequireJsAssets();
 ?>
 <style>
-    .iwd-opc-ko-payment-root .payment-method-title,
-    .iwd-opc-ko-payment-root .actions-toolbar,
-    .iwd-opc-ko-payment-root .payment-method-billing-address,
-    .iwd-opc-payment-method-ko-container .payment-method-title,
-    .iwd-opc-payment-method-ko-container .actions-toolbar,
-    .iwd-opc-payment-method-ko-container .payment-method-billing-address {
+    .fastcheckout-ko-payment-root .payment-method-title,
+    .fastcheckout-ko-payment-root .actions-toolbar,
+    .fastcheckout-ko-payment-root .payment-method-billing-address,
+    .fastcheckout-payment-method-ko-container .payment-method-title,
+    .fastcheckout-payment-method-ko-container .actions-toolbar,
+    .fastcheckout-payment-method-ko-container .payment-method-billing-address {
         display: none !important;
     }
 </style>
@@ -49,11 +49,11 @@ foreach ($layoutScripts['external'] as $externalScript) {
 }
 ?>
 
-<div id="iwd-opc-ko-payment-root"
-     class="iwd-opc-ko-payment-root mt-4"
+<div id="fastcheckout-ko-payment-root"
+     class="fastcheckout-ko-payment-root mt-4"
      style="display: none !important;"
      wire:ignore
-     data-bind="scope: 'iwdOpcHyvaPaymentRenderers'">
+     data-bind="scope: 'fastcheckoutHyvaPaymentRenderers'">
     <!-- ko foreach: getRegion('payment-methods-list') -->
         <!-- ko template: getTemplate() --><!-- /ko -->
     <!-- /ko -->
@@ -125,7 +125,7 @@ foreach ($layoutScripts['external'] as $externalScript) {
         script.onload = onload;
         script.onerror = function () {
             if (window.console && typeof window.console.warn === 'function') {
-                window.console.warn('Kkkonrad OPC: could not load script', src);
+                window.console.warn('Kkkonrad Fastcheckout: could not load script', src);
             }
         };
         document.head.appendChild(script);

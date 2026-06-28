@@ -20,7 +20,7 @@ $paymentMethods = $magewire->getPaymentMethods();
 $allowedPaymentMethodCodes = $magewire->getAllowedPaymentMethodCodes();
 $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
 ?>
-<section class="space-y-8 max-w-7xl mx-auto px-0 py-4 pb-24 md:p-6 md:pb-6 overflow-x-hidden" id="iwd-opc-checkout">
+<section class="space-y-8 max-w-7xl mx-auto px-0 py-4 pb-24 md:p-6 md:pb-6 overflow-x-hidden" id="fastcheckout-checkout">
 
     <!-- Header -->
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-gray-200 pb-6 px-4 md:px-0">
@@ -54,7 +54,7 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
         </div>
     <?php else: ?>
     <form id="co-checkout-form"
-          x-data="initOpcCheckout"
+          x-data="initCheckout"
           @submit.prevent="handleSubmit"
           class="contents">
 
@@ -255,10 +255,10 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                             </svg>
                         </div>
                     </div>
-                    <div id="iwd-opc-ko-shipping-root"
-                         class="iwd-opc-ko-shipping-root"
+                    <div id="fastcheckout-ko-shipping-root"
+                         class="fastcheckout-ko-shipping-root"
                          wire:ignore
-                         data-bind="scope: 'iwdOpcHyvaShippingRenderers'">
+                         data-bind="scope: 'fastcheckoutHyvaShippingRenderers'">
                         <!-- ko foreach: getRegion('shipping-methods-list') -->
                             <!-- ko template: getTemplate() --><!-- /ko -->
                         <!-- /ko -->
@@ -452,24 +452,24 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                                 ?>
  	                            <div class="border border-gray-200 rounded transition-colors"
  	                                 wire:key="payment-method-item-<?= $escaper->escapeHtmlAttr($methodCode) ?>"
- 	                                 data-iwd-opc-payment-option="<?= $escaper->escapeHtmlAttr($methodCode) ?>"
-                                     data-iwd-opc-payment-allowed="<?= $isPaymentMethodAllowed ? '1' : '0' ?>"
+ 	                                 data-fastcheckout-payment-option="<?= $escaper->escapeHtmlAttr($methodCode) ?>"
+                                     data-fastcheckout-payment-allowed="<?= $isPaymentMethodAllowed ? '1' : '0' ?>"
                                      <?= $isPaymentMethodAllowed ? '' : 'style="display:none;" aria-hidden="true"' ?>>
  	                                <label class="flex items-center gap-3 p-3 cursor-pointer hover:bg-gray-50/50 mb-0">
  	                                    <input type="radio"
  	                                           class="form-radio h-4 w-4 text-blue-600 focus:ring-blue-500"
  	                                           name="payment_method"
  	                                           value="<?= $escaper->escapeHtmlAttr($methodCode) ?>"
- 	                                           data-iwd-opc-payment-option-input="<?= $escaper->escapeHtmlAttr($methodCode) ?>"
+ 	                                           data-fastcheckout-payment-option-input="<?= $escaper->escapeHtmlAttr($methodCode) ?>"
  	                                           <?= $isPaymentMethodAllowed && $magewire->paymentMethod === $methodCode ? 'checked' : '' ?>
                                                 <?= $isPaymentMethodAllowed ? '' : 'disabled' ?>
  	                                           required/>
  	                                    <span class="font-medium text-sm text-gray-800"><?= $escaper->escapeHtml($method->getTitle()) ?></span>
  	                                </label>
 
- 	                                <div class="iwd-opc-payment-method-ko-container border-t border-gray-100 hidden"
+ 	                                <div class="fastcheckout-payment-method-ko-container border-t border-gray-100 hidden"
  	                                     style="display: none;"
- 	                                     data-iwd-payment-method-ko-target="<?= $escaper->escapeHtmlAttr($methodCode) ?>"
+ 	                                     data-fastcheckout-payment-method-ko-target="<?= $escaper->escapeHtmlAttr($methodCode) ?>"
  	                                     wire:ignore></div>
  	                            </div>
  	                        <?php endforeach; ?>
@@ -722,10 +722,10 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
 
 <script>
 /**
- * IWD OPC Checkout Alpine component — CSP compatible (Hyva Alpine CSP pattern)
+ * Kkkonrad Fastcheckout Alpine component — CSP compatible (Hyva Alpine CSP pattern)
  * No inline expressions in x-data or event attributes.
  */
-function initOpcCheckout() {
+function initCheckout() {
     return {
         _debounceTimers: {},
         _blurTimers: {},
@@ -733,10 +733,10 @@ function initOpcCheckout() {
 
         init() {
             this.$nextTick(() => {
-                if (window.iwdOpcHyvaShipping && typeof window.iwdOpcHyvaShipping.syncAddress === 'function') {
-                    window.iwdOpcHyvaShipping.syncAddress(this.$wire);
+                if (window.fastcheckoutHyvaShipping && typeof window.fastcheckoutHyvaShipping.syncAddress === 'function') {
+                    window.fastcheckoutHyvaShipping.syncAddress(this.$wire);
                     if (this.$wire.shippingMethod) {
-                        window.iwdOpcHyvaShipping.syncShippingMethod(this.$wire.shippingMethod);
+                        window.fastcheckoutHyvaShipping.syncShippingMethod(this.$wire.shippingMethod);
                     }
                 }
             });
@@ -861,16 +861,16 @@ function initOpcCheckout() {
         handleSubmit() {
             if (this._validateAll()) {
                 // Invoke shipping locker validation if available
-                if (window.iwdOpcHyvaShipping && typeof window.iwdOpcHyvaShipping.validate === 'function') {
-                    if (!window.iwdOpcHyvaShipping.validate()) {
+                if (window.fastcheckoutHyvaShipping && typeof window.fastcheckoutHyvaShipping.validate === 'function') {
+                    if (!window.fastcheckoutHyvaShipping.validate()) {
                         if (window.console && typeof window.console.warn === 'function') {
-                            window.console.warn('Kkkonrad OPC: Order placement halted because shipping validation failed.');
+                            window.console.warn('Kkkonrad Fastcheckout: Order placement halted because shipping validation failed.');
                         }
                         return;
                     }
                 }
 
-                const paymentBridge = window.iwdOpcHyvaPayment;
+                const paymentBridge = window.fastcheckoutHyvaPayment;
 
                 // Read selected payment method directly from DOM (no Magewire state needed)
                 const selectedMethodEl = document.querySelector('input[name="payment_method"]:checked');
@@ -880,10 +880,10 @@ function initOpcCheckout() {
                 if (paymentBridge && typeof paymentBridge.validate === 'function') {
                     if (!paymentBridge.validate()) {
                         if (window.console && typeof window.console.warn === 'function') {
-                            window.console.warn('Kkkonrad OPC: Order placement halted because Knockout payment validation failed.');
+                            window.console.warn('Kkkonrad Fastcheckout: Order placement halted because Knockout payment validation failed.');
                         }
                         if (selectedMethodEl) {
-                            const optionContainer = selectedMethodEl.closest('[data-iwd-opc-payment-option]');
+                            const optionContainer = selectedMethodEl.closest('[data-fastcheckout-payment-option]');
                             if (optionContainer) {
                                 optionContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
                             } else {
@@ -906,7 +906,7 @@ function initOpcCheckout() {
 
                             // Smoothly scroll to the selected payment method container so errors are visible
                             if (selectedMethodEl) {
-                                const optionContainer = selectedMethodEl.closest('[data-iwd-opc-payment-option]');
+                                const optionContainer = selectedMethodEl.closest('[data-fastcheckout-payment-option]');
                                 if (optionContainer) {
                                     optionContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
                                 } else {
@@ -979,7 +979,7 @@ function initOpcCheckout() {
         }
     };
 }
-window.addEventListener('alpine:init', () => Alpine.data('initOpcCheckout', initOpcCheckout), {once: true});
+window.addEventListener('alpine:init', () => Alpine.data('initCheckout', initCheckout), {once: true});
 
 
 
@@ -1033,8 +1033,8 @@ window.addEventListener('alpine:init', () => Alpine.data('initOpcCheckout', init
             if (wire) restore(wire);
             window.addEventListener('magewire:order-placed', function (event) {
                 clearStorage();
-                if (window.iwdOpcHyvaPayment && typeof window.iwdOpcHyvaPayment.afterPlaceOrder === 'function') {
-                    window.iwdOpcHyvaPayment.afterPlaceOrder();
+                if (window.fastcheckoutHyvaPayment && typeof window.fastcheckoutHyvaPayment.afterPlaceOrder === 'function') {
+                    window.fastcheckoutHyvaPayment.afterPlaceOrder();
                 } else {
                     require(['mage/url'], function (url) {
                         window.location.replace(url.build('checkout/onepage/success'));

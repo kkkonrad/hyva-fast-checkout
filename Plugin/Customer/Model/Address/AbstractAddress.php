@@ -1,9 +1,4 @@
 <?php
-/**
- * Copyright © 2018 IWD Agency - All rights reserved.
- * See LICENSE.txt bundled with this module for license details.
- */
-
 namespace Kkkonrad\Fastcheckout\Plugin\Customer\Model\Address;
 
 use Magento\Customer\Model\Address\AbstractAddress as ParentClass;

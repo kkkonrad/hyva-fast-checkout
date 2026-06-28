@@ -28,8 +28,8 @@ class Index extends Action
 
     public function execute()
     {
-        if (!$this->opcHelper->isEnable()
-            || !$this->opcHelper->isModuleOutputEnabled('Kkkonrad_Fastcheckout')) {
+        if (!$this->helper->isEnable()
+            || !$this->helper->isModuleOutputEnabled('Kkkonrad_Fastcheckout')) {
             return $this->resultRedirectFactory->create()->setPath('checkout');
         }
 
