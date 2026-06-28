@@ -11,42 +11,30 @@ define([
             rendererComponents = config.rendererComponents || [];
 
         window.checkoutConfig = config.checkoutConfig || {};
-        window.checkoutConfig.payment = window.checkoutConfig.payment || {};
-        window.checkoutConfig.payment.payuGateway = window.checkoutConfig.payment.payuGateway || { isActive: false };
-        window.checkoutConfig.payment.payuGatewayCard = window.checkoutConfig.payment.payuGatewayCard || { isActive: false };
-        window.checkoutConfig.payment.payuConfig = window.checkoutConfig.payment.payuConfig || { payMethods: {} };
 
-        // Safely initialize Braintree configurations to prevent RequireJS load errors
-        var braintreeKeys = [
-            'braintree',
-            'braintree_paypal',
-            'braintree_paypal_paylater',
-            'braintree_paypal_credit',
-            'braintree_applepay',
-            'braintree_googlepay',
-            'braintree_venmo',
-            'braintree_ach_direct_debit',
-            'braintree_local_payment'
-        ];
-        braintreeKeys.forEach(function (key) {
-            window.checkoutConfig.payment[key] = window.checkoutConfig.payment[key] || {};
-        });
-
+        var initPaymentProxy = function(paymentObj) {
+            paymentObj = paymentObj || {};
+            if (paymentObj.__isProxy) {
+                return paymentObj;
+            }
+            return new Proxy(paymentObj, {
+                get: function(target, prop) {
+                    if (prop === '__isProxy') {
+                        return true;
+                    }
+                    if (prop === '__raw__') {
+                        return target;
+                    }
+                    if (typeof prop === 'string' && !(prop in target)) {
+                        target[prop] = {};
+                    }
+                    return target[prop];
+                }
+            });
+        };
+        window.checkoutConfig.payment = initPaymentProxy(window.checkoutConfig.payment);
         window.isCustomerLoggedIn = window.checkoutConfig.isCustomerLoggedIn;
         window.customerData = window.checkoutConfig.customerData;
-        rendererComponents = rendererComponents.filter(function (component) {
-            var paymentConfig = window.checkoutConfig.payment;
-
-            if (component.indexOf('PayU_PaymentGateway/') === 0) {
-                return !!(paymentConfig.payuGateway || paymentConfig.payuGatewayCard || paymentConfig.payuConfig);
-            }
-
-            if (component.indexOf('Tpay_Magento2/') === 0) {
-                return !!(window.checkoutConfig.tpay || window.checkoutConfig.generic || window.checkoutConfig.tpaycards);
-            }
-
-            return true;
-        });
 
         require([
             'Magento_Ui/js/core/app',

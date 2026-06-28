@@ -367,9 +367,35 @@ class Checkout extends Template
 
             $components = [];
             foreach ($nodes as $node) {
-                $component = trim($node->textContent);
-                if ($component !== '') {
-                    $components[] = $component;
+                $parent = $node->parentNode;
+                if ($parent) {
+                    $methodCode = $parent->getAttribute('name');
+                    $isActive = true;
+                    if ($methodCode && $this->_scopeConfig->getValue('payment/' . $methodCode . '/active') === '0') {
+                        $isActive = false;
+                    } elseif ($methodCode) {
+                        $methodsNodes = $xpath->query('./*[local-name()="item"][@name="methods"]/*[local-name()="item"]', $parent);
+                        if ($methodsNodes->length > 0) {
+                            $hasActiveSubmethod = false;
+                            foreach ($methodsNodes as $methodItem) {
+                                $code = $methodItem->getAttribute('name');
+                                if ($code && $this->_scopeConfig->getValue('payment/' . $code . '/active') !== '0') {
+                                    $hasActiveSubmethod = true;
+                                    break;
+                                }
+                            }
+                            if (!$hasActiveSubmethod) {
+                                $isActive = false;
+                            }
+                        }
+                    }
+
+                    if ($isActive) {
+                        $component = trim($node->textContent);
+                        if ($component !== '') {
+                            $components[] = $component;
+                        }
+                    }
                 }
             }
 
