@@ -886,14 +886,16 @@ class Checkout extends Component
             }
 
             try {
+                $this->checkoutSession->setLastQuoteId($quoteId);
+                $this->checkoutSession->setLastSuccessQuoteId($quoteId);
+                $this->checkoutSession->setLastOrderId($orderId);
                 if ($this->orderFactory !== null) {
                     $order = $this->orderFactory->create()->load($orderId);
-                    $this->setSessionValue('last_real_order_id', $order->getIncrementId());
-                    $this->setSessionValue('last_order_status', $order->getStatus());
+                    if ($order && $order->getId()) {
+                        $this->checkoutSession->setLastRealOrderId($order->getIncrementId());
+                        $this->checkoutSession->setLastOrderStatus($order->getStatus());
+                    }
                 }
-                $this->setSessionValue('last_quote_id', $quoteId);
-                $this->setSessionValue('last_success_quote_id', $quoteId);
-                $this->setSessionValue('last_order_id', $orderId);
             } catch (\Exception $e) {
                 try {
                     $this->logger->error('Kkkonrad Fastcheckout placeOrder load order Error: ' . $e->getMessage(), ['exception' => $e]);
@@ -951,8 +953,9 @@ class Checkout extends Component
     {
         try {
             $method = 'set' . str_replace('_', '', ucwords($key, '_'));
-            if (method_exists($this->checkoutSession, $method)) {
-                $this->checkoutSession->{$method}($value);
+            $this->checkoutSession->{$method}($value);
+            if (method_exists($this->checkoutSession, 'setData')) {
+                $this->checkoutSession->setData($key, $value);
             }
         } catch (\Exception $e) {
             $this->logger->warning('Fastcheckout session value write failed', ['exception' => $e]);

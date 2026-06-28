@@ -1,47 +1,74 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Kkkonrad\Fastcheckout\Observer;
 
-use Magento\Framework\Event\Observer as EventObserver;
-use Magento\Checkout\Model\Session as CheckoutSession;
-use Magento\Sales\Model\Order\Status\HistoryFactory;
-use Magento\Framework\Event\ObserverInterface;
 use Kkkonrad\Fastcheckout\Helper\Data as Helper;
+use Magento\Checkout\Model\Session as CheckoutSession;
+use Magento\Customer\Api\CustomerRepositoryInterface;
 use Magento\Customer\Model\CustomerFactory;
-use Psr\Log\LoggerInterface;
+use Magento\Customer\Model\Session as CustomerSession;
+use Magento\Downloadable\Model\Link\PurchasedFactory;
+use Magento\Downloadable\Observer\SaveDownloadableOrderItemObserver;
+use Magento\Framework\Encryption\EncryptorInterface as Encryptor;
+use Magento\Framework\Event\Observer as EventObserver;
+use Magento\Framework\Event\ObserverFactory as EventObserverFactory;
+use Magento\Framework\EventFactory;
+use Magento\Framework\Event\ObserverInterface;
+use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Sales\Api\OrderRepositoryInterface;
 use Magento\Sales\Model\Order;
+use Magento\Sales\Model\Order\Status\HistoryFactory;
 use Magento\Store\Model\StoreManagerInterface;
-use Magento\Framework\Encryption\EncryptorInterface as Encryptor;
-use \Magento\Downloadable\Model\Link\PurchasedFactory as PurchasedFactory;
-use Magento\Customer\Model\Session as CustomerSession;
-use Magento\Downloadable\Observer\SaveDownloadableOrderItemObserver;
+use Psr\Log\LoggerInterface;
 
 /**
  * Class QuoteSubmitSuccess
- * @package Kkkonrad\Fastcheckout\Observer
  */
 class QuoteSubmitSuccess implements ObserverInterface
 {
-
+    /** @var Helper */
     public $helper;
+
+    /** @var CustomerFactory */
     public $customerFactory;
+
+    /** @var CheckoutSession */
     public $checkoutSession;
+
+    /** @var HistoryFactory */
     public $historyFactory;
+
+    /** @var LoggerInterface */
     public $logger;
+
+    /** @var OrderRepositoryInterface */
     public $orderRepository;
+
+    /** @var StoreManagerInterface */
     public $storeManager;
-    public $objManager;
+
+    /** @var Encryptor */
     public $encryptor;
+
+    /** @var PurchasedFactory */
     public $downloadLink;
+
+    /** @var CustomerSession */
+    public $customerSession;
 
     /** @var SaveDownloadableOrderItemObserver */
     private $saveDownloadableOrderItemObserver;
 
-    /**
-     * @var CustomerSession
-     */
-    public $customerSession;
+    /** @var CustomerRepositoryInterface */
+    private $customerRepository;
+
+    /** @var EventObserverFactory */
+    private $eventObserverFactory;
+
+    /** @var EventFactory */
+    private $eventFactory;
 
     public function __construct(
         Helper $helper,
@@ -54,7 +81,10 @@ class QuoteSubmitSuccess implements ObserverInterface
         Encryptor $encryptor,
         PurchasedFactory $downloadLink,
         CustomerSession $customerSession,
-        SaveDownloadableOrderItemObserver $saveDownloadableOrderItemObserver
+        SaveDownloadableOrderItemObserver $saveDownloadableOrderItemObserver,
+        ?CustomerRepositoryInterface $customerRepository = null,
+        ?EventObserverFactory $eventObserverFactory = null,
+        ?EventFactory $eventFactory = null
     ) {
         $this->helper = $helper;
         $this->customerFactory = $customerFactory;
@@ -67,32 +97,38 @@ class QuoteSubmitSuccess implements ObserverInterface
         $this->downloadLink = $downloadLink;
         $this->customerSession = $customerSession;
         $this->saveDownloadableOrderItemObserver = $saveDownloadableOrderItemObserver;
+        $om = \Magento\Framework\App\ObjectManager::getInstance();
+        $this->customerRepository = $customerRepository ?? $om->get(CustomerRepositoryInterface::class);
+        $this->eventObserverFactory = $eventObserverFactory ?? $om->get(EventObserverFactory::class);
+        $this->eventFactory = $eventFactory ?? $om->get(EventFactory::class);
     }
 
     /**
      * @param EventObserver $observer
      * @return $this
-     * @throws \Magento\Framework\Exception\AlreadyExistsException
      */
     public function execute(EventObserver $observer)
     {
-        /**
-         * @var $order Order
-         */
-
+        /** @var Order $order */
         $order = $observer->getEvent()->getOrder();
         if (!$order || !$this->helper->isEnable()) {
             return $this;
         }
 
         $customerEmail = $order->getCustomerEmail();
-        $customerCandidate = $this->customerFactory->create()
-            ->setWebsiteId($order->getStore()->getWebsiteId())
-            ->loadByEmail($customerEmail);
-
-        if ($customerCandidate && $customerCandidate->getId()) {
-            $customer = $customerCandidate;
-            $this->assignOrderToCustomer($order, $customer);
+        $customer = null;
+        if ($customerEmail) {
+            try {
+                $customerData = $this->customerRepository->get($customerEmail, (int)$order->getStore()->getWebsiteId());
+                if ($customerData && $customerData->getId()) {
+                    $customer = $this->customerFactory->create()->load($customerData->getId());
+                    $this->assignOrderToCustomer($order, $customer);
+                }
+            } catch (NoSuchEntityException $e) {
+                // Customer not found by email
+            } catch (\Exception $e) {
+                $this->logger->error('Fastcheckout QuoteSubmitSuccess customer lookup error: ' . $e->getMessage());
+            }
         }
 
         $this->saveComment($order);
@@ -100,22 +136,19 @@ class QuoteSubmitSuccess implements ObserverInterface
         /* Assign Downloadable product links to Customer Account */
         $items = $order->getAllItems();
         foreach ($items as $item) {
-            //look for downloadable products
             if ($item->getProductType() === 'downloadable') {
-                // create link from repository
-                $om = \Magento\Framework\App\ObjectManager::getInstance();
+                $eventObserver = $this->eventObserverFactory->create();
+                $event = $this->eventFactory->create()->setItem($item);
+                $eventObserver->setEvent($event);
 
-                /** @var \Magento\Framework\Event\Observer $observer */
-                $observer = $om->get('\Magento\Framework\Event\Observer');
-                $event = $om->get('\Magento\Framework\Event')->setItem($item);
-                $observer->setEvent($event);
+                $this->saveDownloadableOrderItemObserver->execute($eventObserver);
 
-                $this->saveDownloadableOrderItemObserver->execute($observer);
-
-                /* Assign Customer to Downloadable product links */
-                if(isset($customer) && $customer->getId() && $link = $this->downloadLink->create()->load($item->getId(), 'order_item_id')){
-                    $link->setCustomerId($customer->getId());
-                    $link->save();
+                if ($customer && $customer->getId()) {
+                    $link = $this->downloadLink->create()->load($item->getId(), 'order_item_id');
+                    if ($link && $link->getId()) {
+                        $link->setCustomerId($customer->getId());
+                        $link->save();
+                    }
                 }
             }
         }
@@ -149,25 +182,25 @@ class QuoteSubmitSuccess implements ObserverInterface
 
     /**
      * @param Order $order
-     * @param $customer
+     * @param mixed $customer
      */
     private function assignOrderToCustomer(Order $order, $customer)
     {
         if ($this->helper->isAssignOrderToCustomer()) {
             try {
-                if (!$order->getCustomerId()) {
-                    if ($customer->getId()) {
-                        $order->setCustomerId($customer->getId());
-                        $order->setCustomerGroupId($customer->getGroupId());
-                        $order->setCustomerIsGuest(0);
-                        $order->setCustomerFirstname($customer->getFirstname());
-                        $order->setCustomerLastname($customer->getLastname());
-                        if ($order->getShippingAddress()) {
-                            $order->getShippingAddress()->setCustomerId($customer->getId());
-                        }
-                        $order->getBillingAddress()->setCustomerId($customer->getId());
-                        $this->orderRepository->save($order);
+                if (!$order->getCustomerId() && $customer && $customer->getId()) {
+                    $order->setCustomerId($customer->getId());
+                    $order->setCustomerGroupId($customer->getGroupId());
+                    $order->setCustomerIsGuest(0);
+                    $order->setCustomerFirstname($customer->getFirstname());
+                    $order->setCustomerLastname($customer->getLastname());
+                    if ($order->getShippingAddress()) {
+                        $order->getShippingAddress()->setCustomerId($customer->getId());
                     }
+                    if ($order->getBillingAddress()) {
+                        $order->getBillingAddress()->setCustomerId($customer->getId());
+                    }
+                    $this->orderRepository->save($order);
                 }
             } catch (\Exception $e) {
                 $this->logger->error($e->getMessage());

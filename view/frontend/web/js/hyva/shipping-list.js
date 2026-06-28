@@ -65,9 +65,7 @@ define([
                         var wire = magewireEl.__livewire;
                         var currentMethod = wire.shippingMethod || (typeof wire.get === 'function' ? wire.get('shippingMethod') : (wire.data ? wire.data.shippingMethod : ''));
                         if (currentMethod !== value) {
-                            if (window.console && typeof window.console.log === 'function') {
-                                window.console.log('Kkkonrad Fastcheckout: KO selected shipping method, syncing to Magewire:', value);
-                            }
+                            
                             wire.call('selectShippingMethod', value);
                         }
                     }
@@ -80,9 +78,7 @@ define([
         initialize: function () {
             this._super();
             window.fastcheckoutHyvaShippingListInstance = this;
-            if (window.console && typeof window.console.log === 'function') {
-                window.console.log('Kkkonrad Fastcheckout: shipping-list JS component initialized');
-            }
+            
             return this;
         },
 
