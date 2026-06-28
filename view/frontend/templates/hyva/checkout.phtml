@@ -20,6 +20,44 @@ $paymentMethods = $magewire->getPaymentMethods();
 $allowedPaymentMethodCodes = $magewire->getAllowedPaymentMethodCodes();
 $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
 ?>
+<style>
+@media (min-width: 1024px) and (max-width: 1279px) {
+    /* Tablet layout uses 2 flex columns */
+    .fc-grid {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+}
+@media (min-width: 1280px) {
+    /* Desktop layout uses 3-column CSS Grid with direct child positioning */
+    .fc-grid {
+        display: grid !important;
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    }
+    .fc-left-wrapper,
+    .fc-right-wrapper {
+        display: contents !important;
+    }
+    .fc-container-1 {
+        grid-column-start: 1 !important;
+        grid-row-start: 1 !important;
+        grid-row-end: span 2 !important;
+    }
+    .fc-container-2 {
+        grid-column-start: 2 !important;
+        grid-row-start: 1 !important;
+    }
+    .fc-container-3 {
+        grid-column-start: 2 !important;
+        grid-row-start: 2 !important;
+    }
+    .fc-container-4 {
+        grid-column-start: 3 !important;
+        grid-row-start: 1 !important;
+        grid-row-end: span 2 !important;
+    }
+}
+</style>
 <section class="space-y-8 max-w-7xl mx-auto px-0 py-4 pb-24 md:p-6 md:pb-6 overflow-x-hidden" id="fastcheckout-checkout">
 
     <!-- Header -->
@@ -59,12 +97,12 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
           class="contents">
 
 
-    <!-- Three Column Layout for Desktop -->
-
-    <!-- Three Column Layout for Desktop -->
-    <div class="grid gap-6 lg:grid-cols-3 grid-cols-1 items-start w-full">
+    <!-- Responsive Grid Layout (1-column Mobile, 2-column Tablet/Intermediate, 3-column Desktop) -->
+    <div class="fc-grid grid gap-6 grid-cols-1 items-start w-full">
         
-        <div class="space-y-6 min-w-0 w-full">
+        <div class="fc-left-wrapper flex flex-col gap-6">
+            <!-- Container 1: Shipping & Billing Address -->
+            <div class="fc-container-1 space-y-6 min-w-0 w-full">
             <div class="card bg-white p-4 md:p-6 shadow rounded-lg border border-gray-200 relative">
                 <div class="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
                     <h2 class="text-xl font-semibold text-gray-900">
@@ -387,8 +425,8 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
             </div>
                   </div>
 
-        <!-- Column 2: Shipping & Payment Methods -->
-        <div class="space-y-6 min-w-0 w-full">
+        <!-- Container 2: Shipping Method -->
+        <div class="fc-container-2 space-y-6 min-w-0 w-full">
             <!-- Shipping Methods Section -->
             <div class="card bg-white p-4 md:p-6 shadow rounded-lg border border-gray-200 relative">
                 <div class="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
@@ -415,6 +453,12 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                     </div>
                 </div>
             </div>
+        </div>
+        </div>
+
+        <div class="fc-right-wrapper flex flex-col gap-6">
+            <!-- Container 3: Payment Method -->
+            <div class="fc-container-3 space-y-6 min-w-0 w-full">
             <!-- Payment Methods Section -->
             <div class="card bg-white p-4 md:p-6 shadow rounded-lg border border-gray-200 relative" wire:key="checkout-payment-methods-card">
                 <div class="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
@@ -470,8 +514,8 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
             </div>
         </div>
 
-        <!-- Column 3: Order Summary, Coupon & Place Order -->
-        <div class="space-y-6 min-w-0 w-full">
+        <!-- Container 4: Order Summary, Coupon & Place Order -->
+        <div class="fc-container-4 space-y-6 min-w-0 w-full">
             <!-- Discount/Coupon Form -->
             <div class="card bg-white p-4 md:p-6 shadow rounded-lg border border-gray-200 relative">
                 <h2 class="text-xl font-semibold text-gray-900 border-b border-gray-200 pb-4 mb-4">
@@ -684,6 +728,7 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
 
             </div>
 
+        </div>
         </div>
 
     </div>
