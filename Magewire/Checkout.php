@@ -27,6 +27,13 @@ class Checkout extends Component
     public $company = '';
     public $street1 = '';
     public $street2 = '';
+    public $street3 = '';
+    public $street4 = '';
+    public $prefix = '';
+    public $middlename = '';
+    public $suffix = '';
+    public $fax = '';
+    public $vatId = '';
     public $city = '';
     public $postcode = '';
     public $countryId = '';
@@ -47,6 +54,13 @@ class Checkout extends Component
     public $billingCompany = '';
     public $billingStreet1 = '';
     public $billingStreet2 = '';
+    public $billingStreet3 = '';
+    public $billingStreet4 = '';
+    public $billingPrefix = '';
+    public $billingMiddlename = '';
+    public $billingSuffix = '';
+    public $billingFax = '';
+    public $billingVatId = '';
     public $billingCity = '';
     public $billingPostcode = '';
     public $billingCountryId = '';
@@ -226,6 +240,14 @@ class Checkout extends Component
             $street = $shippingAddress->getStreet();
             $this->street1 = (string) ($street[0] ?? '');
             $this->street2 = (string) ($street[1] ?? '');
+            $this->street3 = (string) ($street[2] ?? '');
+            $this->street4 = (string) ($street[3] ?? '');
+            
+            $this->prefix = (string) $shippingAddress->getPrefix();
+            $this->middlename = (string) $shippingAddress->getMiddlename();
+            $this->suffix = (string) $shippingAddress->getSuffix();
+            $this->fax = (string) $shippingAddress->getFax();
+            $this->vatId = (string) $shippingAddress->getVatId();
             
             $this->city = (string) $shippingAddress->getCity();
             $this->postcode = (string) $shippingAddress->getPostcode();
@@ -257,6 +279,14 @@ class Checkout extends Component
             $street = $billingAddress->getStreet();
             $this->billingStreet1 = (string) ($street[0] ?? '');
             $this->billingStreet2 = (string) ($street[1] ?? '');
+            $this->billingStreet3 = (string) ($street[2] ?? '');
+            $this->billingStreet4 = (string) ($street[3] ?? '');
+            
+            $this->billingPrefix = (string) $billingAddress->getPrefix();
+            $this->billingMiddlename = (string) $billingAddress->getMiddlename();
+            $this->billingSuffix = (string) $billingAddress->getSuffix();
+            $this->billingFax = (string) $billingAddress->getFax();
+            $this->billingVatId = (string) $billingAddress->getVatId();
             
             $this->billingCity = (string) $billingAddress->getCity();
             $this->billingPostcode = (string) $billingAddress->getPostcode();
@@ -332,7 +362,12 @@ class Checkout extends Component
         if ($shippingAddress) {
             $shippingAddress->setFirstname($this->firstname);
             $shippingAddress->setLastname($this->lastname);
-            $shippingAddress->setStreet([$this->street1, $this->street2]);
+            $shippingAddress->setPrefix($this->prefix);
+            $shippingAddress->setMiddlename($this->middlename);
+            $shippingAddress->setSuffix($this->suffix);
+            $shippingAddress->setFax($this->fax);
+            $shippingAddress->setVatId($this->vatId);
+            $shippingAddress->setStreet([$this->street1, $this->street2, $this->street3, $this->street4]);
             $shippingAddress->setCity($this->city);
             $shippingAddress->setPostcode($this->postcode);
             $shippingAddress->setCountryId($this->countryId);
@@ -390,7 +425,12 @@ class Checkout extends Component
             if ($this->billingSameAsShipping) {
                 $billingAddress->setFirstname($this->firstname);
                 $billingAddress->setLastname($this->lastname);
-                $billingAddress->setStreet([$this->street1, $this->street2]);
+                $billingAddress->setPrefix($this->prefix);
+                $billingAddress->setMiddlename($this->middlename);
+                $billingAddress->setSuffix($this->suffix);
+                $billingAddress->setFax($this->fax);
+                $billingAddress->setVatId($this->vatId);
+                $billingAddress->setStreet([$this->street1, $this->street2, $this->street3, $this->street4]);
                 $billingAddress->setCity($this->city);
                 $billingAddress->setPostcode($this->postcode);
                 $billingAddress->setCountryId($this->countryId);
@@ -401,7 +441,12 @@ class Checkout extends Component
             } else {
                 $billingAddress->setFirstname($this->billingFirstname);
                 $billingAddress->setLastname($this->billingLastname);
-                $billingAddress->setStreet([$this->billingStreet1, $this->billingStreet2]);
+                $billingAddress->setPrefix($this->billingPrefix);
+                $billingAddress->setMiddlename($this->billingMiddlename);
+                $billingAddress->setSuffix($this->billingSuffix);
+                $billingAddress->setFax($this->billingFax);
+                $billingAddress->setVatId($this->billingVatId);
+                $billingAddress->setStreet([$this->billingStreet1, $this->billingStreet2, $this->billingStreet3, $this->billingStreet4]);
                 $billingAddress->setCity($this->billingCity);
                 $billingAddress->setPostcode($this->billingPostcode);
                 $billingAddress->setCountryId($this->billingCountryId);
@@ -985,10 +1030,10 @@ class Checkout extends Component
         }
         
         $isShippingField = in_array($name, [
-            'firstname', 'lastname', 'company', 'street1', 'street2', 'city', 'postcode', 'countryId', 'regionId', 'region', 'telephone'
+            'firstname', 'lastname', 'company', 'street1', 'street2', 'street3', 'street4', 'city', 'postcode', 'countryId', 'regionId', 'region', 'telephone', 'prefix', 'middlename', 'suffix', 'fax', 'vatId'
         ]);
         $isBillingField = in_array($name, [
-            'billingFirstname', 'billingLastname', 'billingCompany', 'billingStreet1', 'billingStreet2', 'billingCity', 'billingPostcode', 'billingCountryId', 'billingRegionId', 'billingRegion', 'billingTelephone'
+            'billingFirstname', 'billingLastname', 'billingCompany', 'billingStreet1', 'billingStreet2', 'billingStreet3', 'billingStreet4', 'billingCity', 'billingPostcode', 'billingCountryId', 'billingRegionId', 'billingRegion', 'billingTelephone', 'billingPrefix', 'billingMiddlename', 'billingSuffix', 'billingFax', 'billingVatId'
         ]);
 
         if ($name === 'email') {
@@ -1111,8 +1156,15 @@ class Checkout extends Component
             $this->firstname  = (string) $address->getFirstname();
             $this->lastname   = (string) $address->getLastname();
             $this->company    = (string) $address->getCompany();
+            $this->prefix     = (string) $address->getPrefix();
+            $this->middlename = (string) $address->getMiddlename();
+            $this->suffix     = (string) $address->getSuffix();
+            $this->fax        = (string) $address->getFax();
+            $this->vatId      = (string) $address->getVatId();
             $this->street1    = $street[0] ?? '';
             $this->street2    = $street[1] ?? '';
+            $this->street3    = $street[2] ?? '';
+            $this->street4    = $street[3] ?? '';
             $this->city       = (string) $address->getCity();
             $this->postcode   = (string) $address->getPostcode();
             $this->countryId  = (string) $address->getCountryId();

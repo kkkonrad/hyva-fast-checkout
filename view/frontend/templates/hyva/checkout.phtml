@@ -20,46 +20,7 @@ $paymentMethods = $magewire->getPaymentMethods();
 $allowedPaymentMethodCodes = $magewire->getAllowedPaymentMethodCodes();
 $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
 ?>
-<style>
-@media (min-width: 1024px) and (max-width: 1279px) {
-    /* Tablet layout uses 2 flex columns */
-    .fc-grid {
-        display: grid !important;
-        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    }
-}
-@media (min-width: 1280px) {
-    /* Desktop layout uses 3-column CSS Grid with direct child positioning */
-    .fc-grid {
-        display: grid !important;
-        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-    }
-    .fc-left-wrapper,
-    .fc-right-wrapper {
-        display: contents !important;
-    }
-    .fc-container-1 {
-        grid-column-start: 1 !important;
-        grid-row-start: 1 !important;
-        grid-row-end: span 2 !important;
-    }
-    .fc-container-2 {
-        grid-column-start: 2 !important;
-        grid-row-start: 1 !important;
-    }
-    .fc-container-3 {
-        grid-column-start: 2 !important;
-        grid-row-start: 2 !important;
-    }
-    .fc-container-4 {
-        grid-column-start: 3 !important;
-        grid-row-start: 1 !important;
-        grid-row-end: span 2 !important;
-    }
-}
-</style>
 <section class="space-y-8 max-w-7xl mx-auto px-0 py-4 pb-24 md:p-6 md:pb-6 overflow-x-hidden" id="fastcheckout-checkout">
-
     <!-- Header -->
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-gray-200 pb-6 px-4 md:px-0">
         <div>
@@ -154,6 +115,28 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                                required/>
                     </label>
 
+                    <?php if ($block->isAttributeVisible('prefix')): ?>
+                    <?php 
+                        $isPrefixRequired = $block->isAttributeRequired('prefix');
+                        $prefixOptions = $block->getOptions('prefix');
+                    ?>
+                    <label for="co-shipping-prefix" class="block">
+                        <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Prefix')) ?><?= $isPrefixRequired ? ' *' : '' ?></span>
+                        <?php if ($prefixOptions): ?>
+                            <select id="co-shipping-prefix" class="form-select mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                    wire:model.blur="prefix" @change="onSelectChange" <?= $isPrefixRequired ? 'required' : '' ?>>
+                                <option value=""></option>
+                                <?php foreach ($prefixOptions as $opt): ?>
+                                    <option value="<?= $escaper->escapeHtmlAttr($opt['value']) ?>"><?= $escaper->escapeHtml($opt['label']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        <?php else: ?>
+                            <input id="co-shipping-prefix" class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                   type="text" wire:model.defer="prefix" data-wire-field="prefix" @input="onFieldInput" @blur="<?= $isPrefixRequired ? 'onFieldBlur' : 'onFieldBlurNoValidate' ?>" <?= $isPrefixRequired ? 'required' : '' ?>/>
+                        <?php endif; ?>
+                    </label>
+                    <?php endif; ?>
+
                     <label for="co-shipping-firstname" class="block">
                         <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('First Name')) ?> *</span>
                         <input id="co-shipping-firstname" class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
@@ -164,6 +147,15 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                                @blur="onFieldBlur"
                                required/>
                     </label>
+
+                    <?php if ($block->isAttributeVisible('middlename')): ?>
+                    <?php $isMiddlenameRequired = $block->isAttributeRequired('middlename'); ?>
+                    <label for="co-shipping-middlename" class="block">
+                        <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Middle Name')) ?><?= $isMiddlenameRequired ? ' *' : '' ?></span>
+                        <input id="co-shipping-middlename" class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                               type="text" wire:model.defer="middlename" data-wire-field="middlename" @input="onFieldInput" @blur="<?= $isMiddlenameRequired ? 'onFieldBlur' : 'onFieldBlurNoValidate' ?>" <?= $isMiddlenameRequired ? 'required' : '' ?>/>
+                    </label>
+                    <?php endif; ?>
 
                     <label for="co-shipping-lastname" class="block">
                         <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Last Name')) ?> *</span>
@@ -176,16 +168,43 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                                required/>
                     </label>
 
+                    <?php if ($block->isAttributeVisible('suffix')): ?>
+                    <?php 
+                        $isSuffixRequired = $block->isAttributeRequired('suffix');
+                        $suffixOptions = $block->getOptions('suffix');
+                    ?>
+                    <label for="co-shipping-suffix" class="block">
+                        <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Suffix')) ?><?= $isSuffixRequired ? ' *' : '' ?></span>
+                        <?php if ($suffixOptions): ?>
+                            <select id="co-shipping-suffix" class="form-select mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                    wire:model.blur="suffix" @change="onSelectChange" <?= $isSuffixRequired ? 'required' : '' ?>>
+                                <option value=""></option>
+                                <?php foreach ($suffixOptions as $opt): ?>
+                                    <option value="<?= $escaper->escapeHtmlAttr($opt['value']) ?>"><?= $escaper->escapeHtml($opt['label']) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        <?php else: ?>
+                            <input id="co-shipping-suffix" class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                   type="text" wire:model.defer="suffix" data-wire-field="suffix" @input="onFieldInput" @blur="<?= $isSuffixRequired ? 'onFieldBlur' : 'onFieldBlurNoValidate' ?>" <?= $isSuffixRequired ? 'required' : '' ?>/>
+                        <?php endif; ?>
+                    </label>
+                    <?php endif; ?>
+
+                    <?php if ($block->isAttributeVisible('company')): ?>
+                    <?php $isCompanyRequired = $block->isAttributeRequired('company'); ?>
                     <label for="co-shipping-company" class="block sm:col-span-2">
-                        <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Company')) ?></span>
+                        <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Company')) ?><?= $isCompanyRequired ? ' *' : '' ?></span>
                         <input id="co-shipping-company" class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                                type="text" autocomplete="organization"
                                wire:model.defer="company"
                                data-wire-field="company"
                                @input="onFieldInput"
-                               @blur="onFieldBlurNoValidate"/>
+                               @blur="<?= $isCompanyRequired ? 'onFieldBlur' : 'onFieldBlurNoValidate' ?>"
+                               <?= $isCompanyRequired ? 'required' : '' ?>/>
                     </label>
+                    <?php endif; ?>
 
+                    <?php $streetLinesCount = $block->getStreetLines(); ?>
                     <label for="co-shipping-street1" class="block sm:col-span-2">
                         <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Street Address')) ?> *</span>
                         <input id="co-shipping-street1" class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
@@ -195,13 +214,16 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                                @input="onFieldInput"
                                @blur="onFieldBlur"
                                placeholder="<?= $escaper->escapeHtmlAttr(__('Line 1')) ?>" required/>
-                        <input id="co-shipping-street2" class="form-input mt-2 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                               type="text" autocomplete="address-line2"
-                               wire:model.defer="street2"
-                               data-wire-field="street2"
+                        
+                        <?php for ($i = 2; $i <= $streetLinesCount; $i++): ?>
+                        <input id="co-shipping-street<?= (int)$i ?>" class="form-input mt-2 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                               type="text" autocomplete="address-line<?= (int)$i ?>"
+                               wire:model.defer="street<?= (int)$i ?>"
+                               data-wire-field="street<?= (int)$i ?>"
                                @input="onFieldInput"
                                @blur="onFieldBlurNoValidate"
-                               placeholder="<?= $escaper->escapeHtmlAttr(__('Line 2')) ?>"/>
+                               placeholder="<?= $escaper->escapeHtmlAttr(__('Line %1', $i)) ?>"/>
+                        <?php endfor; ?>
                     </label>
 
                     <label for="co-shipping-country-id" class="block">
@@ -260,16 +282,37 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                                required/>
                     </label>
 
+                    <?php if ($block->isAttributeVisible('telephone')): ?>
+                    <?php $isTelephoneRequired = $block->isAttributeRequired('telephone'); ?>
                     <label class="block sm:col-span-2">
-                        <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Phone Number')) ?> *</span>
+                        <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Phone Number')) ?><?= $isTelephoneRequired ? ' *' : '' ?></span>
                         <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                                type="tel" autocomplete="tel"
                                wire:model.defer="telephone"
                                data-wire-field="telephone"
                                @input="onFieldInput(); formatTelephone($el);"
-                               @blur="onFieldBlur"
-                               required/>
+                               @blur="<?= $isTelephoneRequired ? 'onFieldBlur' : 'onFieldBlurNoValidate' ?>"
+                               <?= $isTelephoneRequired ? 'required' : '' ?>/>
                     </label>
+                    <?php endif; ?>
+
+                    <?php if ($block->isAttributeVisible('fax')): ?>
+                    <?php $isFaxRequired = $block->isAttributeRequired('fax'); ?>
+                    <label for="co-shipping-fax" class="block sm:col-span-2">
+                        <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Fax')) ?><?= $isFaxRequired ? ' *' : '' ?></span>
+                        <input id="co-shipping-fax" class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                               type="text" wire:model.defer="fax" data-wire-field="fax" @input="onFieldInput" @blur="<?= $isFaxRequired ? 'onFieldBlur' : 'onFieldBlurNoValidate' ?>" <?= $isFaxRequired ? 'required' : '' ?>/>
+                    </label>
+                    <?php endif; ?>
+
+                    <?php if ($block->isAttributeVisible('vat_id')): ?>
+                    <?php $isVatIdRequired = $block->isAttributeRequired('vat_id'); ?>
+                    <label for="co-shipping-vat-id" class="block sm:col-span-2">
+                        <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('VAT Number')) ?><?= $isVatIdRequired ? ' *' : '' ?></span>
+                        <input id="co-shipping-vat-id" class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                               type="text" wire:model.defer="vatId" data-wire-field="vatId" @input="onFieldInput" @blur="<?= $isVatIdRequired ? 'onFieldBlur' : 'onFieldBlurNoValidate' ?>" <?= $isVatIdRequired ? 'required' : '' ?>/>
+                    </label>
+                    <?php endif; ?>
                 </div>
             </div>
             <!-- Billing Address same as Shipping toggle -->
@@ -294,6 +337,28 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                         </div>
 
                         <div class="grid gap-4 sm:grid-cols-2">
+                            <?php if ($block->isAttributeVisible('prefix')): ?>
+                            <?php 
+                                $isBillingPrefixRequired = $block->isAttributeRequired('prefix');
+                                $billingPrefixOptions = $block->getOptions('prefix');
+                            ?>
+                            <label for="co-billing-prefix" class="block">
+                                <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Prefix')) ?><?= $isBillingPrefixRequired ? ' *' : '' ?></span>
+                                <?php if ($billingPrefixOptions): ?>
+                                    <select id="co-billing-prefix" class="form-select mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                            wire:model.blur="billingPrefix" @change="onSelectChange" <?= $isBillingPrefixRequired ? 'required' : '' ?>>
+                                        <option value=""></option>
+                                        <?php foreach ($billingPrefixOptions as $opt): ?>
+                                            <option value="<?= $escaper->escapeHtmlAttr($opt['value']) ?>"><?= $escaper->escapeHtml($opt['label']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                <?php else: ?>
+                                    <input id="co-billing-prefix" class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                           type="text" wire:model.defer="billingPrefix" data-wire-field="billingPrefix" @input="onFieldInput" @blur="<?= $isBillingPrefixRequired ? 'onFieldBlur' : 'onFieldBlurNoValidate' ?>" <?= $isBillingPrefixRequired ? 'required' : '' ?>/>
+                                <?php endif; ?>
+                            </label>
+                            <?php endif; ?>
+
                             <label class="block">
                                 <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('First Name')) ?> *</span>
                                 <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
@@ -304,6 +369,15 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                                        @blur="onFieldBlur"
                                        required/>
                             </label>
+
+                            <?php if ($block->isAttributeVisible('middlename')): ?>
+                            <?php $isBillingMiddlenameRequired = $block->isAttributeRequired('middlename'); ?>
+                            <label for="co-billing-middlename" class="block">
+                                <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Middle Name')) ?><?= $isBillingMiddlenameRequired ? ' *' : '' ?></span>
+                                <input id="co-billing-middlename" class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                       type="text" wire:model.defer="billingMiddlename" data-wire-field="billingMiddlename" @input="onFieldInput" @blur="<?= $isBillingMiddlenameRequired ? 'onFieldBlur' : 'onFieldBlurNoValidate' ?>" <?= $isBillingMiddlenameRequired ? 'required' : '' ?>/>
+                            </label>
+                            <?php endif; ?>
 
                             <label class="block">
                                 <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Last Name')) ?> *</span>
@@ -316,33 +390,62 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                                        required/>
                             </label>
 
-                            <label class="block sm:col-span-2">
-                                <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Company')) ?></span>
-                                <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                       type="text" autocomplete="organization"
-                                       wire:model.defer="billingCompany"
-                                       data-wire-field="billingCompany"
-                                       @input="onFieldInput"
-                                       @blur="onFieldBlurNoValidate"/>
+                            <?php if ($block->isAttributeVisible('suffix')): ?>
+                            <?php 
+                                $isBillingSuffixRequired = $block->isAttributeRequired('suffix');
+                                $billingSuffixOptions = $block->getOptions('suffix');
+                            ?>
+                            <label for="co-billing-suffix" class="block">
+                                <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Suffix')) ?><?= $isBillingSuffixRequired ? ' *' : '' ?></span>
+                                <?php if ($billingSuffixOptions): ?>
+                                    <select id="co-billing-suffix" class="form-select mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                            wire:model.blur="billingSuffix" @change="onSelectChange" <?= $isBillingSuffixRequired ? 'required' : '' ?>>
+                                        <option value=""></option>
+                                        <?php foreach ($billingSuffixOptions as $opt): ?>
+                                            <option value="<?= $escaper->escapeHtmlAttr($opt['value']) ?>"><?= $escaper->escapeHtml($opt['label']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                <?php else: ?>
+                                    <input id="co-billing-suffix" class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                           type="text" wire:model.defer="billingSuffix" data-wire-field="billingSuffix" @input="onFieldInput" @blur="<?= $isBillingSuffixRequired ? 'onFieldBlur' : 'onFieldBlurNoValidate' ?>" <?= $isBillingSuffixRequired ? 'required' : '' ?>/>
+                                <?php endif; ?>
                             </label>
+                            <?php endif; ?>
 
-                            <label class="block sm:col-span-2">
-                                <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Street Address')) ?> *</span>
-                                <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                       type="text" autocomplete="address-line1"
-                                       wire:model.defer="billingStreet1"
-                                       data-wire-field="billingStreet1"
-                                       @input="onFieldInput"
-                                       @blur="onFieldBlur"
-                                       placeholder="<?= $escaper->escapeHtmlAttr(__('Line 1')) ?>" required/>
-                                <input class="form-input mt-2 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                       type="text" autocomplete="address-line2"
-                                       wire:model.defer="billingStreet2"
-                                       data-wire-field="billingStreet2"
-                                       @input="onFieldInput"
-                                       @blur="onFieldBlurNoValidate"
-                                       placeholder="<?= $escaper->escapeHtmlAttr(__('Line 2')) ?>"/>
-                            </label>
+                             <?php if ($block->isAttributeVisible('company')): ?>
+                             <?php $isBillingCompanyRequired = $block->isAttributeRequired('company'); ?>
+                             <label class="block sm:col-span-2">
+                                 <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Company')) ?><?= $isBillingCompanyRequired ? ' *' : '' ?></span>
+                                 <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                        type="text" autocomplete="organization"
+                                        wire:model.defer="billingCompany"
+                                        data-wire-field="billingCompany"
+                                        @input="onFieldInput"
+                                        @blur="<?= $isBillingCompanyRequired ? 'onFieldBlur' : 'onFieldBlurNoValidate' ?>"
+                                        <?= $isBillingCompanyRequired ? 'required' : '' ?>/>
+                             </label>
+                             <?php endif; ?>
+
+                             <label class="block sm:col-span-2">
+                                 <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Street Address')) ?> *</span>
+                                 <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                        type="text" autocomplete="address-line1"
+                                        wire:model.defer="billingStreet1"
+                                        data-wire-field="billingStreet1"
+                                        @input="onFieldInput"
+                                        @blur="onFieldBlur"
+                                        placeholder="<?= $escaper->escapeHtmlAttr(__('Line 1')) ?>" required/>
+                                 
+                                 <?php for ($i = 2; $i <= $streetLinesCount; $i++): ?>
+                                 <input class="form-input mt-2 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                        type="text" autocomplete="address-line<?= (int)$i ?>"
+                                        wire:model.defer="billingStreet<?= (int)$i ?>"
+                                        data-wire-field="billingStreet<?= (int)$i ?>"
+                                        @input="onFieldInput"
+                                        @blur="onFieldBlurNoValidate"
+                                        placeholder="<?= $escaper->escapeHtmlAttr(__('Line %1', $i)) ?>"/>
+                                 <?php endfor; ?>
+                             </label>
 
                             <label class="block">
                                 <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Country')) ?> *</span>
@@ -409,16 +512,37 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                                        required/>
                             </label>
 
-                            <label class="block sm:col-span-2">
-                                <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Phone Number')) ?> *</span>
-                                <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                       type="tel" autocomplete="tel"
-                                       wire:model.defer="billingTelephone"
-                                       data-wire-field="billingTelephone"
-                                       @input="onFieldInput(); formatTelephone($el);"
-                                       @blur="onFieldBlur"
-                                       required/>
-                            </label>
+                             <?php if ($block->isAttributeVisible('telephone')): ?>
+                             <?php $isBillingTelephoneRequired = $block->isAttributeRequired('telephone'); ?>
+                             <label class="block sm:col-span-2">
+                                 <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Phone Number')) ?><?= $isBillingTelephoneRequired ? ' *' : '' ?></span>
+                                 <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                        type="tel" autocomplete="tel"
+                                        wire:model.defer="billingTelephone"
+                                        data-wire-field="billingTelephone"
+                                        @input="onFieldInput(); formatTelephone($el);"
+                                        @blur="<?= $isBillingTelephoneRequired ? 'onFieldBlur' : 'onFieldBlurNoValidate' ?>"
+                                        <?= $isBillingTelephoneRequired ? 'required' : '' ?>/>
+                             </label>
+                             <?php endif; ?>
+
+                             <?php if ($block->isAttributeVisible('fax')): ?>
+                             <?php $isBillingFaxRequired = $block->isAttributeRequired('fax'); ?>
+                             <label for="co-billing-fax" class="block sm:col-span-2">
+                                 <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Fax')) ?><?= $isBillingFaxRequired ? ' *' : '' ?></span>
+                                 <input id="co-billing-fax" class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                        type="text" wire:model.defer="billingFax" data-wire-field="billingFax" @input="onFieldInput" @blur="<?= $isBillingFaxRequired ? 'onFieldBlur' : 'onFieldBlurNoValidate' ?>" <?= $isBillingFaxRequired ? 'required' : '' ?>/>
+                             </label>
+                             <?php endif; ?>
+
+                             <?php if ($block->isAttributeVisible('vat_id')): ?>
+                             <?php $isBillingVatIdRequired = $block->isAttributeRequired('vat_id'); ?>
+                             <label for="co-billing-vat-id" class="block sm:col-span-2">
+                                 <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('VAT Number')) ?><?= $isBillingVatIdRequired ? ' *' : '' ?></span>
+                                 <input id="co-billing-vat-id" class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                        type="text" wire:model.defer="billingVatId" data-wire-field="billingVatId" @input="onFieldInput" @blur="<?= $isBillingVatIdRequired ? 'onFieldBlur' : 'onFieldBlurNoValidate' ?>" <?= $isBillingVatIdRequired ? 'required' : '' ?>/>
+                             </label>
+                             <?php endif; ?>
                         </div>
                     </div>
                 <?php endif; ?>
@@ -1223,4 +1347,44 @@ window.addEventListener('alpine:init', () => Alpine.data('initCheckout', initChe
 })();
 </script>
 <?php $hyvaCsp->registerInlineScript() ?>
+<div wire:ignore>
+<style>
+@media (min-width: 1024px) and (max-width: 1279px) {
+    /* Tablet layout uses 2 flex columns */
+    .fc-grid {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+}
+@media (min-width: 1280px) {
+    /* Desktop layout uses 3-column CSS Grid with direct child positioning */
+    .fc-grid {
+        display: grid !important;
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    }
+    .fc-left-wrapper,
+    .fc-right-wrapper {
+        display: contents !important;
+    }
+    .fc-container-1 {
+        grid-column-start: 1 !important;
+        grid-row-start: 1 !important;
+        grid-row-end: span 2 !important;
+    }
+    .fc-container-2 {
+        grid-column-start: 2 !important;
+        grid-row-start: 1 !important;
+    }
+    .fc-container-3 {
+        grid-column-start: 2 !important;
+        grid-row-start: 2 !important;
+    }
+    .fc-container-4 {
+        grid-column-start: 3 !important;
+        grid-row-start: 1 !important;
+        grid-row-end: span 2 !important;
+    }
+}
+</style>
+</div>
 </section>
