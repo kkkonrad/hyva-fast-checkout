@@ -715,18 +715,23 @@ define([
                         });
                     });
 
-                    // 3. Check if there are any images, custom payment containers, or regulatory texts
-                    var customSelectors = [
-                        'img',
-                        'iframe',
-                        '.payu-card-form-container',
-                        '.tpay-payment-gateways',
-                        '.TpayRegulations'
-                    ];
-                    for (var i = 0; i < customSelectors.length; i++) {
-                        if (clone.querySelector(customSelectors[i])) {
-                            return true;
+                    // 3. Check for any elements indicating actual content or custom containers (e.g. form structures)
+                    var hasContent = false;
+                    clone.querySelectorAll('*').forEach(function (el) {
+                        var tagName = el.tagName.toLowerCase();
+                        // Common content-bearing tags
+                        if (['input', 'select', 'textarea', 'img', 'iframe', 'button', 'a', 'p', 'label'].indexOf(tagName) !== -1) {
+                            hasContent = true;
                         }
+                        // Unique IDs or non-wrapper classes indicate custom gateway elements/containers
+                        if (el.id || (el.className && typeof el.className === 'string' && el.className.split(' ').some(function(cls) {
+                            return cls && ['payment-method-content', 'content', 'clear'].indexOf(cls) === -1;
+                        }))) {
+                            hasContent = true;
+                        }
+                    });
+                    if (hasContent) {
+                        return true;
                     }
 
                     // 4. Check if there is any visible text content
