@@ -14,7 +14,7 @@ const selectors = {
     region: 'select[wire\\:model\\.blur="regionId"]',
     savedAddresses: '#saved-address-select',
     useSavedAddressBtn: 'button[data-select-id="saved-address-select"]',
-    placeOrderBtn: 'button[type="submit"]',
+    placeOrderBtn: 'button[form="co-checkout-form"]',
     orderError: '#messages .message-error, #messages .message.error',
     cartItemsList: 'ul.divide-y.divide-gray-150',
     couponInput: 'input[wire\\:model\\.defer="couponCode"]',
@@ -32,6 +32,16 @@ export class CheckoutPage {
     async goto() {
         await this.page.goto('/fast-checkout/');
         await this.page.waitForLoadState('domcontentloaded');
+        if (this.page.url().includes('/checkout/cart')) {
+            await this.page.goto('/joust-duffle-bag.html');
+            const addToCartBtn = this.page.locator('#product-addtocart-button');
+            if (await addToCartBtn.isVisible()) {
+                await addToCartBtn.click();
+                await this.page.waitForTimeout(2000);
+            }
+            await this.page.goto('/fast-checkout/');
+            await this.page.waitForLoadState('domcontentloaded');
+        }
     }
 
     async fillShippingAddress(data) {
@@ -64,7 +74,8 @@ export class CheckoutPage {
 
     async applyCoupon(code) {
         await this.page.locator(selectors.couponInput).fill(code);
-        await this.page.locator(selectors.couponApplyBtn).click();
+        await this.page.locator(selectors.couponApplyBtn).scrollIntoViewIfNeeded();
+        await this.page.locator(selectors.couponApplyBtn).click({ force: true });
     }
 
     async toggleNewsletter() {
@@ -73,7 +84,7 @@ export class CheckoutPage {
 
     async placeOrder() {
         await this.page.locator(selectors.placeOrderBtn).click();
-        await this.page.waitForLoadState('domcontentloaded');
+        await this.page.waitForTimeout(2000);
     }
 }
 
@@ -114,21 +125,22 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
         await checkout.placeOrder();
     });
 
-    test('should restore and clear localStorage fields correctly', async ({ page }) => {
+    test('should restore and clear sessionStorage fields correctly', async ({ page }) => {
         const checkout = new CheckoutPage(page);
         await checkout.goto();
 
         // Fill one field
-        await page.locator(selectors.firstname).fill('LocalStorageTest');
+        await page.locator(selectors.firstname).fill('SessionStorageTest');
         await page.locator(selectors.firstname).blur();
+        await page.waitForTimeout(1000);
 
         // Reload page
         await page.reload();
         await page.waitForLoadState('domcontentloaded');
 
-        // Check if value restored from localStorage (give brief delay for restore timeout)
-        await page.waitForTimeout(500);
-        await expect(page.locator(selectors.firstname)).toHaveValue('LocalStorageTest');
+        // Check if value restored from sessionStorage (give brief delay for restore timeout)
+        await page.waitForTimeout(1000);
+        await expect(page.locator(selectors.firstname)).toHaveValue('SessionStorageTest');
     });
 
     test('should support address autofill for logged-in customers', async ({ page }) => {
@@ -154,7 +166,7 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
         const checkout = new CheckoutPage(page);
         await checkout.goto();
 
-        await checkout.applyCoupon('VALID_COUPON');
+        await checkout.applyCoupon('CHAT10');
         // Expect coupon message container or total update
         const couponSuccess = page.locator(selectors.couponSuccess);
         await expect(couponSuccess).toBeVisible();
