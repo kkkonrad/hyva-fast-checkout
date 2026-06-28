@@ -1286,12 +1286,21 @@ window.addEventListener('alpine:init', () => Alpine.data('initCheckout', initChe
     const PREFIX = 'fastcheckout_';
     const FIELDS = [
         'email', 'firstname', 'lastname', 'company',
-        'street1', 'street2', 'city', 'postcode',
+        'prefix', 'middlename', 'suffix', 'fax', 'vatId',
+        'street1', 'street2', 'street3', 'street4', 'city', 'postcode',
         'countryId', 'regionId', 'region', 'telephone',
+        'billingFirstname', 'billingLastname', 'billingCompany',
+        'billingPrefix', 'billingMiddlename', 'billingSuffix', 'billingFax', 'billingVatId',
+        'billingStreet1', 'billingStreet2', 'billingStreet3', 'billingStreet4', 'billingCity',
+        'billingPostcode', 'billingCountryId', 'billingRegionId', 'billingRegion', 'billingTelephone'
     ];
 
     function save(field, value) {
-        try { if (value) sessionStorage.setItem(PREFIX + field, value); } catch (e) {}
+        try {
+            if (value !== undefined && value !== null) {
+                sessionStorage.setItem(PREFIX + field, value);
+            }
+        } catch (e) {}
     }
 
     function restore(wire) {
