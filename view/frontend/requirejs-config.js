@@ -6,6 +6,9 @@ var config = {
             },
             'Magento_Checkout/js/action/select-payment-method': {
                 'Magento_SalesRule/js/action/select-payment-method-mixin': false
+            },
+            'Magento_Checkout/js/action/select-billing-address': {
+                'Kkkonrad_Fastcheckout/js/mixin/select-billing-address-mixin': true
             }
         }
     }

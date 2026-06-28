@@ -61,6 +61,43 @@ foreach ($layoutScripts['external'] as $externalScript) {
 
 <script>
 (function () {
+    // Safely define checkoutConfig and payment config inline before RequireJS is loaded/executed
+    // We use a getter/setter to prevent subsequent scripts (e.g. from PayPal_Braintree) from overwriting it completely and removing key structures
+    var existingConfig = window.checkoutConfig || <?= /* @noEscape */ \Laminas\Json\Json::encode($checkoutConfig) ?>;
+    var actualConfig = {};
+    Object.defineProperty(window, 'checkoutConfig', {
+        get: function() {
+            return actualConfig;
+        },
+        set: function(newConfig) {
+            if (newConfig && typeof newConfig === 'object') {
+                actualConfig = Object.assign(actualConfig, newConfig);
+            } else {
+                actualConfig = newConfig;
+            }
+            if (actualConfig && typeof actualConfig === 'object') {
+                actualConfig.payment = actualConfig.payment || {};
+                var braintreeKeys = [
+                    'braintree',
+                    'braintree_paypal',
+                    'braintree_paypal_paylater',
+                    'braintree_paypal_credit',
+                    'braintree_applepay',
+                    'braintree_googlepay',
+                    'braintree_venmo',
+                    'braintree_ach_direct_debit',
+                    'braintree_local_payment'
+                ];
+                braintreeKeys.forEach(function (key) {
+                    actualConfig.payment[key] = actualConfig.payment[key] || {};
+                });
+            }
+        },
+        configurable: true,
+        enumerable: true
+    });
+    window.checkoutConfig = existingConfig;
+
     var config = <?= /* @noEscape */ \Laminas\Json\Json::encode($mageInitConfig) ?>;
     var requireJsUrl = '<?= $escaper->escapeJs($block->getViewFileUrl('requirejs/require.js')) ?>';
     var requireJsConfigUrl = '<?= $escaper->escapeJs($block->getViewFileUrl('requirejs-config.js')) ?>';

@@ -16,6 +16,22 @@ define([
         window.checkoutConfig.payment.payuGatewayCard = window.checkoutConfig.payment.payuGatewayCard || { isActive: false };
         window.checkoutConfig.payment.payuConfig = window.checkoutConfig.payment.payuConfig || { payMethods: {} };
 
+        // Safely initialize Braintree configurations to prevent RequireJS load errors
+        var braintreeKeys = [
+            'braintree',
+            'braintree_paypal',
+            'braintree_paypal_paylater',
+            'braintree_paypal_credit',
+            'braintree_applepay',
+            'braintree_googlepay',
+            'braintree_venmo',
+            'braintree_ach_direct_debit',
+            'braintree_local_payment'
+        ];
+        braintreeKeys.forEach(function (key) {
+            window.checkoutConfig.payment[key] = window.checkoutConfig.payment[key] || {};
+        });
+
         window.isCustomerLoggedIn = window.checkoutConfig.isCustomerLoggedIn;
         window.customerData = window.checkoutConfig.customerData;
         rendererComponents = rendererComponents.filter(function (component) {
@@ -57,6 +73,54 @@ define([
             checkoutData,
             $t
         ) {
+            if (quote && quote.billingAddress) {
+                var currentBilling = quote.billingAddress();
+                if (currentBilling && typeof currentBilling.getCacheKey !== 'function') {
+                    currentBilling.getCacheKey = function () {
+                        return 'billing-address-placeholder';
+                    };
+                }
+                var originalBillingAddress = quote.billingAddress;
+                quote.billingAddress = function (value) {
+                    if (arguments.length > 0) {
+                        if (value && typeof value.getCacheKey !== 'function') {
+                            value.getCacheKey = function () {
+                                return 'billing-address-placeholder';
+                            };
+                        }
+                    }
+                    return originalBillingAddress.apply(this, arguments);
+                };
+                Object.keys(originalBillingAddress).forEach(function (key) {
+                    quote.billingAddress[key] = originalBillingAddress[key];
+                });
+                quote.billingAddress.subscribe = originalBillingAddress.subscribe.bind(originalBillingAddress);
+            }
+
+            if (quote && quote.shippingAddress) {
+                var currentShipping = quote.shippingAddress();
+                if (currentShipping && typeof currentShipping.getCacheKey !== 'function') {
+                    currentShipping.getCacheKey = function () {
+                        return 'shipping-address-placeholder';
+                    };
+                }
+                var originalShippingAddress = quote.shippingAddress;
+                quote.shippingAddress = function (value) {
+                    if (arguments.length > 0) {
+                        if (value && typeof value.getCacheKey !== 'function') {
+                            value.getCacheKey = function () {
+                                return 'shipping-address-placeholder';
+                            };
+                        }
+                    }
+                    return originalShippingAddress.apply(this, arguments);
+                };
+                Object.keys(originalShippingAddress).forEach(function (key) {
+                    quote.shippingAddress[key] = originalShippingAddress[key];
+                });
+                quote.shippingAddress.subscribe = originalShippingAddress.subscribe.bind(originalShippingAddress);
+            }
+
             if (checkoutData) {
                 var cacheKey = 'checkout-data';
                 var getLocalData = function () {
@@ -215,13 +279,7 @@ define([
                             quote.guestEmail(emailVal);
                         }
                         var billing = typeof quote.billingAddress === 'function' ? quote.billingAddress() : null;
-                        if (!billing) {
-                            billing = {};
-                            if (typeof quote.billingAddress === 'function') {
-                                quote.billingAddress(billing);
-                            }
-                        }
-                        if (billing) {
+                        if (billing && typeof billing.getCacheKey === 'function') {
                             billing.email = emailVal;
                         }
                     }
