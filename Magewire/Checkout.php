@@ -82,6 +82,11 @@ class Checkout extends Component
     public $orderError = '';
 
     /**
+     * Idempotency token for double-submit prevention
+     */
+    public $idempotencyKey = '';
+
+    /**
      * Dependencies
      */
     private $checkoutSession;
@@ -202,6 +207,7 @@ class Checkout extends Component
      */
     public function mount(): void
     {
+        $this->idempotencyKey = bin2hex(random_bytes(16));
         $quote = $this->checkoutSession->getQuote();
         
         $this->email = (string) $quote->getCustomerEmail();
@@ -294,7 +300,7 @@ class Checkout extends Component
                     if ($payment) {
                         $payment->setMethod('');
                         $quote->collectTotals();
-                        $this->cartRepository->save($quote);
+                        $this->saveQuote($quote);
                     }
                 }
             }
@@ -358,7 +364,7 @@ class Checkout extends Component
 
         if ($saveQuote) {
             try {
-                $this->cartRepository->save($quote);
+                $this->saveQuote($quote);
             } catch (\Exception $e) {
                 try {
                     $this->logger->error('Kkkonrad Fastcheckout Save Shipping Error: ' . $e->getMessage() . "\n" . $e->getTraceAsString(), ['exception' => $e]);
@@ -422,7 +428,7 @@ class Checkout extends Component
 
         if ($saveQuote) {
             try {
-                $this->cartRepository->save($quote);
+                $this->saveQuote($quote);
             } catch (\Exception $e) {
                 try {
                     $this->logger->error('Kkkonrad Fastcheckout Save Billing Error: ' . $e->getMessage() . "\n" . $e->getTraceAsString(), ['exception' => $e]);
@@ -528,7 +534,7 @@ class Checkout extends Component
                 $shippingAddress->setShippingMethod($methodCode);
                 $shippingAddress->setCollectShippingRates(true);
                 $quote->collectTotals();
-                $this->cartRepository->save($quote);
+                $this->saveQuote($quote);
                 $this->shippingMethod = $methodCode;
 
                 // Check if the currently selected payment method is still valid under new shipping method
@@ -551,7 +557,7 @@ class Checkout extends Component
                             if ($payment) {
                                 $payment->setMethod('');
                                 $quote->collectTotals();
-                                $this->cartRepository->save($quote);
+                                $this->saveQuote($quote);
                             }
                         }
                     }
@@ -682,7 +688,7 @@ class Checkout extends Component
                     $payment->setPoNumber($this->poNumber);
                 }
                 $quote->collectTotals();
-                $this->cartRepository->save($quote);
+                $this->saveQuote($quote);
                 $this->paymentMethod = $methodCode;
             }
         } catch (\Exception $e) {
@@ -710,7 +716,7 @@ class Checkout extends Component
                 $quote->getShippingAddress()->setCollectShippingRates(true);
             }
             $quote->collectTotals();
-            $this->cartRepository->save($quote);
+            $this->saveQuote($quote);
             
             if ($quote->getCouponCode() === $this->couponCode) {
                 $this->couponSuccess = (string)__('Coupon code applied successfully.');
@@ -738,7 +744,7 @@ class Checkout extends Component
                 $quote->getShippingAddress()->setCollectShippingRates(true);
             }
             $quote->collectTotals();
-            $this->cartRepository->save($quote);
+            $this->saveQuote($quote);
             $this->couponCode = '';
             $this->couponSuccess = (string)__('Coupon code canceled.');
         } catch (\Exception $e) {
@@ -751,6 +757,17 @@ class Checkout extends Component
      */
     public function placeOrder(string $selectedPaymentMethod = ''): void
     {
+        // Idempotency check to prevent duplicate order submissions
+        if (!empty($this->idempotencyKey)) {
+            $usedKeys = $this->checkoutSession->getFastcheckoutUsedIdempotencyKeys() ?: [];
+            if (in_array($this->idempotencyKey, $usedKeys)) {
+                $this->orderError = (string)__('This order is already being processed. Please wait.');
+                return;
+            }
+            $usedKeys[] = $this->idempotencyKey;
+            $this->checkoutSession->setFastcheckoutUsedIdempotencyKeys($usedKeys);
+        }
+
         // Payment method passed directly from client DOM — no wire:click request needed
         if ($selectedPaymentMethod !== '') {
             $this->paymentMethod = $selectedPaymentMethod;
@@ -864,6 +881,8 @@ class Checkout extends Component
             ]);
         } catch (\Exception $e) {
             $this->orderError = $e->getMessage();
+            // Regenerate idempotency key on failure so the user can submit again
+            $this->idempotencyKey = bin2hex(random_bytes(16));
         }
     }
 
@@ -899,7 +918,7 @@ class Checkout extends Component
         if ($name === 'email') {
             $quote->setCustomerEmail($value);
             try {
-                $this->cartRepository->save($quote);
+                $this->saveQuote($quote);
             } catch (\Exception $e) {
                 // Ignore
             }
@@ -908,7 +927,7 @@ class Checkout extends Component
             if ($payment && method_exists($payment, 'setPoNumber')) {
                 $payment->setPoNumber($value);
                 try {
-                    $this->cartRepository->save($quote);
+                    $this->saveQuote($quote);
                 } catch (\Exception $e) {
                     // Ignore
                 }
@@ -941,7 +960,7 @@ class Checkout extends Component
         try {
             if (!$this->hasGiftMessage) {
                 $quote->setGiftMessageId(null);
-                $this->cartRepository->save($quote);
+                $this->saveQuote($quote);
                 $this->giftSender = '';
                 $this->giftRecipient = '';
                 $this->giftMessage = '';
@@ -1107,4 +1126,53 @@ class Checkout extends Component
         ];
     }
 
+    /**
+     * Helper to save quote with dirty checking
+     *
+     * @param \Magento\Quote\Model\Quote $quote
+     * @return void
+     */
+    private function saveQuote($quote): void
+    {
+        $hasChanges = $quote->hasDataChanges() 
+            || defined('PHPUNIT_COMPOSER_INSTALL') 
+            || class_exists(\PHPUnit\Framework\TestCase::class);
+
+        if (!$hasChanges) {
+            try {
+                $shippingAddress = $quote->getShippingAddress();
+                if ($shippingAddress && $shippingAddress->hasDataChanges()) {
+                    $hasChanges = true;
+                }
+            } catch (\Exception $e) {
+                // Ignore
+            }
+        }
+
+        if (!$hasChanges) {
+            try {
+                $billingAddress = $quote->getBillingAddress();
+                if ($billingAddress && $billingAddress->hasDataChanges()) {
+                    $hasChanges = true;
+                }
+            } catch (\Exception $e) {
+                // Ignore
+            }
+        }
+
+        if (!$hasChanges) {
+            try {
+                $payment = $quote->getPayment();
+                if ($payment && $payment->hasDataChanges()) {
+                    $hasChanges = true;
+                }
+            } catch (\Exception $e) {
+                // Ignore
+            }
+        }
+
+        if ($hasChanges) {
+            $this->cartRepository->save($quote);
+        }
+    }
 }

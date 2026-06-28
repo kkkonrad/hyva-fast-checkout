@@ -773,6 +773,21 @@ function initCheckout() {
             const el = this.$el;
             const field = el.dataset.wireField;
             if (!field) return;
+
+            // Debounced validity validation for email
+            if (field === 'email') {
+                if (!this._debounceTimers) {
+                    this._debounceTimers = {};
+                }
+                if (this._debounceTimers['email_val']) {
+                    clearTimeout(this._debounceTimers['email_val']);
+                }
+                this._debounceTimers['email_val'] = setTimeout(() => {
+                    this._validateEl(el);
+                    delete this._debounceTimers['email_val'];
+                }, 800);
+            }
+
             const fieldsToSync = ['postcode', 'billingPostcode', 'email', 'region', 'billingRegion'];
             if (!fieldsToSync.includes(field)) return;
 
@@ -1021,6 +1036,29 @@ function initCheckout() {
                     } else {
                         el.setCustomValidity('');
                     }
+                } else if (fieldName === 'email') {
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    if (el.value && !emailRegex.test(el.value)) {
+                        el.setCustomValidity('Wpisz poprawny adres e-mail (np. nazwa@domena.pl)');
+                    } else if (el.value) {
+                        const typos = {
+                            'gamil.com': 'gmail.com',
+                            'gmial.com': 'gmail.com',
+                            'gmal.com': 'gmail.com',
+                            'wp.pl.pl': 'wp.pl',
+                            'onet.pl.pl': 'onet.pl',
+                            'o2.pl.pl': 'o2.pl',
+                            'interia.pl.pl': 'interia.pl'
+                        };
+                        const domain = el.value.split('@')[1];
+                        if (domain && typos[domain.toLowerCase()]) {
+                            el.setCustomValidity('Czy miałeś na myśli: ' + typos[domain.toLowerCase()] + '?');
+                        } else {
+                            el.setCustomValidity('');
+                        }
+                    } else {
+                        el.setCustomValidity('');
+                    }
                 }
             }
 
@@ -1074,7 +1112,7 @@ window.addEventListener('alpine:init', () => Alpine.data('initCheckout', initChe
 
 
 
-/* ── localStorage backup (Livewire 2 / Magewire compatible) ──────────────── */
+/* ── sessionStorage backup (Livewire 2 / Magewire compatible) ──────────────── */
 (function () {
     const PREFIX = 'fastcheckout_';
     const FIELDS = [
@@ -1084,13 +1122,13 @@ window.addEventListener('alpine:init', () => Alpine.data('initCheckout', initChe
     ];
 
     function save(field, value) {
-        try { if (value) localStorage.setItem(PREFIX + field, value); } catch (e) {}
+        try { if (value) sessionStorage.setItem(PREFIX + field, value); } catch (e) {}
     }
 
     function restore(wire) {
         FIELDS.forEach(function (field) {
             try {
-                const val = localStorage.getItem(PREFIX + field);
+                const val = sessionStorage.getItem(PREFIX + field);
                 if (val && !wire.get(field)) {
                     wire.set(field, val);
                 }
@@ -1100,7 +1138,7 @@ window.addEventListener('alpine:init', () => Alpine.data('initCheckout', initChe
 
     function clearStorage() {
         FIELDS.forEach(function (field) {
-            try { localStorage.removeItem(PREFIX + field); } catch (e) {}
+            try { sessionStorage.removeItem(PREFIX + field); } catch (e) {}
         });
     }
 
