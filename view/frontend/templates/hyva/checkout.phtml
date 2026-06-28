@@ -1331,6 +1331,10 @@ window.addEventListener('alpine:init', () => Alpine.data('initCheckout', initChe
             if (wire) restore(wire);
             window.addEventListener('magewire:order-placed', function (event) {
                 clearStorage();
+                if (event.detail && event.detail.redirectUrl) {
+                    window.location.replace(event.detail.redirectUrl);
+                    return;
+                }
                 if (window.fastcheckoutHyvaPayment && typeof window.fastcheckoutHyvaPayment.afterPlaceOrder === 'function') {
                     window.fastcheckoutHyvaPayment.afterPlaceOrder();
                 } else {

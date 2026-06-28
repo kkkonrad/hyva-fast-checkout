@@ -953,9 +953,26 @@ class Checkout extends Component
                 'order_id' => $orderId,
                 'payment_method' => $this->paymentMethod,
             ]);
+
+            $redirectUrl = $this->checkoutSession->getRedirectUrl();
+            if (!$redirectUrl && $orderId) {
+                try {
+                    $order = $this->orderFactory->create()->load($orderId);
+                    if ($order && $order->getId()) {
+                        $methodInstance = $order->getPayment()->getMethodInstance();
+                        if (method_exists($methodInstance, 'getOrderPlaceRedirectUrl')) {
+                            $redirectUrl = $methodInstance->getOrderPlaceRedirectUrl();
+                        }
+                    }
+                } catch (\Exception $e) {
+                    // Ignore
+                }
+            }
+
             $this->dispatchBrowserEvent('magewire:order-placed', [
                 'method' => $this->paymentMethod,
-                'orderId' => $orderId
+                'orderId' => $orderId,
+                'redirectUrl' => $redirectUrl ?: ''
             ]);
         } catch (\Exception $e) {
             $this->orderError = $e->getMessage();

@@ -16,5 +16,8 @@
     <type name="Magento\Quote\Api\CartRepositoryInterface">
         <plugin name="fastcheckout_preserve_inpost_locker" type="Kkkonrad\Fastcheckout\Plugin\Quote\PreserveInpostLocker"/>
     </type>
+    <type name="Magento\Quote\Model\CustomerManagement">
+        <plugin name="fastcheckout_quote_customermanagement" type="Kkkonrad\Fastcheckout\Plugin\Quote\CustomerManagementPlugin"/>
+    </type>
 
 </config>
