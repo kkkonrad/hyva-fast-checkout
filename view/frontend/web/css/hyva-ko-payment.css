@@ -360,3 +360,193 @@ body.checkout-submitting .place-order-spinner {
 body.checkout-submitting .btn-primary {
     pointer-events: none !important;
 }
+
+/* ── Braintree Payments Styling ─────────────────────────────────────────── */
+.payment-method-content .braintree {
+    border: none;
+    padding: 0;
+    margin: 0;
+}
+
+.payment-method-content .braintree .legend {
+    display: none !important; /* Hide standard legend */
+}
+
+.payment-method-content .braintree .field {
+    margin-bottom: 1.25rem;
+}
+
+.payment-method-content .braintree .field .label {
+    display: block;
+    margin-bottom: 0.375rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #374151; /* Gray 700 */
+}
+
+/* Hosted Field Container (the pseudo-input) */
+.payment-method-content .hosted-control {
+    display: block;
+    width: 100%;
+    height: 42px; /* Set fixed height so the iframe has space */
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    background-color: #ffffff;
+    padding: 0 12px; /* Vertical padding 0 to prevent vertical cutoff, horizontal padding 12px */
+    font-size: 0.875rem;
+    color: #111827;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    box-sizing: border-box;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.payment-method-content .hosted-control:focus-within,
+.payment-method-content .hosted-control.braintree-hosted-fields-focused {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.payment-method-content .hosted-control.braintree-hosted-fields-invalid {
+    border-color: #f87171 !important;
+    background-color: #fef2f2 !important;
+}
+
+.payment-method-content .hosted-control iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    float: left;
+}
+
+/* Specific widths for smaller inputs */
+.payment-method-content #braintree_expirationDate.hosted-control {
+    max-width: 140px;
+}
+
+.payment-method-content .control._with-tooltip {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+    max-width: 140px; /* Keep CVV compact */
+}
+
+.payment-method-content #braintree_cc_cid.hosted-control {
+    width: 100%;
+    max-width: 100%;
+    padding-right: 42px !important; /* Make room for tooltip icon inside the input */
+}
+
+/* Braintree CC types icons list below */
+.payment-method-content .braintree-credit-card-types {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    list-style: none;
+    padding: 0;
+    margin: 0.5rem 0 0 0;
+}
+
+.payment-method-content .braintree-credit-card-types .item {
+    display: inline-block;
+}
+
+.payment-method-content .braintree-credit-card-types img {
+    height: 24px;
+    width: auto;
+    border-radius: 0.25rem;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+/* Braintree places the selected card type icon inside the container using left absolute positioning */
+.payment-method-content .braintree-card-control {
+    position: relative;
+    display: block;
+}
+
+.payment-method-content #braintree_cc_number.hosted-control {
+    padding-left: 48px !important; /* Reduce left padding to 48px to give more space for card number placeholder */
+}
+
+.payment-method-content .braintree-credit-card-selected {
+    position: absolute;
+    left: 12px !important; /* Align to the left side */
+    right: auto !important;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 22px;
+    width: auto;
+    z-index: 10;
+    pointer-events: none;
+}
+
+/* Tooltip for CVV positioned inside the input box */
+.payment-method-content .field-tooltip {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 10;
+    margin: 0;
+    display: inline-flex;
+    align-items: center;
+}
+
+.payment-method-content .field-tooltip-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #f3f4f6;
+    color: #4b5563;
+    font-size: 11px;
+    height: 20px;
+    width: 20px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-weight: bold;
+    border: 1px solid #d1d5db;
+    box-shadow: 0 1px 1px rgba(0,0,0,0.05);
+}
+
+.payment-method-content .field-tooltip-action::before {
+    content: '?';
+}
+
+.payment-method-content .field-tooltip-action span {
+    display: none !important; /* Hide original long text 'What is this?' */
+}
+
+.payment-method-content .field-tooltip-content {
+    display: none;
+    position: absolute;
+    bottom: 125%;
+    right: -10px;
+    background: #ffffff;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    padding: 0.5rem;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    z-index: 50;
+    width: 200px;
+}
+
+.payment-method-content .field-tooltip-content img {
+    max-width: 100%;
+    height: auto;
+}
+
+.payment-method-content .field-tooltip:hover .field-tooltip-content {
+    display: block;
+}
+
+/* Error messages */
+.payment-method-content .hosted-error {
+    display: none;
+    color: #ef4444;
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+}
+
+.payment-method-content .braintree-hosted-fields-invalid + .hosted-error {
+    display: block;
+}
