@@ -965,7 +965,12 @@ define([
 
                                 try {
                                     var data = typeof component.getData === 'function' ? component.getData() : { method: getSelectedMethodCode() };
-                                    var result = component.placeOrder(data, new Event('submit'));
+                                    var result;
+                                    if (component.getCode && component.getCode() === 'braintree') {
+                                        result = component.placeOrder();
+                                    } else {
+                                        result = component.placeOrder(data, new Event('submit'));
+                                    }
                                     
                                     // If placeOrder returns false or void, it means it is doing async processing (like tokenize).
                                     // We set a safety timeout to reset the loading state in Alpine if nothing happens.
@@ -1102,8 +1107,10 @@ define([
                         });
                     },
 
-                    selectPaymentMethod: setSelectedMethod
+                    selectPaymentMethod: setSelectedMethod,
+                    getActiveRenderer: getActiveRenderer
                 };
+
 
                 patchRenderers();
                 observePaymentRendererRoot();

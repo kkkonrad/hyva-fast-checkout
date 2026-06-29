@@ -19,14 +19,23 @@ try {
 ?>
 <?php if ($block->getAmount() > 0): ?>
     <script>
-        require([
-            'Kkkonrad_Fastcheckout/js/paypal/button',
-            'jquery'
-        ], function (button, $) {
-            $(function () {
-                button.init('<?= $block->getClientToken() ?>', '<?= $block->escapeHtmlAttr($block->getCurrency()) ?>');
+        if (typeof require === 'function') {
+            require([
+                'PayPal_Braintree/js/paypal/button',
+                'jquery'
+            ], function (ButtonWidget, $) {
+                $(function () {
+                    new ButtonWidget({
+                        buttonConfig: <?= /* @noEscape */ json_encode($block->getButtonConfig()) ?>,
+                        buttonIds: [
+                            "#<?= /* @noEscape */ $paypalId ?>",
+                            "#<?= /* @noEscape */ $paypalCreditId ?>",
+                            "#<?= /* @noEscape */ $paypalPaylaterId ?>"
+                        ]
+                    });
+                })
             })
-        })
+        }
     </script>
 
     <div class="paypal paypal1 checkout paypal-logo braintree-paypal-logo <?= $block->escapeHtmlAttr($block->getContainerId()) ?>-container">
@@ -39,9 +48,9 @@ try {
              data-actionsuccess="<?= $block->getActionSuccess() ?>"
              data-funding="paypal"
              data-fundingicons="true"
-             data-shape="<?= $block->getButtonShape() ?>"
-             data-size="<?= $block->getButtonSize() ?>"
-             data-color="<?= $block->getButtonColor() ?>"
+             data-shape="<?= $block->getButtonShape('paypal') ?>"
+             data-size="<?= $block->getButtonSize('paypal') ?>"
+             data-color="<?= $block->getButtonColor('paypal') ?>"
              class="action-braintree-paypal-logo"></div>
     </div>
 
@@ -56,8 +65,8 @@ try {
                  data-actionsuccess="<?= $block->getActionSuccess() ?>"
                  data-funding="credit"
                  data-fundingicons="true"
-                 data-shape="<?= $block->getButtonShape() ?>"
-                 data-size="<?= $block->getButtonSize() ?>"
+                 data-shape="<?= $block->getButtonShape('credit') ?>"
+                 data-size="<?= $block->getButtonSize('credit') ?>"
                  data-color="darkblue"
                  class="action-braintree-paypal-logo"></div>
         </div>
@@ -74,8 +83,8 @@ try {
                      data-actionsuccess="<?= $block->getActionSuccess() ?>"
                      data-funding="paylater"
                      data-fundingicons="true"
-                     data-shape="<?= $block->getButtonShape() ?>"
-                     data-size="<?= $block->getButtonSize() ?>"
+                     data-shape="<?= $block->getButtonShape('paylater') ?>"
+                     data-size="<?= $block->getButtonSize('paylater') ?>"
                      data-color="white"
                      class="action-braintree-paypal-logo"></div>
             </div>

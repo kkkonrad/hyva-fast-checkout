@@ -12,6 +12,9 @@ var config = {
             },
             'Magento_Checkout/js/action/place-order': {
                 'Kkkonrad_Fastcheckout/js/mixin/place-order-mixin': true
+            },
+            'PayPal_Braintree/js/view/payment/adapter': {
+                'Kkkonrad_Fastcheckout/js/mixin/braintree-adapter-mixin': true
             }
         }
     }
