@@ -740,7 +740,14 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                                     <?php endif; ?>
                                     <div class="flex justify-between items-center mt-1.5 text-xs text-gray-500">
                                         <span><?= $escaper->escapeHtml(__('Qty: %1', $item->getQty() * 1)) ?></span>
-                                        <span class="font-semibold text-gray-900"><?= /* @noEscape */ $block->formatPrice($block->getItemRowTotal($item)) ?></span>
+                                        <div class="text-right">
+                                            <?php if ($block->displayCartBothPrices()): ?>
+                                                <span class="block font-semibold text-gray-900"><?= /* @noEscape */ $block->formatPrice($item->getRowTotalInclTax()) ?> <span class="text-[10px] text-gray-500 font-normal"><?= $escaper->escapeHtml(__('Incl. Tax')) ?></span></span>
+                                                <span class="block text-gray-500 text-[11px]"><?= /* @noEscape */ $block->formatPrice($item->getRowTotal()) ?> <span class="text-[10px] font-normal"><?= $escaper->escapeHtml(__('Excl. Tax')) ?></span></span>
+                                            <?php else: ?>
+                                                <span class="font-semibold text-gray-900"><?= /* @noEscape */ $block->formatPrice($block->getItemRowTotal($item)) ?></span>
+                                            <?php endif; ?>
+                                        </div>
                                     </div>
                                 </div>
                             </li>

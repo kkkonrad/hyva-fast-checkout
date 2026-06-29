@@ -571,10 +571,14 @@ class Checkout extends Template
      */
     public function getItemRowTotal(Item $item)
     {
-        $rowTotal = $item->getRowTotalInclTax();
+        if ($this->displayCartPriceInclTax()) {
+            $rowTotal = $item->getRowTotalInclTax();
+        } else {
+            $rowTotal = $item->getRowTotal();
+        }
 
         if ($rowTotal === null) {
-            $rowTotal = $item->getRowTotal();
+            $rowTotal = $item->getRowTotal() ?: $item->getRowTotalInclTax();
         }
 
         return (float) $rowTotal;
@@ -705,5 +709,37 @@ class Checkout extends Template
             }
         }
         return $options;
+    }
+
+    /**
+     * @var \Magento\Tax\Helper\Data|null
+     */
+    private $taxHelper;
+
+    /**
+     * @return \Magento\Tax\Helper\Data
+     */
+    public function getTaxHelper()
+    {
+        if ($this->taxHelper === null) {
+            $this->taxHelper = $this->getObjectManager()->get(\Magento\Tax\Helper\Data::class);
+        }
+        return $this->taxHelper;
+    }
+
+    /**
+     * @return bool
+     */
+    public function displayCartBothPrices(): bool
+    {
+        return (bool)$this->getTaxHelper()->displayCartBothPrices();
+    }
+
+    /**
+     * @return bool
+     */
+    public function displayCartPriceInclTax(): bool
+    {
+        return (bool)$this->getTaxHelper()->displayCartPriceInclTax();
     }
 }
