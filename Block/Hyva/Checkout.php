@@ -520,7 +520,7 @@ class Checkout extends Template
      */
     public function formatPrice($amount)
     {
-        return $this->pricingHelper->currency((float) $amount, true, false);
+        return $this->getQuote()->getStore()->getCurrentCurrency()->formatPrecision((float)$amount, 2, [], false);
     }
 
     /**
@@ -581,55 +581,33 @@ class Checkout extends Template
     }
 
     /**
+     * Get summary totals dynamically collected, sorted, and translated based on store configuration
+     *
      * @return array
      */
     public function getSummaryTotals()
     {
         $quote = $this->getQuote();
-        $shippingAddress = $quote->getShippingAddress();
-
-        $totals = [
-            [
-                'code' => 'subtotal',
-                'label' => __('Subtotal'),
-                'value' => $quote->getSubtotal(),
-                'strong' => false,
-            ]
-        ];
-
-        if (!$quote->isVirtual()) {
+        $quote->collectTotals();
+        
+        $totals = [];
+        foreach ($quote->getTotals() as $code => $total) {
+            $value = (float)$total->getValue();
+            
+            // Skip zero values for optional segments (like tax, discount, fees),
+            // but always show subtotal and grand total even if zero.
+            if ($value == 0.0 && !in_array($code, ['subtotal', 'grand_total'])) {
+                continue;
+            }
+            
             $totals[] = [
-                'code' => 'shipping',
-                'label' => __('Shipping'),
-                'value' => $shippingAddress->getShippingAmount(),
-                'strong' => false,
+                'code' => $code,
+                'label' => $total->getTitle(),
+                'value' => $value,
+                'strong' => ($total->getArea() === 'footer' || $code === 'grand_total'),
             ];
         }
-
-        $discount = (float)$shippingAddress->getDiscountAmount();
-        if ($discount != 0.0) {
-            $totals[] = [
-                'code' => 'discount',
-                'label' => __('Discount'),
-                'value' => $discount,
-                'strong' => false,
-            ];
-        }
-
-        $totals[] = [
-            'code' => 'tax',
-            'label' => __('Tax'),
-            'value' => $shippingAddress->getTaxAmount(),
-            'strong' => false,
-        ];
-
-        $totals[] = [
-            'code' => 'grand_total',
-            'label' => __('Order Total'),
-            'value' => $quote->getGrandTotal(),
-            'strong' => true,
-        ];
-
+        
         return $totals;
     }
 
