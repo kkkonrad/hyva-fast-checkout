@@ -18,6 +18,14 @@ class RequireJsAssets
 {
     public const XML_PATH_AUTO_GENERATE = 'fastcheckout/hyva/auto_generate_requirejs_assets';
 
+    private const REQUIRED_CONFIG_MARKERS = [
+        'Kkkonrad_Fastcheckout/js/mixin/storage-mixin',
+        'Kkkonrad_Fastcheckout/js/mixin/set-shipping-information-mixin',
+        'Kkkonrad_Fastcheckout/js/mixin/set-payment-information-mixin',
+        'Kkkonrad_Fastcheckout/js/mixin/set-billing-address-mixin',
+        'Kkkonrad_Fastcheckout/js/mixin/place-order-mixin',
+    ];
+
     /**
      * @var ScopeConfigInterface
      */
@@ -100,7 +108,10 @@ class RequireJsAssets
                 $generated = true;
             }
 
-            if (!$staticDir->isExist($this->requireJsConfig->getConfigFileRelativePath())) {
+            if (!$this->isRequireJsConfigCurrent($staticDir)) {
+                if ($staticDir->isExist($this->requireJsConfig->getConfigFileRelativePath())) {
+                    $staticDir->delete($this->requireJsConfig->getConfigFileRelativePath());
+                }
                 $this->fileManager->createRequireJsConfigAsset();
                 $generated = true;
             }
@@ -114,6 +125,24 @@ class RequireJsAssets
         }
 
         return false;
+    }
+
+    private function isRequireJsConfigCurrent(\Magento\Framework\Filesystem\Directory\WriteInterface $staticDir): bool
+    {
+        $configPath = $this->requireJsConfig->getConfigFileRelativePath();
+
+        if (!$staticDir->isExist($configPath)) {
+            return false;
+        }
+
+        $content = (string)$staticDir->readFile($configPath);
+        foreach (self::REQUIRED_CONFIG_MARKERS as $marker) {
+            if (strpos($content, $marker) === false) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

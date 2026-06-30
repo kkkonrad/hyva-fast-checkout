@@ -921,10 +921,6 @@ class Checkout extends Component
 
             $payment = $quote->getPayment();
             if ($payment) {
-                if ((string)$payment->getMethod() === $methodCode && $this->paymentMethod === $methodCode) {
-                    return;
-                }
-
                 $this->importPaymentData($payment, $methodCode);
                 if ($methodCode === 'purchaseorder' && method_exists($payment, 'setPoNumber')) {
                     $payment->setPoNumber($this->poNumber);
@@ -1498,15 +1494,24 @@ class Checkout extends Component
             return;
         }
 
+        $rawPaymentData = $this->getRawPaymentData($methodCode);
         $additionalData = array_merge(
             $this->getGenericAdditionalPaymentData($methodCode),
+            $this->normalizePaymentAdditionalData($rawPaymentData['additional_data'] ?? []),
             $this->normalizePaymentAdditionalData($this->paymentAdditionalData)
         );
 
-        $data = [
-            'method' => $methodCode,
-            'additional_data' => $additionalData,
-        ];
+        $data = $rawPaymentData;
+        $data['method'] = $methodCode;
+        $data['additional_data'] = $additionalData;
+
+        $extensionAttributes = array_merge(
+            $this->normalizePaymentAdditionalData($rawPaymentData['extension_attributes'] ?? []),
+            $this->normalizePaymentAdditionalData($this->paymentExtensionAttributes)
+        );
+        if (!empty($extensionAttributes)) {
+            $data['extension_attributes'] = $extensionAttributes;
+        }
 
         if (method_exists($payment, 'importData')) {
             $payment->importData($data);
@@ -1514,6 +1519,26 @@ class Checkout extends Component
         }
 
         $payment->setMethod($methodCode);
+    }
+
+    private function getRawPaymentData(string $methodCode): array
+    {
+        if (!is_array($this->placeOrderRequestData)) {
+            return [];
+        }
+
+        $paymentData = $this->placeOrderRequestData['paymentMethod'] ?? [];
+        if (!is_array($paymentData)) {
+            return [];
+        }
+
+        $paymentData = $this->normalizePaymentAdditionalData($paymentData);
+        $payloadMethod = isset($paymentData['method']) ? (string)$paymentData['method'] : '';
+        if ($payloadMethod !== '' && $payloadMethod !== $methodCode) {
+            return [];
+        }
+
+        return $paymentData;
     }
 
     private function normalizePaymentAdditionalData($data): array

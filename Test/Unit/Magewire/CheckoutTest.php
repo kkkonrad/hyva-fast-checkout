@@ -480,6 +480,112 @@ class CheckoutTest extends TestCase
         $this->assertEquals('generic-150', $this->checkoutComponent->paymentMethod);
     }
 
+    public function testSelectPaymentMethodImportsRawKoPaymentPayload(): void
+    {
+        $this->quoteMock->expects($this->any())
+            ->method('getId')
+            ->willReturn(42);
+
+        $this->paymentMethodManagementMock->expects($this->once())
+            ->method('getList')
+            ->with(42)
+            ->willReturn([$this->createPaymentMethodMock('checkmo')]);
+
+        $paymentMock = $this->getMockBuilder(\Magento\Quote\Model\Quote\Payment::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['importData'])
+            ->getMock();
+
+        $this->quoteMock->expects($this->once())
+            ->method('getPayment')
+            ->willReturn($paymentMock);
+
+        $this->checkoutComponent->placeOrderRequestData = [
+            'paymentMethod' => [
+                'method' => 'checkmo',
+                'custom_top_level' => 'custom-value',
+                'additional_data' => [
+                    'custom_additional' => 'additional-value',
+                ],
+                'extension_attributes' => [
+                    'agreement_ids' => ['1'],
+                ],
+            ],
+        ];
+        $this->checkoutComponent->paymentAdditionalData = [
+            'custom_additional' => 'overridden-value',
+        ];
+        $this->checkoutComponent->paymentExtensionAttributes = [
+            'agreement_ids' => ['2'],
+        ];
+
+        $paymentMock->expects($this->once())
+            ->method('importData')
+            ->with($this->callback(static function (array $data): bool {
+                return $data['method'] === 'checkmo'
+                    && $data['custom_top_level'] === 'custom-value'
+                    && $data['additional_data']['custom_additional'] === 'overridden-value'
+                    && $data['additional_data']['accept_tos'] === true
+                    && $data['extension_attributes']['agreement_ids'] === ['2'];
+            }));
+
+        $this->quoteMock->expects($this->once())->method('collectTotals');
+        $this->cartRepositoryMock->expects($this->once())
+            ->method('save')
+            ->with($this->quoteMock);
+
+        $this->checkoutComponent->selectPaymentMethod('checkmo');
+    }
+
+    public function testSelectPaymentMethodRefreshesPayloadWhenSameMethodIsAlreadySelected(): void
+    {
+        $this->quoteMock->expects($this->any())
+            ->method('getId')
+            ->willReturn(42);
+
+        $this->paymentMethodManagementMock->expects($this->once())
+            ->method('getList')
+            ->with(42)
+            ->willReturn([$this->createPaymentMethodMock('checkmo')]);
+
+        $paymentMock = $this->getMockBuilder(\Magento\Quote\Model\Quote\Payment::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['importData', 'getMethod'])
+            ->getMock();
+
+        $paymentMock->method('getMethod')->willReturn('checkmo');
+
+        $this->quoteMock->expects($this->once())
+            ->method('getPayment')
+            ->willReturn($paymentMock);
+
+        $this->checkoutComponent->paymentMethod = 'checkmo';
+        $this->checkoutComponent->placeOrderRequestData = [
+            'paymentMethod' => [
+                'method' => 'checkmo',
+                'additional_data' => [
+                    'selected_channel' => 'new-channel',
+                ],
+            ],
+        ];
+
+        $paymentMock->expects($this->once())
+            ->method('importData')
+            ->with($this->callback(static function (array $data): bool {
+                return $data['method'] === 'checkmo'
+                    && $data['additional_data']['selected_channel'] === 'new-channel';
+            }));
+
+        $this->quoteMock->expects($this->once())->method('collectTotals');
+        $this->cartRepositoryMock->expects($this->once())
+            ->method('save')
+            ->with($this->quoteMock);
+
+        $this->checkoutComponent->selectPaymentMethod('checkmo');
+
+        $this->assertSame('checkmo', $this->checkoutComponent->paymentMethod);
+    }
+
     public function testGetPaymentMethodsReturnsAllMagentoAvailableMethods(): void
     {
         $this->quoteMock->expects($this->any())

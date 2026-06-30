@@ -80,7 +80,13 @@ define([
             return Promise.reject(new Error('Magewire not available'));
         }
 
-        return Promise.resolve(wire.call('refreshCheckoutState'));
+        return Promise.resolve(wire.call('refreshCheckoutState'))
+            .catch(function () {
+                return true;
+            })
+            .then(function () {
+                return fetchCheckoutState(wire);
+            });
     }
 
     function parsePayload(data) {
@@ -123,6 +129,43 @@ define([
         }
 
         return Promise.resolve(wire.set(key, value === null ? '' : value));
+    }
+
+    function getWireValue(wire, key) {
+        if (!wire) {
+            return '';
+        }
+        if (typeof wire[key] !== 'undefined') {
+            return wire[key];
+        }
+        if (typeof wire.get === 'function') {
+            return wire.get(key);
+        }
+        if (wire.data && typeof wire.data[key] !== 'undefined') {
+            return wire.data[key];
+        }
+
+        return '';
+    }
+
+    function getStateUrl(wire) {
+        var baseUrl = window.BASE_URL || '/',
+            paymentMethod = getWireValue(wire, 'paymentMethod');
+
+        if (baseUrl.charAt(baseUrl.length - 1) !== '/') {
+            baseUrl += '/';
+        }
+
+        return baseUrl + 'fast-checkout/index/state' + (paymentMethod ? '?payment_method=' + encodeURIComponent(paymentMethod) : '');
+    }
+
+    function fetchCheckoutState(wire) {
+        return $.ajax({
+            url: getStateUrl(wire),
+            type: 'GET',
+            dataType: 'json',
+            cache: false
+        });
     }
 
     function syncAddressToWire(wire, address, isBilling) {
@@ -248,12 +291,24 @@ define([
         if (endpoint === 'estimateShippingMethods') {
             sequence = sequence.then(function () {
                 return syncAddressToWire(wire, payload.address || payload, false);
+            }).then(function () {
+                if (typeof wire.call === 'function') {
+                    return wire.call('saveShippingAddress', true, true, true);
+                }
+
+                return true;
             });
         }
 
         if (endpoint === 'billingAddress') {
             sequence = sequence.then(function () {
                 return syncAddressToWire(wire, payload.address, true);
+            }).then(function () {
+                if (typeof wire.call === 'function') {
+                    return wire.call('saveBillingAddress', true);
+                }
+
+                return true;
             });
         }
 
