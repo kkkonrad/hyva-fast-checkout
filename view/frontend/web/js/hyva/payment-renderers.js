@@ -45,6 +45,11 @@ define([
             'Magento_Checkout/js/model/shipping-service',
             'Magento_Checkout/js/model/shipping-rate-service',
             'Magento_Checkout/js/checkout-data',
+            'Magento_Checkout/js/action/select-shipping-address',
+            'Magento_Checkout/js/action/select-shipping-method',
+            'Magento_Checkout/js/action/select-billing-address',
+            'Magento_Checkout/js/model/address-converter',
+            'Magento_Checkout/js/action/set-shipping-information',
             'mage/translate'
         ], function (
             app,
@@ -57,6 +62,11 @@ define([
             shippingService,
             shippingRateService,
             checkoutData,
+            selectShippingAddressAction,
+            selectShippingMethodAction,
+            selectBillingAddressAction,
+            addressConverter,
+            setShippingInformationAction,
             $t
         ) {
             if (quote && quote.billingAddress) {
@@ -359,53 +369,120 @@ define([
                     return '';
                 }
 
-                function syncAddressToKnockout(magewire) {
-                    if (!magewire) return;
+                function getEmailForQuote() {
+                    var emailEl = document.querySelector('input[name="email"]') ||
+                        document.querySelector('input[type="email"]') ||
+                        document.querySelector('[data-wire-field="email"]');
 
-                    var street = [];
-                    var street1 = getProperty(magewire, 'street1');
-                    var street2 = getProperty(magewire, 'street2');
-                    if (street1) street.push(street1);
-                    if (street2) street.push(street2);
+                    if (emailEl && emailEl.value) {
+                        return emailEl.value;
+                    }
 
-                    var addressData = {
-                        firstname: getProperty(magewire, 'firstname'),
-                        lastname: getProperty(magewire, 'lastname'),
-                        company: getProperty(magewire, 'company'),
-                        street: street,
-                        city: getProperty(magewire, 'city'),
-                        postcode: getProperty(magewire, 'postcode'),
-                        countryId: getProperty(magewire, 'countryId'),
-                        regionId: (getProperty(magewire, 'regionId') && parseInt(getProperty(magewire, 'regionId'), 10) > 0) ? parseInt(getProperty(magewire, 'regionId'), 10) : null,
-                        region: getProperty(magewire, 'region'),
-                        telephone: getProperty(magewire, 'telephone'),
-                        saveInAddressBook: 0
-                    };
+                    if (window.checkoutConfig && window.checkoutConfig.customerData && window.checkoutConfig.customerData.email) {
+                        return window.checkoutConfig.customerData.email;
+                    }
 
-                    require([
-                        'Magento_Checkout/js/action/select-shipping-address',
-                        'Magento_Checkout/js/model/address-converter'
-                    ], function (selectShippingAddress, addressConverter) {
-                        var newAddress = addressConverter.formAddressDataToQuoteAddress(addressData);
-                        var currentAddress = quote.shippingAddress();
+                    if (window.checkoutConfig && window.checkoutConfig.quoteData && window.checkoutConfig.quoteData.customer_email) {
+                        return window.checkoutConfig.quoteData.customer_email;
+                    }
 
-                        if (currentAddress &&
-                            currentAddress.countryId === newAddress.countryId &&
-                            currentAddress.postcode === newAddress.postcode &&
-                            currentAddress.city === newAddress.city &&
-                            JSON.stringify(currentAddress.street) === JSON.stringify(newAddress.street) &&
-                            currentAddress.regionId == newAddress.regionId &&
-                            currentAddress.region === newAddress.region &&
-                            currentAddress.firstname === newAddress.firstname &&
-                            currentAddress.lastname === newAddress.lastname &&
-                            currentAddress.telephone === newAddress.telephone
-                        ) {
-                            return;
+                    return '';
+                }
+
+                function getStreetLines(magewire, prefix) {
+                    var street = [],
+                        isBilling = prefix === 'billing',
+                        line1 = getProperty(magewire, isBilling ? 'billingStreet1' : 'street1'),
+                        line2 = getProperty(magewire, isBilling ? 'billingStreet2' : 'street2'),
+                        line3 = getProperty(magewire, isBilling ? 'billingStreet3' : 'street3'),
+                        line4 = getProperty(magewire, isBilling ? 'billingStreet4' : 'street4');
+
+                    [line1, line2, line3, line4].forEach(function (line) {
+                        if (line) {
+                            street.push(line);
                         }
-
-                        
-                        selectShippingAddress(newAddress);
                     });
+
+                    return street;
+                }
+
+                function buildAddressData(magewire, prefix) {
+                    var isBilling = prefix === 'billing',
+                        countryId = getProperty(magewire, isBilling ? 'billingCountryId' : 'countryId'),
+                        regionId = getProperty(magewire, isBilling ? 'billingRegionId' : 'regionId'),
+                        region = getProperty(magewire, isBilling ? 'billingRegion' : 'region');
+
+                    return {
+                        email: getEmailForQuote(),
+                        firstname: getProperty(magewire, isBilling ? 'billingFirstname' : 'firstname'),
+                        lastname: getProperty(magewire, isBilling ? 'billingLastname' : 'lastname'),
+                        company: getProperty(magewire, isBilling ? 'billingCompany' : 'company'),
+                        street: getStreetLines(magewire, prefix),
+                        city: getProperty(magewire, isBilling ? 'billingCity' : 'city'),
+                        postcode: getProperty(magewire, isBilling ? 'billingPostcode' : 'postcode'),
+                        countryId: countryId,
+                        country_id: countryId,
+                        regionId: regionId && parseInt(regionId, 10) > 0 ? parseInt(regionId, 10) : null,
+                        region_id: regionId && parseInt(regionId, 10) > 0 ? parseInt(regionId, 10) : null,
+                        region: region,
+                        telephone: getProperty(magewire, isBilling ? 'billingTelephone' : 'telephone'),
+                        prefix: getProperty(magewire, isBilling ? 'billingPrefix' : 'prefix'),
+                        middlename: getProperty(magewire, isBilling ? 'billingMiddlename' : 'middlename'),
+                        suffix: getProperty(magewire, isBilling ? 'billingSuffix' : 'suffix'),
+                        fax: getProperty(magewire, isBilling ? 'billingFax' : 'fax'),
+                        vat_id: getProperty(magewire, isBilling ? 'billingVatId' : 'vatId'),
+                        save_in_address_book: 0
+                    };
+                }
+
+                function addressesMatch(currentAddress, newAddress) {
+                    return currentAddress &&
+                        currentAddress.countryId === newAddress.countryId &&
+                        currentAddress.postcode === newAddress.postcode &&
+                        currentAddress.city === newAddress.city &&
+                        JSON.stringify(currentAddress.street || []) === JSON.stringify(newAddress.street || []) &&
+                        currentAddress.regionId == newAddress.regionId &&
+                        currentAddress.region === newAddress.region &&
+                        currentAddress.firstname === newAddress.firstname &&
+                        currentAddress.lastname === newAddress.lastname &&
+                        currentAddress.telephone === newAddress.telephone;
+                }
+
+                function syncAddressToKnockout(magewire) {
+                    if (!magewire) return null;
+
+                    var addressData = buildAddressData(magewire, ''),
+                        newAddress = addressConverter.formAddressDataToQuoteAddress(addressData),
+                        currentAddress = quote.shippingAddress();
+
+                    if (!addressesMatch(currentAddress, newAddress)) {
+                        selectShippingAddressAction(newAddress);
+                    }
+
+                    return quote.shippingAddress() || newAddress;
+                }
+
+                function syncBillingAddressToKnockout(magewire, shippingAddress) {
+                    var billingSameAsShipping = getProperty(magewire, 'billingSameAsShipping'),
+                        newAddress,
+                        currentAddress;
+
+                    if (!magewire) return null;
+
+                    if (billingSameAsShipping === true || billingSameAsShipping === '1' || billingSameAsShipping === 1) {
+                        if (shippingAddress) {
+                            selectBillingAddressAction(shippingAddress);
+                        }
+                        return quote.billingAddress();
+                    }
+
+                    newAddress = addressConverter.formAddressDataToQuoteAddress(buildAddressData(magewire, 'billing'));
+                    currentAddress = quote.billingAddress();
+                    if (!addressesMatch(currentAddress, newAddress)) {
+                        selectBillingAddressAction(newAddress);
+                    }
+
+                    return quote.billingAddress() || newAddress;
                 }
 
                 function syncSelectedShippingMethodToKnockout(methodCode) {
@@ -413,21 +490,52 @@ define([
                         quote.shippingMethod(null);
                         return;
                     }
-                    require([
-                        'Magento_Checkout/js/action/select-shipping-method'
-                    ], function (selectShippingMethod) {
-                        var rates = shippingService.getShippingRates()();
-                        var found = rates.filter(function (rate) {
-                            return (rate.carrier_code + '_' + rate.method_code) === methodCode;
-                        })[0];
-                        if (found) {
-                            var active = quote.shippingMethod();
-                            if (!active || active.carrier_code !== found.carrier_code || active.method_code !== found.method_code) {
-                                
-                                selectShippingMethod(found);
-                            }
+
+                    var rates = shippingService.getShippingRates()(),
+                        found = null;
+
+                    rates.some(function (rate) {
+                        if ((rate.carrier_code + '_' + rate.method_code) === methodCode) {
+                            found = rate;
+                            return true;
                         }
+                        return false;
                     });
+
+                    if (found) {
+                        var active = quote.shippingMethod();
+                        if (!active || active.carrier_code !== found.carrier_code || active.method_code !== found.method_code) {
+                            selectShippingMethodAction(found);
+                        }
+                    }
+                }
+
+                function prepareCheckoutState(magewire) {
+                    syncQuoteCustomerData();
+
+                    var shippingAddress = syncAddressToKnockout(magewire);
+                    syncBillingAddressToKnockout(magewire, shippingAddress);
+
+                    if (magewire) {
+                        syncSelectedShippingMethodToKnockout(getProperty(magewire, 'shippingMethod'));
+                    }
+
+                    if (quote.isVirtual && quote.isVirtual()) {
+                        return Promise.resolve(true);
+                    }
+
+                    if (!quote.shippingAddress() || !quote.shippingMethod()) {
+                        return Promise.resolve(true);
+                    }
+
+                    try {
+                        return Promise.resolve(setShippingInformationAction()).then(function () {
+                            syncPaymentMethods();
+                            return true;
+                        });
+                    } catch (e) {
+                        return Promise.reject(e);
+                    }
                 }
 
                 function getShippingListComponent() {
@@ -999,62 +1107,64 @@ define([
 	                            setSelectedMethod(selectedMethod);
 	                        }
 
-	                        component = getActiveRenderer();
-	                        paymentData = component && typeof component.getData === 'function'
-	                            ? component.getData()
-	                            : this.getActivePaymentData();
+	                        return prepareCheckoutState(wire).then(function () {
+	                            component = getActiveRenderer();
+	                            paymentData = component && typeof component.getData === 'function'
+	                                ? component.getData()
+	                                : this.getActivePaymentData();
 
-	                        if (!component || typeof component.placeOrder !== 'function') {
-	                            return this.syncPaymentData(wire).then(function () {
-	                                return wire.call('placeOrder', selectedMethod || (paymentData && paymentData.method) || getSelectedMethodCode());
-	                            });
-	                        }
-
-	                        if (typeof component.validate === 'function' && !component.validate()) {
-	                            return Promise.reject(new Error('Payment method validation failed'));
-	                        }
-	                        if (
-	                            typeof component.isPlaceOrderActionAllowed === 'function' &&
-	                            !component.isPlaceOrderActionAllowed()
-	                        ) {
-	                            return Promise.reject(new Error('Payment method is not ready'));
-	                        }
-
-	                        this.cleanupKoOrderState();
-	                        this.syncWire = wire;
-	                        this.koOrderActive = true;
-	                        this.koOrderDeferred = $.Deferred();
-
-	                        return new Promise(function (resolve, reject) {
-	                            self.syncResolve = resolve;
-	                            self.syncReject = reject;
-	                            self.koOrderTimeout = window.setTimeout(function () {
-	                                if (!self.koOrderActive) {
-	                                    return;
-	                                }
-	                                self.cleanupKoOrderState();
-	                                reject(new Error('Payment method did not start order placement'));
-	                            }, 30000);
-
-	                            try {
-	                                if (component.getCode && component.getCode() === 'braintree') {
-	                                    result = component.placeOrder();
-	                                } else {
-	                                    result = component.placeOrder(paymentData, new Event('submit'));
-	                                }
-
-	                                if (result === false) {
-	                                    self.cleanupKoOrderState();
-	                                    reject(new Error('Payment method validation failed'));
-	                                }
-	                            } catch (e) {
-	                                if (window.console && typeof window.console.error === 'function') {
-	                                    window.console.error('Kkkonrad Fastcheckout: component placeOrder thrown exception:', e);
-	                                }
-	                                self.cleanupKoOrderState();
-	                                reject(e);
+	                            if (!component || typeof component.placeOrder !== 'function') {
+	                                return this.syncPaymentData(wire).then(function () {
+	                                    return wire.call('placeOrder', selectedMethod || (paymentData && paymentData.method) || getSelectedMethodCode());
+	                                });
 	                            }
-	                        });
+
+	                            if (typeof component.validate === 'function' && !component.validate()) {
+	                                return Promise.reject(new Error('Payment method validation failed'));
+	                            }
+	                            if (
+	                                typeof component.isPlaceOrderActionAllowed === 'function' &&
+	                                !component.isPlaceOrderActionAllowed()
+	                            ) {
+	                                return Promise.reject(new Error('Payment method is not ready'));
+	                            }
+
+	                            this.cleanupKoOrderState();
+	                            this.syncWire = wire;
+	                            this.koOrderActive = true;
+	                            this.koOrderDeferred = $.Deferred();
+
+	                            return new Promise(function (resolve, reject) {
+	                                self.syncResolve = resolve;
+	                                self.syncReject = reject;
+	                                self.koOrderTimeout = window.setTimeout(function () {
+	                                    if (!self.koOrderActive) {
+	                                        return;
+	                                    }
+	                                    self.cleanupKoOrderState();
+	                                    reject(new Error('Payment method did not start order placement'));
+	                                }, 30000);
+
+	                                try {
+	                                    if (component.getCode && component.getCode() === 'braintree') {
+	                                        result = component.placeOrder();
+	                                    } else {
+	                                        result = component.placeOrder(paymentData, new Event('submit'));
+	                                    }
+
+	                                    if (result === false) {
+	                                        self.cleanupKoOrderState();
+	                                        reject(new Error('Payment method validation failed'));
+	                                    }
+	                                } catch (e) {
+	                                    if (window.console && typeof window.console.error === 'function') {
+	                                        window.console.error('Kkkonrad Fastcheckout: component placeOrder thrown exception:', e);
+	                                    }
+	                                    self.cleanupKoOrderState();
+	                                    reject(e);
+	                                }
+	                            });
+	                        }.bind(this));
 	                    },
 
 	                    onPlaceOrderAction: function (paymentData, messageContainer, originalAction) {
