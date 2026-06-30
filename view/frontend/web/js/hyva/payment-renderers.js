@@ -904,165 +904,230 @@ define([
                 }
 
                 window.fastcheckoutHyvaPayment = {
-                    getActivePaymentData: function () {
-                        var component = getActiveRenderer();
+	                    getActivePaymentData: function () {
+	                        var component = getActiveRenderer();
 
-                        if (component && typeof component.getData === 'function') {
-                            return component.getData();
+	                        if (component && typeof component.getData === 'function') {
+	                            return component.getData();
                         }
 
                         return {
                             method: getSelectedMethodCode(),
-                            additional_data: {}
-                        };
-                    },
+	                            additional_data: {}
+	                        };
+	                    },
 
-                    syncPaymentData: function (wire) {
-                        if (!wire || typeof wire.set !== 'function') {
-                            return Promise.resolve();
-                        }
+	                    cleanupKoOrderState: function () {
+	                        if (this.koOrderTimeout) {
+	                            window.clearTimeout(this.koOrderTimeout);
+	                        }
+	                        this.koOrderTimeout = null;
+	                        this.koOrderDeferred = null;
+	                        this.koOrderActive = false;
+	                        this.syncWire = null;
+	                        this.syncResolve = null;
+	                        this.syncReject = null;
+	                    },
 
-                        var component = getActiveRenderer();
-                        var self = this;
-                        self.syncWire = wire;
-                        self.syncResolve = null;
-                        self.syncReject = null;
+	                    getPurchaseOrderNumber: function (paymentData) {
+	                        var poNumber = '';
 
-                        // If the active payment component has a custom placeOrder method (e.g. PayU card, Tpay card, Braintree, etc.)
-                        // we delegate the order placement flow to it, so it can perform custom validation & tokenization.
-                        // Once tokenization succeeds, it calls placeOrderAction, which our mixin intercepts.
-                        if (component && typeof component.placeOrder === 'function') {
-                            return new Promise(function (resolve, reject) {
-                                self.syncResolve = resolve;
-                                self.syncReject = reject;
+	                        if (paymentData) {
+	                            poNumber = paymentData.po_number || '';
+	                            if (!poNumber && paymentData.additional_data) {
+	                                poNumber = paymentData.additional_data.po_number || '';
+	                            }
+	                        }
 
-                                // 1. Run local validation checks before triggering placeOrder
-                                var canProceed = true;
-                                if (typeof component.validate === 'function' && !component.validate()) {
-                                    canProceed = false;
-                                }
-                                if (typeof component.isPlaceOrderActionAllowed === 'function' && !component.isPlaceOrderActionAllowed()) {
-                                    canProceed = false;
-                                }
+	                        if (!poNumber) {
+	                            var poInput = document.querySelector('input[name="payment[po_number]"], #po_number');
+	                            if (poInput) {
+	                                poNumber = poInput.value || '';
+	                            }
+	                        }
 
-                                if (!canProceed) {
-                                    self.syncResolve = null;
-                                    self.syncReject = null;
-                                    reject(new Error('Payment method validation failed'));
-                                    return;
-                                }
+	                        return poNumber;
+	                    },
 
-                                
+	                    getPaymentAdditionalData: function (paymentData) {
+	                        var additionalData = {};
 
-                                // 2. Subscribe to secureFormError if available to catch async errors immediately
-                                var errorSubscription = null;
-                                if (component.secureFormError && typeof component.secureFormError.subscribe === 'function') {
-                                    errorSubscription = component.secureFormError.subscribe(function (newValue) {
-                                        if (newValue && self.syncReject) {
-                                            var rejectFn = self.syncReject;
-                                            self.syncResolve = null;
-                                            self.syncReject = null;
-                                            if (errorSubscription) {
-                                                errorSubscription.dispose();
-                                            }
-                                            rejectFn(new Error(newValue));
-                                        }
-                                    });
-                                }
+	                        if (paymentData && paymentData.additional_data && typeof paymentData.additional_data === 'object') {
+	                            $.extend(additionalData, paymentData.additional_data);
+	                        }
 
-                                try {
-                                    var data = typeof component.getData === 'function' ? component.getData() : { method: getSelectedMethodCode() };
-                                    var result;
-                                    if (component.getCode && component.getCode() === 'braintree') {
-                                        result = component.placeOrder();
-                                    } else {
-                                        result = component.placeOrder(data, new Event('submit'));
-                                    }
-                                    
-                                    // If placeOrder returns false or void, it means it is doing async processing (like tokenize).
-                                    // We set a safety timeout to reset the loading state in Alpine if nothing happens.
-                                    if (result === false || result === undefined) {
-                                        setTimeout(function() {
-                                            if (self.syncResolve) {
-                                                
-                                                self.syncResolve = null;
-                                                self.syncReject = null;
-                                                if (errorSubscription) {
-                                                    errorSubscription.dispose();
-                                                }
-                                                reject(new Error('Validation or tokenization timeout'));
-                                            }
-                                        }, 10000);
-                                    }
-                                } catch (e) {
-                                    if (window.console && typeof window.console.error === 'function') {
-                                        window.console.error('Kkkonrad Fastcheckout: component placeOrder thrown exception:', e);
-                                    }
-                                    self.syncResolve = null;
-                                    self.syncReject = null;
-                                    if (errorSubscription) {
-                                        errorSubscription.dispose();
-                                    }
-                                    reject(e);
-                                }
-                            });
-                        }
+	                        if ((paymentData && paymentData.method === 'purchaseorder') || getSelectedMethodCode() === 'purchaseorder') {
+	                            additionalData.po_number = this.getPurchaseOrderNumber(paymentData);
+	                        }
 
-                        // Default Handling for basic payment methods (cashondelivery, checkmo, etc.)
-                        var paymentData = this.getActivePaymentData(),
-                            additionalData = paymentData.additional_data || {};
+	                        return additionalData;
+	                    },
 
-                        // Extract PO number for purchaseorder
-                        if (paymentData && (paymentData.method === 'purchaseorder' || getSelectedMethodCode() === 'purchaseorder')) {
-                            var poNumber = paymentData.po_number || '';
-                            if (!poNumber) {
-                                var poInput = document.querySelector('input[name="payment[po_number]"]');
-                                if (poInput) {
-                                    poNumber = poInput.value;
-                                }
-                            }
-                            additionalData.po_number = poNumber;
-                        }
+	                    syncWirePaymentData: function (wire, paymentData) {
+	                        var additionalData = this.getPaymentAdditionalData(paymentData),
+	                            methodCode = paymentData && paymentData.method ? paymentData.method : getSelectedMethodCode(),
+	                            poNumber = methodCode === 'purchaseorder' ? this.getPurchaseOrderNumber(paymentData) : '';
 
-                        return Promise.resolve(wire.set('paymentAdditionalData', additionalData));
-                    },
+	                        return Promise.resolve(wire.set('paymentAdditionalData', additionalData))
+	                            .then(function () {
+	                                if (poNumber && typeof wire.set === 'function') {
+	                                    return wire.set('poNumber', poNumber);
+	                                }
+	                                return true;
+	                            });
+	                    },
 
-                    onPlaceOrderAction: function (paymentData, messageContainer, originalAction) {
-                        var additionalData = paymentData.additional_data || {};
-                        var methodCode = paymentData.method || getSelectedMethodCode();
+	                    syncPaymentData: function (wire) {
+	                        if (!wire || typeof wire.set !== 'function') {
+	                            return Promise.resolve();
+	                        }
 
-                        
+	                        return this.syncWirePaymentData(wire, this.getActivePaymentData());
+	                    },
 
-                        // Sync payment data to Magewire
-                        if (this.syncResolve) {
-                            var resolveFn = this.syncResolve;
-                            var rejectFn = this.syncReject;
-                            this.syncResolve = null;
-                            this.syncReject = null;
+	                    placeOrder: function (wire, selectedMethod) {
+	                        var component,
+	                            paymentData,
+	                            result,
+	                            self = this;
 
-                            try {
-                                this.syncWire.set('paymentAdditionalData', additionalData);
-                                
-                                resolveFn(true);
-                            } catch (err) {
-                                if (window.console && typeof window.console.error === 'function') {
-                                    window.console.error('Kkkonrad Fastcheckout: failed to set paymentAdditionalData:', err);
-                                }
-                                rejectFn(err);
-                            }
-                        } else {
-                            // Fallback if triggered outside handleSubmit Promise context (e.g. direct SDK placeOrder)
-                            var wire = this.syncWire || (window.Livewire ? window.Livewire.find(document.querySelector('[wire\\:id]').getAttribute('wire:id')) : null);
-                            if (wire) {
-                                wire.set('paymentAdditionalData', additionalData);
-                                wire.call('placeOrder', methodCode);
-                            }
-                        }
+	                        if (!wire || typeof wire.call !== 'function') {
+	                            return Promise.reject(new Error('Checkout session is not ready'));
+	                        }
 
-                        // Return a dummy jQuery Deferred object to satisfy the Knockout component (preventing errors in done/fail calls)
-                        var deferred = $.Deferred();
-                        return deferred.promise();
-                    },
+	                        if (selectedMethod) {
+	                            setSelectedMethod(selectedMethod);
+	                        }
+
+	                        component = getActiveRenderer();
+	                        paymentData = component && typeof component.getData === 'function'
+	                            ? component.getData()
+	                            : this.getActivePaymentData();
+
+	                        if (!component || typeof component.placeOrder !== 'function') {
+	                            return this.syncPaymentData(wire).then(function () {
+	                                return wire.call('placeOrder', selectedMethod || (paymentData && paymentData.method) || getSelectedMethodCode());
+	                            });
+	                        }
+
+	                        if (typeof component.validate === 'function' && !component.validate()) {
+	                            return Promise.reject(new Error('Payment method validation failed'));
+	                        }
+	                        if (
+	                            typeof component.isPlaceOrderActionAllowed === 'function' &&
+	                            !component.isPlaceOrderActionAllowed()
+	                        ) {
+	                            return Promise.reject(new Error('Payment method is not ready'));
+	                        }
+
+	                        this.cleanupKoOrderState();
+	                        this.syncWire = wire;
+	                        this.koOrderActive = true;
+	                        this.koOrderDeferred = $.Deferred();
+
+	                        return new Promise(function (resolve, reject) {
+	                            self.syncResolve = resolve;
+	                            self.syncReject = reject;
+	                            self.koOrderTimeout = window.setTimeout(function () {
+	                                if (!self.koOrderActive) {
+	                                    return;
+	                                }
+	                                self.cleanupKoOrderState();
+	                                reject(new Error('Payment method did not start order placement'));
+	                            }, 30000);
+
+	                            try {
+	                                if (component.getCode && component.getCode() === 'braintree') {
+	                                    result = component.placeOrder();
+	                                } else {
+	                                    result = component.placeOrder(paymentData, new Event('submit'));
+	                                }
+
+	                                if (result === false) {
+	                                    self.cleanupKoOrderState();
+	                                    reject(new Error('Payment method validation failed'));
+	                                }
+	                            } catch (e) {
+	                                if (window.console && typeof window.console.error === 'function') {
+	                                    window.console.error('Kkkonrad Fastcheckout: component placeOrder thrown exception:', e);
+	                                }
+	                                self.cleanupKoOrderState();
+	                                reject(e);
+	                            }
+	                        });
+	                    },
+
+	                    onPlaceOrderAction: function (paymentData, messageContainer, originalAction) {
+	                        var methodCode = paymentData.method || getSelectedMethodCode();
+
+	                        if (this.koOrderActive && this.syncWire) {
+	                            try {
+	                                if (this.koOrderTimeout) {
+	                                    window.clearTimeout(this.koOrderTimeout);
+	                                    this.koOrderTimeout = null;
+	                                }
+
+	                                this.syncWirePaymentData(this.syncWire, paymentData)
+	                                    .then(function () {
+	                                        return this.syncWire.call('placeOrder', methodCode);
+	                                    }.bind(this))
+	                                    .then(function () {
+	                                        if (this.syncResolve) {
+	                                            this.syncResolve(true);
+	                                            this.syncResolve = null;
+	                                            this.syncReject = null;
+	                                        }
+	                                    }.bind(this))
+	                                    .catch(function (err) {
+	                                        if (this.koOrderDeferred) {
+	                                            this.koOrderDeferred.reject(err);
+	                                        }
+	                                        if (this.syncReject) {
+	                                            this.syncReject(err);
+	                                        }
+	                                        this.cleanupKoOrderState();
+	                                    }.bind(this));
+	                            } catch (err) {
+	                                if (this.koOrderDeferred) {
+	                                    this.koOrderDeferred.reject(err);
+	                                }
+	                                if (this.syncReject) {
+	                                    this.syncReject(err);
+	                                }
+	                                this.cleanupKoOrderState();
+	                            }
+
+	                            return this.koOrderDeferred ? this.koOrderDeferred.promise() : $.Deferred().promise();
+	                        }
+
+	                        // Fallback if a gateway calls placeOrderAction outside the Tailwind submit button flow.
+	                        var wire = this.syncWire || (window.Livewire ? window.Livewire.find(document.querySelector('[wire\\:id]').getAttribute('wire:id')) : null);
+	                        if (wire) {
+	                            this.syncWirePaymentData(wire, paymentData).then(function () {
+	                                wire.call('placeOrder', methodCode);
+	                            });
+	                        }
+
+	                        return $.Deferred().promise();
+	                    },
+
+	                    handleOrderPlaced: function (detail) {
+	                        var deferred = this.koOrderDeferred;
+
+	                        if (detail && detail.redirectUrl) {
+	                            this.cleanupKoOrderState();
+	                            window.location.replace(detail.redirectUrl);
+	                            return true;
+	                        }
+
+	                        if (deferred) {
+	                            this.cleanupKoOrderState();
+	                            deferred.resolve();
+	                            return true;
+	                        }
+
+	                        return false;
+	                    },
 
                     validate: function () {
                         var component = getActiveRenderer();

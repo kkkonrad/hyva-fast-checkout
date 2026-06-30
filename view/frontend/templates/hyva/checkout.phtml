@@ -1097,10 +1097,10 @@ function initCheckout() {
                 this.isProcessing = true;
                 document.body.classList.add('checkout-submitting');
 
-                if (paymentBridge && typeof paymentBridge.syncPaymentData === 'function') {
-                    Promise.resolve(paymentBridge.syncPaymentData(this.$wire))
+                if (paymentBridge && typeof paymentBridge.placeOrder === 'function') {
+                    Promise.resolve(paymentBridge.placeOrder(this.$wire, selectedMethod))
                         .then(() => {
-                            this.$wire.call('placeOrder', selectedMethod);
+                            // KO initiated the order flow. The page will redirect when Magento/Magewire confirms success.
                         })
                         .catch((err) => {
                             this.isProcessing = false;
@@ -1347,6 +1347,13 @@ window.addEventListener('alpine:init', () => Alpine.data('initCheckout', initChe
             if (wire) restore(wire);
             window.addEventListener('magewire:order-placed', function (event) {
                 clearStorage();
+                if (
+                    window.fastcheckoutHyvaPayment &&
+                    typeof window.fastcheckoutHyvaPayment.handleOrderPlaced === 'function' &&
+                    window.fastcheckoutHyvaPayment.handleOrderPlaced(event.detail || {})
+                ) {
+                    return;
+                }
                 if (event.detail && event.detail.redirectUrl) {
                     window.location.replace(event.detail.redirectUrl);
                     return;
