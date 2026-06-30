@@ -1780,6 +1780,56 @@ define([
                     }
                 }
 
+                function getShippingMethodCode(shippingMethod) {
+                    if (!shippingMethod) {
+                        return '';
+                    }
+                    if (typeof shippingMethod === 'string') {
+                        return shippingMethod;
+                    }
+                    if (shippingMethod.carrier_code && shippingMethod.method_code) {
+                        return shippingMethod.carrier_code + '_' + shippingMethod.method_code;
+                    }
+                    if (shippingMethod.carrierCode && shippingMethod.methodCode) {
+                        return shippingMethod.carrierCode + '_' + shippingMethod.methodCode;
+                    }
+                    if (shippingMethod.method) {
+                        return shippingMethod.method;
+                    }
+
+                    return '';
+                }
+
+                function syncShippingMethodToMagewireNow(methodCode) {
+                    var wire,
+                        currentMethod;
+
+                    persistShippingMethodToCheckoutData(methodCode);
+
+                    if (magewireShippingMethodSyncTimer) {
+                        window.clearTimeout(magewireShippingMethodSyncTimer);
+                        magewireShippingMethodSyncTimer = null;
+                    }
+
+                    if (!methodCode) {
+                        return Promise.resolve(false);
+                    }
+
+                    wire = getMagewireComponent();
+                    if (!wire || typeof wire.call !== 'function') {
+                        return Promise.resolve(false);
+                    }
+
+                    currentMethod = getProperty(wire, 'shippingMethod');
+                    lastMagewireShippingMethodCode = methodCode;
+
+                    if (currentMethod === methodCode) {
+                        return Promise.resolve(true);
+                    }
+
+                    return Promise.resolve(wire.call('selectShippingMethod', methodCode));
+                }
+
                 function syncShippingMethodToMagewire(methodCode) {
                     persistShippingMethodToCheckoutData(methodCode);
 
@@ -1810,6 +1860,66 @@ define([
                             wire.call('selectShippingMethod', methodCode);
                         }
                     }, 0);
+                }
+
+                function buildShippingInformationResponse(payload) {
+                    payload = payload && typeof payload === 'object' ? payload : {};
+
+                    return {
+                        totals: payload.totals || (quote && typeof quote.totals === 'function' ? quote.totals() : {}),
+                        payment_methods: Array.isArray(payload.payment_methods) ? payload.payment_methods : []
+                    };
+                }
+
+                function resolveShippingInformationAction(originalAction) {
+                    var wire = getMagewireComponent(),
+                        selectedMethod = quote && typeof quote.shippingMethod === 'function' ? quote.shippingMethod() : null,
+                        methodCode = getShippingMethodCode(selectedMethod),
+                        deferred = $.Deferred();
+
+                    if (!wire || typeof wire.call !== 'function') {
+                        return originalAction();
+                    }
+
+                    if (!methodCode) {
+                        return originalAction();
+                    }
+
+                    if (fullScreenLoader && typeof fullScreenLoader.startLoader === 'function') {
+                        fullScreenLoader.startLoader();
+                    }
+                    if (shippingService && shippingService.isLoading && typeof shippingService.isLoading === 'function') {
+                        shippingService.isLoading(true);
+                    }
+
+                    syncShippingMethodToMagewireNow(methodCode)
+                        .then(function () {
+                            return refreshCheckoutStateFromMagewire();
+                        })
+                        .then(function (payload) {
+                            var response = buildShippingInformationResponse(payload);
+
+                            if (shippingService && shippingService.isLoading && typeof shippingService.isLoading === 'function') {
+                                shippingService.isLoading(false);
+                            }
+                            if (fullScreenLoader && typeof fullScreenLoader.stopLoader === 'function') {
+                                fullScreenLoader.stopLoader();
+                            }
+
+                            deferred.resolve(response);
+                        })
+                        .catch(function (error) {
+                            if (shippingService && shippingService.isLoading && typeof shippingService.isLoading === 'function') {
+                                shippingService.isLoading(false);
+                            }
+                            if (fullScreenLoader && typeof fullScreenLoader.stopLoader === 'function') {
+                                fullScreenLoader.stopLoader();
+                            }
+                            handlePaymentError(error, getBridgeMessageContainer());
+                            deferred.reject(error);
+                        });
+
+                    return deferred.promise();
                 }
 
                 function getPaymentMethodCode(paymentMethod) {
@@ -1930,6 +2040,12 @@ define([
                     syncAddress: syncAddressToKnockout,
                     syncShippingMethod: syncSelectedShippingMethodToKnockout,
                     syncShippingMethodToMagewire: syncShippingMethodToMagewire,
+                    onSelectShippingMethodAction: function (shippingMethod) {
+                        syncShippingMethodToMagewire(getShippingMethodCode(shippingMethod));
+                    },
+                    onSetShippingInformationAction: function (originalAction) {
+                        return resolveShippingInformationAction(originalAction);
+                    },
                     onRecollectShippingRatesAction: function (originalAction) {
                         if (!getMagewireComponent()) {
                             return originalAction();
