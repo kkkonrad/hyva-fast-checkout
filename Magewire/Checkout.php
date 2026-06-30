@@ -76,6 +76,8 @@ class Checkout extends Component
     public $paymentMethod = '';
     public $paymentAdditionalData = [];
     public $paymentExtensionAttributes = [];
+    public $placeOrderRequestHeaders = [];
+    public $placeOrderRequestData = [];
     public $poNumber = '';
     public $couponCode = '';
     public $subscribe = false;

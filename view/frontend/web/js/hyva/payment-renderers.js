@@ -65,6 +65,7 @@ define([
             'Magento_Ui/js/model/messageList',
             'Magento_Checkout/js/model/error-processor',
             'Magento_Checkout/js/model/full-screen-loader',
+            'Magento_Checkout/js/model/payment/place-order-hooks',
             'mage/translate'
         ], function (
             app,
@@ -88,6 +89,7 @@ define([
             globalMessageList,
             errorProcessor,
             fullScreenLoader,
+            placeOrderHooks,
             $t
         ) {
             if (quote && quote.billingAddress) {
@@ -2234,6 +2236,99 @@ define([
 
                 loadOptionalValidationComponents();
 
+                function runPlaceOrderRequestModifiers(paymentData, includeBillingAddress) {
+                    var headers = {},
+                        payload = {
+                            cartId: quote && typeof quote.getQuoteId === 'function' ? quote.getQuoteId() : null,
+                            paymentMethod: paymentData || {}
+                        };
+
+                    if (includeBillingAddress === true && quote && typeof quote.billingAddress === 'function') {
+                        payload.billingAddress = quote.billingAddress();
+                    }
+                    if (quote && quote.guestEmail) {
+                        payload.email = quote.guestEmail;
+                    }
+
+                    if (placeOrderHooks && Array.isArray(placeOrderHooks.requestModifiers)) {
+                        placeOrderHooks.requestModifiers.forEach(function (modifier) {
+                            if (typeof modifier === 'function') {
+                                modifier(headers, payload);
+                            }
+                        });
+                    }
+
+                    return {
+                        headers: headers,
+                        payload: payload,
+                        paymentData: payload.paymentMethod || paymentData || {}
+                    };
+                }
+
+                function runPlaceOrderAfterRequestListeners() {
+                    if (!placeOrderHooks || !Array.isArray(placeOrderHooks.afterRequestListeners)) {
+                        return;
+                    }
+
+                    placeOrderHooks.afterRequestListeners.forEach(function (listener) {
+                        if (typeof listener === 'function') {
+                            try {
+                                listener();
+                            } catch (e) {
+                                if (window.console && typeof window.console.warn === 'function') {
+                                    window.console.warn('Kkkonrad Fastcheckout: place-order after request listener failed.', e);
+                                }
+                            }
+                        }
+                    });
+                }
+
+                function sanitizeHookPayload(value, depth) {
+                    var result;
+
+                    depth = depth || 0;
+                    if (depth > 6 || value === null || typeof value === 'undefined') {
+                        return value === undefined ? null : value;
+                    }
+                    if (typeof value === 'function') {
+                        return null;
+                    }
+                    if (typeof value !== 'object') {
+                        return value;
+                    }
+                    if (Array.isArray(value)) {
+                        return value.map(function (item) {
+                            return sanitizeHookPayload(item, depth + 1);
+                        });
+                    }
+                    if (value.nodeType || value.window === value) {
+                        return null;
+                    }
+
+                    result = {};
+                    Object.keys(value).forEach(function (key) {
+                        if (key === '__disableTmpl') {
+                            return;
+                        }
+                        result[key] = sanitizeHookPayload(value[key], depth + 1);
+                    });
+
+                    return result;
+                }
+
+                function syncPlaceOrderHookData(wire, hookData) {
+                    if (!wire || typeof wire.set !== 'function') {
+                        return Promise.resolve();
+                    }
+
+                    hookData = hookData || { headers: {}, payload: {} };
+
+                    return Promise.resolve(wire.set('placeOrderRequestHeaders', sanitizeHookPayload(hookData.headers || {})))
+                        .then(function () {
+                            return wire.set('placeOrderRequestData', sanitizeHookPayload(hookData.payload || {}));
+                        });
+                }
+
                 window.fastcheckoutHyvaPayment = {
 	                    getActivePaymentData: function () {
 	                        var component = getActiveRenderer();
@@ -2294,8 +2389,12 @@ define([
 	                        return additionalData;
 	                    },
 
-	                    syncWirePaymentData: function (wire, paymentData) {
-                            paymentData = applyPaymentDataAssigners(paymentData || this.getActivePaymentData());
+	                    syncWirePaymentData: function (wire, paymentData, hookData) {
+                            hookData = hookData || runPlaceOrderRequestModifiers(
+                                applyPaymentDataAssigners(paymentData || this.getActivePaymentData()),
+                                true
+                            );
+                            paymentData = applyPaymentDataAssigners(hookData.paymentData || paymentData || this.getActivePaymentData());
 
 	                        var additionalData = this.getPaymentAdditionalData(paymentData),
                                 extensionAttributes = paymentData && paymentData.extension_attributes ? paymentData.extension_attributes : {},
@@ -2314,6 +2413,9 @@ define([
 	                                    return wire.set('poNumber', poNumber);
 	                                }
 	                                return true;
+	                            })
+                                .then(function () {
+                                    return syncPlaceOrderHookData(wire, hookData);
 	                            });
 	                    },
 
@@ -2343,7 +2445,8 @@ define([
                         onSetPaymentInformationAction: function (messageContainer, paymentData, skipBilling, originalAction) {
                             var wire = getMagewireComponent(),
                                 self = this,
-                                methodCode = paymentData && paymentData.method ? paymentData.method : getSelectedMethodCode();
+                                methodCode = paymentData && paymentData.method ? paymentData.method : getSelectedMethodCode(),
+                                hookData;
 
                             messageContainer = subscribePaymentMessageContainer(messageContainer) || getBridgeMessageContainer();
 
@@ -2358,7 +2461,11 @@ define([
                                             checkoutTotals.isLoading(true);
                                         }
                                         syncCheckoutStateWithoutServer(wire);
-                                        self.syncWirePaymentData(wire, paymentData || self.getActivePaymentData())
+                                        hookData = runPlaceOrderRequestModifiers(
+                                            applyPaymentDataAssigners(paymentData || self.getActivePaymentData()),
+                                            skipBilling === false
+                                        );
+                                        self.syncWirePaymentData(wire, paymentData || self.getActivePaymentData(), hookData)
                                             .then(function () {
                                                 if (methodCode && typeof wire.call === 'function') {
                                                     return wire.call('selectPaymentMethod', methodCode);
@@ -2367,10 +2474,15 @@ define([
                                             })
                                             .then(function () {
                                                 syncQuoteTotalsFromDom();
+                                                runPlaceOrderAfterRequestListeners();
                                                 resolve(true);
                                             })
-                                            .catch(reject);
+                                            .catch(function (error) {
+                                                runPlaceOrderAfterRequestListeners();
+                                                reject(error);
+                                            });
                                     } catch (error) {
+                                        runPlaceOrderAfterRequestListeners();
                                         reject(error);
                                     }
                                 }),
@@ -2426,7 +2538,11 @@ define([
                                     }
 	                                return this.syncPaymentData(wire).then(function () {
 	                                    return wire.call('placeOrder', selectedMethod || (paymentData && paymentData.method) || getSelectedMethodCode());
+	                                }).then(function (result) {
+                                        runPlaceOrderAfterRequestListeners();
+                                        return result;
 	                                }).catch(function (err) {
+                                        runPlaceOrderAfterRequestListeners();
                                         handlePaymentError(err, getBridgeMessageContainer());
                                         throw err;
 	                                });
@@ -2490,7 +2606,8 @@ define([
 	                    },
 
 	                    onPlaceOrderAction: function (paymentData, messageContainer, originalAction) {
-	                        var methodCode = paymentData.method || getSelectedMethodCode();
+	                        var methodCode = paymentData && paymentData.method ? paymentData.method : getSelectedMethodCode(),
+                                hookData = runPlaceOrderRequestModifiers(paymentData || this.getActivePaymentData(), true);
                             messageContainer = subscribePaymentMessageContainer(messageContainer) || getBridgeMessageContainer();
 
 	                        if (this.koOrderActive && this.syncWire) {
@@ -2500,11 +2617,12 @@ define([
 	                                    this.koOrderTimeout = null;
 	                                }
 
-	                                this.syncWirePaymentData(this.syncWire, paymentData)
+	                                this.syncWirePaymentData(this.syncWire, paymentData, hookData)
 	                                    .then(function () {
 	                                        return this.syncWire.call('placeOrder', methodCode);
 	                                    }.bind(this))
 	                                    .then(function () {
+                                            runPlaceOrderAfterRequestListeners();
 	                                        if (this.syncResolve) {
 	                                            this.syncResolve(true);
 	                                            this.syncResolve = null;
@@ -2512,6 +2630,7 @@ define([
 	                                        }
 	                                    }.bind(this))
 	                                    .catch(function (err) {
+                                            runPlaceOrderAfterRequestListeners();
                                             handlePaymentError(err, messageContainer);
 	                                        if (this.koOrderDeferred) {
 	                                            this.koOrderDeferred.reject(err);
@@ -2522,6 +2641,7 @@ define([
 	                                        this.cleanupKoOrderState();
 	                                    }.bind(this));
 	                            } catch (err) {
+                                    runPlaceOrderAfterRequestListeners();
                                     handlePaymentError(err, messageContainer);
 	                                if (this.koOrderDeferred) {
 	                                    this.koOrderDeferred.reject(err);
@@ -2538,9 +2658,12 @@ define([
 	                        // Fallback if a gateway calls placeOrderAction outside the Tailwind submit button flow.
 	                        var wire = this.syncWire || (window.Livewire ? window.Livewire.find(document.querySelector('[wire\\:id]').getAttribute('wire:id')) : null);
 	                        if (wire) {
-	                            this.syncWirePaymentData(wire, paymentData).then(function () {
+	                            this.syncWirePaymentData(wire, paymentData, hookData).then(function () {
 	                                wire.call('placeOrder', methodCode);
+	                            }).then(function () {
+                                    runPlaceOrderAfterRequestListeners();
 	                            }).catch(function (err) {
+                                    runPlaceOrderAfterRequestListeners();
                                     handlePaymentError(err, messageContainer);
 	                            });
 	                        }
