@@ -918,6 +918,9 @@ function initCheckout() {
             window.addEventListener('fastcheckout:payment-error', (event) => {
                 this.onPaymentError(event);
             });
+            window.addEventListener('fastcheckout:shipping-error', (event) => {
+                this.onPaymentError(event);
+            });
 
             this.$nextTick(() => {
                 if (window.fastcheckoutHyvaShipping && typeof window.fastcheckoutHyvaShipping.syncAddress === 'function') {

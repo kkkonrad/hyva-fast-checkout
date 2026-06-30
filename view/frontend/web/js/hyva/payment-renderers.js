@@ -363,7 +363,106 @@ define([
                 return provider;
             }
 
+            function createShippingAddressComponentFallback() {
+                var component = {
+                    name: 'fastcheckout.shippingAddress',
+                    index: 'shippingAddress',
+                    isFormInline: true,
+                    source: getCheckoutProvider(),
+                    errorValidationMessage: function (message) {
+                        if (arguments.length) {
+                            component.errorMessage = message || false;
+                            if (message && typeof document !== 'undefined') {
+                                document.dispatchEvent(new CustomEvent('fastcheckout:shipping-error', {
+                                    detail: {
+                                        message: message
+                                    }
+                                }));
+                            }
+                        }
+
+                        return component.errorMessage || false;
+                    },
+                    validateShippingInformation: function () {
+                        var provider = getCheckoutProvider(),
+                            isValid = true;
+
+                        if (provider && typeof provider.set === 'function') {
+                            provider.set('params.invalid', false);
+                        }
+
+                        if (!quote.isVirtual || !quote.isVirtual()) {
+                            if (!quote.shippingMethod || !quote.shippingMethod()) {
+                                this.errorValidationMessage($t('The shipping method is missing. Select the shipping method and try again.'));
+                                if (provider && typeof provider.set === 'function') {
+                                    provider.set('params.invalid', true);
+                                }
+                                return false;
+                            }
+                        }
+
+                        if (
+                            window.fastcheckoutHyvaShipping &&
+                            typeof window.fastcheckoutHyvaShipping.validate === 'function'
+                        ) {
+                            isValid = window.fastcheckoutHyvaShipping.validate();
+                        }
+
+                        if (!isValid && provider && typeof provider.set === 'function') {
+                            provider.set('params.invalid', true);
+                        }
+
+                        return isValid && !(provider && provider.get && provider.get('params.invalid'));
+                    },
+                    triggerShippingDataValidateEvent: function () {
+                        var provider = getCheckoutProvider();
+
+                        if (provider && typeof provider.trigger === 'function') {
+                            provider.trigger('shippingAddress.data.validate');
+                        }
+                    },
+                    focusInvalid: function () {
+                        var invalid = document.querySelector('#co-checkout-form [aria-invalid="true"], #co-checkout-form .mage-error, #co-checkout-form .field-error');
+
+                        if (invalid) {
+                            invalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                    },
+                    setShippingInformation: function () {
+                        return this.validateShippingInformation();
+                    }
+                };
+
+                component.errorMessage = false;
+
+                return component;
+            }
+
+            function getShippingAddressComponent() {
+                var component;
+
+                try {
+                    component = registry.get('index = shippingAddress');
+                } catch (e) {
+                    component = null;
+                }
+
+                if (!component) {
+                    component = createShippingAddressComponentFallback();
+                    try {
+                        registry.set('fastcheckout.shippingAddress', component);
+                    } catch (e) {
+                        if (window.console && typeof window.console.warn === 'function') {
+                            window.console.warn('Kkkonrad Fastcheckout: could not register fallback shippingAddress component.', e);
+                        }
+                    }
+                }
+
+                return component;
+            }
+
             getCheckoutProvider();
+            getShippingAddressComponent();
 
             function loadRendererComponents(done) {
                 var remaining = rendererComponents.length;
