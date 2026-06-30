@@ -1,0 +1,124 @@
+# Szczegółowa Dokumentacja Integracji KO (Knockout.js Bridge)
+
+Most integracyjny KO (Knockout.js) w module **Fastcheckout** to zaawansowany system uruchamiający izolowane, kompatybilne środowisko Knockout.js i RequireJS wewnątrz sklepu opartego na szablonie **Hyvä**. Pozwala on na uruchomienie tradycyjnych wtyczek płatności bez konieczności przepisywania ich na Alpine.js.
+
+---
+
+## 1. Wykrywanie i Generowanie Zasobów RequireJS
+
+Most opiera się na bibliotece RequireJS. W środowisku Hyvä tradycyjne pliki JS koszyka nie są ładowane. Moduł dynamicznie dba o to, by zasoby te były dostępne:
+- **[Model/Hyva/RequireJsAssets.php](file:///var/www/html/app/code/Kkkonrad/Fastcheckout/Model/Hyva/RequireJsAssets.php)**: 
+  Metoda `ensure($storeId)` sprawdza w katalogu plików statycznych (`pub/static`) obecność dwóch kluczowych plików:
+  1. `requirejs/require.js` – plik silnika RequireJS.
+  2. `requirejs-config.js` – scalona konfiguracja mapowania modułów RequireJS.
+  Jeśli plików brakuje, są one kompilowane i publikowane w locie za pomocą publishera zasobów. Działanie to można włączyć/wyłączyć w konfiguracji sklepu pod ścieżką `fastcheckout/hyva/auto_generate_requirejs_assets`.
+
+---
+
+## 2. Inicjalizacja Mostu na Frontendzie (`payment-renderers.phtml`)
+
+Szablon [payment-renderers.phtml](file:///var/www/html/app/code/Kkkonrad/Fastcheckout/view/frontend/templates/hyva/knockout/payment-renderers.phtml) wstrzykuje izolowany kontener KO i zarządza kolejnością ładowania skryptów:
+
+### A. Bezpieczny Getter/Setter dla `window.checkoutConfig`
+Zewnętrzne wtyczki (np. PayPal Braintree) często próbują nadpisać cały obiekt `window.checkoutConfig`. Aby temu zapobiec, w szablonie zaimplementowano mechanizm `Object.defineProperty`:
+```javascript
+Object.defineProperty(window, 'checkoutConfig', {
+    get: function() { return actualConfig; },
+    set: function(newConfig) {
+        if (newConfig && typeof newConfig === 'object') {
+            actualConfig = Object.assign(actualConfig, newConfig);
+        } else {
+            actualConfig = newConfig;
+        }
+        if (actualConfig && typeof actualConfig === 'object') {
+            actualConfig.payment = initPaymentProxy(actualConfig.payment);
+        }
+    },
+    configurable: true,
+    enumerable: true
+});
+```
+
+### B. JavaScript Proxy zapobiegające błędom braku kluczy
+Funkcja `initPaymentProxy` opakowuje konfigurację płatności w obiekt `Proxy`:
+```javascript
+var initPaymentProxy = function(paymentObj) {
+    paymentObj = paymentObj || {};
+    if (paymentObj.__isProxy) return paymentObj;
+    return new Proxy(paymentObj, {
+        get: function(target, prop) {
+            if (prop === '__isProxy') return true;
+            if (prop === '__raw__') return target;
+            if (typeof prop === 'string' && !(prop in target)) {
+                target[prop] = {}; // Automatycznie twórz pusty obiekt, jeśli klucz nie istnieje
+            }
+            return target[prop];
+        }
+    });
+};
+```
+Dzięki temu odczyt głęboko zagnieżdżonych i niezdefiniowanych kluczy (np. `checkoutConfig.payment.stripe_payments.cc_fields`) nie kończy się krytycznym błędem w konsoli.
+
+### C. Opóźniona inicjalizacja
+Skrypt nasłuchuje zdarzeń `magewire:available` lub `livewire:available`. Dopiero po załadowaniu backendu asynchronicznego, wczytywana jest biblioteka `require.js`, a następnie konfiguracja mixinów i główny inicjalizator renderera płatności.
+
+---
+
+## 3. Emulacja środowiska KO w `payment-renderers.js`
+
+Główny plik JS mostu ([payment-renderers.js](file:///var/www/html/app/code/Kkkonrad/Fastcheckout/view/frontend/web/js/hyva/payment-renderers.js)) dostarcza atrapy (mocki) brakujących obiektów i rejestrów Magento:
+
+- **Atrapy Adresów koszyka (Quote Addresses)**: 
+  Moduły płatności KO wywołują na adresach metodę `.getCacheKey()`. Most podmienia obiekty `quote.billingAddress` oraz `quote.shippingAddress` tak, by zwracały statyczny klucz i implementowały subskrypcje KO:
+  ```javascript
+  currentBilling.getCacheKey = function () { return 'billing-address-placeholder'; };
+  ```
+- **Fallback dla `checkoutProvider`**:
+  Funkcja `createCheckoutProviderFallback()` tworzy obiekt emulujący standardowy provider danych Magento (zarządza nasłuchiwaniem zdarzeń `.on()`, wyzwalaniem `.trigger()`, pobieraniem danych `.get()` oraz słownikami krajów).
+- **Atrapa komponentu `shippingAddress`**:
+  Tworzy obiekt `fastcheckout.shippingAddress` i rejestruje go w `uiRegistry`. Dostarcza on metody walidacji `validateShippingInformation()` oraz komunikaty o błędach.
+- **Komunikaty o błędach (Messages & MessageList)**:
+  Większość modułów KO raportuje błędy do globalnego obiektu `messageList`. Most subskrybuje te listy błędów:
+  ```javascript
+  messageContainer.errorMessages.subscribe(function (messages) {
+      if (messages && messages.length) {
+          dispatchPaymentMessage('error', messages[messages.length - 1]);
+      }
+  });
+  ```
+  Zdarzenie to jest następnie konwertowane na natywny event JS `fastcheckout:payment-error`, który przechwytuje Alpine.js i wyświetla błąd w głównym widoku koszyka Hyvä.
+
+---
+
+## 4. Mixiny RequireJS (Przechwytywanie Przepływu)
+
+W pliku [requirejs-config.js](file:///var/www/html/app/code/Kkkonrad/Fastcheckout/view/frontend/requirejs-config.js) zadeklarowano mixiny dla standardowych akcji koszyka Magento:
+
+| Nazwa Mixinu | Targetowany komponent KO | Opis i Rola w Moście |
+| :--- | :--- | :--- |
+| `checkout-data-mixin` | `Magento_Checkout/js/checkout-data` | Dodaje obsługę metod zapisu i odczytu punktów Paczkomatów InPost w `localStorage`. |
+| `select-billing-address-mixin` | `Magento_Checkout/js/action/select-billing-address` | Przekazuje informację o wyborze adresu rozliczeniowego do mostu Alpine.js. |
+| `select-payment-method-mixin` | `Magento_Checkout/js/action/select-payment-method` | Synchronizuje stan wybranej metody płatności z Magewire. |
+| `place-order-mixin` | `Magento_Checkout/js/action/place-order` | Interceptuje składanie zamówienia w KO i przekazuje je do obsługi przez Magewire. |
+| `set-payment-information-mixin` | `Magento_Checkout/js/action/set-payment-information` | Przechwytuje zapis danych płatności w KO i kieruje je do Magewire. |
+| `set-payment-information-extended-mixin` | `Magento_Checkout/js/action/set-payment-information-extended` | Rozszerzona wersja zapisu danych płatności KO zintegrowana z Magewire. |
+| `set-billing-address-mixin` | `Magento_Checkout/js/action/set-billing-address` | Przechwytuje akcję zapisu adresu rozliczeniowego i przesyła go do Magewire. |
+| `get-payment-information-mixin` | `Magento_Checkout/js/action/get-payment-information` | Blokuje standardowe zapytania REST pobierania płatności KO i pobiera dane z Magewire. |
+| `get-totals-mixin` | `Magento_Checkout/js/action/get-totals` | Przekierowuje zapytania o podsumowanie koszyka z KO do Magewire. |
+| `recollect-shipping-rates-mixin` | `Magento_Checkout/js/action/recollect-shipping-rates` | Wywołuje asynchroniczne przeliczenie kurierów w Magewire zamiast zapytań REST KO. |
+
+---
+
+## 5. Integracja z Braintree (`braintree-adapter-mixin.js`)
+
+Plik [braintree-adapter-mixin.js](file:///var/www/html/app/code/Kkkonrad/Fastcheckout/view/frontend/web/js/mixin/braintree-adapter-mixin.js) opakowuje metodę `tokenizeHostedFields` oficjalnego modułu `PayPal_Braintree`.
+
+W przypadku wystąpienia błędów walidacji (np. puste pola karty kredytowej lub nieprawidłowy kod CVV), mixin wykonuje:
+1. **Wizualne podświetlenie błędów**:
+   Mapuje klucze Braintree (`number`, `expirationDate`, `cvv`) na identyfikatory pól w DOM (`braintree_cc_number`, `braintree_expirationDate`, `braintree_cc_cid`) i dodaje klasę CSS `.braintree-hosted-fields-invalid`, nadając im czerwoną ramkę.
+2. **Tłumaczenie komunikatów**:
+   Podmienia standardowe, surowe błędy API Braintree na przyjazne komunikaty w języku polskim:
+   - `HOSTED_FIELDS_FIELDS_EMPTY` -> *"Proszę wypełnić wszystkie pola karty kredytowej."*
+   - `HOSTED_FIELDS_FIELDS_INVALID` -> *"Niektóre pola karty kredytowej są niepoprawne. Sprawdź wpisane dane."*
+3. **Odblokowanie formularza**:
+   Wywołuje metodę odrzucenia obietnicy w moście (`window.fastcheckoutHyvaPayment.syncReject`), co informuje komponent Alpine.js o konieczności zatrzymania spinnera i odblokowania przycisku składania zamówienia na stronie.

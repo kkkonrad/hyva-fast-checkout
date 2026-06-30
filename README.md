@@ -1,62 +1,113 @@
 # Kkkonrad Fastcheckout
 
-Fastcheckout is a Magento 2 checkout customization module designed to improve the one-page checkout experience, especially for Hyva/Magewire-based storefronts.
+**Fastcheckout** to zaawansowany moduł optymalizacji i dostosowywania koszyka zakupowego (One-Page Checkout) dedykowany dla platformy Magento 2 ze szczególnym uwzględnieniem szablonów **Hyvä Themes** oraz technologii **Magewire**. 
 
-## What it does
+Moduł ten zapewnia wyjątkową szybkość działania, przejrzysty 3-kolumnowy układ graficzny dostosowany do urządzeń mobilnych oraz autorską technologię mostu kompatybilności (KO Bridge), która pozwala uruchamiać tradycyjne bramki płatności i wysyłki napisane w Knockout.js i RequireJS.
 
-- Provides a more flexible checkout flow with custom shipping and payment handling.
-- Supports configurable shipping/payment method visibility and mapping.
-- Adds safeguards around address validation and payment additional information.
-- Improves resilience during order placement with idempotency and better error handling.
+---
 
-## Main features
+## Główne Funkcje i Możliwości
 
-- Configurable checkout title and visibility options.
-- Optional restriction of payment methods by configuration.
-- Shipping/payment method mapping rules.
-- Support for gift messages and newsletter subscription toggles.
-- Defensive plugins for address validation and payment info storage.
+### 🚀 Wydajność i Kompatybilność Hybrydowa
+- **Most kompatybilności Knockout.js (KO Bridge)**: Umożliwia integrację i renderowanie płatności opartych na Knockout.js w ekosystemie szablonu Hyvä (który domyślnie korzysta z Alpine.js i Magewire).
+- **Zabezpieczenie CSP (Content Security Policy)**: Pełna kompatybilność z mechanizmem CSP w Hyvä dzięki rejestracji skryptów inline za pomocą interfejsu `HyvaCsp`.
+- **Integracja Tailwind CSS**: Wbudowany obserwator integruje ścieżkę modułu z kompilatorem Tailwind w szablonie Hyvä.
 
-## Installation
+### 📦 Elastyczna Konfiguracja i Logika Biznesowa
+- **Dynamiczne mapowanie metod dostawy i płatności**: Możliwość sztywnego przypisania metod płatności do wybranych metod dostawy (np. pobranie tylko przy wysyłce kurierskiej).
+- **Automatyczne przypisywanie zamówienia do konta klienta**: Jeśli klient składa zamówienie jako gość, ale podany e-mail pasuje do istniejącego konta, moduł automatycznie przypisze zamówienie do tego konta.
+- **Dodatkowe pola koszyka**:
+  - Komentarz do zamówienia (zapisywany w historii zamówienia).
+  - Newsletter (checkbox zapisu do newslettera).
+  - Wiadomość prezentowa (Gift Message) dla całego zamówienia.
 
-1. Copy the module into your Magento installation under app/code/Kkkonrad/Fastcheckout.
-2. Enable the module:
-   - `php bin/magento module:enable Kkkonrad_Fastcheckout`
-3. Run setup upgrades:
-   - `php bin/magento setup:upgrade`
-4. Clear caches:
-   - `php bin/magento cache:flush`
+### 🛡️ Bezpieczeństwo i Niezawodność
+- **Zabezpieczenie przed podwójnym kliknięciem (Idempotency)**: Generowanie unikalnego klucza w sesji zapobiega złożeniu dwóch takich samych zamówień (np. w przypadku wolnego łącza internetowego).
+- **Bezpieczny fallback adresów**: Wbudowane pluginy naprawiające walidację regionów w adresach oraz błędy Magento przy walidacji brakujących pól adresowych u gości.
+- **Odporność na błędy serializacji**: Przechwytywanie i odrzucanie obiektowych parametrów płatności w bazie w celu uniknięcia krytycznych błędów zapisu Quote.
 
-## Configuration
+---
 
-The module exposes its settings in Stores > Configuration > Sales > Checkout > Fastcheckout.
+## Struktura Modułu i Główne Pliki
 
-Useful settings include:
+```
+Kkkonrad/Fastcheckout/
+├── Block/                          # Klasy bloków widoku (Hyva Checkout i konfiguracja mapowania)
+├── Controller/                     # Kontroler obsługujący trasę /fast-checkout
+├── Helper/                         # Helpery konfiguracyjne i pomocnicze koszyka
+├── Magewire/                       # Komponent Magewire (backendowy stan checkoutu)
+├── Model/                          # Logika modeli (generowanie zasobów RequireJS, źródła configu)
+├── Observer/                       # Obserwatory zdarzeń (Tailwind compilation, przypisanie konta, komentarze)
+├── Plugin/                         # Wtyczki kompatybilności (czyszczenie lockerów InPost, poprawki walidacji)
+├── Test/Unit/                      # Zestaw testów jednostkowych
+├── etc/                            # Konfiguracja modułu (di.xml, routes.xml, system.xml, config.xml)
+├── view/                           # Widok: szablony phtml, zasoby js/css, pliki układu layout XML
+└── README.md                       # Główny plik dokumentacji modułu
+```
 
-- General enable/disable switch.
-- Title and checkout visibility options.
-- Default shipping and payment methods.
-- Shipping/payment method mapping.
-- Payment restrictions.
+---
 
-## Logging
+## Instalacja i Aktywacja
 
-The module logs important checkout events through Magento's PSR-3 logger. Typical events include:
+Moduł powinien zostać zainstalowany w strukturze katalogów Magento 2 pod ścieżką: `app/code/Kkkonrad/Fastcheckout`.
 
-- Order placement start and success/failure.
-- Address validation edge cases.
-- Payment method selection and validation issues.
-- Session/idempotency handling failures.
+### Procedura Krok po Kroku:
 
-## Testing
+1. Włącz moduł w konfiguracji Magento:
+   ```bash
+   php bin/magento module:enable Kkkonrad_Fastcheckout
+   ```
+2. Wykonaj aktualizację struktury bazy danych i konfiguracji:
+   ```bash
+   php bin/magento setup:upgrade
+   ```
+3. Uruchom kompilację DI (Dependency Injection):
+   ```bash
+   php bin/magento setup:di:compile
+   ```
+4. Wygeneruj pliki statyczne (jeśli pracujesz w trybie produkcyjnym):
+   ```bash
+   php bin/magento setup:static-content:deploy
+   ```
+5. Wyczyść pamięć podręczną Magento:
+   ```bash
+   php bin/magento cache:flush
+   ```
 
-Unit tests for the helper and Magewire checkout logic are available under the module's Test/Unit folder.
+---
 
-Run:
+## Konfiguracja w Panelu Administracyjnym
 
-- `vendor/bin/phpunit app/code/Kkkonrad/Fastcheckout/Test/Unit/Helper/DataTest.php`
-- `vendor/bin/phpunit app/code/Kkkonrad/Fastcheckout/Test/Unit/Magewire/CheckoutTest.php`
+Wszystkie parametry modułu konfiguruje się w sekcji **Sklepy > Konfiguracja > Sprzedaż > Koszyk > Fastcheckout** (Stores > Configuration > Sales > Checkout > Fastcheckout).
 
-## Notes
+### Najważniejsze grupy ustawień:
+- **General Settings**: Włączenie modułu oraz wybór domyślnej metody płatności i dostawy.
+- **Extended Options**: Zarządzanie widocznością sekcji kuponów rabatowych, komentarzy, zgody na newsletter i wiadomości prezentowej.
+- **Shipping-Payment Method Mapping**: Tabela mapowania określająca, które płatności są dostępne dla poszczególnych kurierów.
+- **RequireJS Auto-Generation**: Automatyczne generowanie plików RequireJS dla motywów Hyvä.
 
-The module is intentionally defensive and should be safe to use even when some payment or address data are incomplete or malformed.
+---
+
+## Testy Jednostkowe
+
+Moduł dostarcza testy jednostkowe weryfikujące poprawność logiki pomocniczej oraz kontroli stanu Magewire. Uruchomienie testów:
+
+```bash
+# Test helpera Data
+vendor/bin/phpunit app/code/Kkkonrad/Fastcheckout/Test/Unit/Helper/DataTest.php
+
+# Test komponentu Magewire Checkout
+vendor/bin/phpunit app/code/Kkkonrad/Fastcheckout/Test/Unit/Magewire/CheckoutTest.php
+
+# Test bloku widoku Checkout
+vendor/bin/phpunit app/code/Kkkonrad/Fastcheckout/Test/Unit/Block/Hyva/CheckoutTest.php
+```
+
+---
+
+## Rozszerzona Dokumentacja Techniczna
+
+W celu szczegółowego zapoznania się z mechanizmami działania zapraszamy do lektury dedykowanych dokumentów:
+
+1. 💻 **[Most Integracyjny Knockout.js (KO Bridge)](file:///var/www/html/app/code/Kkkonrad/Fastcheckout/docs/integracja_ko.md)** – Informacje o tym, jak wstrzykiwane jest środowisko KO, jak działają proxy JS, mixiny oraz specyficzne integracje (np. Braintree).
+2. 🏛️ **[Architektura Systemowa i Przepływ Danych](file:///var/www/html/app/code/Kkkonrad/Fastcheckout/docs/architektura.md)** – Opis cyklu życia koszyka, walidacji pól, synchronizacji formularza Magewire/Alpine, obsługi InPost oraz stabilizacji zapisu bazy danych.
