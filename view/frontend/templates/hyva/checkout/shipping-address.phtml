@@ -1,0 +1,495 @@
+<?php
+/**
+ * Shipping & Billing address container block.
+ *
+ * @var \Kkkonrad\Fastcheckout\Block\Hyva\Checkout $block
+ * @var \Magento\Framework\Escaper $escaper
+ * @var \Kkkonrad\Fastcheckout\Magewire\Checkout $magewire
+ */
+?>
+<!-- Container 1: Shipping & Billing Address -->
+<div class="fc-container-1 space-y-6 min-w-0 w-full">
+<div class="card bg-white p-4 md:p-6 shadow rounded-lg border border-gray-200 relative">
+    <div class="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
+        <h2 class="text-xl font-semibold text-gray-900">
+            <?= $escaper->escapeHtml(__('Shipping Address')) ?>
+        </h2>
+        <div wire:loading wire:target="email,firstname,lastname,company,street1,street2,city,postcode,countryId,regionId,region,telephone" class="text-xs text-blue-600 animate-pulse flex items-center gap-1.5">
+            <svg class="animate-spin h-3.5 w-3.5 text-blue-600 inline" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span class="hidden md:inline"><?= $escaper->escapeHtml(__('Saving...')) ?></span>
+        </div>
+    </div>
+    <?php $savedAddresses = $magewire->getSavedAddresses(); ?>
+    <?php if (!empty($savedAddresses)): ?>
+        <div class="mb-4 pb-4 border-b border-gray-100">
+            <label class="block">
+                <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Use a Saved Address')) ?></span>
+                <div class="mt-1 flex gap-2">
+                    <select id="saved-address-select"
+                            class="form-select flex-1 rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm">
+                        <option value=""><?= $escaper->escapeHtml(__('— Select saved address —')) ?></option>
+                        <?php foreach ($savedAddresses as $saved): ?>
+                            <option value="<?= (int)$saved['id'] ?>">
+                                <?= $escaper->escapeHtml($saved['label']) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <button type="button"
+                            class="btn btn-secondary text-sm px-3 shrink-0"
+                            data-select-id="saved-address-select"
+                            @click="fillSavedAddress">
+                        <?= $escaper->escapeHtml(__('Use')) ?>
+                    </button>
+                </div>
+            </label>
+        </div>
+    <?php endif; ?>
+
+    <div class="grid gap-4 sm:grid-cols-2">
+        <label for="co-shipping-email" class="block sm:col-span-2">
+            <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Email Address')) ?> *</span>
+            <input id="co-shipping-email" class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                   type="email" autocomplete="email"
+                   wire:model.defer="email"
+                   data-wire-field="email"
+                   @input="onFieldInput"
+                   @blur="onFieldBlur"
+                   required/>
+        </label>
+
+        <?php if ($block->isAttributeVisible('prefix')): ?>
+        <?php 
+            $isPrefixRequired = $block->isAttributeRequired('prefix');
+            $prefixOptions = $block->getOptions('prefix');
+        ?>
+        <label for="co-shipping-prefix" class="block">
+            <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Prefix')) ?><?= $isPrefixRequired ? ' *' : '' ?></span>
+            <?php if ($prefixOptions): ?>
+                <select id="co-shipping-prefix" class="form-select mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                        wire:model.blur="prefix" @change="onSelectChange" <?= $isPrefixRequired ? 'required' : '' ?>>
+                    <option value=""></option>
+                    <?php foreach ($prefixOptions as $opt): ?>
+                        <option value="<?= $escaper->escapeHtmlAttr($opt['value']) ?>"><?= $escaper->escapeHtml($opt['label']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            <?php else: ?>
+                <input id="co-shipping-prefix" class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                       type="text" wire:model.defer="prefix" data-wire-field="prefix" @input="onFieldInput" @blur="<?= $isPrefixRequired ? 'onFieldBlur' : 'onFieldBlurNoValidate' ?>" <?= $isPrefixRequired ? 'required' : '' ?>/>
+            <?php endif; ?>
+        </label>
+        <?php endif; ?>
+
+        <label for="co-shipping-firstname" class="block">
+            <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('First Name')) ?> *</span>
+            <input id="co-shipping-firstname" class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                   type="text" autocomplete="given-name"
+                   wire:model.defer="firstname"
+                   data-wire-field="firstname"
+                   @input="onFieldInput"
+                   @blur="onFieldBlur"
+                   required/>
+        </label>
+
+        <?php if ($block->isAttributeVisible('middlename')): ?>
+        <?php $isMiddlenameRequired = $block->isAttributeRequired('middlename'); ?>
+        <label for="co-shipping-middlename" class="block">
+            <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Middle Name')) ?><?= $isMiddlenameRequired ? ' *' : '' ?></span>
+            <input id="co-shipping-middlename" class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                   type="text" wire:model.defer="middlename" data-wire-field="middlename" @input="onFieldInput" @blur="<?= $isMiddlenameRequired ? 'onFieldBlur' : 'onFieldBlurNoValidate' ?>" <?= $isMiddlenameRequired ? 'required' : '' ?>/>
+        </label>
+        <?php endif; ?>
+
+        <label for="co-shipping-lastname" class="block">
+            <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Last Name')) ?> *</span>
+            <input id="co-shipping-lastname" class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                   type="text" autocomplete="family-name"
+                   wire:model.defer="lastname"
+                   data-wire-field="lastname"
+                   @input="onFieldInput"
+                   @blur="onFieldBlur"
+                   required/>
+        </label>
+
+        <?php if ($block->isAttributeVisible('suffix')): ?>
+        <?php 
+            $isSuffixRequired = $block->isAttributeRequired('suffix');
+            $suffixOptions = $block->getOptions('suffix');
+        ?>
+        <label for="co-shipping-suffix" class="block">
+            <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Suffix')) ?><?= $isSuffixRequired ? ' *' : '' ?></span>
+            <?php if ($suffixOptions): ?>
+                <select id="co-shipping-suffix" class="form-select mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                        wire:model.blur="suffix" @change="onSelectChange" <?= $isSuffixRequired ? 'required' : '' ?>>
+                    <option value=""></option>
+                    <?php foreach ($suffixOptions as $opt): ?>
+                        <option value="<?= $escaper->escapeHtmlAttr($opt['value']) ?>"><?= $escaper->escapeHtml($opt['label']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            <?php else: ?>
+                <input id="co-shipping-suffix" class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                       type="text" wire:model.defer="suffix" data-wire-field="suffix" @input="onFieldInput" @blur="<?= $isSuffixRequired ? 'onFieldBlur' : 'onFieldBlurNoValidate' ?>" <?= $isSuffixRequired ? 'required' : '' ?>/>
+            <?php endif; ?>
+        </label>
+        <?php endif; ?>
+
+        <?php if ($block->isAttributeVisible('company')): ?>
+        <?php $isCompanyRequired = $block->isAttributeRequired('company'); ?>
+        <label for="co-shipping-company" class="block sm:col-span-2">
+            <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Company')) ?><?= $isCompanyRequired ? ' *' : '' ?></span>
+            <input id="co-shipping-company" class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                   type="text" autocomplete="organization"
+                   wire:model.defer="company"
+                   data-wire-field="company"
+                   @input="onFieldInput"
+                   @blur="<?= $isCompanyRequired ? 'onFieldBlur' : 'onFieldBlurNoValidate' ?>"
+                   <?= $isCompanyRequired ? 'required' : '' ?>/>
+        </label>
+        <?php endif; ?>
+
+        <?php $streetLinesCount = $block->getStreetLines(); ?>
+        <label for="co-shipping-street1" class="block sm:col-span-2">
+            <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Street Address')) ?> *</span>
+            <input id="co-shipping-street1" class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                   type="text" autocomplete="address-line1"
+                   wire:model.defer="street1"
+                   data-wire-field="street1"
+                   @input="onFieldInput"
+                   @blur="onFieldBlur"
+                   placeholder="<?= $escaper->escapeHtmlAttr(__('Line 1')) ?>" required/>
+            
+            <?php for ($i = 2; $i <= $streetLinesCount; $i++): ?>
+            <input id="co-shipping-street<?= (int)$i ?>" class="form-input mt-2 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                   type="text" autocomplete="address-line<?= (int)$i ?>"
+                   wire:model.defer="street<?= (int)$i ?>"
+                   data-wire-field="street<?= (int)$i ?>"
+                   @input="onFieldInput"
+                   @blur="onFieldBlurNoValidate"
+                   placeholder="<?= $escaper->escapeHtmlAttr(__('Line %1', $i)) ?>"/>
+            <?php endfor; ?>
+        </label>
+
+        <label for="co-shipping-country-id" class="block">
+            <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Country')) ?> *</span>
+            <select id="co-shipping-country-id" class="form-select mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    wire:model.blur="countryId" @change="onSelectChange" autocomplete="country" required>
+                <?php foreach ($countries as $country): ?>
+                    <option value="<?= $escaper->escapeHtmlAttr($country['value']) ?>">
+                        <?= $escaper->escapeHtml($country['label']) ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </label>
+
+        <label class="block">
+            <?php $isRegionRequired = $magewire->isRegionRequired($magewire->countryId); ?>
+            <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('State/Province')) ?><?= $isRegionRequired ? ' *' : '' ?></span>
+            <?php $regions = $magewire->getRegions(); ?>
+            <?php if ($regions): ?>
+                <select name="region_id" class="form-select mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" wire:model.blur="regionId" autocomplete="address-level1" <?= $isRegionRequired ? 'required' : '' ?>>
+                    <?php foreach ($regions as $regionOption): ?>
+                        <option value="<?= $escaper->escapeHtmlAttr($regionOption['value']) ?>">
+                            <?= $escaper->escapeHtml($regionOption['label']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            <?php else: ?>
+                <input name="region" class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                       type="text" wire:model.defer="region" autocomplete="address-level1"
+                       data-wire-field="region"
+                       @input="onFieldInput"
+                       @blur="onFieldBlur"
+                       placeholder="<?= $escaper->escapeHtmlAttr(__('Enter state/province')) ?>" <?= $isRegionRequired ? 'required' : '' ?>/>
+            <?php endif; ?>
+        </label>
+
+        <label class="block">
+            <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('City')) ?> *</span>
+            <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                   type="text" autocomplete="address-level2"
+                   wire:model.defer="city"
+                   data-wire-field="city"
+                   @input="onFieldInput"
+                   @blur="onFieldBlur"
+                   required/>
+        </label>
+
+        <label class="block">
+            <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Zip/Postal Code')) ?> *</span>
+            <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                   type="text" autocomplete="postal-code"
+                   wire:model.defer="postcode"
+                   data-wire-field="postcode"
+                   @input="onFieldInput(); formatPostcode($el, false);"
+                   @blur="onFieldBlur"
+                   required/>
+        </label>
+
+        <?php if ($block->isAttributeVisible('telephone')): ?>
+        <?php $isTelephoneRequired = $block->isAttributeRequired('telephone'); ?>
+        <label class="block sm:col-span-2">
+            <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Phone Number')) ?><?= $isTelephoneRequired ? ' *' : '' ?></span>
+            <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                   type="tel" autocomplete="tel"
+                   wire:model.defer="telephone"
+                   data-wire-field="telephone"
+                   @input="onFieldInput(); formatTelephone($el);"
+                   @blur="<?= $isTelephoneRequired ? 'onFieldBlur' : 'onFieldBlurNoValidate' ?>"
+                   <?= $isTelephoneRequired ? 'required' : '' ?>/>
+        </label>
+        <?php endif; ?>
+
+        <?php if ($block->isAttributeVisible('fax')): ?>
+        <?php $isFaxRequired = $block->isAttributeRequired('fax'); ?>
+        <label for="co-shipping-fax" class="block sm:col-span-2">
+            <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Fax')) ?><?= $isFaxRequired ? ' *' : '' ?></span>
+            <input id="co-shipping-fax" class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                   type="text" wire:model.defer="fax" data-wire-field="fax" @input="onFieldInput" @blur="<?= $isFaxRequired ? 'onFieldBlur' : 'onFieldBlurNoValidate' ?>" <?= $isFaxRequired ? 'required' : '' ?>/>
+        </label>
+        <?php endif; ?>
+
+        <?php if ($block->isAttributeVisible('vat_id')): ?>
+        <?php $isVatIdRequired = $block->isAttributeRequired('vat_id'); ?>
+        <label for="co-shipping-vat-id" class="block sm:col-span-2">
+            <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('VAT Number')) ?><?= $isVatIdRequired ? ' *' : '' ?></span>
+            <input id="co-shipping-vat-id" class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                   type="text" wire:model.defer="vatId" data-wire-field="vatId" @input="onFieldInput" @blur="<?= $isVatIdRequired ? 'onFieldBlur' : 'onFieldBlurNoValidate' ?>" <?= $isVatIdRequired ? 'required' : '' ?>/>
+        </label>
+        <?php endif; ?>
+    </div>
+</div>
+<!-- Billing Address same as Shipping toggle -->
+<div class="card bg-white p-4 md:p-6 shadow rounded-lg border border-gray-200">
+    <label class="flex items-center gap-3 cursor-pointer mb-0">
+        <input type="checkbox" class="form-checkbox h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500" wire:model="billingSameAsShipping"/>
+        <span class="text-sm font-medium text-gray-900"><?= $escaper->escapeHtml(__('My billing address is the same')) ?></span>
+    </label>
+
+    <!-- Billing Address Form -->
+    <?php if (!$magewire->billingSameAsShipping): ?>
+        <div class="mt-6 pt-6 border-t border-gray-200 relative">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900"><?= $escaper->escapeHtml(__('Billing Address')) ?></h3>
+                <div wire:loading wire:target="billingFirstname,billingLastname,billingCompany,billingStreet1,billingStreet2,billingCity,billingPostcode,billingCountryId,billingRegionId,billingRegion,billingTelephone" class="text-xs text-blue-600 animate-pulse flex items-center gap-1.5">
+                    <svg class="animate-spin h-3.5 w-3.5 text-blue-600 inline" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span class="hidden md:inline"><?= $escaper->escapeHtml(__('Saving...')) ?></span>
+                </div>
+            </div>
+
+            <div class="grid gap-4 sm:grid-cols-2">
+                <?php if ($block->isAttributeVisible('prefix')): ?>
+                <?php 
+                    $isBillingPrefixRequired = $block->isAttributeRequired('prefix');
+                    $billingPrefixOptions = $block->getOptions('prefix');
+                ?>
+                <label for="co-billing-prefix" class="block">
+                    <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Prefix')) ?><?= $isBillingPrefixRequired ? ' *' : '' ?></span>
+                    <?php if ($billingPrefixOptions): ?>
+                        <select id="co-billing-prefix" class="form-select mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                wire:model.blur="billingPrefix" @change="onSelectChange" <?= $isBillingPrefixRequired ? 'required' : '' ?>>
+                            <option value=""></option>
+                            <?php foreach ($billingPrefixOptions as $opt): ?>
+                                <option value="<?= $escaper->escapeHtmlAttr($opt['value']) ?>"><?= $escaper->escapeHtml($opt['label']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    <?php else: ?>
+                        <input id="co-billing-prefix" class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                               type="text" wire:model.defer="billingPrefix" data-wire-field="billingPrefix" @input="onFieldInput" @blur="<?= $isBillingPrefixRequired ? 'onFieldBlur' : 'onFieldBlurNoValidate' ?>" <?= $isBillingPrefixRequired ? 'required' : '' ?>/>
+                    <?php endif; ?>
+                </label>
+                <?php endif; ?>
+
+                <label class="block">
+                    <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('First Name')) ?> *</span>
+                    <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                           type="text" autocomplete="given-name"
+                           wire:model.defer="billingFirstname"
+                           data-wire-field="billingFirstname"
+                           @input="onFieldInput"
+                           @blur="onFieldBlur"
+                           required/>
+                </label>
+
+                <?php if ($block->isAttributeVisible('middlename')): ?>
+                <?php $isBillingMiddlenameRequired = $block->isAttributeRequired('middlename'); ?>
+                <label for="co-billing-middlename" class="block">
+                    <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Middle Name')) ?><?= $isBillingMiddlenameRequired ? ' *' : '' ?></span>
+                    <input id="co-billing-middlename" class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                           type="text" wire:model.defer="billingMiddlename" data-wire-field="billingMiddlename" @input="onFieldInput" @blur="<?= $isBillingMiddlenameRequired ? 'onFieldBlur' : 'onFieldBlurNoValidate' ?>" <?= $isBillingMiddlenameRequired ? 'required' : '' ?>/>
+                </label>
+                <?php endif; ?>
+
+                <label class="block">
+                    <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Last Name')) ?> *</span>
+                    <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                           type="text" autocomplete="family-name"
+                           wire:model.defer="billingLastname"
+                           data-wire-field="billingLastname"
+                           @input="onFieldInput"
+                           @blur="onFieldBlur"
+                           required/>
+                </label>
+
+                <?php if ($block->isAttributeVisible('suffix')): ?>
+                <?php 
+                    $isBillingSuffixRequired = $block->isAttributeRequired('suffix');
+                    $billingSuffixOptions = $block->getOptions('suffix');
+                ?>
+                <label for="co-billing-suffix" class="block">
+                    <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Suffix')) ?><?= $isBillingSuffixRequired ? ' *' : '' ?></span>
+                    <?php if ($billingSuffixOptions): ?>
+                        <select id="co-billing-suffix" class="form-select mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                wire:model.blur="billingSuffix" @change="onSelectChange" <?= $isBillingSuffixRequired ? 'required' : '' ?>>
+                            <option value=""></option>
+                            <?php foreach ($billingSuffixOptions as $opt): ?>
+                                <option value="<?= $escaper->escapeHtmlAttr($opt['value']) ?>"><?= $escaper->escapeHtml($opt['label']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    <?php else: ?>
+                        <input id="co-billing-suffix" class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                               type="text" wire:model.defer="billingSuffix" data-wire-field="billingSuffix" @input="onFieldInput" @blur="<?= $isBillingSuffixRequired ? 'onFieldBlur' : 'onFieldBlurNoValidate' ?>" <?= $isBillingSuffixRequired ? 'required' : '' ?>/>
+                    <?php endif; ?>
+                </label>
+                <?php endif; ?>
+
+                 <?php if ($block->isAttributeVisible('company')): ?>
+                 <?php $isBillingCompanyRequired = $block->isAttributeRequired('company'); ?>
+                 <label class="block sm:col-span-2">
+                     <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Company')) ?><?= $isBillingCompanyRequired ? ' *' : '' ?></span>
+                     <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                            type="text" autocomplete="organization"
+                            wire:model.defer="billingCompany"
+                            data-wire-field="billingCompany"
+                            @input="onFieldInput"
+                            @blur="<?= $isBillingCompanyRequired ? 'onFieldBlur' : 'onFieldBlurNoValidate' ?>"
+                            <?= $isBillingCompanyRequired ? 'required' : '' ?>/>
+                 </label>
+                 <?php endif; ?>
+
+                 <label class="block sm:col-span-2">
+                     <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Street Address')) ?> *</span>
+                     <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                            type="text" autocomplete="address-line1"
+                            wire:model.defer="billingStreet1"
+                            data-wire-field="billingStreet1"
+                            @input="onFieldInput"
+                            @blur="onFieldBlur"
+                            placeholder="<?= $escaper->escapeHtmlAttr(__('Line 1')) ?>" required/>
+                     
+                     <?php for ($i = 2; $i <= $streetLinesCount; $i++): ?>
+                     <input class="form-input mt-2 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                            type="text" autocomplete="address-line<?= (int)$i ?>"
+                            wire:model.defer="billingStreet<?= (int)$i ?>"
+                            data-wire-field="billingStreet<?= (int)$i ?>"
+                            @input="onFieldInput"
+                            @blur="onFieldBlurNoValidate"
+                            placeholder="<?= $escaper->escapeHtmlAttr(__('Line %1', $i)) ?>"/>
+                     <?php endfor; ?>
+                 </label>
+
+                <label class="block">
+                    <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Country')) ?> *</span>
+                    <select class="form-select mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                            wire:model.blur="billingCountryId"
+                            @change="onSelectChange" autocomplete="country"
+                            required>
+                        <?php foreach ($countries as $country): ?>
+                            <option value="<?= $escaper->escapeHtmlAttr($country['value']) ?>">
+                                <?= $escaper->escapeHtml($country['label']) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+
+                <label class="block">
+                    <?php $isBillingRegionRequired = $magewire->isRegionRequired($magewire->billingCountryId); ?>
+                    <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('State/Province')) ?><?= $isBillingRegionRequired ? ' *' : '' ?></span>
+                    <?php $billingRegions = $magewire->getBillingRegions(); ?>
+                    <?php if ($billingRegions): ?>
+                        <select name="billing_region_id"
+                                class="form-select mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                wire:model.blur="billingRegionId"
+                                @change="onSelectChange" autocomplete="address-level1"
+                                <?= $isBillingRegionRequired ? 'required' : '' ?>>
+                            <?php foreach ($billingRegions as $regionOption): ?>
+                                <option value="<?= $escaper->escapeHtmlAttr($regionOption['value']) ?>">
+                                    <?= $escaper->escapeHtml($regionOption['label']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    <?php else: ?>
+                        <input name="billing_region"
+                               class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                               type="text" autocomplete="address-level1"
+                               wire:model.defer="billingRegion"
+                               data-wire-field="billingRegion"
+                               @input="onFieldInput"
+                               @blur="onFieldBlur"
+                               placeholder="<?= $escaper->escapeHtmlAttr(__('Enter state/province')) ?>"
+                               <?= $isBillingRegionRequired ? 'required' : '' ?>/>
+                    <?php endif; ?>
+                </label>
+
+                <label class="block">
+                    <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('City')) ?> *</span>
+                    <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                           type="text" autocomplete="address-level2"
+                           wire:model.defer="billingCity"
+                           data-wire-field="billingCity"
+                           @input="onFieldInput"
+                           @blur="onFieldBlur"
+                           required/>
+                </label>
+
+                <label class="block">
+                    <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Zip/Postal Code')) ?> *</span>
+                    <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                           type="text" autocomplete="postal-code"
+                           wire:model.defer="billingPostcode"
+                           data-wire-field="billingPostcode"
+                           @input="onFieldInput(); formatPostcode($el, true);"
+                           @blur="onFieldBlur"
+                           required/>
+                </label>
+
+                 <?php if ($block->isAttributeVisible('telephone')): ?>
+                 <?php $isBillingTelephoneRequired = $block->isAttributeRequired('telephone'); ?>
+                 <label class="block sm:col-span-2">
+                     <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Phone Number')) ?><?= $isBillingTelephoneRequired ? ' *' : '' ?></span>
+                     <input class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                            type="tel" autocomplete="tel"
+                            wire:model.defer="billingTelephone"
+                            data-wire-field="billingTelephone"
+                            @input="onFieldInput(); formatTelephone($el);"
+                            @blur="<?= $isBillingTelephoneRequired ? 'onFieldBlur' : 'onFieldBlurNoValidate' ?>"
+                            <?= $isBillingTelephoneRequired ? 'required' : '' ?>/>
+                 </label>
+                 <?php endif; ?>
+
+                 <?php if ($block->isAttributeVisible('fax')): ?>
+                 <?php $isBillingFaxRequired = $block->isAttributeRequired('fax'); ?>
+                 <label for="co-billing-fax" class="block sm:col-span-2">
+                     <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Fax')) ?><?= $isBillingFaxRequired ? ' *' : '' ?></span>
+                     <input id="co-billing-fax" class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                            type="text" wire:model.defer="billingFax" data-wire-field="billingFax" @input="onFieldInput" @blur="<?= $isBillingFaxRequired ? 'onFieldBlur' : 'onFieldBlurNoValidate' ?>" <?= $isBillingFaxRequired ? 'required' : '' ?>/>
+                 </label>
+                 <?php endif; ?>
+
+                 <?php if ($block->isAttributeVisible('vat_id')): ?>
+                 <?php $isBillingVatIdRequired = $block->isAttributeRequired('vat_id'); ?>
+                 <label for="co-billing-vat-id" class="block sm:col-span-2">
+                     <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('VAT Number')) ?><?= $isBillingVatIdRequired ? ' *' : '' ?></span>
+                     <input id="co-billing-vat-id" class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                            type="text" wire:model.defer="billingVatId" data-wire-field="billingVatId" @input="onFieldInput" @blur="<?= $isBillingVatIdRequired ? 'onFieldBlur' : 'onFieldBlurNoValidate' ?>" <?= $isBillingVatIdRequired ? 'required' : '' ?>/>
+                 </label>
+                 <?php endif; ?>
+            </div>
+        </div>
+    <?php endif; ?>
+</div>
+</div>

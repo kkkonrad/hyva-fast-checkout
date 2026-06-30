@@ -1,0 +1,68 @@
+<?php
+/**
+ * Payment methods container block.
+ *
+ * @var \Kkkonrad\Fastcheckout\Block\Hyva\Checkout $block
+ * @var \Magento\Framework\Escaper $escaper
+ * @var \Kkkonrad\Fastcheckout\Magewire\Checkout $magewire
+ * @var array $paymentMethods
+ * @var bool $hasPaymentMethodFilter
+ * @var array $allowedPaymentMethodCodes
+ */
+?>
+<!-- Container 3: Payment Method -->
+<div class="fc-container-3 space-y-6 min-w-0 w-full">
+<!-- Payment Methods Section -->
+<div class="card bg-white p-4 md:p-6 shadow rounded-lg border border-gray-200 relative" wire:key="checkout-payment-methods-card">
+    <div class="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
+        <h2 class="text-xl font-semibold text-gray-900">
+            <?= $escaper->escapeHtml(__('Payment Method')) ?>
+        </h2>
+    </div>
+
+    <?php if (empty($paymentMethods)): ?>
+        <p class="text-sm text-gray-500">
+            <?= $escaper->escapeHtml(__('No payment methods available.')) ?>
+        </p>
+    <?php else: ?>
+        <div class="grid gap-3 relative min-h-[50px]" wire:key="checkout-payment-methods-grid">
+            <div wire:loading.flex
+                 wire:target="countryId,regionId,region,postcode,city,street1,street2,fillFromSavedAddress,selectShippingMethod"
+                 class="absolute inset-0 bg-white/80 backdrop-blur-[1px] z-20 rounded flex-col gap-3 p-4 justify-center transition-all duration-200"
+                 style="display: none;">
+                <div class="h-12 bg-gray-150 rounded animate-pulse w-full"></div>
+                <div class="h-12 bg-gray-150 rounded animate-pulse w-full"></div>
+            </div>
+            <?php foreach ($paymentMethods as $method): ?>
+                <?php
+                $methodCode = $method->getCode();
+                $isPaymentMethodAllowed = !$hasPaymentMethodFilter || in_array($methodCode, $allowedPaymentMethodCodes, true);
+                $isSelectedPayment = $isPaymentMethodAllowed && $magewire->paymentMethod === $methodCode;
+                ?>
+                <div class="border rounded transition-all duration-200 <?= $isSelectedPayment ? 'border-blue-600 bg-blue-50/40 ring-1 ring-blue-600 shadow-sm' : 'border-gray-200 hover:border-gray-300' ?>"
+                     wire:key="payment-method-item-<?= $escaper->escapeHtmlAttr($methodCode) ?>"
+                     data-fastcheckout-payment-option="<?= $escaper->escapeHtmlAttr($methodCode) ?>"
+                     data-fastcheckout-payment-allowed="<?= $isPaymentMethodAllowed ? '1' : '0' ?>"
+                     <?= $isPaymentMethodAllowed ? '' : 'style="display:none;" aria-hidden="true"' ?>>
+                    <label class="flex items-center gap-3 p-3 cursor-pointer hover:bg-gray-50/50 mb-0">
+                        <input type="radio"
+                               class="form-radio h-4 w-4 text-blue-600 focus:ring-blue-500"
+                               name="payment_method"
+                               value="<?= $escaper->escapeHtmlAttr($methodCode) ?>"
+                               data-fastcheckout-payment-option-input="<?= $escaper->escapeHtmlAttr($methodCode) ?>"
+                               <?= $isPaymentMethodAllowed && $magewire->paymentMethod === $methodCode ? 'checked' : '' ?>
+                                <?= $isPaymentMethodAllowed ? '' : 'disabled' ?>
+                               required/>
+                        <span class="font-medium text-sm text-gray-800"><?= $escaper->escapeHtml($method->getTitle()) ?></span>
+                    </label>
+
+                    <div class="fastcheckout-payment-method-ko-container border-t border-gray-100 hidden"
+                         style="display: none;"
+                         data-fastcheckout-payment-method-ko-target="<?= $escaper->escapeHtmlAttr($methodCode) ?>"
+                         wire:ignore></div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
+</div>
+</div>

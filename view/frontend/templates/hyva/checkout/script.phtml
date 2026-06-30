@@ -1,0 +1,562 @@
+<?php
+/**
+ * Checkout Alpine.js script, sessionStorage backup logic, and layout overrides.
+ *
+ * @var \Kkkonrad\Fastcheckout\Block\Hyva\Checkout $block
+ * @var \Magento\Framework\Escaper $escaper
+ * @var \Kkkonrad\Fastcheckout\Magewire\Checkout $magewire
+ * @var \Hyva\Theme\ViewModel\HyvaCsp $hyvaCsp
+ */
+?>
+<script>
+/**
+ * Kkkonrad Fastcheckout Alpine component — CSP compatible (Hyva Alpine CSP pattern)
+ * No inline expressions in x-data or event attributes.
+ */
+function initCheckout() {
+    return {
+        _debounceTimers: {},
+        _blurTimers: {},
+        isProcessing: false,
+        clientOrderError: '',
+
+        init() {
+            window.addEventListener('fastcheckout:payment-error', (event) => {
+                this.onPaymentError(event);
+            });
+            window.addEventListener('fastcheckout:shipping-error', (event) => {
+                this.onPaymentError(event);
+            });
+
+            // Alpine watches to sync state to KO
+            const fieldsToWatch = [
+                'email', 'countryId', 'postcode', 'city', 'region', 'regionId',
+                'firstname', 'lastname', 'telephone', 'company', 'street1', 'street2',
+                'billingCountryId', 'billingPostcode', 'billingCity', 'billingRegion', 'billingRegionId',
+                'billingFirstname', 'billingLastname', 'billingTelephone', 'billingCompany', 'billingStreet1', 'billingStreet2',
+                'paymentMethod'
+            ];
+
+            fieldsToWatch.forEach((field) => {
+                this.$watch(`$wire.${field}`, (value) => {
+                    if (window.fastcheckoutHyvaPayment && typeof window.fastcheckoutHyvaPayment.syncFieldToKo === 'function') {
+                        window.fastcheckoutHyvaPayment.syncFieldToKo(field, value);
+                    }
+                });
+            });
+
+            this.$nextTick(() => {
+                if (window.fastcheckoutHyvaShipping && typeof window.fastcheckoutHyvaShipping.syncAddress === 'function') {
+                    window.fastcheckoutHyvaShipping.syncAddress(this.$wire);
+                    if (this.$wire.shippingMethod) {
+                        window.fastcheckoutHyvaShipping.syncShippingMethod(this.$wire.shippingMethod);
+                    }
+                }
+            });
+
+            if (window.Livewire && typeof window.Livewire.hook === 'function') {
+                window.Livewire.hook('message.processed', (message) => {
+                    const updates = message.updateQueue || (message.payload && message.payload.updates) || [];
+                    const isPlacingOrder = updates.some(update => 
+                        update.type === 'callMethod' && update.payload && update.payload.method === 'placeOrder'
+                    );
+                    if (isPlacingOrder) {
+                        const hasError = this.$wire.orderError || (typeof this.$wire.get === 'function' ? this.$wire.get('orderError') : '');
+                        if (hasError) {
+                            this.isProcessing = false;
+                            document.body.classList.remove('checkout-submitting');
+                        }
+                    }
+                });
+                window.Livewire.hook('message.failed', () => {
+                    this.isProcessing = false;
+                    document.body.classList.remove('checkout-submitting');
+                });
+            }
+        },
+
+        /**
+         * Debounced field save — called from @input.
+         * Reads data-wire-field attribute to determine the Magewire property name.
+         */
+        onFieldInput() {
+            const el = this.$el;
+            const field = el.dataset.wireField;
+            if (!field) return;
+
+            // Debounced validity validation for email
+            if (field === 'email') {
+                if (!this._debounceTimers) {
+                    this._debounceTimers = {};
+                }
+                if (this._debounceTimers['email_val']) {
+                    clearTimeout(this._debounceTimers['email_val']);
+                }
+                this._debounceTimers['email_val'] = setTimeout(() => {
+                    this._validateEl(el);
+                    delete this._debounceTimers['email_val'];
+                }, 800);
+            }
+
+            const fieldsToSync = ['postcode', 'billingPostcode', 'email', 'region', 'billingRegion'];
+            if (!fieldsToSync.includes(field)) return;
+
+            // If a blur timer is already active (meaning we just blurred and are now autofilling/updating),
+            // re-schedule the blur timer to save the newly entered/autofilled value.
+            if (this._blurTimers && this._blurTimers[field]) {
+                clearTimeout(this._blurTimers[field]);
+                this._blurTimers[field] = setTimeout(() => {
+                    this.$wire.set(field, el.value);
+                    delete this._blurTimers[field];
+                }, 150);
+            }
+        },
+
+        /**
+         * Immediate save + validation — called from @blur on required fields.
+         */
+        onFieldBlur() {
+            const el = this.$el;
+            const field = el.dataset.wireField;
+            if (field) {
+                const fieldsToSync = ['postcode', 'billingPostcode', 'email', 'region', 'billingRegion'];
+                if (fieldsToSync.includes(field)) {
+                    // Delay the blur update slightly so autocomplete events can override/re-schedule it
+                    if (!this._blurTimers) {
+                        this._blurTimers = {};
+                    }
+                    if (this._blurTimers[field]) {
+                        clearTimeout(this._blurTimers[field]);
+                    }
+                    this._blurTimers[field] = setTimeout(() => {
+                        this.$wire.set(field, el.value);
+                        delete this._blurTimers[field];
+                    }, 150);
+                }
+            }
+            this._validateEl(el);
+        },
+
+        /**
+         * Immediate save without validation — called from @blur on optional fields.
+         */
+        onFieldBlurNoValidate() {
+            const el = this.$el;
+            const field = el.dataset.wireField;
+            if (field) {
+                const fieldsToSync = ['postcode', 'billingPostcode', 'email', 'region', 'billingRegion'];
+                if (fieldsToSync.includes(field)) {
+                    // Delay the blur update slightly so autocomplete events can override/re-schedule it
+                    if (!this._blurTimers) {
+                        this._blurTimers = {};
+                    }
+                    if (this._blurTimers[field]) {
+                        clearTimeout(this._blurTimers[field]);
+                    }
+                    this._blurTimers[field] = setTimeout(() => {
+                        this.$wire.set(field, el.value);
+                        delete this._blurTimers[field];
+                    }, 150);
+                }
+            }
+        },
+
+        /**
+         * Validation only — for fields using wire:model.blur.
+         */
+        onFieldBlurValidateOnly() {
+            this._validateEl(this.$el);
+        },
+
+        /**
+         * Validate select on change.
+         */
+        onSelectChange() {
+            this._validateEl(this.$el);
+        },
+
+        /**
+         * Fill all shipping fields from a saved customer address.
+         * Reads the selected value from the select whose id is in data-select-id.
+         */
+        fillSavedAddress() {
+            const selectId = this.$el.dataset.selectId;
+            const sel = selectId ? document.getElementById(selectId) : null;
+            if (!sel) return;
+            const id = parseInt(sel.value, 10);
+            if (id > 0) {
+                this.$wire.call('fillFromSavedAddress', id);
+            }
+        },
+
+        /**
+         * Handle form submit — validate all, then place order.
+         */
+        handleSubmit() {
+            this.clientOrderError = '';
+
+            if (this._validateAll()) {
+                // Invoke shipping locker validation if available
+                if (window.fastcheckoutHyvaShipping && typeof window.fastcheckoutHyvaShipping.validate === 'function') {
+                    if (!window.fastcheckoutHyvaShipping.validate()) {
+                        if (window.console && typeof window.console.warn === 'function') {
+                            window.console.warn('Kkkonrad Fastcheckout: Order placement halted because shipping validation failed.');
+                        }
+                        return;
+                    }
+                }
+
+                const paymentBridge = window.fastcheckoutHyvaPayment;
+
+                // Read selected payment method directly from DOM (no Magewire state needed)
+                const selectedMethodEl = document.querySelector('input[name="payment_method"]:checked');
+                const selectedMethod = selectedMethodEl ? selectedMethodEl.value : '';
+
+                // Invoke Knockout JS validation first if available
+                if (paymentBridge && typeof paymentBridge.validate === 'function') {
+                    if (!paymentBridge.validate()) {
+                        if (window.console && typeof window.console.warn === 'function') {
+                            window.console.warn('Kkkonrad Fastcheckout: Order placement halted because Knockout payment validation failed.');
+                        }
+                        if (selectedMethodEl) {
+                            const optionContainer = selectedMethodEl.closest('[data-fastcheckout-payment-option]');
+                            if (optionContainer) {
+                                optionContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            } else {
+                                selectedMethodEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            }
+                        }
+                        return;
+                    }
+                }
+
+                this.isProcessing = true;
+                document.body.classList.add('checkout-submitting');
+
+                if (paymentBridge && typeof paymentBridge.placeOrder === 'function') {
+                    Promise.resolve(paymentBridge.placeOrder(this.$wire, selectedMethod))
+                        .then(() => {
+                            // KO initiated the order flow. The page will redirect when Magento/Magewire confirms success.
+                        })
+                        .catch((err) => {
+                            this.isProcessing = false;
+                            document.body.classList.remove('checkout-submitting');
+                            if (!this.clientOrderError && err && err.message) {
+                                this.clientOrderError = err.message;
+                            }
+
+                            // Smoothly scroll to the selected payment method container so errors are visible
+                            if (selectedMethodEl) {
+                                const optionContainer = selectedMethodEl.closest('[data-fastcheckout-payment-option]');
+                                if (optionContainer) {
+                                    optionContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                } else {
+                                    selectedMethodEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                }
+                            }
+                        });
+                    return;
+                }
+
+                this.$wire.call('placeOrder', selectedMethod);
+            }
+        },
+
+        onPaymentError(event) {
+            const detail = event && event.detail ? event.detail : {};
+            this.clientOrderError = detail.message || '';
+            this.isProcessing = false;
+            document.body.classList.remove('checkout-submitting');
+        },
+
+        /**
+         * Copy text to clipboard in a CSP compatible way.
+         */
+        copyToClipboard() {
+            const el = this.$el;
+            const text = el.dataset.copyText;
+            if (!text) return;
+            navigator.clipboard.writeText(text).then(() => {
+                const oldText = el.innerText;
+                el.innerText = el.dataset.copiedLabel || oldText;
+                setTimeout(() => el.innerText = oldText, 2000);
+            });
+        },
+
+        formatPostcode(el, isBilling = false) {
+            const countryId = isBilling ? this.$wire.billingCountryId : this.$wire.countryId;
+            if (countryId === 'PL') {
+                let value = el.value.replace(/\D/g, '');
+                if (value.length > 5) value = value.slice(0, 5);
+                let formatted = value;
+                if (value.length > 2) {
+                    formatted = value.slice(0, 2) + '-' + value.slice(2);
+                }
+                if (el.value !== formatted) {
+                    el.value = formatted;
+                    el.dispatchEvent(new Event('input'));
+                }
+            }
+        },
+
+        formatTelephone(el) {
+            let value = el.value.replace(/[^\d+]/g, ''); // keep only digits and +
+            let formatted = el.value;
+            if (value.startsWith('+')) {
+                let digits = value.slice(1).replace(/\D/g, '');
+                if (digits.startsWith('48')) {
+                    let parts = ['+48'];
+                    let rest = digits.slice(2);
+                    if (rest.length > 0) parts.push(rest.slice(0, 3));
+                    if (rest.length > 3) parts.push(rest.slice(3, 6));
+                    if (rest.length > 6) parts.push(rest.slice(6, 9));
+                    formatted = parts.join(' ');
+                } else {
+                    formatted = '+' + digits.slice(0, 15);
+                }
+            } else {
+                let digits = value.replace(/\D/g, '');
+                if (digits.length > 9) digits = digits.slice(0, 9);
+                let parts = [];
+                if (digits.length > 0) parts.push(digits.slice(0, 3));
+                if (digits.length > 3) parts.push(digits.slice(3, 6));
+                if (digits.length > 6) parts.push(digits.slice(6, 9));
+                formatted = parts.join(' ');
+            }
+            if (el.value !== formatted) {
+                el.value = formatted;
+                el.dispatchEvent(new Event('input'));
+            }
+        },
+
+        /* ── Private helpers ────────────────────────────────────────────── */
+
+        _validateEl(el) {
+            const wrapper = el.closest('label');
+            let msg = wrapper ? wrapper.querySelector('.field-error') : null;
+            const errorId = (el.id || el.name || el.dataset.wireField || Math.random().toString(36).substring(2, 9)) + '-error';
+
+            // Custom validation rules
+            if (el.dataset.wireField) {
+                const fieldName = el.dataset.wireField;
+                if (fieldName === 'postcode' || fieldName === 'billingPostcode') {
+                    const countryId = fieldName === 'billingPostcode' ? this.$wire.billingCountryId : this.$wire.countryId;
+                    if (countryId === 'PL') {
+                        const plPostcodeRegex = /^\d{2}-\d{3}$/;
+                        if (!plPostcodeRegex.test(el.value)) {
+                            el.setCustomValidity('Kod pocztowy musi mieć format XX-XXX (np. 00-950)');
+                        } else {
+                            el.setCustomValidity('');
+                        }
+                    } else {
+                        el.setCustomValidity('');
+                    }
+                } else if (fieldName === 'telephone' || fieldName === 'billingTelephone') {
+                    const digits = el.value.replace(/\D/g, '');
+                    if (digits.length < 9) {
+                        el.setCustomValidity('Numer telefonu musi mieć co najmniej 9 cyfr');
+                    } else {
+                        el.setCustomValidity('');
+                    }
+                } else if (fieldName === 'email') {
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    if (el.value && !emailRegex.test(el.value)) {
+                        el.setCustomValidity('Wpisz poprawny adres e-mail (np. nazwa@domena.pl)');
+                    } else if (el.value) {
+                        const typos = {
+                            'gamil.com': 'gmail.com',
+                            'gmial.com': 'gmail.com',
+                            'gmal.com': 'gmail.com',
+                            'wp.pl.pl': 'wp.pl',
+                            'onet.pl.pl': 'onet.pl',
+                            'o2.pl.pl': 'o2.pl',
+                            'interia.pl.pl': 'interia.pl'
+                        };
+                        const domain = el.value.split('@')[1];
+                        if (domain && typos[domain.toLowerCase()]) {
+                            el.setCustomValidity('Czy miałeś na myśli: ' + typos[domain.toLowerCase()] + '?');
+                        } else {
+                            el.setCustomValidity('');
+                        }
+                    } else {
+                        el.setCustomValidity('');
+                    }
+                }
+            }
+
+            if (!el.validity.valid) {
+                el.classList.add('border-red-400', 'ring-1', 'ring-red-400');
+                el.classList.remove('border-gray-300');
+                el.setAttribute('aria-invalid', 'true');
+                el.setAttribute('aria-describedby', errorId);
+
+                if (!msg && wrapper) {
+                    msg = document.createElement('span');
+                    msg.id = errorId;
+                    msg.className = 'field-error mt-1 text-xs text-red-600 block';
+                    msg.setAttribute('role', 'alert');
+                    wrapper.appendChild(msg);
+                }
+                if (msg) msg.textContent = el.validationMessage;
+            } else {
+                el.classList.remove('border-red-400', 'ring-1', 'ring-red-400');
+                el.classList.add('border-gray-300');
+                el.removeAttribute('aria-invalid');
+                el.removeAttribute('aria-describedby');
+                if (msg) msg.remove();
+            }
+        },
+
+        _validateAll() {
+            let valid = true;
+            let firstInvalidEl = null;
+            const form = this.$el; // on @submit.prevent this.$el is the <form>
+            for (const el of form.elements) {
+                if (el.willValidate) {
+                    this._validateEl(el);
+                    if (!el.validity.valid) {
+                        valid = false;
+                        if (!firstInvalidEl) {
+                            firstInvalidEl = el;
+                        }
+                    }
+                }
+            }
+            if (firstInvalidEl) {
+                firstInvalidEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                firstInvalidEl.focus();
+            }
+            return valid;
+        }
+    };
+}
+window.addEventListener('alpine:init', () => Alpine.data('initCheckout', initCheckout), {once: true});
+
+
+
+/* ── sessionStorage backup (Livewire 2 / Magewire compatible) ──────────────── */
+(function () {
+    const PREFIX = 'fastcheckout_';
+    const FIELDS = [
+        'email', 'firstname', 'lastname', 'company',
+        'prefix', 'middlename', 'suffix', 'fax', 'vatId',
+        'street1', 'street2', 'street3', 'street4', 'city', 'postcode',
+        'countryId', 'regionId', 'region', 'telephone',
+        'billingFirstname', 'billingLastname', 'billingCompany',
+        'billingPrefix', 'billingMiddlename', 'billingSuffix', 'billingFax', 'billingVatId',
+        'billingStreet1', 'billingStreet2', 'billingStreet3', 'billingStreet4', 'billingCity',
+        'billingPostcode', 'billingCountryId', 'billingRegionId', 'billingRegion', 'billingTelephone'
+    ];
+
+    function save(field, value) {
+        try {
+            if (value !== undefined && value !== null) {
+                sessionStorage.setItem(PREFIX + field, value);
+            }
+        } catch (e) {}
+    }
+
+    function restore(wire) {
+        FIELDS.forEach(function (field) {
+            try {
+                const val = sessionStorage.getItem(PREFIX + field);
+                if (val && !wire.get(field)) {
+                    wire.set(field, val);
+                }
+            } catch (e) {}
+        });
+    }
+
+    function clearStorage() {
+        FIELDS.forEach(function (field) {
+            try { sessionStorage.removeItem(PREFIX + field); } catch (e) {}
+        });
+    }
+
+    function getWire() {
+        const el = document.querySelector('[wire\\:id]');
+        return el ? (window.Livewire && window.Livewire.find(el.getAttribute('wire:id'))) : null;
+    }
+
+    if (window.Livewire) {
+        window.Livewire.hook('message.processed', function (message, component) {
+            if (!component || !component.data) return;
+            FIELDS.forEach(function (field) {
+                try { save(field, component.data[field]); } catch (e) {}
+            });
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        setTimeout(function () {
+            const wire = getWire();
+            if (wire) restore(wire);
+            window.addEventListener('magewire:order-placed', function (event) {
+                clearStorage();
+                if (
+                    window.fastcheckoutHyvaPayment &&
+                    typeof window.fastcheckoutHyvaPayment.handleOrderPlaced === 'function' &&
+                    window.fastcheckoutHyvaPayment.handleOrderPlaced(event.detail || {})
+                ) {
+                    return;
+                }
+                if (event.detail && event.detail.redirectUrl) {
+                    window.location.replace(event.detail.redirectUrl);
+                    return;
+                }
+                if (window.fastcheckoutHyvaPayment && typeof window.fastcheckoutHyvaPayment.afterPlaceOrder === 'function') {
+                    window.fastcheckoutHyvaPayment.afterPlaceOrder();
+                } else {
+                    require(['mage/url'], function (url) {
+                        window.location.replace(url.build('checkout/onepage/success'));
+                    });
+                }
+            });
+            if (window.location.href.includes('/checkout/onepage/success')) {
+                clearStorage();
+            }
+        }, 400);
+    });
+})();
+</script>
+<?php $hyvaCsp->registerInlineScript() ?>
+<div wire:ignore>
+<style>
+@media (min-width: 1024px) and (max-width: 1279px) {
+    /* Tablet layout uses 2 flex columns */
+    .fc-grid {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+}
+@media (min-width: 1280px) {
+    /* Desktop layout uses 3-column CSS Grid with direct child positioning */
+    .fc-grid {
+        display: grid !important;
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    }
+    .fc-left-wrapper,
+    .fc-right-wrapper {
+        display: contents !important;
+    }
+    .fc-container-1 {
+        grid-column-start: 1 !important;
+        grid-row-start: 1 !important;
+        grid-row-end: span 2 !important;
+    }
+    .fc-container-2 {
+        grid-column-start: 2 !important;
+        grid-row-start: 1 !important;
+    }
+    .fc-container-3 {
+        grid-column-start: 2 !important;
+        grid-row-start: 2 !important;
+    }
+    .fc-container-4 {
+        grid-column-start: 3 !important;
+        grid-row-start: 1 !important;
+        grid-row-end: span 2 !important;
+    }
+}
+</style>
+</div>
