@@ -848,6 +848,9 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                     <?php if ($magewire->orderError): ?>
                         <p class="mt-3 text-sm text-red-600 font-medium text-center"><?= $escaper->escapeHtml($magewire->orderError) ?></p>
                     <?php endif; ?>
+                    <template x-if="clientOrderError">
+                        <p class="mt-3 text-sm text-red-600 font-medium text-center" x-text="clientOrderError"></p>
+                    </template>
 
                     <div class="mt-6 flex items-center justify-center gap-2 text-xs text-gray-500 border-t border-gray-100 pt-4">
                         <svg class="h-4 w-4 text-green-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -909,8 +912,13 @@ function initCheckout() {
         _debounceTimers: {},
         _blurTimers: {},
         isProcessing: false,
+        clientOrderError: '',
 
         init() {
+            window.addEventListener('fastcheckout:payment-error', (event) => {
+                this.onPaymentError(event);
+            });
+
             this.$nextTick(() => {
                 if (window.fastcheckoutHyvaShipping && typeof window.fastcheckoutHyvaShipping.syncAddress === 'function') {
                     window.fastcheckoutHyvaShipping.syncAddress(this.$wire);
@@ -1059,6 +1067,8 @@ function initCheckout() {
          * Handle form submit — validate all, then place order.
          */
         handleSubmit() {
+            this.clientOrderError = '';
+
             if (this._validateAll()) {
                 // Invoke shipping locker validation if available
                 if (window.fastcheckoutHyvaShipping && typeof window.fastcheckoutHyvaShipping.validate === 'function') {
@@ -1105,6 +1115,9 @@ function initCheckout() {
                         .catch((err) => {
                             this.isProcessing = false;
                             document.body.classList.remove('checkout-submitting');
+                            if (!this.clientOrderError && err && err.message) {
+                                this.clientOrderError = err.message;
+                            }
 
                             // Smoothly scroll to the selected payment method container so errors are visible
                             if (selectedMethodEl) {
@@ -1121,6 +1134,13 @@ function initCheckout() {
 
                 this.$wire.call('placeOrder', selectedMethod);
             }
+        },
+
+        onPaymentError(event) {
+            const detail = event && event.detail ? event.detail : {};
+            this.clientOrderError = detail.message || '';
+            this.isProcessing = false;
+            document.body.classList.remove('checkout-submitting');
         },
 
         /**

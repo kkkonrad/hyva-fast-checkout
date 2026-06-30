@@ -51,6 +51,9 @@ define([
             'Magento_Checkout/js/model/address-converter',
             'Magento_Checkout/js/action/set-shipping-information',
             'Magento_Checkout/js/model/payment/additional-validators',
+            'Magento_Ui/js/model/messages',
+            'Magento_Checkout/js/model/error-processor',
+            'Magento_Checkout/js/model/full-screen-loader',
             'mage/translate'
         ], function (
             app,
@@ -69,6 +72,9 @@ define([
             addressConverter,
             setShippingInformationAction,
             additionalValidators,
+            Messages,
+            errorProcessor,
+            fullScreenLoader,
             $t
         ) {
             if (quote && quote.billingAddress) {
@@ -215,6 +221,122 @@ define([
                 var checkoutDataFallbackWarningShown = false;
                 var optionalValidationComponentsRequested = false;
                 var optionalPaymentDataAssigners = [];
+                var bridgeMessageContainer = new Messages();
+
+                function getMessageText(message) {
+                    if (!message) {
+                        return '';
+                    }
+
+                    if (typeof message === 'string') {
+                        return message;
+                    }
+
+                    if (message.message) {
+                        return message.message;
+                    }
+
+                    return String(message);
+                }
+
+                function dispatchPaymentMessage(type, message) {
+                    var text = getMessageText(message);
+
+                    if (!text) {
+                        return;
+                    }
+
+                    document.dispatchEvent(new CustomEvent('fastcheckout:payment-message', {
+                        detail: {
+                            type: type,
+                            message: text
+                        }
+                    }));
+
+                    if (type === 'error') {
+                        document.dispatchEvent(new CustomEvent('fastcheckout:payment-error', {
+                            detail: {
+                                message: text
+                            }
+                        }));
+                    }
+                }
+
+                function subscribePaymentMessageContainer(messageContainer) {
+                    if (!messageContainer || messageContainer.fastcheckoutHyvaSubscribed) {
+                        return messageContainer;
+                    }
+
+                    messageContainer.fastcheckoutHyvaSubscribed = true;
+
+                    if (
+                        typeof messageContainer.errorMessages === 'function' &&
+                        typeof messageContainer.errorMessages.subscribe === 'function'
+                    ) {
+                        messageContainer.errorMessages.subscribe(function (messages) {
+                            if (messages && messages.length) {
+                                dispatchPaymentMessage('error', messages[messages.length - 1]);
+                            }
+                        });
+                    }
+
+                    if (
+                        typeof messageContainer.successMessages === 'function' &&
+                        typeof messageContainer.successMessages.subscribe === 'function'
+                    ) {
+                        messageContainer.successMessages.subscribe(function (messages) {
+                            if (messages && messages.length) {
+                                dispatchPaymentMessage('success', messages[messages.length - 1]);
+                            }
+                        });
+                    }
+
+                    return messageContainer;
+                }
+
+                function getBridgeMessageContainer() {
+                    return subscribePaymentMessageContainer(bridgeMessageContainer);
+                }
+
+                function clearPaymentMessages() {
+                    if (bridgeMessageContainer && typeof bridgeMessageContainer.clear === 'function') {
+                        bridgeMessageContainer.clear();
+                    }
+                }
+
+                function messageContainerHasMessages(messageContainer) {
+                    return !!(
+                        messageContainer &&
+                        typeof messageContainer.hasMessages === 'function' &&
+                        messageContainer.hasMessages()
+                    );
+                }
+
+                function handlePaymentError(error, messageContainer) {
+                    var container = subscribePaymentMessageContainer(messageContainer) || getBridgeMessageContainer(),
+                        message = error && error.message ? error.message : $t('We could not place your order. Please try again.');
+
+                    if (fullScreenLoader && typeof fullScreenLoader.stopLoader === 'function') {
+                        fullScreenLoader.stopLoader(true);
+                    }
+
+                    if (error && (error.responseText || error.status)) {
+                        try {
+                            errorProcessor.process(error, container);
+                            return;
+                        } catch (e) {}
+                    }
+
+                    if (messageContainerHasMessages(container)) {
+                        return;
+                    }
+
+                    if (container && typeof container.addErrorMessage === 'function') {
+                        container.addErrorMessage({ message: message });
+                    } else {
+                        dispatchPaymentMessage('error', message);
+                    }
+                }
 
                 function registerAdditionalValidatorOnce(validator) {
                     if (!additionalValidators || !validator || typeof validator.validate !== 'function') {
@@ -954,10 +1076,16 @@ define([
 
                 function patchRenderer(component) {
                     if (!component || component.fastcheckoutHyvaPatched) {
+                        if (component && component.messageContainer) {
+                            subscribePaymentMessageContainer(component.messageContainer);
+                        }
                         return;
                     }
 
                     component.fastcheckoutHyvaPatched = true;
+                    if (component.messageContainer) {
+                        subscribePaymentMessageContainer(component.messageContainer);
+                    }
                     component.selectPaymentMethod = function () {
                         syncQuoteCustomerData();
                         var paymentData = typeof component.getData === 'function'
@@ -1455,8 +1583,12 @@ define([
 	                            result,
 	                            self = this;
 
+                            clearPaymentMessages();
+
 	                        if (!wire || typeof wire.call !== 'function') {
-	                            return Promise.reject(new Error('Checkout session is not ready'));
+                                var missingSessionError = new Error('Checkout session is not ready');
+                                handlePaymentError(missingSessionError, getBridgeMessageContainer());
+	                            return Promise.reject(missingSessionError);
 	                        }
 
 	                        if (selectedMethod) {
@@ -1471,21 +1603,30 @@ define([
 
 	                            if (!component || typeof component.placeOrder !== 'function') {
                                     if (!this.validate()) {
-                                        return Promise.reject(new Error('Payment method validation failed'));
+                                        var validationError = new Error('Payment method validation failed');
+                                        handlePaymentError(validationError, getBridgeMessageContainer());
+                                        return Promise.reject(validationError);
                                     }
 	                                return this.syncPaymentData(wire).then(function () {
 	                                    return wire.call('placeOrder', selectedMethod || (paymentData && paymentData.method) || getSelectedMethodCode());
+	                                }).catch(function (err) {
+                                        handlePaymentError(err, getBridgeMessageContainer());
+                                        throw err;
 	                                });
 	                            }
 
 	                            if (!this.validate()) {
-	                                return Promise.reject(new Error('Payment method validation failed'));
+                                    var activeValidationError = new Error('Payment method validation failed');
+                                    handlePaymentError(activeValidationError, component.messageContainer || getBridgeMessageContainer());
+	                                return Promise.reject(activeValidationError);
 	                            }
 	                            if (
 	                                typeof component.isPlaceOrderActionAllowed === 'function' &&
 	                                !component.isPlaceOrderActionAllowed()
 	                            ) {
-	                                return Promise.reject(new Error('Payment method is not ready'));
+                                    var notReadyError = new Error('Payment method is not ready');
+                                    handlePaymentError(notReadyError, component.messageContainer || getBridgeMessageContainer());
+	                                return Promise.reject(notReadyError);
 	                            }
 
 	                            this.cleanupKoOrderState();
@@ -1501,7 +1642,9 @@ define([
 	                                        return;
 	                                    }
 	                                    self.cleanupKoOrderState();
-	                                    reject(new Error('Payment method did not start order placement'));
+                                        var timeoutError = new Error('Payment method did not start order placement');
+                                        handlePaymentError(timeoutError, component.messageContainer || getBridgeMessageContainer());
+	                                    reject(timeoutError);
 	                                }, 30000);
 
 	                                try {
@@ -1513,13 +1656,16 @@ define([
 
 	                                    if (result === false) {
 	                                        self.cleanupKoOrderState();
-	                                        reject(new Error('Payment method validation failed'));
+                                            var resultError = new Error('Payment method validation failed');
+                                            handlePaymentError(resultError, component.messageContainer || getBridgeMessageContainer());
+	                                        reject(resultError);
 	                                    }
 	                                } catch (e) {
 	                                    if (window.console && typeof window.console.error === 'function') {
 	                                        window.console.error('Kkkonrad Fastcheckout: component placeOrder thrown exception:', e);
 	                                    }
 	                                    self.cleanupKoOrderState();
+                                        handlePaymentError(e, component.messageContainer || getBridgeMessageContainer());
 	                                    reject(e);
 	                                }
 	                            });
@@ -1528,6 +1674,7 @@ define([
 
 	                    onPlaceOrderAction: function (paymentData, messageContainer, originalAction) {
 	                        var methodCode = paymentData.method || getSelectedMethodCode();
+                            messageContainer = subscribePaymentMessageContainer(messageContainer) || getBridgeMessageContainer();
 
 	                        if (this.koOrderActive && this.syncWire) {
 	                            try {
@@ -1548,6 +1695,7 @@ define([
 	                                        }
 	                                    }.bind(this))
 	                                    .catch(function (err) {
+                                            handlePaymentError(err, messageContainer);
 	                                        if (this.koOrderDeferred) {
 	                                            this.koOrderDeferred.reject(err);
 	                                        }
@@ -1557,6 +1705,7 @@ define([
 	                                        this.cleanupKoOrderState();
 	                                    }.bind(this));
 	                            } catch (err) {
+                                    handlePaymentError(err, messageContainer);
 	                                if (this.koOrderDeferred) {
 	                                    this.koOrderDeferred.reject(err);
 	                                }
@@ -1574,6 +1723,8 @@ define([
 	                        if (wire) {
 	                            this.syncWirePaymentData(wire, paymentData).then(function () {
 	                                wire.call('placeOrder', methodCode);
+	                            }).catch(function (err) {
+                                    handlePaymentError(err, messageContainer);
 	                            });
 	                        }
 
@@ -1650,7 +1801,9 @@ define([
                     },
 
                     selectPaymentMethod: setSelectedMethod,
-                    getActiveRenderer: getActiveRenderer
+                    getActiveRenderer: getActiveRenderer,
+                    getMessageContainer: getBridgeMessageContainer,
+                    clearMessages: clearPaymentMessages
                 };
 
 
