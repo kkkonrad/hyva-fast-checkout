@@ -100,8 +100,28 @@ class CheckoutTest extends TestCase
 
         $this->quoteMock = $this->getMockBuilder(Quote::class)
             ->disableOriginalConstructor()
-            ->onlyMethods(['getShippingAddress', 'getBillingAddress', 'getPayment', 'isVirtual', 'getId', 'hasItems', 'setCheckoutMethod', 'collectTotals'])
-            ->addMethods(['getCustomerId', 'getCustomerEmail', 'getCouponCode', 'setCustomerEmail', 'setCouponCode'])
+            ->onlyMethods([
+                'getShippingAddress',
+                'getBillingAddress',
+                'getPayment',
+                'isVirtual',
+                'getId',
+                'hasItems',
+                'setCheckoutMethod',
+                'collectTotals',
+                'getTotals',
+                'getAllVisibleItems',
+            ])
+            ->addMethods([
+                'getCustomerId',
+                'getCustomerEmail',
+                'getCouponCode',
+                'setCustomerEmail',
+                'setCouponCode',
+                'getGrandTotal',
+                'getSubtotal',
+                'getSubtotalWithDiscount',
+            ])
             ->getMock();
 
         $this->checkoutSessionMock->expects($this->any())
@@ -128,10 +148,11 @@ class CheckoutTest extends TestCase
         );
     }
 
-    private function createPaymentMethodMock(string $code): PaymentMethodInterface
+    private function createPaymentMethodMock(string $code, ?string $title = null): PaymentMethodInterface
     {
         $method = $this->createMock(PaymentMethodInterface::class);
         $method->method('getCode')->willReturn($code);
+        $method->method('getTitle')->willReturn($title ?? $code);
 
         return $method;
     }
@@ -478,6 +499,70 @@ class CheckoutTest extends TestCase
         $this->assertSame(['checkmo', 'tpay'], array_map(static function (PaymentMethodInterface $method): string {
             return $method->getCode();
         }, $methods));
+    }
+
+    public function testRefreshCheckoutStateReturnsTotalsAndPaymentMethods(): void
+    {
+        $subtotal = new \Magento\Framework\DataObject([
+            'title' => 'Subtotal',
+            'value' => 80.0,
+        ]);
+        $grandTotal = new \Magento\Framework\DataObject([
+            'title' => 'Grand Total',
+            'value' => 100.0,
+        ]);
+
+        $this->quoteMock->expects($this->any())
+            ->method('getId')
+            ->willReturn(42);
+        $this->quoteMock->expects($this->once())
+            ->method('hasItems')
+            ->willReturn(true);
+        $this->quoteMock->expects($this->once())
+            ->method('collectTotals');
+        $this->cartRepositoryMock->expects($this->once())
+            ->method('save')
+            ->with($this->quoteMock);
+        $this->quoteMock->expects($this->any())
+            ->method('getCouponCode')
+            ->willReturn('SALE10');
+        $this->quoteMock->expects($this->once())
+            ->method('getAllVisibleItems')
+            ->willReturn([]);
+        $this->quoteMock->expects($this->once())
+            ->method('getSubtotal')
+            ->willReturn(80.0);
+        $this->quoteMock->expects($this->once())
+            ->method('getSubtotalWithDiscount')
+            ->willReturn(75.0);
+        $this->quoteMock->expects($this->once())
+            ->method('getGrandTotal')
+            ->willReturn(100.0);
+        $this->quoteMock->expects($this->once())
+            ->method('getTotals')
+            ->willReturn([
+                'subtotal' => $subtotal,
+                'grand_total' => $grandTotal,
+            ]);
+        $this->paymentMethodManagementMock->expects($this->once())
+            ->method('getList')
+            ->with(42)
+            ->willReturn([
+                $this->createPaymentMethodMock('checkmo', 'Check / Money order'),
+                $this->createPaymentMethodMock('tpay', 'Tpay'),
+            ]);
+
+        $this->checkoutComponent->paymentMethod = 'checkmo';
+
+        $state = $this->checkoutComponent->refreshCheckoutState();
+
+        $this->assertSame('checkmo', $state['selected_payment_method']);
+        $this->assertSame('SALE10', $state['coupon_code']);
+        $this->assertSame(100.0, $state['totals']['grand_total']);
+        $this->assertSame(75.0, $state['totals']['subtotal_with_discount']);
+        $this->assertSame('grand_total', $state['totals']['total_segments'][1]['code']);
+        $this->assertSame('tpay', $state['payment_methods'][1]['method']);
+        $this->assertSame('Tpay', $state['payment_methods'][1]['title']);
     }
 
     public function testGetAllowedPaymentMethodsFiltersMethodsByShippingMapping(): void

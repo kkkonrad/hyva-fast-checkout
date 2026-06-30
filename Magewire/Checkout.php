@@ -721,6 +721,120 @@ class Checkout extends Component
     }
 
     /**
+     * Return the current quote state in the shape expected by Magento checkout KO actions.
+     */
+    public function refreshCheckoutState(): array
+    {
+        try {
+            $quote = $this->checkoutSession->getQuote();
+
+            if ($quote && $quote->getId() && $quote->hasItems()) {
+                $quote->collectTotals();
+                $this->saveQuote($quote);
+            }
+
+            if ($quote) {
+                $this->couponCode = (string)$quote->getCouponCode();
+            }
+
+            return [
+                'totals' => $this->buildTotalsData($quote),
+                'payment_methods' => $this->buildPaymentMethodsData(),
+                'selected_payment_method' => $this->paymentMethod,
+                'coupon_code' => $this->couponCode,
+            ];
+        } catch (\Exception $e) {
+            $this->logger->error('Kkkonrad Fastcheckout refreshCheckoutState Error: ' . $e->getMessage(), ['exception' => $e]);
+
+            return [
+                'totals' => [
+                    'items' => [],
+                    'total_segments' => [],
+                    'subtotal' => 0.0,
+                    'subtotal_with_discount' => 0.0,
+                    'grand_total' => 0.0,
+                ],
+                'payment_methods' => [],
+                'selected_payment_method' => $this->paymentMethod,
+                'coupon_code' => $this->couponCode,
+            ];
+        }
+    }
+
+    private function buildPaymentMethodsData(): array
+    {
+        $methods = [];
+
+        foreach ($this->getAllowedPaymentMethods() as $method) {
+            $code = (string)$method->getCode();
+            $title = method_exists($method, 'getTitle') ? (string)$method->getTitle() : $code;
+
+            $methods[] = [
+                'method' => $code,
+                'title' => $title !== '' ? $title : $code,
+            ];
+        }
+
+        return $methods;
+    }
+
+    private function buildTotalsData($quote): array
+    {
+        if (!$quote) {
+            return [
+                'items' => [],
+                'total_segments' => [],
+                'subtotal' => 0.0,
+                'subtotal_with_discount' => 0.0,
+                'grand_total' => 0.0,
+            ];
+        }
+
+        $totalsData = [
+            'items' => $this->buildTotalsItemsData($quote),
+            'total_segments' => [],
+            'subtotal' => (float)$quote->getSubtotal(),
+            'subtotal_with_discount' => (float)$quote->getSubtotalWithDiscount(),
+            'grand_total' => (float)$quote->getGrandTotal(),
+            'coupon_code' => (string)$quote->getCouponCode(),
+        ];
+
+        foreach ($quote->getTotals() as $code => $total) {
+            $value = (float)$total->getValue();
+
+            $totalsData[(string)$code] = $value;
+            $totalsData['total_segments'][] = [
+                'code' => (string)$code,
+                'title' => (string)$total->getTitle(),
+                'value' => $value,
+            ];
+        }
+
+        if ($totalsData['subtotal_with_discount'] === 0.0) {
+            $totalsData['subtotal_with_discount'] = $totalsData['subtotal'];
+        }
+
+        return $totalsData;
+    }
+
+    private function buildTotalsItemsData($quote): array
+    {
+        $items = [];
+
+        foreach ($quote->getAllVisibleItems() as $item) {
+            $items[] = [
+                'item_id' => (int)$item->getId(),
+                'name' => (string)$item->getName(),
+                'qty' => (float)$item->getQty(),
+                'price' => (float)$item->getPrice(),
+                'row_total' => (float)$item->getRowTotal(),
+            ];
+        }
+
+        return $items;
+    }
+
+    /**
      * Select payment method
      */
     public function selectPaymentMethod(string $methodCode): void
@@ -1028,7 +1142,7 @@ class Checkout extends Component
                 'redirectUrl' => $redirectUrl ?: ''
             ]);
         } catch (\Exception $e) {
-            $this->orderError = (string)__('We could not place your order. Please try again or contact us for help.');
+            $this->orderError = (string)__('Something went wrong while processing your order. Please try again later.');
             $this->logger->error('Fastcheckout placeOrder failed', [
                 'quote_id' => $quote->getId(),
                 'payment_method' => $this->paymentMethod,

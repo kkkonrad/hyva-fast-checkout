@@ -19,6 +19,12 @@ var config = {
             'Magento_Checkout/js/action/set-billing-address': {
                 'Kkkonrad_Fastcheckout/js/mixin/set-billing-address-mixin': true
             },
+            'Magento_Checkout/js/action/get-payment-information': {
+                'Kkkonrad_Fastcheckout/js/mixin/get-payment-information-mixin': true
+            },
+            'Magento_Checkout/js/action/get-totals': {
+                'Kkkonrad_Fastcheckout/js/mixin/get-totals-mixin': true
+            },
             'PayPal_Braintree/js/view/payment/adapter': {
                 'Kkkonrad_Fastcheckout/js/mixin/braintree-adapter-mixin': true
             }

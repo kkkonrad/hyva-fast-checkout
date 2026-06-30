@@ -756,9 +756,14 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
                 </div>
 
                 <!-- Summary Totals -->
-                <dl class="space-y-3 border-t border-gray-200 pt-4">
+                <dl class="space-y-3 border-t border-gray-200 pt-4"
+                    data-fastcheckout-summary-totals>
                     <?php foreach ($block->getSummaryTotals() as $total): ?>
-                        <div class="<?= $total['strong'] ? 'border-t border-gray-200 pt-4 text-lg font-bold text-gray-950' : 'text-sm text-gray-600' ?> flex items-center justify-between gap-4">
+                        <div class="<?= $total['strong'] ? 'border-t border-gray-200 pt-4 text-lg font-bold text-gray-950' : 'text-sm text-gray-600' ?> flex items-center justify-between gap-4"
+                             data-fastcheckout-total-row
+                             data-code="<?= $escaper->escapeHtmlAttr($total['code']) ?>"
+                             data-label="<?= $escaper->escapeHtmlAttr($total['label']) ?>"
+                             data-value="<?= $escaper->escapeHtmlAttr((string)$total['value']) ?>">
                             <dt><?= $escaper->escapeHtml($total['label']) ?></dt>
                             <dd class="<?= $total['strong'] ? 'text-xl' : 'font-semibold text-gray-900' ?>">
                                 <?= /* @noEscape */ $block->formatPrice($total['value']) ?>

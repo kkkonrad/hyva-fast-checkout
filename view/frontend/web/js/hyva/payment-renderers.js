@@ -31,6 +31,15 @@ define([
             });
         };
         window.checkoutConfig.payment = initPaymentProxy(window.checkoutConfig.payment);
+        if (!window.checkoutConfig.totalsData || typeof window.checkoutConfig.totalsData !== 'object') {
+            window.checkoutConfig.totalsData = {
+                items: window.checkoutConfig.quoteItemData || [],
+                total_segments: [],
+                subtotal: 0,
+                subtotal_with_discount: 0,
+                grand_total: 0
+            };
+        }
         window.isCustomerLoggedIn = window.checkoutConfig.isCustomerLoggedIn;
         window.customerData = window.checkoutConfig.customerData;
 
@@ -40,6 +49,7 @@ define([
             'Magento_Checkout/js/model/payment/method-converter',
             'Magento_Checkout/js/model/payment/method-list',
             'Magento_Checkout/js/model/quote',
+            'Magento_Checkout/js/model/totals',
             'Magento_Checkout/js/action/select-payment-method',
             'uiRegistry',
             'Magento_Checkout/js/model/shipping-service',
@@ -62,6 +72,7 @@ define([
             methodConverter,
             methodList,
             quote,
+            checkoutTotals,
             selectPaymentMethodAction,
             registry,
             shippingService,
@@ -530,7 +541,8 @@ define([
                     'Please check the selected payment method and try again.': 'Sprawdź wybraną metodę płatności i spróbuj ponownie.',
                     'The selected payment method is not ready. Please try again.': 'Wybrana metoda płatności nie jest jeszcze gotowa. Spróbuj ponownie.',
                     'The selected payment method did not start order placement. Please try again.': 'Wybrana metoda płatności nie rozpoczęła składania zamówienia. Spróbuj ponownie.',
-                    'We could not place your order. Please try again.': 'Nie udało się złożyć zamówienia. Spróbuj ponownie.'
+                    'We could not place your order. Please try again.': 'Nie udało się złożyć zamówienia. Spróbuj ponownie.',
+                    'Something went wrong while processing your order. Please try again later.': 'Coś poszło nie tak podczas przetwarzania zamówienia. Spróbuj ponownie później.'
                 };
 
                 function isPolishLocale() {
@@ -686,7 +698,7 @@ define([
                     var container = subscribePaymentMessageContainer(messageContainer) || getBridgeMessageContainer(),
                         message = error && error.message
                             ? translateFastcheckoutMessage(error.message)
-                            : translateFastcheckoutMessage('We could not place your order. Please try again.');
+                            : translateFastcheckoutMessage('Something went wrong while processing your order. Please try again later.');
 
                     if (fullScreenLoader && typeof fullScreenLoader.stopLoader === 'function') {
                         fullScreenLoader.stopLoader(true);
@@ -850,6 +862,213 @@ define([
                     }
                 }
 
+                function normalizeTotalsData(totalsData) {
+                    var data = $.extend(true, {}, totalsData || {}),
+                        quoteItems = (window.checkoutConfig && window.checkoutConfig.quoteItemData) ||
+                            (config.checkoutConfig && config.checkoutConfig.quoteItemData) ||
+                            [];
+
+                    if (!Array.isArray(data.items)) {
+                        data.items = quoteItems;
+                    }
+                    if (!Array.isArray(data.total_segments)) {
+                        data.total_segments = [];
+                    }
+                    ['subtotal', 'grand_total', 'shipping_amount', 'tax_amount', 'discount_amount'].forEach(function (code) {
+                        if (typeof data[code] === 'undefined' || data[code] === null || data[code] === '') {
+                            data[code] = 0;
+                        }
+                        data[code] = parseFloat(data[code]) || 0;
+                    });
+                    if (typeof data.subtotal_with_discount === 'undefined' || data.subtotal_with_discount === null || data.subtotal_with_discount === '') {
+                        data.subtotal_with_discount = data.subtotal + (parseFloat(data.discount_amount) || 0);
+                    }
+                    data.subtotal_with_discount = parseFloat(data.subtotal_with_discount) || data.subtotal || 0;
+
+                    return data;
+                }
+
+                function getCheckoutConfigTotalsData() {
+                    if (window.checkoutConfig && window.checkoutConfig.totalsData) {
+                        return window.checkoutConfig.totalsData;
+                    }
+                    if (config.checkoutConfig && config.checkoutConfig.totalsData) {
+                        return config.checkoutConfig.totalsData;
+                    }
+
+                    return null;
+                }
+
+                function readSummaryTotalsFromDom() {
+                    var rows = document.querySelectorAll('[data-fastcheckout-total-row]'),
+                        currentTotals = quote && typeof quote.totals === 'function' ? quote.totals() : null,
+                        data,
+                        segmentsByCode = {};
+
+                    if (!rows.length) {
+                        return null;
+                    }
+
+                    data = normalizeTotalsData(currentTotals || getCheckoutConfigTotalsData());
+                    data.total_segments.forEach(function (segment) {
+                        if (segment && segment.code) {
+                            segmentsByCode[segment.code] = segment;
+                        }
+                    });
+
+                    rows.forEach(function (row) {
+                        var code = row.getAttribute('data-code'),
+                            label = row.getAttribute('data-label') || code,
+                            value = parseFloat(row.getAttribute('data-value'));
+
+                        if (!code || isNaN(value)) {
+                            return;
+                        }
+
+                        data[code] = value;
+                        if (!segmentsByCode[code]) {
+                            segmentsByCode[code] = {
+                                code: code
+                            };
+                            data.total_segments.push(segmentsByCode[code]);
+                        }
+                        segmentsByCode[code].title = label;
+                        segmentsByCode[code].value = value;
+                    });
+
+                    return normalizeTotalsData(data);
+                }
+
+                function syncQuoteTotals(totalsData) {
+                    var data = normalizeTotalsData(totalsData);
+
+                    if (!quote || typeof quote.setTotals !== 'function') {
+                        return false;
+                    }
+
+                    quote.setTotals(data);
+                    if (window.checkoutConfig) {
+                        window.checkoutConfig.totalsData = data;
+                    }
+                    if (checkoutTotals && checkoutTotals.isLoading && typeof checkoutTotals.isLoading === 'function') {
+                        checkoutTotals.isLoading(false);
+                    }
+
+                    return true;
+                }
+
+                function syncQuoteTotalsFromConfig() {
+                    var totalsData = getCheckoutConfigTotalsData();
+
+                    if (!totalsData) {
+                        return false;
+                    }
+
+                    return syncQuoteTotals(totalsData);
+                }
+
+                function syncQuoteTotalsFromDom() {
+                    var totalsData = readSummaryTotalsFromDom();
+
+                    if (!totalsData) {
+                        return false;
+                    }
+
+                    return syncQuoteTotals(totalsData);
+                }
+
+                function applyCheckoutStatePayload(payload) {
+                    var methodsJson;
+
+                    if (!payload || typeof payload !== 'object') {
+                        syncQuoteTotalsFromDom();
+                        syncPaymentMethods();
+                        return false;
+                    }
+
+                    if (payload.totals) {
+                        syncQuoteTotals(payload.totals);
+                    } else {
+                        syncQuoteTotalsFromDom();
+                    }
+
+                    if (Array.isArray(payload.payment_methods)) {
+                        paymentService.setPaymentMethods(payload.payment_methods);
+                        methodsJson = JSON.stringify(payload.payment_methods);
+                        if (methodsJson) {
+                            lastMethodsJson = methodsJson;
+                        }
+                    } else {
+                        syncPaymentMethods();
+                    }
+
+                    if (payload.selected_payment_method) {
+                        quote.paymentMethod({
+                            method: payload.selected_payment_method
+                        });
+                        persistPaymentMethodToCheckoutData(payload.selected_payment_method);
+                    }
+
+                    if (typeof payload.coupon_code !== 'undefined' && window.checkoutConfig && window.checkoutConfig.totalsData) {
+                        window.checkoutConfig.totalsData.coupon_code = payload.coupon_code || '';
+                    }
+
+                    return true;
+                }
+
+                function refreshCheckoutStateFromMagewire() {
+                    var wire = getMagewireComponent();
+
+                    if (!wire || typeof wire.call !== 'function') {
+                        applyCheckoutStatePayload(null);
+                        return Promise.resolve(false);
+                    }
+
+                    return Promise.resolve(wire.call('refreshCheckoutState')).then(function (payload) {
+                        applyCheckoutStatePayload(payload);
+                        return payload;
+                    });
+                }
+
+                function resolveCheckoutStateRefresh(callbacks, deferred, messageContainer) {
+                    var proceed = true;
+
+                    callbacks = Array.isArray(callbacks) ? callbacks : [];
+                    deferred = deferred || $.Deferred();
+
+                    if (checkoutTotals && checkoutTotals.isLoading && typeof checkoutTotals.isLoading === 'function') {
+                        checkoutTotals.isLoading(true);
+                    }
+
+                    refreshCheckoutStateFromMagewire()
+                        .then(function (payload) {
+                            callbacks.forEach(function (callback) {
+                                if (typeof callback === 'function') {
+                                    proceed = proceed && callback();
+                                }
+                            });
+
+                            if (!proceed) {
+                                deferred.reject();
+                                return;
+                            }
+
+                            if (checkoutTotals && checkoutTotals.isLoading && typeof checkoutTotals.isLoading === 'function') {
+                                checkoutTotals.isLoading(false);
+                            }
+                            deferred.resolve(payload);
+                        })
+                        .catch(function (error) {
+                            if (checkoutTotals && checkoutTotals.isLoading && typeof checkoutTotals.isLoading === 'function') {
+                                checkoutTotals.isLoading(false);
+                            }
+                            handlePaymentError(error, messageContainer || getBridgeMessageContainer());
+                            deferred.reject(error);
+                        });
+
+                    return deferred.promise();
+                }
+
                 function syncPaymentMethods() {
                     syncQuoteCustomerData();
                     var domMethods = getDomPaymentMethods();
@@ -890,6 +1109,8 @@ define([
                 }
 
                 syncPaymentMethods();
+                syncQuoteTotalsFromConfig();
+                syncQuoteTotalsFromDom();
 
                 app({
                     components: {
@@ -1218,9 +1439,15 @@ define([
                             if (fullScreenLoader && typeof fullScreenLoader.stopLoader === 'function') {
                                 fullScreenLoader.stopLoader(true);
                             }
+                            if (checkoutTotals && checkoutTotals.isLoading && typeof checkoutTotals.isLoading === 'function') {
+                                checkoutTotals.isLoading(false);
+                            }
                             deferred.resolve();
                         })
                         .catch(function (error) {
+                            if (checkoutTotals && checkoutTotals.isLoading && typeof checkoutTotals.isLoading === 'function') {
+                                checkoutTotals.isLoading(false);
+                            }
                             handlePaymentError(error, messageContainer || getBridgeMessageContainer());
                             deferred.reject(error);
                         });
@@ -1368,6 +1595,9 @@ define([
                     try {
                         return Promise.resolve(setShippingInformationAction()).then(function () {
                             syncPaymentMethods();
+                            if (checkoutTotals && checkoutTotals.isLoading && typeof checkoutTotals.isLoading === 'function') {
+                                checkoutTotals.isLoading(false);
+                            }
                             return true;
                         });
                     } catch (e) {
@@ -1499,6 +1729,9 @@ define([
                         return;
                     }
 
+                    if (checkoutTotals && checkoutTotals.isLoading && typeof checkoutTotals.isLoading === 'function') {
+                        checkoutTotals.isLoading(true);
+                    }
                     syncShippingMethodToMagewire(method.carrier_code + '_' + method.method_code);
                 });
 
@@ -2077,7 +2310,8 @@ define([
 
                         onSetPaymentInformationAction: function (messageContainer, paymentData, skipBilling, originalAction) {
                             var wire = getMagewireComponent(),
-                                self = this;
+                                self = this,
+                                methodCode = paymentData && paymentData.method ? paymentData.method : getSelectedMethodCode();
 
                             messageContainer = subscribePaymentMessageContainer(messageContainer) || getBridgeMessageContainer();
 
@@ -2088,9 +2322,19 @@ define([
                             return resolveAsKoDeferred(
                                 new Promise(function (resolve, reject) {
                                     try {
+                                        if (checkoutTotals && checkoutTotals.isLoading && typeof checkoutTotals.isLoading === 'function') {
+                                            checkoutTotals.isLoading(true);
+                                        }
                                         syncCheckoutStateWithoutServer(wire);
                                         self.syncWirePaymentData(wire, paymentData || self.getActivePaymentData())
                                             .then(function () {
+                                                if (methodCode && typeof wire.call === 'function') {
+                                                    return wire.call('selectPaymentMethod', methodCode);
+                                                }
+                                                return true;
+                                            })
+                                            .then(function () {
+                                                syncQuoteTotalsFromDom();
                                                 resolve(true);
                                             })
                                             .catch(reject);
@@ -2100,6 +2344,22 @@ define([
                                 }),
                                 messageContainer
                             );
+                        },
+
+                        onGetPaymentInformationAction: function (deferred, messageContainer, originalAction) {
+                            if (!getMagewireComponent()) {
+                                return originalAction(deferred, messageContainer);
+                            }
+
+                            return resolveCheckoutStateRefresh([], deferred, messageContainer);
+                        },
+
+                        onGetTotalsAction: function (callbacks, deferred, originalAction) {
+                            if (!getMagewireComponent()) {
+                                return originalAction(callbacks, deferred);
+                            }
+
+                            return resolveCheckoutStateRefresh(callbacks, deferred, getBridgeMessageContainer());
                         },
 
 	                    placeOrder: function (wire, selectedMethod) {
@@ -2408,6 +2668,7 @@ define([
 
                     window.Livewire.hook('message.processed', function () {
                         syncPaymentMethods();
+                        syncQuoteTotalsFromDom();
                         var code = getSelectedMethodCode();
                         
                         patchRenderers();
@@ -2421,6 +2682,9 @@ define([
                             if (currentMethod) {
                                 syncSelectedShippingMethodToKnockout(currentMethod);
                             }
+                        }
+                        if (checkoutTotals && checkoutTotals.isLoading && typeof checkoutTotals.isLoading === 'function') {
+                            checkoutTotals.isLoading(false);
                         }
                     });
                 }
