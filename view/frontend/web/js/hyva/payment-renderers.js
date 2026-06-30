@@ -52,6 +52,7 @@ define([
             'Magento_Checkout/js/action/set-shipping-information',
             'Magento_Checkout/js/model/payment/additional-validators',
             'Magento_Ui/js/model/messages',
+            'Magento_Ui/js/model/messageList',
             'Magento_Checkout/js/model/error-processor',
             'Magento_Checkout/js/model/full-screen-loader',
             'mage/translate'
@@ -73,6 +74,7 @@ define([
             setShippingInformationAction,
             additionalValidators,
             Messages,
+            globalMessageList,
             errorProcessor,
             fullScreenLoader,
             $t
@@ -599,9 +601,44 @@ define([
                     return subscribePaymentMessageContainer(bridgeMessageContainer);
                 }
 
+                function getCheckoutErrorsComponent() {
+                    var component;
+
+                    try {
+                        component = registry.get('checkout.errors');
+                    } catch (e) {
+                        component = null;
+                    }
+
+                    if (!component) {
+                        component = {
+                            name: 'checkout.errors',
+                            index: 'checkout.errors',
+                            messageContainer: getBridgeMessageContainer()
+                        };
+
+                        try {
+                            registry.set('checkout.errors', component);
+                        } catch (e) {
+                            if (window.console && typeof window.console.warn === 'function') {
+                                window.console.warn('Kkkonrad Fastcheckout: could not register fallback checkout.errors component.', e);
+                            }
+                        }
+                    } else if (!component.messageContainer) {
+                        component.messageContainer = getBridgeMessageContainer();
+                    } else {
+                        subscribePaymentMessageContainer(component.messageContainer);
+                    }
+
+                    return component;
+                }
+
                 function clearPaymentMessages() {
                     if (bridgeMessageContainer && typeof bridgeMessageContainer.clear === 'function') {
                         bridgeMessageContainer.clear();
+                    }
+                    if (globalMessageList && typeof globalMessageList.clear === 'function') {
+                        globalMessageList.clear();
                     }
                 }
 
@@ -638,6 +675,9 @@ define([
                         dispatchPaymentMessage('error', message);
                     }
                 }
+
+                subscribePaymentMessageContainer(globalMessageList);
+                getCheckoutErrorsComponent();
 
                 function registerAdditionalValidatorOnce(validator) {
                     if (!additionalValidators || !validator || typeof validator.validate !== 'function') {
@@ -1944,7 +1984,7 @@ define([
                             clearPaymentMessages();
 
 	                        if (!wire || typeof wire.call !== 'function') {
-                                var missingSessionError = new Error('Checkout session is not ready');
+                                var missingSessionError = new Error($t('Checkout session is not ready. Please refresh the page and try again.'));
                                 handlePaymentError(missingSessionError, getBridgeMessageContainer());
 	                            return Promise.reject(missingSessionError);
 	                        }
@@ -1961,7 +2001,7 @@ define([
 
 	                            if (!component || typeof component.placeOrder !== 'function') {
                                     if (!this.validate()) {
-                                        var validationError = new Error('Payment method validation failed');
+                                        var validationError = new Error($t('Please check the selected payment method and try again.'));
                                         handlePaymentError(validationError, getBridgeMessageContainer());
                                         return Promise.reject(validationError);
                                     }
@@ -1974,7 +2014,7 @@ define([
 	                            }
 
 	                            if (!this.validate()) {
-                                    var activeValidationError = new Error('Payment method validation failed');
+                                    var activeValidationError = new Error($t('Please check the selected payment method and try again.'));
                                     handlePaymentError(activeValidationError, component.messageContainer || getBridgeMessageContainer());
 	                                return Promise.reject(activeValidationError);
 	                            }
@@ -1982,7 +2022,7 @@ define([
 	                                typeof component.isPlaceOrderActionAllowed === 'function' &&
 	                                !component.isPlaceOrderActionAllowed()
 	                            ) {
-                                    var notReadyError = new Error('Payment method is not ready');
+                                    var notReadyError = new Error($t('The selected payment method is not ready. Please try again.'));
                                     handlePaymentError(notReadyError, component.messageContainer || getBridgeMessageContainer());
 	                                return Promise.reject(notReadyError);
 	                            }
@@ -2000,7 +2040,7 @@ define([
 	                                        return;
 	                                    }
 	                                    self.cleanupKoOrderState();
-                                        var timeoutError = new Error('Payment method did not start order placement');
+                                        var timeoutError = new Error($t('The selected payment method did not start order placement. Please try again.'));
                                         handlePaymentError(timeoutError, component.messageContainer || getBridgeMessageContainer());
 	                                    reject(timeoutError);
 	                                }, 30000);
@@ -2014,7 +2054,7 @@ define([
 
 	                                    if (result === false) {
 	                                        self.cleanupKoOrderState();
-                                            var resultError = new Error('Payment method validation failed');
+                                            var resultError = new Error($t('Please check the selected payment method and try again.'));
                                             handlePaymentError(resultError, component.messageContainer || getBridgeMessageContainer());
 	                                        reject(resultError);
 	                                    }

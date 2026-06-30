@@ -296,3 +296,7 @@
 "Add Mapping","Dodaj mapowanie"
 "Allowed Payment Method","Dozwolona metoda płatności"
 "Shipping & Address","Dostawa i Adres"
+"Checkout session is not ready. Please refresh the page and try again.","Sesja checkoutu nie jest gotowa. Odśwież stronę i spróbuj ponownie."
+"Please check the selected payment method and try again.","Sprawdź wybraną metodę płatności i spróbuj ponownie."
+"The selected payment method is not ready. Please try again.","Wybrana metoda płatności nie jest jeszcze gotowa. Spróbuj ponownie."
+"The selected payment method did not start order placement. Please try again.","Wybrana metoda płatności nie rozpoczęła składania zamówienia. Spróbuj ponownie."
