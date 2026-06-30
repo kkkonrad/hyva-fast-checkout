@@ -738,7 +738,7 @@ class CheckoutTest extends TestCase
             ->willThrowException(new \Magento\Framework\Exception\LocalizedException(__('Postcode is required.')));
 
         $this->checkoutComponent->placeOrder();
-        $this->assertStringContainsString('Address validation failed', $this->checkoutComponent->orderError);
+        $this->assertStringContainsString('Please check your address details', $this->checkoutComponent->orderError);
     }
 
     public function testUpdatedResetsRegionOnCountryChange(): void
@@ -827,6 +827,7 @@ class CheckoutTest extends TestCase
         $addressMock->method('getCountryId')->willReturn('PL');
         $addressMock->method('getTelephone')->willReturn('123456789');
         $addressMock->method('getRegion')->willReturn($regionMock);
+        $addressMock->method('getCustomerId')->willReturn(123);
 
         $addressRepoMock = $this->createMock(\Magento\Customer\Api\AddressRepositoryInterface::class);
         $addressRepoMock->method('getById')->with(42)->willReturn($addressMock);
@@ -836,6 +837,7 @@ class CheckoutTest extends TestCase
             ->onlyMethods(['isLoggedIn', 'getCustomerId'])
             ->getMock();
         $customerSessionMock->method('isLoggedIn')->willReturn(true);
+        $customerSessionMock->method('getCustomerId')->willReturn(123);
 
         $searchBuilderMock = $this->getMockBuilder(\Magento\Framework\Api\SearchCriteriaBuilder::class)
             ->disableOriginalConstructor()
@@ -895,5 +897,49 @@ class CheckoutTest extends TestCase
         $this->assertSame('PL', $component->countryId);
         $this->assertSame('ul. Testowa 1', $component->street1);
         $this->assertSame('m. 2', $component->street2);
+    }
+
+    public function testFillFromSavedAddressRejectsAddressOwnedByAnotherCustomer(): void
+    {
+        $addressMock = $this->getMockBuilder(\Magento\Customer\Api\Data\AddressInterface::class)
+            ->getMock();
+        $addressMock->method('getCustomerId')->willReturn(456);
+
+        $addressRepoMock = $this->createMock(\Magento\Customer\Api\AddressRepositoryInterface::class);
+        $addressRepoMock->expects($this->once())->method('getById')->with(42)->willReturn($addressMock);
+
+        $customerSessionMock = $this->getMockBuilder(\Magento\Customer\Model\Session::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['isLoggedIn', 'getCustomerId'])
+            ->getMock();
+        $customerSessionMock->method('isLoggedIn')->willReturn(true);
+        $customerSessionMock->method('getCustomerId')->willReturn(123);
+
+        $loggerMock = $this->createMock(\Psr\Log\LoggerInterface::class);
+        $loggerMock->expects($this->once())->method('warning');
+
+        $component = new Checkout(
+            $this->checkoutSessionMock,
+            $this->cartRepositoryMock,
+            $this->shippingMethodManagementMock,
+            $this->paymentMethodManagementMock,
+            $this->cartManagementMock,
+            $this->countryCollectionFactoryMock,
+            $this->regionCollectionFactoryMock,
+            $this->subscriberFactoryMock,
+            $this->helperMock,
+            $loggerMock,
+            null,
+            null,
+            null,
+            $customerSessionMock,
+            $addressRepoMock,
+            null
+        );
+
+        $component->fillFromSavedAddress(42);
+
+        $this->assertSame('', $component->firstname);
+        $this->assertSame('', $component->street1);
     }
 }

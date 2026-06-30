@@ -520,7 +520,7 @@ class Checkout extends Template
      */
     public function formatPrice($amount)
     {
-        return $this->getQuote()->getStore()->getCurrentCurrency()->formatPrecision((float)$amount, 2, [], false);
+        return $this->pricingHelper->currency((float)$amount, true, false);
     }
 
     /**

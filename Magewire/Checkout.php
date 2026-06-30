@@ -367,7 +367,7 @@ class Checkout extends Component
             $shippingAddress->setSuffix($this->suffix);
             $shippingAddress->setFax($this->fax);
             $shippingAddress->setVatId($this->vatId);
-            $shippingAddress->setStreet([$this->street1, $this->street2, $this->street3, $this->street4]);
+            $shippingAddress->setStreet($this->buildStreetLines($this->street1, $this->street2, $this->street3, $this->street4));
             $shippingAddress->setCity($this->city);
             $shippingAddress->setPostcode($this->postcode);
             $shippingAddress->setCountryId($this->countryId);
@@ -430,7 +430,7 @@ class Checkout extends Component
                 $billingAddress->setSuffix($this->suffix);
                 $billingAddress->setFax($this->fax);
                 $billingAddress->setVatId($this->vatId);
-                $billingAddress->setStreet([$this->street1, $this->street2, $this->street3, $this->street4]);
+                $billingAddress->setStreet($this->buildStreetLines($this->street1, $this->street2, $this->street3, $this->street4));
                 $billingAddress->setCity($this->city);
                 $billingAddress->setPostcode($this->postcode);
                 $billingAddress->setCountryId($this->countryId);
@@ -446,7 +446,12 @@ class Checkout extends Component
                 $billingAddress->setSuffix($this->billingSuffix);
                 $billingAddress->setFax($this->billingFax);
                 $billingAddress->setVatId($this->billingVatId);
-                $billingAddress->setStreet([$this->billingStreet1, $this->billingStreet2, $this->billingStreet3, $this->billingStreet4]);
+                $billingAddress->setStreet($this->buildStreetLines(
+                    $this->billingStreet1,
+                    $this->billingStreet2,
+                    $this->billingStreet3,
+                    $this->billingStreet4
+                ));
                 $billingAddress->setCity($this->billingCity);
                 $billingAddress->setPostcode($this->billingPostcode);
                 $billingAddress->setCountryId($this->billingCountryId);
@@ -770,7 +775,8 @@ class Checkout extends Component
                 $this->couponError = (string)__('The coupon code is not valid.');
             }
         } catch (\Exception $e) {
-            $this->couponError = $e->getMessage();
+            $this->logger->warning('Fastcheckout coupon apply failed', ['exception' => $e]);
+            $this->couponError = (string)__('We could not apply this coupon code. Please try again.');
         }
     }
 
@@ -793,7 +799,8 @@ class Checkout extends Component
             $this->couponCode = '';
             $this->couponSuccess = (string)__('Coupon code canceled.');
         } catch (\Exception $e) {
-            $this->couponError = $e->getMessage();
+            $this->logger->warning('Fastcheckout coupon cancel failed', ['exception' => $e]);
+            $this->couponError = (string)__('We could not remove this coupon code. Please try again.');
         }
     }
 
@@ -802,25 +809,17 @@ class Checkout extends Component
      */
     public function placeOrder(string $selectedPaymentMethod = ''): void
     {
-        // Idempotency check to prevent duplicate order submissions
-        if (!empty($this->idempotencyKey)) {
-            $usedKeys = $this->getStoredIdempotencyKeys();
-
-            if (in_array($this->idempotencyKey, $usedKeys, true)) {
-                $this->orderError = (string)__('This order is already being processed. Please wait.');
-                return;
-            }
-
-            $usedKeys[] = $this->idempotencyKey;
-            $this->persistIdempotencyKeys($usedKeys);
-        }
-
         // Payment method passed directly from client DOM — no wire:click request needed
         if ($selectedPaymentMethod !== '') {
             $this->paymentMethod = $selectedPaymentMethod;
         }
 
         $this->orderError = '';
+        if ($this->isIdempotencyKeyAlreadyUsed()) {
+            $this->orderError = (string)__('This order is already being processed. Please wait.');
+            return;
+        }
+
         $quote = $this->checkoutSession->getQuote();
         $isVirtual = (bool)$quote->isVirtual();
 
@@ -853,7 +852,11 @@ class Checkout extends Component
             $this->saveShippingAddress(false);
             $this->saveBillingAddress(false);
         } catch (\Exception $e) {
-            $this->orderError = (string)__('Address validation failed: %1', $e->getMessage());
+            $this->logger->warning('Fastcheckout placeOrder blocked: address validation failed', [
+                'quote_id' => $quote->getId(),
+                'exception' => $e,
+            ]);
+            $this->orderError = (string)__('Please check your address details and try again.');
             return;
         }
         
@@ -897,6 +900,11 @@ class Checkout extends Component
         }
 
         try {
+            if (!$this->claimIdempotencyKey()) {
+                $this->orderError = (string)__('This order is already being processed. Please wait.');
+                return;
+            }
+
             $payment = $quote->getPayment();
             $this->importPaymentData($payment, $this->paymentMethod);
             if ($this->paymentMethod === 'purchaseorder' && method_exists($payment, 'setPoNumber')) {
@@ -907,7 +915,7 @@ class Checkout extends Component
 
             // Save comment to session so QuoteSubmitSuccess observer can persist it to order history
             if (!empty(trim($this->comment))) {
-                $this->checkoutSession->setFastcheckoutComment(trim($this->comment));
+                $this->setSessionValue('fastcheckout_comment', trim($this->comment));
             }
 
             if ($this->subscribe && !empty($this->email)) {
@@ -923,7 +931,7 @@ class Checkout extends Component
             $orderId = $this->cartManagement->placeOrder($quoteId);
 
             try {
-                if (is_callable([$this->checkoutSession, 'clearHelperData'])) {
+                if (method_exists($this->checkoutSession, 'clearHelperData')) {
                     $this->checkoutSession->clearHelperData();
                 }
             } catch (\Exception $e) {
@@ -931,17 +939,17 @@ class Checkout extends Component
             }
 
             try {
-                $this->checkoutSession->setLastQuoteId($quoteId);
-                $this->checkoutSession->setLastSuccessQuoteId($quoteId);
-                $this->checkoutSession->setLastOrderId($orderId);
+                $this->setSessionValue('last_quote_id', $quoteId);
+                $this->setSessionValue('last_success_quote_id', $quoteId);
+                $this->setSessionValue('last_order_id', $orderId);
                 if ($this->orderFactory !== null) {
                     $order = $this->orderFactory->create()->load($orderId);
                     if ($order && $order->getId()) {
-                        $this->checkoutSession->setLastRealOrderId($order->getIncrementId());
-                        $this->checkoutSession->setLastOrderStatus($order->getStatus());
+                        $this->setSessionValue('last_real_order_id', $order->getIncrementId());
+                        $this->setSessionValue('last_order_status', $order->getStatus());
                     }
                 }
-            } catch (\Exception $e) {
+            } catch (\Throwable $e) {
                 try {
                     $this->logger->error('Kkkonrad Fastcheckout placeOrder load order Error: ' . $e->getMessage(), ['exception' => $e]);
                 } catch (\Exception $ex) {
@@ -954,8 +962,19 @@ class Checkout extends Component
                 'payment_method' => $this->paymentMethod,
             ]);
 
-            $redirectUrl = $this->checkoutSession->getRedirectUrl();
-            if (!$redirectUrl && $orderId) {
+            $redirectUrl = '';
+            try {
+                if (method_exists($this->checkoutSession, 'getData')) {
+                    $redirectUrl = (string)$this->checkoutSession->getData('redirect_url');
+                }
+                if ($redirectUrl === '' && method_exists($this->checkoutSession, 'getRedirectUrl')) {
+                    $redirectUrl = (string)$this->checkoutSession->getRedirectUrl();
+                }
+            } catch (\Throwable $e) {
+                $this->logger->warning('Fastcheckout checkout session redirect URL read failed', ['exception' => $e]);
+            }
+
+            if (!$redirectUrl && $orderId && $this->orderFactory !== null) {
                 try {
                     $order = $this->orderFactory->create()->load($orderId);
                     if ($order && $order->getId()) {
@@ -964,7 +983,7 @@ class Checkout extends Component
                             $redirectUrl = $methodInstance->getOrderPlaceRedirectUrl();
                         }
                     }
-                } catch (\Exception $e) {
+                } catch (\Throwable $e) {
                     // Ignore
                 }
             }
@@ -975,7 +994,7 @@ class Checkout extends Component
                 'redirectUrl' => $redirectUrl ?: ''
             ]);
         } catch (\Exception $e) {
-            $this->orderError = $e->getMessage();
+            $this->orderError = (string)__('We could not place your order. Please try again or contact us for help.');
             $this->logger->error('Fastcheckout placeOrder failed', [
                 'quote_id' => $quote->getId(),
                 'payment_method' => $this->paymentMethod,
@@ -986,6 +1005,29 @@ class Checkout extends Component
         }
     }
 
+    private function claimIdempotencyKey(): bool
+    {
+        if (empty($this->idempotencyKey)) {
+            $this->idempotencyKey = bin2hex(random_bytes(16));
+        }
+
+        $usedKeys = $this->getStoredIdempotencyKeys();
+        if (in_array($this->idempotencyKey, $usedKeys, true)) {
+            return false;
+        }
+
+        $usedKeys[] = $this->idempotencyKey;
+        $this->persistIdempotencyKeys(array_slice($usedKeys, -20));
+
+        return true;
+    }
+
+    private function isIdempotencyKeyAlreadyUsed(): bool
+    {
+        return $this->idempotencyKey !== ''
+            && in_array($this->idempotencyKey, $this->getStoredIdempotencyKeys(), true);
+    }
+
     private function getStoredIdempotencyKeys(): array
     {
         try {
@@ -993,7 +1035,7 @@ class Checkout extends Component
                 $storedKeys = $this->checkoutSession->getData('fastcheckout_used_idempotency_keys');
                 return is_array($storedKeys) ? $storedKeys : [];
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             $this->logger->warning('Fastcheckout idempotency session read failed', ['exception' => $e]);
         }
 
@@ -1006,7 +1048,7 @@ class Checkout extends Component
             if (is_callable([$this->checkoutSession, 'setData'])) {
                 $this->checkoutSession->setData('fastcheckout_used_idempotency_keys', $keys);
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             $this->logger->warning('Fastcheckout idempotency session write failed', ['exception' => $e]);
         }
     }
@@ -1015,11 +1057,13 @@ class Checkout extends Component
     {
         try {
             $method = 'set' . str_replace('_', '', ucwords($key, '_'));
-            $this->checkoutSession->{$method}($value);
-            if (method_exists($this->checkoutSession, 'setData')) {
+            if (is_callable([$this->checkoutSession, 'setData'])) {
                 $this->checkoutSession->setData($key, $value);
             }
-        } catch (\Exception $e) {
+            if (is_callable([$this->checkoutSession, $method])) {
+                $this->checkoutSession->{$method}($value);
+            }
+        } catch (\Throwable $e) {
             $this->logger->warning('Fastcheckout session value write failed', ['exception' => $e]);
         }
     }
@@ -1167,7 +1211,23 @@ class Checkout extends Component
             return;
         }
         try {
+            if (!$this->customerSession->isLoggedIn()) {
+                return;
+            }
+            $customerId = (int)$this->customerSession->getCustomerId();
+            if ($customerId <= 0) {
+                return;
+            }
+
             $address = $this->addressRepository->getById($addressId);
+            if ((int)$address->getCustomerId() !== $customerId) {
+                $this->logger->warning('Fastcheckout rejected saved address access for another customer', [
+                    'customer_id' => $customerId,
+                    'address_id' => $addressId,
+                ]);
+                return;
+            }
+
             $street = (array) $address->getStreet();
 
             $this->firstname  = (string) $address->getFirstname();
@@ -1208,6 +1268,21 @@ class Checkout extends Component
             return (string)$this->directoryHelper->getDefaultCountry();
         }
         return 'US';
+    }
+
+    private function buildStreetLines($line1, $line2, $line3 = '', $line4 = ''): array
+    {
+        $street = [(string)$line1, (string)$line2];
+
+        if ((string)$line3 !== '' || (string)$line4 !== '') {
+            $street[] = (string)$line3;
+        }
+
+        if ((string)$line4 !== '') {
+            $street[] = (string)$line4;
+        }
+
+        return $street;
     }
 
     private function importPaymentData($payment, string $methodCode): void
