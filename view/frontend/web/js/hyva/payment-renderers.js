@@ -208,6 +208,9 @@ define([
                 });
 
                 var lastMethodsJson = '';
+                var lastMagewireShippingMethodCode = '';
+                var magewireShippingMethodSyncTimer = null;
+                var checkoutDataFallbackWarningShown = false;
 
                 function getDomPaymentMethods() {
                     var methods = [];
@@ -272,6 +275,7 @@ define([
                         if (typeof quote.guestEmail === 'function') {
                             quote.guestEmail(emailVal);
                         }
+                        persistEmailToCheckoutData(emailVal);
                         var billing = typeof quote.billingAddress === 'function' ? quote.billingAddress() : null;
                         if (billing && typeof billing.getCacheKey === 'function') {
                             billing.email = emailVal;
@@ -307,6 +311,7 @@ define([
                     if (quoteMethod && !domHasPaymentMethod(quoteMethod)) {
                         
                         selectPaymentMethodAction(null);
+                        persistPaymentMethodToCheckoutData(null);
                         hidePaymentPlaceholders();
                     }
 
@@ -435,6 +440,136 @@ define([
                     };
                 }
 
+                function getCheckoutDataFallbackStoreCode() {
+                    return (window.checkoutConfig && window.checkoutConfig.storeCode) || 'default';
+                }
+
+                function readCheckoutDataFallback() {
+                    var cache;
+
+                    try {
+                        cache = window.localStorage ? JSON.parse(window.localStorage.getItem('mage-cache-storage') || '{}') : {};
+                    } catch (e) {
+                        cache = {};
+                    }
+
+                    return {
+                        cache: cache,
+                        data: cache['checkout-data'] || {}
+                    };
+                }
+
+                function writeCheckoutDataFallback(data) {
+                    var fallback = readCheckoutDataFallback();
+
+                    fallback.cache['checkout-data'] = data;
+
+                    try {
+                        if (window.localStorage) {
+                            window.localStorage.setItem('mage-cache-storage', JSON.stringify(fallback.cache));
+                        }
+                    } catch (e) {}
+                }
+
+                function updateCheckoutDataFallback(update) {
+                    var fallback = readCheckoutDataFallback();
+
+                    update(fallback.data);
+                    writeCheckoutDataFallback(fallback.data);
+                }
+
+                function setAddressByStoreFallback(currentValue, addressData) {
+                    var byStore = currentValue || {};
+
+                    byStore[getCheckoutDataFallbackStoreCode()] = addressData;
+                    return byStore;
+                }
+
+                function safeCheckoutDataSet(methodName, value, fallback) {
+                    if (checkoutData && typeof checkoutData[methodName] === 'function') {
+                        try {
+                            checkoutData[methodName](value);
+                            return;
+                        } catch (e) {
+                            if (!checkoutDataFallbackWarningShown && window.console && typeof window.console.warn === 'function') {
+                                checkoutDataFallbackWarningShown = true;
+                                window.console.warn(
+                                    'Kkkonrad Fastcheckout: checkout-data storage is not ready, using local fallback.',
+                                    e
+                                );
+                            }
+                        }
+                    }
+
+                    if (typeof fallback === 'function') {
+                        fallback(value);
+                    }
+                }
+
+                function persistEmailToCheckoutData(email) {
+                    if (!email) {
+                        return;
+                    }
+
+                    safeCheckoutDataSet('setValidatedEmailValue', email, function (value) {
+                        updateCheckoutDataFallback(function (data) {
+                            data.validatedEmailValue = value;
+                        });
+                    });
+                    safeCheckoutDataSet('setInputFieldEmailValue', email, function (value) {
+                        updateCheckoutDataFallback(function (data) {
+                            data.inputFieldEmailValue = value;
+                        });
+                    });
+                }
+
+                function persistAddressToCheckoutData(addressData, type) {
+                    if (!addressData) {
+                        return;
+                    }
+
+                    if (type === 'billing') {
+                        safeCheckoutDataSet('setBillingAddressFromData', addressData, function (value) {
+                            updateCheckoutDataFallback(function (data) {
+                                data.billingAddressFromData = value;
+                            });
+                        });
+                        safeCheckoutDataSet('setNewCustomerBillingAddress', addressData, function (value) {
+                            updateCheckoutDataFallback(function (data) {
+                                data.newCustomerBillingAddress = value;
+                            });
+                        });
+                        return;
+                    }
+
+                    safeCheckoutDataSet('setShippingAddressFromData', addressData, function (value) {
+                        updateCheckoutDataFallback(function (data) {
+                            data.shippingAddressFromData = setAddressByStoreFallback(data.shippingAddressFromData, value);
+                        });
+                    });
+                    safeCheckoutDataSet('setNewCustomerShippingAddress', addressData, function (value) {
+                        updateCheckoutDataFallback(function (data) {
+                            data.newCustomerShippingAddress = setAddressByStoreFallback(data.newCustomerShippingAddress, value);
+                        });
+                    });
+                }
+
+                function persistShippingMethodToCheckoutData(methodCode) {
+                    safeCheckoutDataSet('setSelectedShippingRate', methodCode || null, function (value) {
+                        updateCheckoutDataFallback(function (data) {
+                            data.selectedShippingRate = value;
+                        });
+                    });
+                }
+
+                function persistPaymentMethodToCheckoutData(methodCode) {
+                    safeCheckoutDataSet('setSelectedPaymentMethod', methodCode || null, function (value) {
+                        updateCheckoutDataFallback(function (data) {
+                            data.selectedPaymentMethod = value;
+                        });
+                    });
+                }
+
                 function addressesMatch(currentAddress, newAddress) {
                     return currentAddress &&
                         currentAddress.countryId === newAddress.countryId &&
@@ -455,6 +590,8 @@ define([
                         newAddress = addressConverter.formAddressDataToQuoteAddress(addressData),
                         currentAddress = quote.shippingAddress();
 
+                    persistAddressToCheckoutData(addressData, 'shipping');
+
                     if (!addressesMatch(currentAddress, newAddress)) {
                         selectShippingAddressAction(newAddress);
                     }
@@ -470,13 +607,17 @@ define([
                     if (!magewire) return null;
 
                     if (billingSameAsShipping === true || billingSameAsShipping === '1' || billingSameAsShipping === 1) {
+                        persistAddressToCheckoutData(buildAddressData(magewire, ''), 'billing');
                         if (shippingAddress) {
                             selectBillingAddressAction(shippingAddress);
                         }
                         return quote.billingAddress();
                     }
 
-                    newAddress = addressConverter.formAddressDataToQuoteAddress(buildAddressData(magewire, 'billing'));
+                    var addressData = buildAddressData(magewire, 'billing');
+                    persistAddressToCheckoutData(addressData, 'billing');
+
+                    newAddress = addressConverter.formAddressDataToQuoteAddress(addressData);
                     currentAddress = quote.billingAddress();
                     if (!addressesMatch(currentAddress, newAddress)) {
                         selectBillingAddressAction(newAddress);
@@ -486,6 +627,8 @@ define([
                 }
 
                 function syncSelectedShippingMethodToKnockout(methodCode) {
+                    persistShippingMethodToCheckoutData(methodCode);
+
                     if (!methodCode) {
                         quote.shippingMethod(null);
                         return;
@@ -508,6 +651,38 @@ define([
                             selectShippingMethodAction(found);
                         }
                     }
+                }
+
+                function syncShippingMethodToMagewire(methodCode) {
+                    persistShippingMethodToCheckoutData(methodCode);
+
+                    if (!methodCode || methodCode === lastMagewireShippingMethodCode) {
+                        return;
+                    }
+
+                    lastMagewireShippingMethodCode = methodCode;
+
+                    if (magewireShippingMethodSyncTimer) {
+                        window.clearTimeout(magewireShippingMethodSyncTimer);
+                    }
+
+                    magewireShippingMethodSyncTimer = window.setTimeout(function () {
+                        var magewireEl = document.querySelector('[wire\\:id]'),
+                            wire,
+                            currentMethod;
+
+                        magewireShippingMethodSyncTimer = null;
+
+                        if (!magewireEl || !magewireEl.__livewire) {
+                            return;
+                        }
+
+                        wire = magewireEl.__livewire;
+                        currentMethod = getProperty(wire, 'shippingMethod');
+                        if (currentMethod !== methodCode && typeof wire.call === 'function') {
+                            wire.call('selectShippingMethod', methodCode);
+                        }
+                    }, 0);
                 }
 
                 function prepareCheckoutState(magewire) {
@@ -565,6 +740,7 @@ define([
                 window.fastcheckoutHyvaShipping = {
                     syncAddress: syncAddressToKnockout,
                     syncShippingMethod: syncSelectedShippingMethodToKnockout,
+                    syncShippingMethodToMagewire: syncShippingMethodToMagewire,
                     setError: function (methodCode, message) {
                         showShippingFieldError(methodCode, '', message);
                     },
@@ -656,17 +832,12 @@ define([
 
                 quote.shippingMethod.subscribe(function (method) {
                     clearShippingFieldError();
-                    if (!method) return;
-                    var methodCode = method.carrier_code + '_' + method.method_code;
-
-                    var magewireEl = document.querySelector('[wire\\:id]');
-                    if (magewireEl && magewireEl.__livewire) {
-                        var wire = magewireEl.__livewire;
-                        if (wire.shippingMethod !== methodCode) {
-                            
-                            wire.call('selectShippingMethod', methodCode);
-                        }
+                    if (!method) {
+                        persistShippingMethodToCheckoutData(null);
+                        return;
                     }
+
+                    syncShippingMethodToMagewire(method.carrier_code + '_' + method.method_code);
                 });
 
                 shippingService.getShippingRates().subscribe(function () {
@@ -739,6 +910,7 @@ define([
 
                         if (paymentData && paymentData.method) {
                             selectPaymentMethodAction(paymentData);
+                            persistPaymentMethodToCheckoutData(rendererCode);
                             quote.paymentMethod({
                                 method: rendererCode,
                                 title: component.item ? component.item.title : null
@@ -898,6 +1070,7 @@ define([
 
                     method = getMethod(methodCode) || { method: methodCode };
                     selectPaymentMethodAction(method);
+                    persistPaymentMethodToCheckoutData(methodCode);
                     patchRenderers();
                     renderer = getRendererByMethod(methodCode);
                     patchRenderer(renderer);
@@ -905,6 +1078,7 @@ define([
                     
                     activeMethod = getMethod(activeCode) || { method: activeCode, title: method.title };
                     quote.paymentMethod(activeMethod);
+                    persistPaymentMethodToCheckoutData(activeCode);
                     if (renderer && typeof renderer.selectPaymentMethod === 'function') {
                         renderer.selectPaymentMethod();
                     }
@@ -961,12 +1135,14 @@ define([
 
                     if (!methodCode) {
                         pendingSelectedMethodCode = '';
+                        persistPaymentMethodToCheckoutData(null);
                         hidePaymentPlaceholders();
                         return;
                     }
 
                     if (!domHasPaymentMethod(methodCode)) {
                         pendingSelectedMethodCode = '';
+                        persistPaymentMethodToCheckoutData(null);
                         hidePaymentPlaceholders();
                         
                         return;

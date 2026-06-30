@@ -64,6 +64,14 @@ define([
 
                     selectShippingMethodAction(found);
 
+                    if (
+                        window.fastcheckoutHyvaShipping &&
+                        typeof window.fastcheckoutHyvaShipping.syncShippingMethodToMagewire === 'function'
+                    ) {
+                        window.fastcheckoutHyvaShipping.syncShippingMethodToMagewire(value);
+                        return;
+                    }
+
                     // Sync the selected shipping method back to Magewire
                     var magewireEl = document.querySelector('[wire\\:id]');
                     if (magewireEl && magewireEl.__livewire) {
