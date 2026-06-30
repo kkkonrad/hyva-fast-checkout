@@ -50,6 +50,7 @@ define([
             'Magento_Checkout/js/action/select-billing-address',
             'Magento_Checkout/js/model/address-converter',
             'Magento_Checkout/js/action/set-shipping-information',
+            'Magento_Checkout/js/model/payment/additional-validators',
             'mage/translate'
         ], function (
             app,
@@ -67,6 +68,7 @@ define([
             selectBillingAddressAction,
             addressConverter,
             setShippingInformationAction,
+            additionalValidators,
             $t
         ) {
             if (quote && quote.billingAddress) {
@@ -211,6 +213,61 @@ define([
                 var lastMagewireShippingMethodCode = '';
                 var magewireShippingMethodSyncTimer = null;
                 var checkoutDataFallbackWarningShown = false;
+                var optionalValidationComponentsRequested = false;
+                var optionalPaymentDataAssigners = [];
+
+                function registerAdditionalValidatorOnce(validator) {
+                    if (!additionalValidators || !validator || typeof validator.validate !== 'function') {
+                        return;
+                    }
+
+                    if (
+                        typeof additionalValidators.getValidators === 'function' &&
+                        additionalValidators.getValidators().indexOf(validator) !== -1
+                    ) {
+                        return;
+                    }
+
+                    if (typeof additionalValidators.registerValidator === 'function') {
+                        additionalValidators.registerValidator(validator);
+                    }
+                }
+
+                function registerPaymentDataAssignerOnce(assigner) {
+                    if (typeof assigner !== 'function' || optionalPaymentDataAssigners.indexOf(assigner) !== -1) {
+                        return;
+                    }
+
+                    optionalPaymentDataAssigners.push(assigner);
+                }
+
+                function loadOptionalValidationComponents() {
+                    if (optionalValidationComponentsRequested) {
+                        return;
+                    }
+
+                    optionalValidationComponentsRequested = true;
+
+                    if (
+                        !window.checkoutConfig ||
+                        !window.checkoutConfig.checkoutAgreements ||
+                        !window.checkoutConfig.checkoutAgreements.isEnabled
+                    ) {
+                        return;
+                    }
+
+                    require([
+                        'Magento_CheckoutAgreements/js/model/agreement-validator',
+                        'Magento_CheckoutAgreements/js/model/agreements-assigner'
+                    ], function (agreementValidator, agreementsAssigner) {
+                        registerAdditionalValidatorOnce(agreementValidator);
+                        registerPaymentDataAssignerOnce(agreementsAssigner);
+                    }, function (error) {
+                        if (window.console && typeof window.console.warn === 'function') {
+                            window.console.warn('Kkkonrad Fastcheckout: optional checkout agreements validators could not be loaded.', error);
+                        }
+                    });
+                }
 
                 function getDomPaymentMethods() {
                     var methods = [];
@@ -1187,18 +1244,83 @@ define([
                     return found;
                 }
 
+                function assignCheckoutAgreementsFallback(paymentData) {
+                    var agreementIds = [];
+
+                    if (
+                        !paymentData ||
+                        !window.checkoutConfig ||
+                        !window.checkoutConfig.checkoutAgreements ||
+                        !window.checkoutConfig.checkoutAgreements.isEnabled
+                    ) {
+                        return paymentData;
+                    }
+
+                    $('.payment-method._active div[data-role=checkout-agreements] input').serializeArray().forEach(function (item) {
+                        agreementIds.push(item.value);
+                    });
+
+                    if (!agreementIds.length) {
+                        return paymentData;
+                    }
+
+                    paymentData.extension_attributes = paymentData.extension_attributes || {};
+                    if (!paymentData.extension_attributes.agreement_ids) {
+                        paymentData.extension_attributes.agreement_ids = agreementIds;
+                    }
+
+                    return paymentData;
+                }
+
+                function applyPaymentDataAssigners(paymentData) {
+                    paymentData = paymentData || { method: getSelectedMethodCode() };
+
+                    loadOptionalValidationComponents();
+
+                    optionalPaymentDataAssigners.forEach(function (assigner) {
+                        try {
+                            assigner(paymentData);
+                        } catch (e) {
+                            if (window.console && typeof window.console.warn === 'function') {
+                                window.console.warn('Kkkonrad Fastcheckout: payment data assigner failed.', e);
+                            }
+                        }
+                    });
+
+                    return assignCheckoutAgreementsFallback(paymentData);
+                }
+
+                function validateAdditionalValidators(hideError) {
+                    loadOptionalValidationComponents();
+
+                    if (!additionalValidators || typeof additionalValidators.validate !== 'function') {
+                        return true;
+                    }
+
+                    try {
+                        return additionalValidators.validate(!!hideError);
+                    } catch (e) {
+                        if (window.console && typeof window.console.warn === 'function') {
+                            window.console.warn('Kkkonrad Fastcheckout: additional checkout validation failed.', e);
+                        }
+                        return false;
+                    }
+                }
+
+                loadOptionalValidationComponents();
+
                 window.fastcheckoutHyvaPayment = {
 	                    getActivePaymentData: function () {
 	                        var component = getActiveRenderer();
 
 	                        if (component && typeof component.getData === 'function') {
-	                            return component.getData();
+	                            return applyPaymentDataAssigners(component.getData());
                         }
 
-                        return {
+                        return applyPaymentDataAssigners({
                             method: getSelectedMethodCode(),
 	                            additional_data: {}
-	                        };
+	                        });
 	                    },
 
 	                    cleanupKoOrderState: function () {
@@ -1248,6 +1370,8 @@ define([
 	                    },
 
 	                    syncWirePaymentData: function (wire, paymentData) {
+                            paymentData = applyPaymentDataAssigners(paymentData || this.getActivePaymentData());
+
 	                        var additionalData = this.getPaymentAdditionalData(paymentData),
 	                            methodCode = paymentData && paymentData.method ? paymentData.method : getSelectedMethodCode(),
 	                            poNumber = methodCode === 'purchaseorder' ? this.getPurchaseOrderNumber(paymentData) : '';
@@ -1286,16 +1410,19 @@ define([
 	                        return prepareCheckoutState(wire).then(function () {
 	                            component = getActiveRenderer();
 	                            paymentData = component && typeof component.getData === 'function'
-	                                ? component.getData()
+	                                ? applyPaymentDataAssigners(component.getData())
 	                                : this.getActivePaymentData();
 
 	                            if (!component || typeof component.placeOrder !== 'function') {
+                                    if (!this.validate()) {
+                                        return Promise.reject(new Error('Payment method validation failed'));
+                                    }
 	                                return this.syncPaymentData(wire).then(function () {
 	                                    return wire.call('placeOrder', selectedMethod || (paymentData && paymentData.method) || getSelectedMethodCode());
 	                                });
 	                            }
 
-	                            if (typeof component.validate === 'function' && !component.validate()) {
+	                            if (!this.validate()) {
 	                                return Promise.reject(new Error('Payment method validation failed'));
 	                            }
 	                            if (
@@ -1419,10 +1546,11 @@ define([
                         var component = getActiveRenderer();
                         if (component && typeof component.validate === 'function') {
                             var isValid = component.validate();
-                            
-                            return isValid;
+                            if (!isValid) {
+                                return false;
+                            }
                         }
-                        return true;
+                        return validateAdditionalValidators(false);
                     },
 
                     afterPlaceOrder: function () {
