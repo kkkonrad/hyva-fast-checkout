@@ -41,6 +41,8 @@ class Checkout extends Component
     public $regionId = '';
     public $region = '';
     public $telephone = '';
+    public $shippingCustomAttributes = [];
+    public $shippingExtensionAttributes = [];
 
     /**
      * Billing fields toggle
@@ -68,6 +70,8 @@ class Checkout extends Component
     public $billingRegionId = '';
     public $billingRegion = '';
     public $billingTelephone = '';
+    public $billingCustomAttributes = [];
+    public $billingExtensionAttributes = [];
 
     /**
      * Checkout states
@@ -400,6 +404,11 @@ class Checkout extends Component
             
             $shippingAddress->setTelephone($this->telephone);
             $shippingAddress->setCompany($this->company);
+            $this->applyAddressAttributes(
+                $shippingAddress,
+                $this->shippingCustomAttributes,
+                $this->shippingExtensionAttributes
+            );
             
             $shippingAddress->setShouldIgnoreValidation($ignoreValidation);
             $shippingAddress->setCollectShippingRates($collectRates);
@@ -450,6 +459,11 @@ class Checkout extends Component
                 $billingAddress->setRegion($this->region);
                 $billingAddress->setTelephone($this->telephone);
                 $billingAddress->setCompany($this->company);
+                $this->applyAddressAttributes(
+                    $billingAddress,
+                    $this->shippingCustomAttributes,
+                    $this->shippingExtensionAttributes
+                );
             } else {
                 $billingAddress->setFirstname($this->billingFirstname);
                 $billingAddress->setLastname($this->billingLastname);
@@ -484,6 +498,11 @@ class Checkout extends Component
                 
                 $billingAddress->setTelephone($this->billingTelephone);
                 $billingAddress->setCompany($this->billingCompany);
+                $this->applyAddressAttributes(
+                    $billingAddress,
+                    $this->billingCustomAttributes,
+                    $this->billingExtensionAttributes
+                );
             }
             $billingAddress->setShouldIgnoreValidation($ignoreValidation);
         }
@@ -1509,6 +1528,84 @@ class Checkout extends Component
                 continue;
             }
 
+            if (is_scalar($value) || $value === null || is_array($value)) {
+                $result[(string)$key] = $value;
+            }
+        }
+
+        return $result;
+    }
+
+    private function applyAddressAttributes($address, $customAttributes, $extensionAttributes): void
+    {
+        foreach ($this->normalizeGenericData($customAttributes) as $code => $value) {
+            if (method_exists($address, 'setCustomAttribute')) {
+                try {
+                    $address->setCustomAttribute($code, $value);
+                } catch (\Throwable $e) {
+                    // Some quote address implementations reject non-EAV custom attributes; keep data fallback.
+                }
+            }
+            if (method_exists($address, 'setData')) {
+                $address->setData($code, $value);
+            }
+        }
+
+        $normalizedExtensionAttributes = $this->normalizeGenericData($extensionAttributes);
+        if (empty($normalizedExtensionAttributes)) {
+            return;
+        }
+
+        foreach ($normalizedExtensionAttributes as $code => $value) {
+            if (method_exists($address, 'setData')) {
+                $address->setData($code, $value);
+            }
+        }
+
+        if (!method_exists($address, 'getExtensionAttributes') || !method_exists($address, 'setExtensionAttributes')) {
+            return;
+        }
+
+        try {
+            $extension = $address->getExtensionAttributes();
+            if ($extension === null) {
+                $extension = \Magento\Framework\App\ObjectManager::getInstance()
+                    ->get(\Magento\Quote\Api\Data\AddressExtensionFactory::class)
+                    ->create();
+            }
+
+            foreach ($normalizedExtensionAttributes as $code => $value) {
+                $setter = 'set' . str_replace(' ', '', ucwords(str_replace('_', ' ', (string)$code)));
+                if (method_exists($extension, $setter)) {
+                    $extension->{$setter}($value);
+                }
+            }
+
+            $address->setExtensionAttributes($extension);
+        } catch (\Throwable $e) {
+            try {
+                $this->logger->warning('Fastcheckout address extension attributes sync failed', ['exception' => $e]);
+            } catch (\Exception $ignored) {
+                // ignore
+            }
+        }
+    }
+
+    private function normalizeGenericData($data): array
+    {
+        if (!is_array($data)) {
+            return [];
+        }
+
+        $result = [];
+        foreach ($data as $key => $value) {
+            if (!is_string($key) && !is_int($key)) {
+                continue;
+            }
+            if (is_array($value) && isset($value['attribute_code'])) {
+                $key = (string)$value['attribute_code'];
+                $value = $value['value'] ?? null;
+            }
             if (is_scalar($value) || $value === null || is_array($value)) {
                 $result[(string)$key] = $value;
             }

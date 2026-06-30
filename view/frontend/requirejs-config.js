@@ -19,6 +19,12 @@ var config = {
             'Magento_Checkout/js/action/set-shipping-information': {
                 'Kkkonrad_Fastcheckout/js/mixin/set-shipping-information-mixin': true
             },
+            'Magento_Checkout/js/model/shipping-rate-processor/new-address': {
+                'Kkkonrad_Fastcheckout/js/mixin/shipping-rate-processor-new-address-mixin': true
+            },
+            'Magento_Checkout/js/model/shipping-rate-processor/customer-address': {
+                'Kkkonrad_Fastcheckout/js/mixin/shipping-rate-processor-customer-address-mixin': true
+            },
             'Magento_Checkout/js/action/place-order': {
                 'Kkkonrad_Fastcheckout/js/mixin/place-order-mixin': true
             },

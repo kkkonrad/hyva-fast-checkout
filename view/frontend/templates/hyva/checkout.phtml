@@ -55,6 +55,7 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
     <form id="co-checkout-form"
           x-data="initCheckout"
           @submit.prevent="handleSubmit"
+          data-role="email-with-possible-login"
           class="contents">
 
         <!-- Responsive Grid Layout (1-column Mobile, 2-column Tablet/Intermediate, 3-column Desktop) -->

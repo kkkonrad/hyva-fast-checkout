@@ -1,185 +1,36 @@
 define([
     'underscore',
-    'ko',
-    'mageUtils',
-    'uiComponent',
-    'Magento_Checkout/js/model/payment/method-list',
-    'Magento_Checkout/js/model/payment/renderer-list',
-    'uiLayout',
-    'mage/translate',
-    'uiRegistry'
-], function (_, ko, utils, Component, paymentMethods, rendererList, layout, $t, registry) {
+    'Magento_Checkout/js/view/payment/list',
+    'Magento_Checkout/js/model/payment/method-list'
+], function (_, PaymentList, paymentMethods) {
     'use strict';
 
-    return Component.extend({
-        defaults: {
-            template: 'Magento_Checkout/payment-methods/list',
-            visible: paymentMethods().length > 0,
-            configDefaultGroup: {
-                name: 'methodGroup',
-                component: 'Magento_Checkout/js/model/payment/method-group'
-            },
-            paymentGroupsList: [],
-            defaultGroupTitle: $t('Select a new payment method')
-        },
-
+    return PaymentList.extend({
         initialize: function () {
-            this.pendingRendererCodes = {};
-            this._super().initDefaulGroup().initChildren();
+            this.pendingRendererCodes = this.pendingRendererCodes || {};
+            this._super();
             window.fastcheckoutHyvaPaymentList = this;
 
             paymentMethods.subscribe(function (changes) {
-                _.each(changes, function (change) {
-                    if (change.status === 'deleted') {
-                        this.removeRenderer(change.value.method);
-                    }
-                }, this);
-
-                _.each(changes, function (change) {
-                    if (change.status === 'added') {
-                        this.createRenderer(change.value);
-                    }
-                }, this);
-
                 this.syncRenderers();
             }, this, 'arrayChange');
 
             return this;
         },
 
-        initObservable: function () {
-            this._super().observe(['paymentGroupsList']);
-
-            return this;
-        },
-
-        initDefaulGroup: function () {
-            layout([this.configDefaultGroup]);
-
-            return this;
-        },
-
-        initChildren: function () {
-            _.each(paymentMethods(), function (paymentMethodData) {
-                this.createRenderer(paymentMethodData);
-            }, this);
-
-            return this;
-        },
-
-        createComponent: function (payment) {
-            var rendererTemplate,
-                rendererComponent,
-                templateData;
-
-            templateData = {
-                parentName: this.name,
-                name: payment.name
-            };
-            rendererTemplate = {
-                parent: '${ $.$data.parentName }',
-                name: '${ $.$data.name }',
-                displayArea: payment.displayArea,
-                component: payment.component
-            };
-            rendererComponent = utils.template(rendererTemplate, templateData);
-            utils.extend(rendererComponent, {
-                item: payment.item,
-                config: payment.config
-            });
-
-            return rendererComponent;
-        },
-
         createRenderer: function (paymentMethodData) {
-            var isRendererForMethod = false,
-                currentGroup;
-
             if (this.hasRenderer(paymentMethodData.method) || this.pendingRendererCodes[paymentMethodData.method]) {
                 return;
             }
 
-            registry.get(this.configDefaultGroup.name, function (defaultGroup) {
-                _.each(rendererList(), function (renderer) {
-                    if (renderer.hasOwnProperty('typeComparatorCallback') &&
-                        typeof renderer.typeComparatorCallback === 'function'
-                    ) {
-                        isRendererForMethod = renderer.typeComparatorCallback(renderer.type, paymentMethodData.method);
-                    } else {
-                        isRendererForMethod = renderer.type === paymentMethodData.method;
-                    }
+            this.pendingRendererCodes[paymentMethodData.method] = true;
+            this._super(paymentMethodData);
 
-                    if (isRendererForMethod) {
-                        currentGroup = renderer.group ? renderer.group : defaultGroup;
-                        this.collectPaymentGroups(currentGroup);
-                        this.pendingRendererCodes[paymentMethodData.method] = true;
-
-                        layout([
-                            this.createComponent({
-                                config: renderer.config,
-                                component: renderer.component,
-                                name: renderer.type,
-                                method: paymentMethodData.method,
-                                item: paymentMethodData,
-                                displayArea: currentGroup.displayArea
-                            })
-                        ]);
-
-                        window.setTimeout(function () {
-                            delete this.pendingRendererCodes[paymentMethodData.method];
-                        }.bind(this), 0);
-                    }
-                }.bind(this));
-            }.bind(this));
+            window.setTimeout(function () {
+                delete this.pendingRendererCodes[paymentMethodData.method];
+            }.bind(this), 0);
         },
 
-        collectPaymentGroups: function (group) {
-            var groupsList = this.paymentGroupsList(),
-                isGroupExists = _.some(groupsList, function (existsGroup) {
-                    return existsGroup.alias === group.alias;
-                });
-
-            if (!isGroupExists) {
-                groupsList.push(group);
-                groupsList = _.sortBy(groupsList, function (existsGroup) {
-                    return existsGroup.sortOrder;
-                });
-                this.paymentGroupsList(groupsList);
-            }
-        },
-
-        getGroupTitle: function (group) {
-            var title = group().title;
-
-            if (group().isDefault() && this.paymentGroupsList().length > 1) {
-                title = this.defaultGroupTitle;
-            }
-
-            return title;
-        },
-
-        isPaymentMethodsAvailable: function () {
-            return _.some(this.paymentGroupsList(), function (group) {
-                return this.regionHasElements(group.displayArea);
-            }, this);
-        },
-
-        removeRenderer: function (paymentMethodCode) {
-            var items;
-
-            _.each(this.paymentGroupsList(), function (group) {
-                items = this.getRegion(group.displayArea);
-
-                _.find(items(), function (value) {
-                    if (value.item && value.item.method === paymentMethodCode) {
-                        value.disposeSubscriptions();
-                        value.destroy();
-                    }
-                });
-            }, this);
-        }
-
-        ,
         hasRenderer: function (paymentMethodCode) {
             var found = false;
 

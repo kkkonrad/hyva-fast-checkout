@@ -52,7 +52,7 @@
         <label for="co-shipping-email" class="block sm:col-span-2">
             <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Email Address')) ?> *</span>
             <input id="co-shipping-email" class="form-input mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                   type="email" autocomplete="email"
+                   type="email" name="username" autocomplete="email"
                    wire:model.defer="email"
                    data-wire-field="email"
                    @input="onFieldInput"
