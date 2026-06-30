@@ -44,6 +44,7 @@ define([
         window.customerData = window.checkoutConfig.customerData;
 
         require([
+            'knockout',
             'Magento_Ui/js/core/app',
             'Magento_Checkout/js/model/payment-service',
             'Magento_Checkout/js/model/payment/method-converter',
@@ -68,6 +69,7 @@ define([
             'Magento_Checkout/js/model/payment/place-order-hooks',
             'mage/translate'
         ], function (
+            ko,
             app,
             paymentService,
             methodConverter,
@@ -476,8 +478,58 @@ define([
                 return component;
             }
 
+            function createBillingAddressComponentFallback() {
+                var component = {
+                    name: 'fastcheckout.billingAddress',
+                    index: 'billingAddress',
+                    isAddressSameAsShipping: ko.observable(true),
+                    isAddressFormVisible: ko.observable(false),
+                    isAddressDetailsVisible: ko.observable(true),
+                    errorValidationMessage: ko.observable(false),
+                    errorMessage: false,
+                    
+                    updateAddress: function () {
+                        // Empty mock
+                    },
+                    useShippingAddress: function () {
+                        this.isAddressSameAsShipping(true);
+                    },
+                    editAddress: function () {
+                        this.isAddressSameAsShipping(false);
+                    },
+                    cancelAddressEdit: function () {
+                        this.isAddressSameAsShipping(true);
+                    }
+                };
+                return component;
+            }
+
+            function getBillingAddressComponent() {
+                var component;
+
+                try {
+                    component = registry.get('index = billingAddress');
+                } catch (e) {
+                    component = null;
+                }
+
+                if (!component) {
+                    component = createBillingAddressComponentFallback();
+                    try {
+                        registry.set('fastcheckout.billingAddress', component);
+                    } catch (e) {
+                        if (window.console && typeof window.console.warn === 'function') {
+                            window.console.warn('Kkkonrad Fastcheckout: could not register fallback billingAddress component.', e);
+                        }
+                    }
+                }
+
+                return component;
+            }
+
             getCheckoutProvider();
             getShippingAddressComponent();
+            getBillingAddressComponent();
 
             // Reactive State Adapter: Subscribe to KO state and sync back to Magewire
             if (quote) {

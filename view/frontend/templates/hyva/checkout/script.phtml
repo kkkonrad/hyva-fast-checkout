@@ -487,6 +487,16 @@ window.addEventListener('alpine:init', () => Alpine.data('initCheckout', initChe
         });
     }
 
+    // Save inputs instantly on user typing to ensure robust recovery and test compatibility
+    document.addEventListener('input', function (event) {
+        var target = event.target;
+        if (!target) return;
+        var field = target.dataset.wireField;
+        if (field && FIELDS.includes(field)) {
+            save(field, target.value);
+        }
+    });
+
     document.addEventListener('DOMContentLoaded', function () {
         setTimeout(function () {
             const wire = getWire();

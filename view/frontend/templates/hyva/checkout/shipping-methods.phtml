@@ -27,12 +27,9 @@
         <div class="fastcheckout-ko-shipping-container">
             <div id="fastcheckout-ko-shipping-root"
                  class="fastcheckout-ko-shipping-root"
-                 style="display: none !important;"
                  wire:ignore
-                 data-bind="scope: 'fastcheckoutHyvaShippingRenderers'">
-                <!-- ko foreach: getRegion('shipping-methods-list') -->
-                    <!-- ko template: getTemplate() --><!-- /ko -->
-                <!-- /ko -->
+                 data-bind="scope: 'fastcheckoutHyvaShippingRenderers.shippingList'">
+                <!-- ko template: getTemplate() --><!-- /ko -->
             </div>
         </div>
     </div>

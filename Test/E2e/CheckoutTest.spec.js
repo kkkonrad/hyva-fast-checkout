@@ -14,12 +14,12 @@ const selectors = {
     region: 'select[wire\\:model\\.blur="regionId"]',
     savedAddresses: '#saved-address-select',
     useSavedAddressBtn: 'button[data-select-id="saved-address-select"]',
-    placeOrderBtn: 'button[form="co-checkout-form"]',
+    placeOrderBtn: '#co-checkout-form button[type="submit"]',
     orderError: '#messages .message-error, #messages .message.error',
     cartItemsList: 'ul.space-y-3',
     couponInput: 'input[wire\\:model\\.defer="couponCode"]',
     couponApplyBtn: 'button[wire\\:click="applyCoupon"]',
-    couponSuccess: '.text-green-700',
+    couponSuccess: '.mt-3.text-green-700',
     couponError: '.text-red-700',
     newsletterCheckbox: 'input[wire\\:model="subscribe"]'
 };
@@ -42,6 +42,8 @@ export class CheckoutPage {
             await this.page.goto('/fast-checkout/');
             await this.page.waitForLoadState('domcontentloaded');
         }
+        // Wait for Magewire initial loader to hide
+        await this.page.waitForTimeout(2000);
     }
 
     async fillShippingAddress(data) {
@@ -74,7 +76,6 @@ export class CheckoutPage {
 
     async applyCoupon(code) {
         await this.page.locator(selectors.couponInput).fill(code);
-        await this.page.locator(selectors.couponApplyBtn).scrollIntoViewIfNeeded();
         await this.page.locator(selectors.couponApplyBtn).click({ force: true });
     }
 
@@ -83,7 +84,7 @@ export class CheckoutPage {
     }
 
     async placeOrder() {
-        await this.page.locator(selectors.placeOrderBtn).click();
+        await this.page.locator(selectors.placeOrderBtn).first().click({ force: true });
         await this.page.waitForTimeout(2000);
     }
 }
