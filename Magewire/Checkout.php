@@ -560,6 +560,11 @@ class Checkout extends Component
         
         $shippingAddress = $quote->getShippingAddress();
         if ($shippingAddress && $shippingAddress->getCountryId()) {
+            $rates = $shippingAddress->getGroupedAllShippingRates();
+            if (!$shippingAddress->getCollectShippingRates() && !empty($rates)) {
+                return $rates;
+            }
+
             $shippingAddress->setCollectShippingRates(true);
             $quote->collectTotals();
             return $shippingAddress->getGroupedAllShippingRates();
@@ -733,6 +738,10 @@ class Checkout extends Component
 
             $payment = $quote->getPayment();
             if ($payment) {
+                if ((string)$payment->getMethod() === $methodCode && $this->paymentMethod === $methodCode) {
+                    return;
+                }
+
                 $this->importPaymentData($payment, $methodCode);
                 if ($methodCode === 'purchaseorder' && method_exists($payment, 'setPoNumber')) {
                     $payment->setPoNumber($this->poNumber);
@@ -929,6 +938,7 @@ class Checkout extends Component
             $quoteId = $quote->getId();
             // Place order
             $orderId = $this->cartManagement->placeOrder($quoteId);
+            $placedOrder = null;
 
             try {
                 if (method_exists($this->checkoutSession, 'clearHelperData')) {
@@ -943,10 +953,10 @@ class Checkout extends Component
                 $this->setSessionValue('last_success_quote_id', $quoteId);
                 $this->setSessionValue('last_order_id', $orderId);
                 if ($this->orderFactory !== null) {
-                    $order = $this->orderFactory->create()->load($orderId);
-                    if ($order && $order->getId()) {
-                        $this->setSessionValue('last_real_order_id', $order->getIncrementId());
-                        $this->setSessionValue('last_order_status', $order->getStatus());
+                    $placedOrder = $this->orderFactory->create()->load($orderId);
+                    if ($placedOrder && $placedOrder->getId()) {
+                        $this->setSessionValue('last_real_order_id', $placedOrder->getIncrementId());
+                        $this->setSessionValue('last_order_status', $placedOrder->getStatus());
                     }
                 }
             } catch (\Throwable $e) {
@@ -974,9 +984,12 @@ class Checkout extends Component
                 $this->logger->warning('Fastcheckout checkout session redirect URL read failed', ['exception' => $e]);
             }
 
-            if (!$redirectUrl && $orderId && $this->orderFactory !== null) {
+            if (!$redirectUrl && $orderId) {
                 try {
-                    $order = $this->orderFactory->create()->load($orderId);
+                    $order = $placedOrder;
+                    if (!$order && $this->orderFactory !== null) {
+                        $order = $this->orderFactory->create()->load($orderId);
+                    }
                     if ($order && $order->getId()) {
                         $methodInstance = $order->getPayment()->getMethodInstance();
                         if (method_exists($methodInstance, 'getOrderPlaceRedirectUrl')) {
@@ -1355,8 +1368,7 @@ class Checkout extends Component
     private function saveQuote($quote): void
     {
         $hasChanges = $quote->hasDataChanges() 
-            || defined('PHPUNIT_COMPOSER_INSTALL') 
-            || class_exists(\PHPUnit\Framework\TestCase::class);
+            || defined('PHPUNIT_COMPOSER_INSTALL');
 
         if (!$hasChanges) {
             try {

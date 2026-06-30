@@ -806,6 +806,7 @@ define([
                 var readyDispatched = false;
                 var pendingSelectedMethodCode = '';
                 var paymentRendererObserver = null;
+                var paymentRendererObserverRetryTimer = null;
 
                 function dispatchReadyEvent() {
                     if (readyDispatched) { return; }
@@ -832,7 +833,13 @@ define([
                     }
 
                     paymentRendererObserver = new MutationObserver(function () {
-                        window.setTimeout(retryPendingSelectedMethod, 0);
+                        if (paymentRendererObserverRetryTimer) {
+                            return;
+                        }
+                        paymentRendererObserverRetryTimer = window.setTimeout(function () {
+                            paymentRendererObserverRetryTimer = null;
+                            retryPendingSelectedMethod();
+                        }, 0);
                     });
                     paymentRendererObserver.observe(root, {
                         childList: true,

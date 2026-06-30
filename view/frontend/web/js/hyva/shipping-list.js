@@ -40,11 +40,16 @@ define([
                         self.clearError();
                     }
                     var rates = shippingService.getShippingRates()();
-                    var found = rates.filter(function (rate) {
+                    var found = null;
+                    rates.some(function (rate) {
                         var c1 = rate.carrier_code + '_' + rate.method_code;
                         var c2 = rate.method_code + '_' + rate.carrier_code;
-                        return c1 === value || c2 === value || rate.carrier_code === value || rate.method_code === value;
-                    })[0];
+                        if (c1 === value || c2 === value || rate.carrier_code === value || rate.method_code === value) {
+                            found = rate;
+                            return true;
+                        }
+                        return false;
+                    });
 
                     if (!found) {
                         var parts = value.split('_');

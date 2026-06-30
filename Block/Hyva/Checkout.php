@@ -80,6 +80,31 @@ class Checkout extends Template
     private $objectManager;
 
     /**
+     * @var array|null
+     */
+    private $checkoutConfigCache;
+
+    /**
+     * @var string[]|null
+     */
+    private $paymentRendererComponentsCache;
+
+    /**
+     * @var array|null
+     */
+    private $checkoutLayoutAssetsCache;
+
+    /**
+     * @var array|null
+     */
+    private $checkoutLayoutScriptsCache;
+
+    /**
+     * @var array|null
+     */
+    private $summaryTotalsCache;
+
+    /**
      * @var Helper
      */
     private $helper;
@@ -181,21 +206,29 @@ class Checkout extends Template
 
     public function getCheckoutConfig()
     {
+        if ($this->checkoutConfigCache !== null) {
+            return $this->checkoutConfigCache;
+        }
+
         $quote = $this->getQuote();
         if (!$quote || !$quote->getId() || !$quote->hasItems()) {
-            return [];
+            $this->checkoutConfigCache = [];
+            return $this->checkoutConfigCache;
         }
 
         $configProvider = $this->getConfigProvider();
         if ($configProvider === null) {
-            return [];
+            $this->checkoutConfigCache = [];
+            return $this->checkoutConfigCache;
         }
 
         try {
-            return $configProvider->getConfig();
+            $this->checkoutConfigCache = $configProvider->getConfig();
         } catch (\Throwable $exception) {
-            return [];
+            $this->checkoutConfigCache = [];
         }
+
+        return $this->checkoutConfigCache;
     }
 
     /**
@@ -216,10 +249,15 @@ class Checkout extends Template
      */
     public function getPaymentRendererComponents()
     {
+        if ($this->paymentRendererComponentsCache !== null) {
+            return $this->paymentRendererComponentsCache;
+        }
+
         $moduleList = $this->getModuleList();
         $componentRegistrar = $this->getComponentRegistrar();
         if ($moduleList === null || $componentRegistrar === null) {
-            return [];
+            $this->paymentRendererComponentsCache = [];
+            return $this->paymentRendererComponentsCache;
         }
 
         $components = [];
@@ -237,7 +275,9 @@ class Checkout extends Template
             $components = array_merge($components, $this->getPaymentRendererComponentsFromLayout($layoutFile));
         }
 
-        return array_values(array_unique($components));
+        $this->paymentRendererComponentsCache = array_values(array_unique($components));
+
+        return $this->paymentRendererComponentsCache;
     }
 
     /**
@@ -248,10 +288,15 @@ class Checkout extends Template
      */
     public function getCheckoutLayoutAssets()
     {
+        if ($this->checkoutLayoutAssetsCache !== null) {
+            return $this->checkoutLayoutAssetsCache;
+        }
+
         $moduleList = $this->getModuleList();
         $componentRegistrar = $this->getComponentRegistrar();
         if ($moduleList === null || $componentRegistrar === null) {
-            return ['css' => [], 'scripts' => []];
+            $this->checkoutLayoutAssetsCache = ['css' => [], 'scripts' => []];
+            return $this->checkoutLayoutAssetsCache;
         }
 
         $css = [];
@@ -309,10 +354,12 @@ class Checkout extends Template
             }
         }
 
-        return [
+        $this->checkoutLayoutAssetsCache = [
             'css' => array_values(array_unique($css, SORT_REGULAR)),
             'scripts' => array_values(array_unique($scripts))
         ];
+
+        return $this->checkoutLayoutAssetsCache;
     }
 
     /**
@@ -320,6 +367,10 @@ class Checkout extends Template
      */
     public function getCheckoutLayoutScripts()
     {
+        if ($this->checkoutLayoutScriptsCache !== null) {
+            return $this->checkoutLayoutScriptsCache;
+        }
+
         $assets = $this->getCheckoutLayoutAssets();
         $requireModules = [];
         $externalScripts = [];
@@ -337,10 +388,12 @@ class Checkout extends Template
             }
         }
 
-        return [
+        $this->checkoutLayoutScriptsCache = [
             'modules' => $requireModules,
             'external' => $externalScripts
         ];
+
+        return $this->checkoutLayoutScriptsCache;
     }
 
     /**
@@ -591,8 +644,14 @@ class Checkout extends Template
      */
     public function getSummaryTotals()
     {
+        if ($this->summaryTotalsCache !== null) {
+            return $this->summaryTotalsCache;
+        }
+
         $quote = $this->getQuote();
-        $quote->collectTotals();
+        if (!$quote->getTotalsCollectedFlag()) {
+            $quote->collectTotals();
+        }
         
         $totals = [];
         foreach ($quote->getTotals() as $code => $total) {
@@ -612,7 +671,9 @@ class Checkout extends Template
             ];
         }
         
-        return $totals;
+        $this->summaryTotalsCache = $totals;
+
+        return $this->summaryTotalsCache;
     }
 
     /**
