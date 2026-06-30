@@ -534,6 +534,8 @@ define([
                 var lastMethodsJson = '';
                 var lastMagewireShippingMethodCode = '';
                 var magewireShippingMethodSyncTimer = null;
+                var lastMagewirePaymentMethodCode = '';
+                var magewirePaymentMethodSyncTimer = null;
                 var checkoutDataFallbackWarningShown = false;
                 var optionalValidationComponentsRequested = false;
                 var optionalPaymentDataAssigners = [];
@@ -1601,6 +1603,65 @@ define([
                     }, 0);
                 }
 
+                function getPaymentMethodCode(paymentMethod) {
+                    if (!paymentMethod) {
+                        return '';
+                    }
+                    if (typeof paymentMethod === 'string') {
+                        return paymentMethod;
+                    }
+
+                    return paymentMethod.method || '';
+                }
+
+                function syncPaymentMethodToMagewire(paymentMethod) {
+                    var methodCode = getPaymentMethodCode(paymentMethod);
+
+                    persistPaymentMethodToCheckoutData(methodCode || null);
+
+                    if (!methodCode) {
+                        lastMagewirePaymentMethodCode = '';
+                        if (magewirePaymentMethodSyncTimer) {
+                            window.clearTimeout(magewirePaymentMethodSyncTimer);
+                        }
+                        magewirePaymentMethodSyncTimer = window.setTimeout(function () {
+                            var wire = getMagewireComponent();
+
+                            magewirePaymentMethodSyncTimer = null;
+                            if (wire && typeof wire.set === 'function') {
+                                wire.set('paymentMethod', '');
+                            }
+                        }, 50);
+                        return;
+                    }
+
+                    if (methodCode === lastMagewirePaymentMethodCode) {
+                        return;
+                    }
+
+                    lastMagewirePaymentMethodCode = methodCode;
+
+                    if (magewirePaymentMethodSyncTimer) {
+                        window.clearTimeout(magewirePaymentMethodSyncTimer);
+                    }
+
+                    magewirePaymentMethodSyncTimer = window.setTimeout(function () {
+                        var wire = getMagewireComponent(),
+                            currentMethod;
+
+                        magewirePaymentMethodSyncTimer = null;
+
+                        if (!wire || typeof wire.call !== 'function') {
+                            return;
+                        }
+
+                        currentMethod = getProperty(wire, 'paymentMethod');
+                        if (currentMethod !== methodCode) {
+                            wire.call('selectPaymentMethod', methodCode);
+                        }
+                    }, 50);
+                }
+
                 function prepareCheckoutState(magewire) {
                     syncQuoteCustomerData();
 
@@ -2426,6 +2487,33 @@ define([
 
 	                        return this.syncWirePaymentData(wire, this.getActivePaymentData());
 	                    },
+
+                        onSelectPaymentMethodAction: function (paymentMethod) {
+                            var methodCode = getPaymentMethodCode(paymentMethod),
+                                input;
+
+                            if (!methodCode) {
+                                persistPaymentMethodToCheckoutData(null);
+                                syncPaymentMethodToMagewire(null);
+                                hidePaymentPlaceholders();
+                                return;
+                            }
+
+                            persistPaymentMethodToCheckoutData(methodCode);
+                            document.querySelectorAll('input[name="payment_method"]').forEach(function (element) {
+                                if (!input && element.value === methodCode) {
+                                    input = element;
+                                }
+                            });
+                            if (input && !input.checked) {
+                                input.checked = true;
+                            }
+                            if (domHasPaymentMethod(methodCode)) {
+                                patchRenderers();
+                                updateActiveRendererClass(methodCode, methodCode);
+                            }
+                            syncPaymentMethodToMagewire(paymentMethod);
+                        },
 
                         onSetBillingAddressAction: function (messageContainer, originalAction) {
                             var wire = getMagewireComponent();
