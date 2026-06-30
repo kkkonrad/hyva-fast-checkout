@@ -1,7 +1,8 @@
 define([
     'jquery',
-    'mage/utils/wrapper'
-], function ($, wrapper) {
+    'mage/utils/wrapper',
+    'Kkkonrad_Fastcheckout/js/mixin/is-fastcheckout-active'
+], function ($, wrapper, isFastcheckoutActive) {
     'use strict';
 
     return function (customerData) {
@@ -9,15 +10,45 @@ define([
             return customerData;
         }
 
-        var isSyncing = false;
+        var isSyncing = false,
+            lastPrivateContent = {};
 
-        // 1. Listen to Hyva's private-content-loaded and synchronize it to KO
+        function mergeSection(sectionName, sectionData) {
+            lastPrivateContent = $.extend(true, {}, lastPrivateContent);
+            lastPrivateContent[sectionName] = sectionData;
+
+            return lastPrivateContent;
+        }
+
+        function mergeSections(sections) {
+            lastPrivateContent = $.extend(true, {}, lastPrivateContent, sections || {});
+
+            return lastPrivateContent;
+        }
+
+        function dispatchCustomerDataUpdated(sections) {
+            window.dispatchEvent(new CustomEvent('fastcheckout:customer-data-updated', {
+                detail: {
+                    data: sections || {}
+                }
+            }));
+        }
+
+        function dispatchPrivateContentLoaded(sections) {
+            window.dispatchEvent(new CustomEvent('private-content-loaded', {
+                detail: {
+                    data: mergeSections(sections)
+                }
+            }));
+        }
+
         window.addEventListener('private-content-loaded', function (event) {
-            if (isSyncing) {
+            if (!isFastcheckoutActive() || isSyncing) {
                 return;
             }
             var sections = event.detail && event.detail.data;
             if (sections && typeof sections === 'object') {
+                mergeSections(sections);
                 isSyncing = true;
                 try {
                     Object.keys(sections).forEach(function (sectionName) {
@@ -40,32 +71,28 @@ define([
             }
         });
 
-        // 2. Intercept customerData.set from KO to notify Hyva/Alpine
         if (typeof customerData.set === 'function') {
             customerData.set = wrapper.wrap(customerData.set, function (originalSet, sectionName, sectionData) {
                 var result = originalSet(sectionName, sectionData);
 
-                if (!isSyncing) {
+                if (isFastcheckoutActive() && !isSyncing) {
                     var data = {};
                     data[sectionName] = sectionData;
-                    window.dispatchEvent(new CustomEvent('private-content-loaded', {
-                        detail: {
-                            data: data
-                        }
-                    }));
+
+                    mergeSection(sectionName, sectionData);
+                    dispatchCustomerDataUpdated(data);
+                    dispatchPrivateContentLoaded(data);
                 }
 
                 return result;
             });
         }
 
-        // 3. Intercept customerData.invalidate and notify Hyva to reload
         if (typeof customerData.invalidate === 'function') {
             customerData.invalidate = wrapper.wrap(customerData.invalidate, function (originalInvalidate, sectionNames) {
                 var result = originalInvalidate(sectionNames);
 
-                if (!isSyncing) {
-                    // Trigger Hyva private content reload
+                if (isFastcheckoutActive() && !isSyncing) {
                     window.dispatchEvent(new CustomEvent('reload-customer-section-data'));
                 }
 
@@ -73,19 +100,15 @@ define([
             });
         }
 
-        // 4. Intercept customerData.reload and propagate to Hyva
         if (typeof customerData.reload === 'function') {
             customerData.reload = wrapper.wrap(customerData.reload, function (originalReload, sectionNames, forceNewSectionTimestamp) {
                 var deferred = originalReload(sectionNames, forceNewSectionTimestamp);
                 
                 if (deferred && typeof deferred.done === 'function') {
                     deferred.done(function (sections) {
-                        if (!isSyncing && sections && typeof sections === 'object') {
-                            window.dispatchEvent(new CustomEvent('private-content-loaded', {
-                                detail: {
-                                    data: sections
-                                }
-                            }));
+                        if (isFastcheckoutActive() && !isSyncing && sections && typeof sections === 'object') {
+                            dispatchCustomerDataUpdated(sections);
+                            dispatchPrivateContentLoaded(sections);
                         }
                     });
                 }

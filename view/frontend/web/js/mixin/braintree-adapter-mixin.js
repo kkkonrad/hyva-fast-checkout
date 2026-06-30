@@ -1,12 +1,18 @@
 define([
-    'mage/utils/wrapper'
-], function (wrapper) {
+    'mage/utils/wrapper',
+    'Kkkonrad_Fastcheckout/js/mixin/is-fastcheckout-active'
+], function (wrapper, isFastcheckoutActive) {
     'use strict';
 
     return function (braintreeAdapter) {
         if (braintreeAdapter && typeof braintreeAdapter.tokenizeHostedFields === 'function') {
             braintreeAdapter.tokenizeHostedFields = wrapper.wrap(braintreeAdapter.tokenizeHostedFields, function (originalTokenize) {
                 var self = this;
+
+                if (!isFastcheckoutActive()) {
+                    return originalTokenize.apply(this, Array.prototype.slice.call(arguments, 1));
+                }
+
                 if (self.hostedFieldsInstance && !self.hostedFieldsInstance.__isWrappedForFastcheckout) {
                     self.hostedFieldsInstance.__isWrappedForFastcheckout = true;
                     var originalTokenizeMethod = self.hostedFieldsInstance.tokenize;

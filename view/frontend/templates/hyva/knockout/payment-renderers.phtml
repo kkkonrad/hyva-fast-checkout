@@ -135,11 +135,40 @@ foreach ($layoutScripts['external'] as $externalScript) {
     var originalQuerySelector = document.querySelector;
     var originalQuerySelectorAll = document.querySelectorAll;
 
+    function getFastcheckoutRoot() {
+        return originalGetElementById.call(document, 'fastcheckout-checkout');
+    }
+
+    function shouldSkipShadowLookup(selector) {
+        return typeof selector === 'string' && (
+            selector.indexOf('wire:') !== -1 ||
+            selector.indexOf('x-') !== -1 ||
+            selector.indexOf('[wire') !== -1 ||
+            selector.indexOf('[x-') !== -1 ||
+            selector.indexOf('livewire') !== -1 ||
+            selector.indexOf('alpine') !== -1
+        );
+    }
+
+    function getPaymentPlaceholders() {
+        if (!getFastcheckoutRoot()) {
+            return [];
+        }
+
+        return originalQuerySelectorAll.call(document, '[data-fastcheckout-payment-method-ko-target]');
+    }
+
     function setupDomOverrides() {
+        if (window.fastcheckoutKoDomOverridesApplied || !getFastcheckoutRoot()) {
+            return;
+        }
+
+        window.fastcheckoutKoDomOverridesApplied = true;
+
         document.getElementById = function (id) {
             var el = originalGetElementById.call(document, id);
             if (!el) {
-                var placeholders = originalQuerySelectorAll.call(document, '[data-fastcheckout-payment-method-ko-target]');
+                var placeholders = getPaymentPlaceholders();
                 for (var i = 0; i < placeholders.length; i++) {
                     if (placeholders[i].shadowRoot) {
                         el = placeholders[i].shadowRoot.getElementById(id);
@@ -153,18 +182,11 @@ foreach ($layoutScripts['external'] as $externalScript) {
         document.querySelector = function (selector) {
             var el = originalQuerySelector.call(document, selector);
             if (!el) {
-                if (typeof selector === 'string' && (
-                    selector.indexOf('wire:') !== -1 ||
-                    selector.indexOf('x-') !== -1 ||
-                    selector.indexOf('[wire') !== -1 ||
-                    selector.indexOf('[x-') !== -1 ||
-                    selector.indexOf('livewire') !== -1 ||
-                    selector.indexOf('alpine') !== -1
-                )) {
+                if (shouldSkipShadowLookup(selector)) {
                     return el;
                 }
 
-                var placeholders = originalQuerySelectorAll.call(document, '[data-fastcheckout-payment-method-ko-target]');
+                var placeholders = getPaymentPlaceholders();
                 for (var i = 0; i < placeholders.length; i++) {
                     if (placeholders[i].shadowRoot) {
                         el = placeholders[i].shadowRoot.querySelector(selector);
@@ -178,19 +200,12 @@ foreach ($layoutScripts['external'] as $externalScript) {
         document.querySelectorAll = function (selector) {
             var lightList = Array.from(originalQuerySelectorAll.call(document, selector));
             
-            if (typeof selector === 'string' && (
-                selector.indexOf('wire:') !== -1 ||
-                selector.indexOf('x-') !== -1 ||
-                selector.indexOf('[wire') !== -1 ||
-                selector.indexOf('[x-') !== -1 ||
-                selector.indexOf('livewire') !== -1 ||
-                selector.indexOf('alpine') !== -1
-            )) {
+            if (shouldSkipShadowLookup(selector)) {
                 return lightList;
             }
 
             var shadowElements = [];
-            var placeholders = originalQuerySelectorAll.call(document, '[data-fastcheckout-payment-method-ko-target]');
+            var placeholders = getPaymentPlaceholders();
             for (var i = 0; i < placeholders.length; i++) {
                 if (placeholders[i].shadowRoot) {
                     placeholders[i].shadowRoot.querySelectorAll(selector).forEach(function (el) {
