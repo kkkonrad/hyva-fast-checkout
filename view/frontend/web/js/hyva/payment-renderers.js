@@ -525,6 +525,38 @@ define([
                 var optionalValidationComponentsRequested = false;
                 var optionalPaymentDataAssigners = [];
                 var bridgeMessageContainer = new Messages();
+                var localTranslations = {
+                    'Checkout session is not ready. Please refresh the page and try again.': 'Sesja checkoutu nie jest gotowa. Odśwież stronę i spróbuj ponownie.',
+                    'Please check the selected payment method and try again.': 'Sprawdź wybraną metodę płatności i spróbuj ponownie.',
+                    'The selected payment method is not ready. Please try again.': 'Wybrana metoda płatności nie jest jeszcze gotowa. Spróbuj ponownie.',
+                    'The selected payment method did not start order placement. Please try again.': 'Wybrana metoda płatności nie rozpoczęła składania zamówienia. Spróbuj ponownie.',
+                    'We could not place your order. Please try again.': 'Nie udało się złożyć zamówienia. Spróbuj ponownie.'
+                };
+
+                function isPolishLocale() {
+                    var locale = (window.LOCALE || (window.checkoutConfig && window.checkoutConfig.locale) || '').toLowerCase();
+
+                    return locale.indexOf('pl') === 0;
+                }
+
+                function translateFastcheckoutMessage(message) {
+                    var translated;
+
+                    if (!message) {
+                        return '';
+                    }
+
+                    translated = $t(message);
+                    if (translated !== message) {
+                        return translated;
+                    }
+
+                    if (isPolishLocale() && localTranslations[message]) {
+                        return localTranslations[message];
+                    }
+
+                    return translated;
+                }
 
                 function getMessageText(message) {
                     if (!message) {
@@ -532,11 +564,11 @@ define([
                     }
 
                     if (typeof message === 'string') {
-                        return message;
+                        return translateFastcheckoutMessage(message);
                     }
 
                     if (message.message) {
-                        return message.message;
+                        return translateFastcheckoutMessage(message.message);
                     }
 
                     return String(message);
@@ -652,7 +684,9 @@ define([
 
                 function handlePaymentError(error, messageContainer) {
                     var container = subscribePaymentMessageContainer(messageContainer) || getBridgeMessageContainer(),
-                        message = error && error.message ? error.message : $t('We could not place your order. Please try again.');
+                        message = error && error.message
+                            ? translateFastcheckoutMessage(error.message)
+                            : translateFastcheckoutMessage('We could not place your order. Please try again.');
 
                     if (fullScreenLoader && typeof fullScreenLoader.stopLoader === 'function') {
                         fullScreenLoader.stopLoader(true);
@@ -1141,6 +1175,57 @@ define([
                     } else {
                         provider.shippingAddress = dataToSet;
                     }
+                }
+
+                function getMagewireComponent() {
+                    var magewireEl = document.querySelector('[wire\\:id]');
+
+                    if (magewireEl && magewireEl.__livewire) {
+                        return magewireEl.__livewire;
+                    }
+
+                    if (
+                        magewireEl &&
+                        window.Livewire &&
+                        typeof window.Livewire.find === 'function' &&
+                        magewireEl.getAttribute('wire:id')
+                    ) {
+                        return window.Livewire.find(magewireEl.getAttribute('wire:id'));
+                    }
+
+                    return null;
+                }
+
+                function syncCheckoutStateWithoutServer(magewire) {
+                    var shippingAddress;
+
+                    syncQuoteCustomerData();
+
+                    if (!magewire) {
+                        return;
+                    }
+
+                    shippingAddress = syncAddressToKnockout(magewire);
+                    syncBillingAddressToKnockout(magewire, shippingAddress);
+                    syncSelectedShippingMethodToKnockout(getProperty(magewire, 'shippingMethod'));
+                }
+
+                function resolveAsKoDeferred(promise, messageContainer) {
+                    var deferred = $.Deferred();
+
+                    Promise.resolve(promise)
+                        .then(function () {
+                            if (fullScreenLoader && typeof fullScreenLoader.stopLoader === 'function') {
+                                fullScreenLoader.stopLoader(true);
+                            }
+                            deferred.resolve();
+                        })
+                        .catch(function (error) {
+                            handlePaymentError(error, messageContainer || getBridgeMessageContainer());
+                            deferred.reject(error);
+                        });
+
+                    return deferred.promise();
                 }
 
                 function addressesMatch(currentAddress, newAddress) {
@@ -1975,6 +2060,48 @@ define([
 	                        return this.syncWirePaymentData(wire, this.getActivePaymentData());
 	                    },
 
+                        onSetBillingAddressAction: function (messageContainer, originalAction) {
+                            var wire = getMagewireComponent();
+
+                            messageContainer = subscribePaymentMessageContainer(messageContainer) || getBridgeMessageContainer();
+
+                            if (!wire) {
+                                return originalAction(messageContainer);
+                            }
+
+                            return resolveAsKoDeferred(new Promise(function (resolve) {
+                                syncCheckoutStateWithoutServer(wire);
+                                resolve(true);
+                            }), messageContainer);
+                        },
+
+                        onSetPaymentInformationAction: function (messageContainer, paymentData, skipBilling, originalAction) {
+                            var wire = getMagewireComponent(),
+                                self = this;
+
+                            messageContainer = subscribePaymentMessageContainer(messageContainer) || getBridgeMessageContainer();
+
+                            if (!wire) {
+                                return originalAction(messageContainer, paymentData, skipBilling);
+                            }
+
+                            return resolveAsKoDeferred(
+                                new Promise(function (resolve, reject) {
+                                    try {
+                                        syncCheckoutStateWithoutServer(wire);
+                                        self.syncWirePaymentData(wire, paymentData || self.getActivePaymentData())
+                                            .then(function () {
+                                                resolve(true);
+                                            })
+                                            .catch(reject);
+                                    } catch (error) {
+                                        reject(error);
+                                    }
+                                }),
+                                messageContainer
+                            );
+                        },
+
 	                    placeOrder: function (wire, selectedMethod) {
 	                        var component,
 	                            paymentData,
@@ -1984,7 +2111,7 @@ define([
                             clearPaymentMessages();
 
 	                        if (!wire || typeof wire.call !== 'function') {
-                                var missingSessionError = new Error($t('Checkout session is not ready. Please refresh the page and try again.'));
+                                var missingSessionError = new Error(translateFastcheckoutMessage('Checkout session is not ready. Please refresh the page and try again.'));
                                 handlePaymentError(missingSessionError, getBridgeMessageContainer());
 	                            return Promise.reject(missingSessionError);
 	                        }
@@ -2001,7 +2128,7 @@ define([
 
 	                            if (!component || typeof component.placeOrder !== 'function') {
                                     if (!this.validate()) {
-                                        var validationError = new Error($t('Please check the selected payment method and try again.'));
+                                        var validationError = new Error(translateFastcheckoutMessage('Please check the selected payment method and try again.'));
                                         handlePaymentError(validationError, getBridgeMessageContainer());
                                         return Promise.reject(validationError);
                                     }
@@ -2014,7 +2141,7 @@ define([
 	                            }
 
 	                            if (!this.validate()) {
-                                    var activeValidationError = new Error($t('Please check the selected payment method and try again.'));
+                                    var activeValidationError = new Error(translateFastcheckoutMessage('Please check the selected payment method and try again.'));
                                     handlePaymentError(activeValidationError, component.messageContainer || getBridgeMessageContainer());
 	                                return Promise.reject(activeValidationError);
 	                            }
@@ -2022,7 +2149,7 @@ define([
 	                                typeof component.isPlaceOrderActionAllowed === 'function' &&
 	                                !component.isPlaceOrderActionAllowed()
 	                            ) {
-                                    var notReadyError = new Error($t('The selected payment method is not ready. Please try again.'));
+                                    var notReadyError = new Error(translateFastcheckoutMessage('The selected payment method is not ready. Please try again.'));
                                     handlePaymentError(notReadyError, component.messageContainer || getBridgeMessageContainer());
 	                                return Promise.reject(notReadyError);
 	                            }
@@ -2040,7 +2167,7 @@ define([
 	                                        return;
 	                                    }
 	                                    self.cleanupKoOrderState();
-                                        var timeoutError = new Error($t('The selected payment method did not start order placement. Please try again.'));
+                                        var timeoutError = new Error(translateFastcheckoutMessage('The selected payment method did not start order placement. Please try again.'));
                                         handlePaymentError(timeoutError, component.messageContainer || getBridgeMessageContainer());
 	                                    reject(timeoutError);
 	                                }, 30000);
@@ -2054,7 +2181,7 @@ define([
 
 	                                    if (result === false) {
 	                                        self.cleanupKoOrderState();
-                                            var resultError = new Error($t('Please check the selected payment method and try again.'));
+                                            var resultError = new Error(translateFastcheckoutMessage('Please check the selected payment method and try again.'));
                                             handlePaymentError(resultError, component.messageContainer || getBridgeMessageContainer());
 	                                        reject(resultError);
 	                                    }
