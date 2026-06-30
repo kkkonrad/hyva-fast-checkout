@@ -164,7 +164,7 @@ class CheckoutTest extends TestCase
             'getPostcode', 'getCountryId', 'getRegionId', 'getRegion', 'getTelephone', 
             'getShippingMethod', 'setFirstname', 'setLastname', 'setStreet', 'setCity', 
             'setPostcode', 'setCountryId', 'setRegionId', 'setRegion', 'setTelephone', 
-            'setCompany'
+            'setCompany', 'getGroupedAllShippingRates'
         ];
         
         $magicMethods = array_merge([
@@ -563,6 +563,66 @@ class CheckoutTest extends TestCase
         $this->assertSame('grand_total', $state['totals']['total_segments'][1]['code']);
         $this->assertSame('tpay', $state['payment_methods'][1]['method']);
         $this->assertSame('Tpay', $state['payment_methods'][1]['title']);
+    }
+
+    public function testRefreshCheckoutStateReturnsFlattenedShippingRates(): void
+    {
+        $shippingAddressMock = $this->createAddressMock(['getCollectShippingRates']);
+        $rate = new \Magento\Framework\DataObject([
+            'carrier' => 'flatrate',
+            'method' => 'flatrate',
+            'carrier_title' => 'Flat Rate',
+            'method_title' => 'Fixed',
+            'price' => 12.5,
+            'error_message' => '',
+        ]);
+
+        $this->quoteMock->expects($this->any())
+            ->method('getId')
+            ->willReturn(42);
+        $this->quoteMock->expects($this->once())
+            ->method('hasItems')
+            ->willReturn(true);
+        $this->quoteMock->expects($this->once())
+            ->method('collectTotals');
+        $this->cartRepositoryMock->expects($this->once())
+            ->method('save')
+            ->with($this->quoteMock);
+        $this->quoteMock->expects($this->any())
+            ->method('getShippingAddress')
+            ->willReturn($shippingAddressMock);
+        $this->quoteMock->expects($this->once())
+            ->method('getAllVisibleItems')
+            ->willReturn([]);
+        $this->quoteMock->expects($this->once())
+            ->method('getTotals')
+            ->willReturn([]);
+        $this->paymentMethodManagementMock->expects($this->once())
+            ->method('getList')
+            ->with(42)
+            ->willReturn([]);
+
+        $shippingAddressMock->expects($this->any())
+            ->method('getCountryId')
+            ->willReturn('PL');
+        $shippingAddressMock->expects($this->any())
+            ->method('getShippingMethod')
+            ->willReturn('flatrate_flatrate');
+        $shippingAddressMock->expects($this->once())
+            ->method('getGroupedAllShippingRates')
+            ->willReturn(['flatrate' => [$rate]]);
+        $shippingAddressMock->expects($this->once())
+            ->method('getCollectShippingRates')
+            ->willReturn(false);
+
+        $state = $this->checkoutComponent->refreshCheckoutState();
+
+        $this->assertSame('flatrate', $state['shipping_rates'][0]['carrier_code']);
+        $this->assertSame('flatrate', $state['shipping_rates'][0]['method_code']);
+        $this->assertSame('Flat Rate', $state['shipping_rates'][0]['carrier_title']);
+        $this->assertSame('Fixed', $state['shipping_rates'][0]['method_title']);
+        $this->assertSame(12.5, $state['shipping_rates'][0]['amount']);
+        $this->assertTrue($state['shipping_rates'][0]['available']);
     }
 
     public function testGetAllowedPaymentMethodsFiltersMethodsByShippingMapping(): void

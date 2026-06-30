@@ -1002,6 +1002,10 @@ define([
                         syncPaymentMethods();
                     }
 
+                    if (Array.isArray(payload.shipping_rates)) {
+                        shippingService.setShippingRates(payload.shipping_rates);
+                    }
+
                     if (payload.selected_payment_method) {
                         quote.paymentMethod({
                             method: payload.selected_payment_method
@@ -1067,6 +1071,27 @@ define([
                         });
 
                     return deferred.promise();
+                }
+
+                function refreshShippingRatesFromMagewire() {
+                    if (shippingService && shippingService.isLoading && typeof shippingService.isLoading === 'function') {
+                        shippingService.isLoading(true);
+                    }
+
+                    return refreshCheckoutStateFromMagewire()
+                        .then(function (payload) {
+                            if (shippingService && shippingService.isLoading && typeof shippingService.isLoading === 'function') {
+                                shippingService.isLoading(false);
+                            }
+                            return payload;
+                        })
+                        .catch(function (error) {
+                            if (shippingService && shippingService.isLoading && typeof shippingService.isLoading === 'function') {
+                                shippingService.isLoading(false);
+                            }
+                            handlePaymentError(error, getBridgeMessageContainer());
+                            throw error;
+                        });
                 }
 
                 function syncPaymentMethods() {
@@ -1633,6 +1658,13 @@ define([
                     syncAddress: syncAddressToKnockout,
                     syncShippingMethod: syncSelectedShippingMethodToKnockout,
                     syncShippingMethodToMagewire: syncShippingMethodToMagewire,
+                    onRecollectShippingRatesAction: function (originalAction) {
+                        if (!getMagewireComponent()) {
+                            return originalAction();
+                        }
+
+                        return refreshShippingRatesFromMagewire();
+                    },
                     setError: function (methodCode, message) {
                         showShippingFieldError(methodCode, '', message);
                     },

@@ -25,6 +25,9 @@ var config = {
             'Magento_Checkout/js/action/get-totals': {
                 'Kkkonrad_Fastcheckout/js/mixin/get-totals-mixin': true
             },
+            'Magento_Checkout/js/action/recollect-shipping-rates': {
+                'Kkkonrad_Fastcheckout/js/mixin/recollect-shipping-rates-mixin': true
+            },
             'PayPal_Braintree/js/view/payment/adapter': {
                 'Kkkonrad_Fastcheckout/js/mixin/braintree-adapter-mixin': true
             }

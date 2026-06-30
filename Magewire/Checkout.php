@@ -740,6 +740,7 @@ class Checkout extends Component
             return [
                 'totals' => $this->buildTotalsData($quote),
                 'payment_methods' => $this->buildPaymentMethodsData(),
+                'shipping_rates' => $this->buildShippingRatesData(),
                 'selected_payment_method' => $this->paymentMethod,
                 'coupon_code' => $this->couponCode,
             ];
@@ -755,6 +756,7 @@ class Checkout extends Component
                     'grand_total' => 0.0,
                 ],
                 'payment_methods' => [],
+                'shipping_rates' => [],
                 'selected_payment_method' => $this->paymentMethod,
                 'coupon_code' => $this->couponCode,
             ];
@@ -776,6 +778,42 @@ class Checkout extends Component
         }
 
         return $methods;
+    }
+
+    private function buildShippingRatesData(): array
+    {
+        $ratesData = [];
+
+        foreach ($this->getShippingMethods() as $carrierRates) {
+            if ($carrierRates instanceof \Traversable) {
+                $carrierRates = iterator_to_array($carrierRates);
+            }
+            if (!is_array($carrierRates)) {
+                $carrierRates = [$carrierRates];
+            }
+
+            foreach ($carrierRates as $rate) {
+                if (!$rate) {
+                    continue;
+                }
+
+                $price = (float)$rate->getPrice();
+                $ratesData[] = [
+                    'carrier_code' => (string)$rate->getCarrier(),
+                    'method_code' => (string)$rate->getMethod(),
+                    'carrier_title' => (string)$rate->getCarrierTitle(),
+                    'method_title' => (string)$rate->getMethodTitle(),
+                    'amount' => $price,
+                    'base_amount' => $price,
+                    'price_excl_tax' => $price,
+                    'price_incl_tax' => $price,
+                    'available' => !$rate->getErrorMessage(),
+                    'error_message' => (string)$rate->getErrorMessage(),
+                ];
+            }
+        }
+
+        return $ratesData;
     }
 
     private function buildTotalsData($quote): array
