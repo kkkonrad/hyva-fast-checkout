@@ -1272,6 +1272,51 @@ define([
                     return paymentData;
                 }
 
+                function validateCheckoutAgreementsFallback(hideError) {
+                    var inputs,
+                        isValid = true,
+                        firstInvalid = null;
+
+                    if (
+                        !window.checkoutConfig ||
+                        !window.checkoutConfig.checkoutAgreements ||
+                        !window.checkoutConfig.checkoutAgreements.isEnabled
+                    ) {
+                        return true;
+                    }
+
+                    inputs = $('.payment-method._active div.checkout-agreements input');
+                    if (!inputs.length) {
+                        return true;
+                    }
+
+                    inputs.each(function (index, element) {
+                        var valid = true;
+
+                        if ($.validator && typeof $.validator.validateSingleElement === 'function') {
+                            valid = $.validator.validateSingleElement(element, {
+                                errorElement: 'div',
+                                hideError: !!hideError
+                            });
+                        } else if ((element.type === 'checkbox' || element.type === 'radio') && !element.checked) {
+                            valid = false;
+                        }
+
+                        if (!valid) {
+                            isValid = false;
+                            if (!firstInvalid) {
+                                firstInvalid = element;
+                            }
+                        }
+                    });
+
+                    if (!isValid && firstInvalid && !hideError) {
+                        firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+
+                    return isValid;
+                }
+
                 function applyPaymentDataAssigners(paymentData) {
                     paymentData = paymentData || { method: getSelectedMethodCode() };
 
@@ -1293,18 +1338,22 @@ define([
                 function validateAdditionalValidators(hideError) {
                     loadOptionalValidationComponents();
 
+                    var isValid = true;
+
                     if (!additionalValidators || typeof additionalValidators.validate !== 'function') {
-                        return true;
+                        return validateCheckoutAgreementsFallback(hideError);
                     }
 
                     try {
-                        return additionalValidators.validate(!!hideError);
+                        isValid = additionalValidators.validate(!!hideError);
                     } catch (e) {
                         if (window.console && typeof window.console.warn === 'function') {
                             window.console.warn('Kkkonrad Fastcheckout: additional checkout validation failed.', e);
                         }
                         return false;
                     }
+
+                    return isValid && validateCheckoutAgreementsFallback(hideError);
                 }
 
                 loadOptionalValidationComponents();
@@ -1373,10 +1422,17 @@ define([
                             paymentData = applyPaymentDataAssigners(paymentData || this.getActivePaymentData());
 
 	                        var additionalData = this.getPaymentAdditionalData(paymentData),
+                                extensionAttributes = paymentData && paymentData.extension_attributes ? paymentData.extension_attributes : {},
 	                            methodCode = paymentData && paymentData.method ? paymentData.method : getSelectedMethodCode(),
 	                            poNumber = methodCode === 'purchaseorder' ? this.getPurchaseOrderNumber(paymentData) : '';
 
 	                        return Promise.resolve(wire.set('paymentAdditionalData', additionalData))
+                                .then(function () {
+                                    if (typeof wire.set === 'function') {
+                                        return wire.set('paymentExtensionAttributes', extensionAttributes);
+                                    }
+                                    return true;
+                                })
 	                            .then(function () {
 	                                if (poNumber && typeof wire.set === 'function') {
 	                                    return wire.set('poNumber', poNumber);

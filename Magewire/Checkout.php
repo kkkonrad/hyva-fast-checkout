@@ -9,6 +9,7 @@ use Magento\Quote\Api\CartRepositoryInterface;
 use Magento\Quote\Api\ShippingMethodManagementInterface;
 use Magento\Quote\Api\PaymentMethodManagementInterface;
 use Magento\Quote\Api\CartManagementInterface;
+use Magento\Checkout\Api\AgreementsValidatorInterface;
 use Magento\Customer\Model\Session as CustomerSession;
 use Magento\Customer\Api\AddressRepositoryInterface;
 use Magento\Framework\Api\SearchCriteriaBuilder;
@@ -74,6 +75,7 @@ class Checkout extends Component
     public $shippingMethod = '';
     public $paymentMethod = '';
     public $paymentAdditionalData = [];
+    public $paymentExtensionAttributes = [];
     public $poNumber = '';
     public $couponCode = '';
     public $subscribe = false;
@@ -121,6 +123,7 @@ class Checkout extends Component
     private $searchCriteriaBuilder;
     private $giftMessageRepository;
     private $giftMessageFactory;
+    private $agreementsValidator;
 
     /**
      * @param CheckoutSession $checkoutSession
@@ -139,6 +142,7 @@ class Checkout extends Component
      * @param CustomerSession|null $customerSession
      * @param AddressRepositoryInterface|null $addressRepository
      * @param SearchCriteriaBuilder|null $searchCriteriaBuilder
+     * @param AgreementsValidatorInterface|null $agreementsValidator
      */
     public function __construct(
         CheckoutSession $checkoutSession,
@@ -158,7 +162,8 @@ class Checkout extends Component
         AddressRepositoryInterface $addressRepository = null,
         SearchCriteriaBuilder $searchCriteriaBuilder = null,
         \Magento\GiftMessage\Api\CartRepositoryInterface $giftMessageRepository = null,
-        \Magento\GiftMessage\Api\Data\MessageInterfaceFactory $giftMessageFactory = null
+        \Magento\GiftMessage\Api\Data\MessageInterfaceFactory $giftMessageFactory = null,
+        AgreementsValidatorInterface $agreementsValidator = null
     ) {
         $this->checkoutSession = $checkoutSession;
         $this->cartRepository = $cartRepository;
@@ -213,6 +218,11 @@ class Checkout extends Component
             $this->giftMessageFactory = $giftMessageFactory ?? \Magento\Framework\App\ObjectManager::getInstance()->get(\Magento\GiftMessage\Api\Data\MessageInterfaceFactory::class);
         } catch (\Exception $e) {
             $this->giftMessageFactory = null;
+        }
+        try {
+            $this->agreementsValidator = $agreementsValidator ?? \Magento\Framework\App\ObjectManager::getInstance()->get(AgreementsValidatorInterface::class);
+        } catch (\Exception $e) {
+            $this->agreementsValidator = null;
         }
     }
 
@@ -908,6 +918,17 @@ class Checkout extends Component
             return;
         }
 
+        if (!$this->validateCheckoutAgreements()) {
+            $this->orderError = (string)__(
+                "The order wasn't placed. First, agree to the terms and conditions, then try placing your order again."
+            );
+            $this->logger->info('Fastcheckout placeOrder blocked: checkout agreements validation failed', [
+                'quote_id' => $quote->getId(),
+                'payment_method' => $this->paymentMethod,
+            ]);
+            return;
+        }
+
         try {
             if (!$this->claimIdempotencyKey()) {
                 $this->orderError = (string)__('This order is already being processed. Please wait.');
@@ -1336,6 +1357,41 @@ class Checkout extends Component
 
             if (is_scalar($value) || $value === null || is_array($value)) {
                 $result[(string)$key] = $value;
+            }
+        }
+
+        return $result;
+    }
+
+    private function validateCheckoutAgreements(): bool
+    {
+        if ($this->agreementsValidator === null) {
+            return true;
+        }
+
+        try {
+            return (bool)$this->agreementsValidator->isValid($this->getAgreementIds());
+        } catch (\Exception $e) {
+            $this->logger->warning('Fastcheckout checkout agreements validation failed', ['exception' => $e]);
+            return false;
+        }
+    }
+
+    private function getAgreementIds(): array
+    {
+        if (!is_array($this->paymentExtensionAttributes)) {
+            return [];
+        }
+
+        $agreementIds = $this->paymentExtensionAttributes['agreement_ids'] ?? [];
+        if (!is_array($agreementIds)) {
+            $agreementIds = [$agreementIds];
+        }
+
+        $result = [];
+        foreach ($agreementIds as $agreementId) {
+            if (is_scalar($agreementId) && (string)$agreementId !== '') {
+                $result[] = (string)$agreementId;
             }
         }
 

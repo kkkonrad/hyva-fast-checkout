@@ -713,6 +713,92 @@ class CheckoutTest extends TestCase
         $this->assertEquals('', $this->checkoutComponent->orderError);
     }
 
+    public function testPlaceOrderStopsWhenCheckoutAgreementsAreInvalid(): void
+    {
+        $loggerMock = $this->createMock(\Psr\Log\LoggerInterface::class);
+        $agreementsValidatorMock = $this->createMock(\Magento\Checkout\Api\AgreementsValidatorInterface::class);
+
+        $component = new Checkout(
+            $this->checkoutSessionMock,
+            $this->cartRepositoryMock,
+            $this->shippingMethodManagementMock,
+            $this->paymentMethodManagementMock,
+            $this->cartManagementMock,
+            $this->countryCollectionFactoryMock,
+            $this->regionCollectionFactoryMock,
+            $this->subscriberFactoryMock,
+            $this->helperMock,
+            $loggerMock,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            $agreementsValidatorMock
+        );
+
+        $component->email = 'guest@example.com';
+        $component->firstname = 'Jan';
+        $component->lastname = 'Kowalski';
+        $component->street1 = 'Testowa 1';
+        $component->city = 'Warszawa';
+        $component->postcode = '00-001';
+        $component->countryId = 'PL';
+        $component->telephone = '123456789';
+        $component->paymentMethod = 'checkmo';
+        $component->shippingMethod = 'flatrate_flatrate';
+        $component->paymentExtensionAttributes = ['agreement_ids' => []];
+
+        $shippingAddressMock = $this->createAddressMock();
+        $billingAddressMock = $this->createAddressMock();
+
+        $this->quoteMock->expects($this->once())
+            ->method('hasItems')
+            ->willReturn(true);
+        $this->quoteMock->expects($this->once())
+            ->method('getCustomerId')
+            ->willReturn(null);
+        $this->quoteMock->expects($this->once())
+            ->method('setCustomerEmail')
+            ->with('guest@example.com');
+        $this->quoteMock->expects($this->once())
+            ->method('isVirtual')
+            ->willReturn(false);
+        $this->quoteMock->expects($this->any())
+            ->method('getShippingAddress')
+            ->willReturn($shippingAddressMock);
+        $this->quoteMock->expects($this->any())
+            ->method('getBillingAddress')
+            ->willReturn($billingAddressMock);
+        $this->quoteMock->expects($this->any())
+            ->method('getId')
+            ->willReturn(42);
+
+        $this->cartRepositoryMock->expects($this->exactly(2))
+            ->method('save')
+            ->with($this->quoteMock);
+
+        $this->paymentMethodManagementMock->expects($this->once())
+            ->method('getList')
+            ->with(42)
+            ->willReturn([$this->createPaymentMethodMock('checkmo')]);
+
+        $agreementsValidatorMock->expects($this->once())
+            ->method('isValid')
+            ->with([])
+            ->willReturn(false);
+
+        $this->cartManagementMock->expects($this->never())
+            ->method('placeOrder');
+
+        $component->placeOrder();
+
+        $this->assertStringContainsString('agree to the terms and conditions', $component->orderError);
+    }
+
     public function testPlaceOrderValidationError(): void
     {
         $this->checkoutComponent->email = 'guest@example.com';
