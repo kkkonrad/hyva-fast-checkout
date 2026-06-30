@@ -479,6 +479,163 @@ define([
             getCheckoutProvider();
             getShippingAddressComponent();
 
+            // Reactive State Adapter: Subscribe to KO state and sync back to Magewire
+            if (quote) {
+                var isSyncingFromKo = false;
+
+                function syncKoAddressToMagewire(address, isBilling) {
+                    if (isSyncingFromKo || !address) return;
+                    var el = document.querySelector('[wire\\:id]');
+                    var wire = el && window.Livewire ? window.Livewire.find(el.getAttribute('wire:id')) : null;
+                    if (!wire) return;
+
+                    isSyncingFromKo = true;
+                    try {
+                        var prefix = isBilling ? 'billing' : '';
+                        var fields = {
+                            'countryId': prefix ? 'billingCountryId' : 'countryId',
+                            'postcode': prefix ? 'billingPostcode' : 'postcode',
+                            'city': prefix ? 'billingCity' : 'city',
+                            'region': prefix ? 'billingRegion' : 'region',
+                            'regionId': prefix ? 'billingRegionId' : 'regionId',
+                            'firstname': prefix ? 'billingFirstname' : 'firstname',
+                            'lastname': prefix ? 'billingLastname' : 'lastname',
+                            'telephone': prefix ? 'billingTelephone' : 'telephone',
+                            'company': prefix ? 'billingCompany' : 'company'
+                        };
+
+                        Object.keys(fields).forEach(function (koField) {
+                            var wireField = fields[koField];
+                            var koVal = address[koField];
+                            if (typeof koVal === 'function') koVal = koVal();
+
+                            if (koField === 'street' && Array.isArray(koVal)) {
+                                if (koVal[0] && wire.get(prefix ? 'billingStreet1' : 'street1') !== koVal[0]) {
+                                    wire.set(prefix ? 'billingStreet1' : 'street1', koVal[0]);
+                                }
+                                if (koVal[1] && wire.get(prefix ? 'billingStreet2' : 'street2') !== koVal[1]) {
+                                    wire.set(prefix ? 'billingStreet2' : 'street2', koVal[1]);
+                                }
+                            } else if (koVal !== undefined && koVal !== null) {
+                                if (String(wire.get(wireField)) !== String(koVal)) {
+                                    wire.set(wireField, koVal);
+                                }
+                            }
+                        });
+                    } catch (e) {
+                        if (window.console && typeof window.console.warn === 'function') {
+                            window.console.warn('Fastcheckout: Sync address to Magewire failed', e);
+                        }
+                    } finally {
+                        isSyncingFromKo = false;
+                    }
+                }
+
+                if (typeof quote.shippingAddress === 'function') {
+                    quote.shippingAddress.subscribe(function (address) {
+                        syncKoAddressToMagewire(address, false);
+                    });
+                }
+
+                if (typeof quote.billingAddress === 'function') {
+                    quote.billingAddress.subscribe(function (address) {
+                        syncKoAddressToMagewire(address, true);
+                    });
+                }
+
+                if (typeof quote.paymentMethod === 'function') {
+                    quote.paymentMethod.subscribe(function (method) {
+                        if (isSyncingFromKo || !method) return;
+                        var el = document.querySelector('[wire\\:id]');
+                        var wire = el && window.Livewire ? window.Livewire.find(el.getAttribute('wire:id')) : null;
+                        var methodCode = method.method;
+                        if (wire && methodCode && wire.get('paymentMethod') !== methodCode) {
+                            isSyncingFromKo = true;
+                            try {
+                                wire.set('paymentMethod', methodCode);
+                            } finally {
+                                isSyncingFromKo = false;
+                            }
+                        }
+                    });
+                }
+            }
+
+            // Sync helper from Alpine watch to KO
+            window.fastcheckoutHyvaPayment = window.fastcheckoutHyvaPayment || {};
+            window.fastcheckoutHyvaPayment.syncFieldToKo = function (field, value) {
+                if (!quote) return;
+                var shipping = typeof quote.shippingAddress === 'function' ? quote.shippingAddress() : null;
+                var billing = typeof quote.billingAddress === 'function' ? quote.billingAddress() : null;
+
+                if (field === 'email' && typeof quote.guestEmail === 'function') {
+                    if (quote.guestEmail() !== value) quote.guestEmail(value);
+                }
+
+                if (field === 'paymentMethod' && typeof quote.paymentMethod === 'function') {
+                    var currentPayment = quote.paymentMethod();
+                    if (!currentPayment || currentPayment.method !== value) {
+                        quote.paymentMethod({ method: value });
+                    }
+                }
+
+                var mapping = {
+                    'countryId': 'countryId',
+                    'postcode': 'postcode',
+                    'city': 'city',
+                    'region': 'region',
+                    'regionId': 'regionId',
+                    'firstname': 'firstname',
+                    'lastname': 'lastname',
+                    'telephone': 'telephone',
+                    'company': 'company'
+                };
+
+                if (shipping && mapping[field]) {
+                    var koField = mapping[field];
+                    if (shipping[koField] !== value) {
+                        shipping[koField] = value;
+                        quote.shippingAddress.valueHasMutated();
+                    }
+                }
+
+                var billingMapping = {
+                    'billingCountryId': 'countryId',
+                    'billingPostcode': 'postcode',
+                    'billingCity': 'city',
+                    'billingRegion': 'region',
+                    'billingRegionId': 'regionId',
+                    'billingFirstname': 'firstname',
+                    'billingLastname': 'lastname',
+                    'billingTelephone': 'telephone',
+                    'billingCompany': 'company'
+                };
+
+                if (billing && billingMapping[field]) {
+                    var koFieldBilling = billingMapping[field];
+                    if (billing[koFieldBilling] !== value) {
+                        billing[koFieldBilling] = value;
+                        quote.billingAddress.valueHasMutated();
+                    }
+                }
+
+                if (shipping && (field === 'street1' || field === 'street2')) {
+                    var street = shipping.street || [];
+                    if (field === 'street1') street[0] = value;
+                    if (field === 'street2') street[1] = value;
+                    shipping.street = street;
+                    quote.shippingAddress.valueHasMutated();
+                }
+
+                if (billing && (field === 'billingStreet1' || field === 'billingStreet2')) {
+                    var billingStreet = billing.street || [];
+                    if (field === 'billingStreet1') billingStreet[0] = value;
+                    if (field === 'billingStreet2') billingStreet[1] = value;
+                    billing.street = billingStreet;
+                    quote.billingAddress.valueHasMutated();
+                }
+            };
+
             function loadRendererComponents(done) {
                 var remaining = rendererComponents.length;
 
@@ -2038,8 +2195,44 @@ define([
 
                         var target = document.querySelector('[data-fastcheckout-payment-method-ko-target="' + methodCode + '"]');
                         if (target) {
-                            
-                            target.appendChild(activeElement);
+                            var shadow = target.shadowRoot;
+                            if (!shadow) {
+                                shadow = target.attachShadow({ mode: 'open' });
+                                
+                                // Clone ALL page stylesheets (including main Tailwind stylesheet)
+                                document.querySelectorAll('link[rel="stylesheet"]').forEach(function (link) {
+                                    shadow.appendChild(link.cloneNode(true));
+                                });
+
+                                // Clean up the default style borders on the inner .payment-method
+                                var style = document.createElement('style');
+                                style.textContent = `
+                                    .payment-method {
+                                        display: block !important;
+                                        border: none !important;
+                                        background: transparent !important;
+                                        margin-top: 0 !important;
+                                        padding: 0 !important;
+                                    }
+                                    .payment-method-title,
+                                    .actions-toolbar,
+                                    .payment-method-billing-address,
+                                    .fastcheckout-payment-method-ko-container .payment-method-title,
+                                    .fastcheckout-payment-method-ko-container .actions-toolbar,
+                                    .fastcheckout-payment-method-ko-container .payment-method-billing-address {
+                                        display: none !important;
+                                    }
+                                `;
+                                shadow.appendChild(style);
+                            }
+
+                            // Wrap activeElement in a container with class fastcheckout-payment-method-ko-container
+                            // to ensure that CSS selectors starting with .fastcheckout-payment-method-ko-container will match perfectly!
+                            var wrapper = document.createElement('div');
+                            wrapper.className = 'fastcheckout-payment-method-ko-container';
+                            wrapper.appendChild(activeElement);
+
+                            shadow.appendChild(wrapper);
                             target.classList.remove('hidden');
                             target.style.display = 'block';
                             movedToTarget = true;
@@ -2884,7 +3077,15 @@ define([
                                 count++;
                             }
                         });
-                        
+
+                        // Clear empty wrappers from shadow roots
+                        document.querySelectorAll('[data-fastcheckout-payment-method-ko-target]').forEach(function (placeholder) {
+                            if (placeholder.shadowRoot) {
+                                placeholder.shadowRoot.querySelectorAll('.fastcheckout-payment-method-ko-container').forEach(function (wrapper) {
+                                    wrapper.remove();
+                                });
+                            }
+                        });
                     }
                 }
 

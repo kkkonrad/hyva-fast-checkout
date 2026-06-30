@@ -131,10 +131,83 @@ foreach ($layoutScripts['external'] as $externalScript) {
         document.head.appendChild(script);
     }
 
+    var originalGetElementById = document.getElementById;
+    var originalQuerySelector = document.querySelector;
+    var originalQuerySelectorAll = document.querySelectorAll;
+
+    function setupDomOverrides() {
+        document.getElementById = function (id) {
+            var el = originalGetElementById.call(document, id);
+            if (!el) {
+                var placeholders = originalQuerySelectorAll.call(document, '[data-fastcheckout-payment-method-ko-target]');
+                for (var i = 0; i < placeholders.length; i++) {
+                    if (placeholders[i].shadowRoot) {
+                        el = placeholders[i].shadowRoot.getElementById(id);
+                        if (el) break;
+                    }
+                }
+            }
+            return el;
+        };
+
+        document.querySelector = function (selector) {
+            var el = originalQuerySelector.call(document, selector);
+            if (!el) {
+                if (typeof selector === 'string' && (
+                    selector.indexOf('wire:') !== -1 ||
+                    selector.indexOf('x-') !== -1 ||
+                    selector.indexOf('[wire') !== -1 ||
+                    selector.indexOf('[x-') !== -1 ||
+                    selector.indexOf('livewire') !== -1 ||
+                    selector.indexOf('alpine') !== -1
+                )) {
+                    return el;
+                }
+
+                var placeholders = originalQuerySelectorAll.call(document, '[data-fastcheckout-payment-method-ko-target]');
+                for (var i = 0; i < placeholders.length; i++) {
+                    if (placeholders[i].shadowRoot) {
+                        el = placeholders[i].shadowRoot.querySelector(selector);
+                        if (el) break;
+                    }
+                }
+            }
+            return el;
+        };
+
+        document.querySelectorAll = function (selector) {
+            var lightList = Array.from(originalQuerySelectorAll.call(document, selector));
+            
+            if (typeof selector === 'string' && (
+                selector.indexOf('wire:') !== -1 ||
+                selector.indexOf('x-') !== -1 ||
+                selector.indexOf('[wire') !== -1 ||
+                selector.indexOf('[x-') !== -1 ||
+                selector.indexOf('livewire') !== -1 ||
+                selector.indexOf('alpine') !== -1
+            )) {
+                return lightList;
+            }
+
+            var shadowElements = [];
+            var placeholders = originalQuerySelectorAll.call(document, '[data-fastcheckout-payment-method-ko-target]');
+            for (var i = 0; i < placeholders.length; i++) {
+                if (placeholders[i].shadowRoot) {
+                    placeholders[i].shadowRoot.querySelectorAll(selector).forEach(function (el) {
+                        shadowElements.push(el);
+                    });
+                }
+            }
+            return lightList.concat(shadowElements);
+        };
+    }
+
     function initPaymentRenderers() {
         if (started || typeof window.require !== 'function') {
             return;
         }
+
+        setupDomOverrides();
 
         started = true;
         window.require.config({

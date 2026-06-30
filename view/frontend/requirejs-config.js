@@ -4,6 +4,9 @@ var config = {
             'Magento_Checkout/js/checkout-data': {
                 'Kkkonrad_Fastcheckout/js/mixin/checkout-data-mixin': true
             },
+            'Magento_Customer/js/customer-data': {
+                'Kkkonrad_Fastcheckout/js/mixin/customer-data-mixin': true
+            },
             'Magento_Checkout/js/action/select-billing-address': {
                 'Kkkonrad_Fastcheckout/js/mixin/select-billing-address-mixin': true
             },
@@ -33,6 +36,9 @@ var config = {
             },
             'PayPal_Braintree/js/view/payment/adapter': {
                 'Kkkonrad_Fastcheckout/js/mixin/braintree-adapter-mixin': true
+            },
+            'mage/storage': {
+                'Kkkonrad_Fastcheckout/js/mixin/storage-mixin': true
             }
         }
     }

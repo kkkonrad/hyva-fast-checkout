@@ -927,6 +927,23 @@ function initCheckout() {
                 this.onPaymentError(event);
             });
 
+            // Alpine watches to sync state to KO
+            const fieldsToWatch = [
+                'email', 'countryId', 'postcode', 'city', 'region', 'regionId',
+                'firstname', 'lastname', 'telephone', 'company', 'street1', 'street2',
+                'billingCountryId', 'billingPostcode', 'billingCity', 'billingRegion', 'billingRegionId',
+                'billingFirstname', 'billingLastname', 'billingTelephone', 'billingCompany', 'billingStreet1', 'billingStreet2',
+                'paymentMethod'
+            ];
+
+            fieldsToWatch.forEach((field) => {
+                this.$watch(`$wire.${field}`, (value) => {
+                    if (window.fastcheckoutHyvaPayment && typeof window.fastcheckoutHyvaPayment.syncFieldToKo === 'function') {
+                        window.fastcheckoutHyvaPayment.syncFieldToKo(field, value);
+                    }
+                });
+            });
+
             this.$nextTick(() => {
                 if (window.fastcheckoutHyvaShipping && typeof window.fastcheckoutHyvaShipping.syncAddress === 'function') {
                     window.fastcheckoutHyvaShipping.syncAddress(this.$wire);
