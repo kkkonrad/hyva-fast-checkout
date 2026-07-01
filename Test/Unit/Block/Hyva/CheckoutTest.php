@@ -143,4 +143,9 @@ class CheckoutTest extends TestCase
     {
         $this->assertEquals(['modules' => [], 'external' => []], $this->checkoutBlock->getCheckoutLayoutScripts());
     }
+
+    public function testGetPaymentValidationComponentsReturnsEmptyWhenDepsNull(): void
+    {
+        $this->assertEquals([], $this->checkoutBlock->getPaymentValidationComponents());
+    }
 }

@@ -12,9 +12,17 @@ if (!is_array($paymentMethods) || $paymentMethods === []) {
     $paymentMethods = $checkoutConfig['paymentMethods'] ?? [];
 }
 $rendererComponents = $block->getPaymentRendererComponents();
+$shippingRatesValidationComponents = $block->getShippingRatesValidationComponents();
+$paymentValidationComponents = $block->getPaymentValidationComponents();
 $layoutScripts = $block->getCheckoutLayoutScripts();
 
-if (empty($rendererComponents) && empty($layoutScripts['modules']) && empty($layoutScripts['external'])) {
+if (
+    empty($rendererComponents) &&
+    empty($shippingRatesValidationComponents) &&
+    empty($paymentValidationComponents) &&
+    empty($layoutScripts['modules']) &&
+    empty($layoutScripts['external'])
+) {
     return;
 }
 
@@ -22,6 +30,8 @@ $mageInitConfig = [
     'checkoutConfig' => $checkoutConfig,
     'paymentMethods' => $paymentMethods,
     'rendererComponents' => $rendererComponents,
+    'shippingRatesValidationComponents' => $shippingRatesValidationComponents,
+    'paymentValidationComponents' => $paymentValidationComponents,
     'layoutScripts' => $layoutScripts['modules'] ?? [],
     'scope' => 'fastcheckoutHyvaPaymentRenderers'
 ];

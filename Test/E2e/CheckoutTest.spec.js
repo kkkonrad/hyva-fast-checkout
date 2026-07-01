@@ -113,6 +113,7 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
                 'Magento_Checkout/js/view/shipping',
                 'Magento_Checkout/js/view/shipping-information',
                 'Magento_Checkout/js/view/form/element/email',
+                'Magento_Checkout/js/action/select-shipping-address',
                 'Magento_Checkout/js/action/select-shipping-method',
                 'Magento_Checkout/js/action/set-shipping-information',
                 'Magento_Checkout/js/action/select-payment-method',
@@ -164,6 +165,8 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
                             'syncAddress',
                             'syncShippingMethod',
                             'syncShippingMethodToMagewire',
+                            'onSelectShippingAddressAction',
+                            'onSelectBillingAddressAction',
                             'onSelectShippingMethodAction',
                             'onSetShippingInformationAction',
                             'onEstimateShippingRatesAction',
@@ -208,6 +211,7 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
                 'jquery',
                 'Magento_Checkout/js/model/quote',
                 'Magento_Checkout/js/action/select-billing-address',
+                'Magento_Checkout/js/action/select-shipping-address',
                 'Magento_Checkout/js/action/select-shipping-method',
                 'Magento_Checkout/js/action/set-shipping-information',
                 'Magento_Checkout/js/action/set-billing-address',
@@ -221,6 +225,7 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
                 $,
                 quote,
                 selectBillingAddress,
+                selectShippingAddress,
                 selectShippingMethod,
                 setShippingInformation,
                 setBillingAddress,
@@ -261,6 +266,12 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
                     regionId: null,
                     region_id: null,
                     telephone: '123456789',
+                    prefix: 'Dr',
+                    middlename: 'Middle',
+                    suffix: 'Jr',
+                    fax: '987654321',
+                    vatId: 'PL1234567890',
+                    vat_id: 'PL1234567890',
                     saveInAddressBook: null,
                     customAttributes: {
                         compat_test: 'yes'
@@ -321,13 +332,45 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
                     return domInput ? domInput.value : '';
                 };
 
+                const getWireSnapshot = () => {
+                    const el = document.querySelector('[wire\\:id]');
+                    const livewire = window.Livewire || window.Magewire;
+                    const wire = el && livewire && typeof livewire.find === 'function'
+                        ? livewire.find(el.getAttribute('wire:id'))
+                        : null;
+
+                    if (!wire) {
+                        return {};
+                    }
+
+                    const get = (name) => {
+                        if (typeof wire[name] !== 'undefined') {
+                            return wire[name];
+                        }
+                        return typeof wire.get === 'function' ? wire.get(name) : undefined;
+                    };
+
+                    return {
+                        prefix: get('prefix'),
+                        middlename: get('middlename'),
+                        suffix: get('suffix'),
+                        fax: get('fax'),
+                        vatId: get('vatId'),
+                        billingPrefix: get('billingPrefix'),
+                        billingMiddlename: get('billingMiddlename'),
+                        billingSuffix: get('billingSuffix'),
+                        billingFax: get('billingFax'),
+                        billingVatId: get('billingVatId')
+                    };
+                };
+
                 (async () => {
                     try {
                         if (fullScreenLoader && typeof fullScreenLoader.stopLoader === 'function') {
                             fullScreenLoader.stopLoader(true);
                         }
 
-                        quote.shippingAddress(address);
+                        selectShippingAddress(address);
                         selectBillingAddress(address);
                         quote.guestEmail = 'ko-compatibility@example.com';
                         await estimateShippingRates(address);
@@ -370,6 +413,8 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
                         const paymentInfoDeferred = $.Deferred();
                         await waitForPromise(getPaymentInformation(paymentInfoDeferred, messageList));
 
+                        const wireSnapshot = getWireSnapshot();
+
                         resolve({
                             ok: true,
                             shipping: {
@@ -390,6 +435,7 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
                                 billingAddress: Boolean(quote.billingAddress && quote.billingAddress()),
                                 paymentMethod
                             },
+                            wire: wireSnapshot,
                             messages: {
                                 hasErrors: messageList && typeof messageList.hasMessages === 'function'
                                     ? messageList.hasMessages()
@@ -443,6 +489,560 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
         expect(actionResult.shipping.paymentMethods).toBeGreaterThanOrEqual(0);
         expect(actionResult.billing.paymentMethods).toBeGreaterThanOrEqual(0);
         expect(actionResult.quote.paymentMethod).toBeTruthy();
+        expect(actionResult.wire).toMatchObject({
+            prefix: 'Dr',
+            middlename: 'Middle',
+            suffix: 'Jr',
+            fax: '987654321',
+            vatId: 'PL1234567890',
+            billingPrefix: 'Dr',
+            billingMiddlename: 'Middle',
+            billingSuffix: 'Jr',
+            billingFax: '987654321',
+            billingVatId: 'PL1234567890'
+        });
+    });
+
+    test('should buffer direct Magento checkout-data setters and apply them to Fastcheckout state', async ({ page }) => {
+        const checkout = new CheckoutPage(page);
+        await checkout.goto();
+
+        await expect.poll(async () => page.evaluate(() => Boolean(window.fastcheckoutCheckoutDataBufferReady)), {
+            timeout: 10000
+        }).toBe(true);
+
+        const syncResult = await page.evaluate(() => new Promise((resolve) => {
+            const timeout = window.setTimeout(() => {
+                resolve({
+                    ok: false,
+                    step: 'timeout'
+                });
+            }, 5000);
+
+            window.require([
+                'Magento_Checkout/js/checkout-data'
+            ], (
+                checkoutData
+            ) => {
+                const address = {
+                    firstname: 'CheckoutData',
+                    lastname: 'Sync',
+                    company: '',
+                    street: ['Checkout Data Street 9'],
+                    city: 'Krakow',
+                    postcode: '30-001',
+                    country_id: 'PL',
+                    countryId: 'PL',
+                    region: '',
+                    region_id: null,
+                    regionId: null,
+                    telephone: '123456789'
+                };
+                const events = [];
+                const listener = (event) => {
+                    events.push(event.detail && event.detail.method);
+                };
+                const getWire = () => {
+                    const el = document.querySelector('[wire\\:id]');
+                    const livewire = window.Livewire || window.Magewire;
+
+                    return el && livewire && typeof livewire.find === 'function'
+                        ? livewire.find(el.getAttribute('wire:id'))
+                        : null;
+                };
+                window.addEventListener('fastcheckout:checkout-data-set', listener);
+
+                checkoutData.setShippingAddressFromData(address);
+                checkoutData.setBillingAddressFromData(address);
+                checkoutData.setValidatedEmailValue('checkout-data-sync@example.com');
+                checkoutData.setSelectedPaymentMethod('checkmo');
+                checkoutData.setSelectedShippingRate('flatrate_flatrate');
+
+                window.setTimeout(() => {
+                    const wire = getWire();
+                    let applied = false;
+                    Promise.resolve(
+                        wire && typeof window.fastcheckoutApplyPendingCheckoutData === 'function'
+                            ? window.fastcheckoutApplyPendingCheckoutData(wire)
+                            : true
+                    ).then((result) => {
+                        applied = result;
+                        window.clearTimeout(timeout);
+                        window.removeEventListener('fastcheckout:checkout-data-set', listener);
+                        resolve({
+                            ok: true,
+                            events,
+                            email: checkoutData.getValidatedEmailValue(),
+                            shippingAddress: checkoutData.getShippingAddressFromData(),
+                            billingAddress: checkoutData.getBillingAddressFromData(),
+                            paymentMethod: checkoutData.getSelectedPaymentMethod(),
+                            shippingRate: checkoutData.getSelectedShippingRate(),
+                            applied,
+                            pending: window.fastcheckoutPendingCheckoutData
+                        });
+                    }).catch((error) => {
+                        window.clearTimeout(timeout);
+                        window.removeEventListener('fastcheckout:checkout-data-set', listener);
+                        resolve({
+                            ok: false,
+                            step: 'apply',
+                            message: error && (error.message || error.statusText || String(error))
+                        });
+                    });
+                }, 800);
+            }, (error) => {
+                window.clearTimeout(timeout);
+                resolve({
+                    ok: false,
+                    step: 'require',
+                    requireError: error && (error.requireModules || error.message || String(error))
+                });
+            });
+        }));
+
+        expect(syncResult, JSON.stringify(syncResult, null, 2)).toMatchObject({
+            ok: true,
+            email: 'checkout-data-sync@example.com',
+            paymentMethod: 'checkmo',
+            shippingRate: 'flatrate_flatrate'
+        });
+        expect(syncResult.requireError).toBeFalsy();
+        expect(syncResult.events).toEqual(expect.arrayContaining([
+            'setShippingAddressFromData',
+            'setBillingAddressFromData',
+            'setValidatedEmailValue',
+            'setSelectedPaymentMethod',
+            'setSelectedShippingRate'
+        ]));
+        expect(syncResult.shippingAddress).toMatchObject({
+            firstname: 'CheckoutData',
+            lastname: 'Sync',
+            street: ['Checkout Data Street 9'],
+            city: 'Krakow',
+        });
+        expect(syncResult.billingAddress).toMatchObject({
+            firstname: 'CheckoutData',
+            lastname: 'Sync',
+            street: ['Checkout Data Street 9'],
+            city: 'Krakow'
+        });
+        expect(syncResult, JSON.stringify(syncResult, null, 2)).toMatchObject({
+            applied: true,
+            pending: {
+                changed: false
+            }
+        });
+    });
+
+    test('should route custom KO shipping-rate processors through Fastcheckout bridge', async ({ page }) => {
+        const checkout = new CheckoutPage(page);
+        await checkout.goto();
+
+        await expect.poll(async () => page.evaluate(() => Boolean(
+            window.fastcheckoutHyvaShipping &&
+            typeof window.fastcheckoutHyvaShipping.onEstimateShippingRatesAction === 'function'
+        )), {
+            timeout: 10000
+        }).toBe(true);
+
+        const processorResult = await page.evaluate(() => new Promise((resolve) => {
+            const timeout = window.setTimeout(() => {
+                resolve({
+                    ok: false,
+                    step: 'timeout'
+                });
+            }, 8000);
+
+            window.require([
+                'Magento_Checkout/js/model/quote',
+                'Magento_Checkout/js/model/shipping-rate-service',
+                'Magento_Checkout/js/model/shipping-service'
+            ], (
+                quote,
+                shippingRateService,
+                shippingService
+            ) => {
+                const processorType = 'fastcheckout-e2e-custom-address';
+                const cacheKey = `${processorType}-${Date.now()}`;
+                const originalEstimate = window.fastcheckoutHyvaShipping.onEstimateShippingRatesAction;
+                let originalProcessorCalls = 0;
+                let estimateCalls = 0;
+                let estimatedRateCount = null;
+
+                const restore = () => {
+                    window.fastcheckoutHyvaShipping.onEstimateShippingRatesAction = originalEstimate;
+                    window.clearTimeout(timeout);
+                };
+
+                const address = {
+                    firstname: 'Custom',
+                    lastname: 'Processor',
+                    company: '',
+                    street: ['Custom Processor Street 1'],
+                    city: 'Warszawa',
+                    postcode: '00-001',
+                    countryId: 'PL',
+                    country_id: 'PL',
+                    region: '',
+                    regionId: null,
+                    region_id: null,
+                    telephone: '123456789',
+                    saveInAddressBook: null,
+                    customAttributes: [],
+                    extension_attributes: {},
+                    getType: () => processorType,
+                    getCacheKey: () => cacheKey,
+                    canUseForBilling: () => true
+                };
+
+                window.fastcheckoutHyvaShipping.onEstimateShippingRatesAction = function () {
+                    estimateCalls += 1;
+
+                    return Promise.resolve(originalEstimate.apply(this, arguments)).then((rates) => {
+                        estimatedRateCount = Array.isArray(rates) ? rates.length : null;
+
+                        return rates;
+                    });
+                };
+
+                shippingRateService.registerProcessor(processorType, {
+                    getRates: () => {
+                        originalProcessorCalls += 1;
+                    }
+                });
+
+                shippingService.setShippingRates([]);
+                quote.shippingAddress(address);
+
+                const startedAt = Date.now();
+                const check = () => {
+                    const serviceRates = typeof shippingService.getShippingRates === 'function'
+                        ? shippingService.getShippingRates()()
+                        : [];
+
+                    if (estimateCalls > 0 && shippingService.isLoading && !shippingService.isLoading()) {
+                        restore();
+                        resolve({
+                            ok: true,
+                            originalProcessorCalls,
+                            estimateCalls,
+                            estimatedRateCount,
+                            serviceRateCount: Array.isArray(serviceRates) ? serviceRates.length : null,
+                            addressType: quote.shippingAddress() && quote.shippingAddress().getType
+                                ? quote.shippingAddress().getType()
+                                : null
+                        });
+
+                        return;
+                    }
+
+                    if (Date.now() - startedAt > 7000) {
+                        restore();
+                        resolve({
+                            ok: false,
+                            step: 'wait',
+                            originalProcessorCalls,
+                            estimateCalls,
+                            estimatedRateCount,
+                            isLoading: shippingService.isLoading ? shippingService.isLoading() : null,
+                            serviceRateCount: Array.isArray(serviceRates) ? serviceRates.length : null
+                        });
+
+                        return;
+                    }
+
+                    window.setTimeout(check, 100);
+                };
+
+                check();
+            }, (error) => {
+                window.clearTimeout(timeout);
+                resolve({
+                    ok: false,
+                    step: 'require',
+                    requireError: error && (error.requireModules || error.message || String(error))
+                });
+            });
+        }));
+
+        expect(processorResult, JSON.stringify(processorResult, null, 2)).toMatchObject({
+            ok: true,
+            originalProcessorCalls: 0,
+            addressType: 'fastcheckout-e2e-custom-address'
+        });
+        expect(processorResult.requireError).toBeFalsy();
+        expect(processorResult.estimateCalls).toBeGreaterThanOrEqual(1);
+        expect(processorResult.serviceRateCount).toBe(processorResult.estimatedRateCount);
+    });
+
+    test('should load standard KO shipping rate validators and block invalid rate estimates', async ({ page }) => {
+        const checkout = new CheckoutPage(page);
+        await checkout.goto();
+
+        await expect.poll(async () => page.evaluate(() => Boolean(
+            window.fastcheckoutHyvaShipping &&
+            typeof window.fastcheckoutHyvaShipping.onEstimateShippingRatesAction === 'function' &&
+            window.fastcheckoutShippingRatesValidationComponentsLoaded
+        )), {
+            timeout: 10000
+        }).toBe(true);
+
+        const validationResult = await page.evaluate(() => new Promise((resolve) => {
+            const timeout = window.setTimeout(() => {
+                resolve({
+                    ok: false,
+                    step: 'timeout'
+                });
+            }, 5000);
+
+            window.require([
+                'Magento_Checkout/js/model/shipping-rates-validator',
+                'Magento_Checkout/js/model/shipping-rates-validation-rules',
+                'Magento_Checkout/js/model/shipping-service'
+            ], (
+                shippingRatesValidator,
+                shippingRatesValidationRules,
+                shippingService
+            ) => {
+                const livewireEl = document.querySelector('[wire\\:id]');
+                const livewire = window.Livewire || window.Magewire;
+                const wire = livewireEl && livewire && typeof livewire.find === 'function'
+                    ? livewire.find(livewireEl.getAttribute('wire:id'))
+                    : livewireEl && livewireEl.__livewire
+                        ? livewireEl.__livewire
+                        : null;
+                const originalCall = wire && typeof wire.call === 'function' ? wire.call : null;
+                let saveShippingAddressCalls = 0;
+
+                const invalidAddress = {
+                    firstname: 'Invalid',
+                    lastname: 'Shipping',
+                    street: ['No Country Street 1'],
+                    city: 'Warszawa',
+                    postcode: '00-001',
+                    countryId: '',
+                    country_id: '',
+                    telephone: '123456789',
+                    getType: () => 'new-customer-address',
+                    getCacheKey: () => `fastcheckout-invalid-${Date.now()}`,
+                    canUseForBilling: () => true
+                };
+
+                if (wire && originalCall) {
+                    wire.call = function (methodName) {
+                        if (methodName === 'saveShippingAddress') {
+                            saveShippingAddressCalls += 1;
+                        }
+
+                        return originalCall.apply(this, arguments);
+                    };
+                }
+
+                Promise.resolve(window.fastcheckoutHyvaShipping.onEstimateShippingRatesAction(invalidAddress))
+                    .then((rates) => {
+                        if (wire && originalCall) {
+                            wire.call = originalCall;
+                        }
+                        window.clearTimeout(timeout);
+                        resolve({
+                            ok: true,
+                            components: window.fastcheckoutShippingRatesValidationComponentNames || [],
+                            observableFields: typeof shippingRatesValidationRules.getObservableFields === 'function'
+                                ? shippingRatesValidationRules.getObservableFields()
+                                : [],
+                            directValidation: typeof shippingRatesValidator.validateAddressData === 'function'
+                                ? shippingRatesValidator.validateAddressData(invalidAddress)
+                                : null,
+                            rates,
+                            serviceRates: typeof shippingService.getShippingRates === 'function'
+                                ? shippingService.getShippingRates()()
+                                : null,
+                            saveShippingAddressCalls
+                        });
+                    })
+                    .catch((error) => {
+                        if (wire && originalCall) {
+                            wire.call = originalCall;
+                        }
+                        window.clearTimeout(timeout);
+                        resolve({
+                            ok: false,
+                            step: 'estimate',
+                            message: error && (error.message || error.statusText || String(error)),
+                            saveShippingAddressCalls
+                        });
+                    });
+            }, (error) => {
+                window.clearTimeout(timeout);
+                resolve({
+                    ok: false,
+                    step: 'require',
+                    requireError: error && (error.requireModules || error.message || String(error))
+                });
+            });
+        }));
+
+        expect(validationResult, JSON.stringify(validationResult, null, 2)).toMatchObject({
+            ok: true,
+            directValidation: false,
+            rates: [],
+            serviceRates: [],
+            saveShippingAddressCalls: 0
+        });
+        expect(validationResult.requireError).toBeFalsy();
+        expect(validationResult.components.length).toBeGreaterThan(0);
+        expect(validationResult.observableFields).toContain('country_id');
+    });
+
+    test('should honor standard Magento additional validators and global messageList', async ({ page }) => {
+        const checkout = new CheckoutPage(page);
+        await checkout.goto();
+
+        await expect.poll(async () => page.evaluate(() => Boolean(
+            window.fastcheckoutHyvaPayment &&
+            typeof window.fastcheckoutHyvaPayment.validate === 'function'
+        )), {
+            timeout: 10000
+        }).toBe(true);
+
+        const validationResult = await page.evaluate(() => new Promise((resolve) => {
+            const timeout = window.setTimeout(() => {
+                resolve({
+                    ok: false,
+                    step: 'timeout'
+                });
+            }, 5000);
+
+            window.require([
+                'Magento_Checkout/js/model/payment/additional-validators',
+                'Magento_Ui/js/model/messageList'
+            ], (
+                additionalValidators,
+                messageList
+            ) => {
+                const initialValidatorCount = typeof additionalValidators.getValidators === 'function'
+                    ? additionalValidators.getValidators().length
+                    : 0;
+                const validatorMessage = 'Fastcheckout validator blocked order';
+                const paymentErrors = [];
+                const paymentMessages = [];
+                const errorListener = (event) => {
+                    paymentErrors.push(event.detail && event.detail.message);
+                };
+                const messageListener = (event) => {
+                    paymentMessages.push(event.detail || {});
+                };
+                const validator = {
+                    validate: () => {
+                        messageList.addErrorMessage({ message: validatorMessage });
+                        return false;
+                    }
+                };
+
+                document.addEventListener('fastcheckout:payment-error', errorListener);
+                document.addEventListener('fastcheckout:payment-message', messageListener);
+                additionalValidators.registerValidator(validator);
+
+                const isValid = window.fastcheckoutHyvaPayment.validate();
+
+                window.setTimeout(() => {
+                    const validators = typeof additionalValidators.getValidators === 'function'
+                        ? additionalValidators.getValidators()
+                        : [];
+
+                    validators.splice(initialValidatorCount);
+                    document.removeEventListener('fastcheckout:payment-error', errorListener);
+                    document.removeEventListener('fastcheckout:payment-message', messageListener);
+                    window.clearTimeout(timeout);
+
+                    resolve({
+                        ok: true,
+                        isValid,
+                        paymentErrors,
+                        paymentMessages,
+                        messageListErrors: typeof messageList.errorMessages === 'function'
+                            ? messageList.errorMessages()
+                            : []
+                    });
+                }, 200);
+            }, (error) => {
+                window.clearTimeout(timeout);
+                resolve({
+                    ok: false,
+                    step: 'require',
+                    requireError: error && (error.requireModules || error.message || String(error))
+                });
+            });
+        }));
+
+        expect(validationResult, JSON.stringify(validationResult, null, 2)).toMatchObject({
+            ok: true,
+            isValid: false
+        });
+        expect(validationResult.requireError).toBeFalsy();
+        expect(validationResult.messageListErrors).toContain('Fastcheckout validator blocked order');
+        expect(validationResult.paymentErrors).toContain('Fastcheckout validator blocked order');
+        expect(validationResult.paymentMessages).toEqual(expect.arrayContaining([
+            expect.objectContaining({
+                type: 'error',
+                message: 'Fastcheckout validator blocked order'
+            })
+        ]));
+    });
+
+    test('should load standard KO payment validation components from checkout layout', async ({ page }) => {
+        const checkout = new CheckoutPage(page);
+        await checkout.goto();
+
+        await expect.poll(async () => page.evaluate(() => Boolean(
+            window.fastcheckoutPaymentValidationComponentsLoaded &&
+            Array.isArray(window.fastcheckoutPaymentValidationComponentNames)
+        )), {
+            timeout: 10000
+        }).toBe(true);
+
+        const componentResult = await page.evaluate(() => new Promise((resolve) => {
+            const timeout = window.setTimeout(() => {
+                resolve({
+                    ok: false,
+                    step: 'timeout'
+                });
+            }, 5000);
+
+            window.require([
+                'Magento_Checkout/js/model/payment/additional-validators'
+            ], (
+                additionalValidators
+            ) => {
+                window.clearTimeout(timeout);
+                const validators = typeof additionalValidators.getValidators === 'function'
+                    ? additionalValidators.getValidators()
+                    : [];
+
+                resolve({
+                    ok: true,
+                    components: window.fastcheckoutPaymentValidationComponentNames || [],
+                    validatorCount: validators.length,
+                    hasEmailValidatorComponent: (window.fastcheckoutPaymentValidationComponentNames || [])
+                        .indexOf('Magento_Checkout/js/view/payment/email-validator') !== -1
+                });
+            }, (error) => {
+                window.clearTimeout(timeout);
+                resolve({
+                    ok: false,
+                    step: 'require',
+                    requireError: error && (error.requireModules || error.message || String(error))
+                });
+            });
+        }));
+
+        expect(componentResult, JSON.stringify(componentResult, null, 2)).toMatchObject({
+            ok: true,
+            hasEmailValidatorComponent: true
+        });
+        expect(componentResult.requireError).toBeFalsy();
+        expect(componentResult.components.length).toBeGreaterThan(0);
+        expect(componentResult.validatorCount).toBeGreaterThan(0);
     });
 
     test('should route standard Magento KO place-order action through Fastcheckout bridge', async ({ page }) => {

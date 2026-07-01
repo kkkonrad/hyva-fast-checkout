@@ -10,6 +10,9 @@ var config = {
             'Magento_Checkout/js/action/select-billing-address': {
                 'Kkkonrad_Fastcheckout/js/mixin/select-billing-address-mixin': true
             },
+            'Magento_Checkout/js/action/select-shipping-address': {
+                'Kkkonrad_Fastcheckout/js/mixin/select-shipping-address-mixin': true
+            },
             'Magento_Checkout/js/action/select-shipping-method': {
                 'Kkkonrad_Fastcheckout/js/mixin/select-shipping-method-mixin': true
             },
@@ -24,6 +27,9 @@ var config = {
             },
             'Magento_Checkout/js/model/shipping-rate-processor/customer-address': {
                 'Kkkonrad_Fastcheckout/js/mixin/shipping-rate-processor-customer-address-mixin': true
+            },
+            'Magento_Checkout/js/model/shipping-rate-service': {
+                'Kkkonrad_Fastcheckout/js/mixin/shipping-rate-service-mixin': true
             },
             'Magento_Checkout/js/action/place-order': {
                 'Kkkonrad_Fastcheckout/js/mixin/place-order-mixin': true

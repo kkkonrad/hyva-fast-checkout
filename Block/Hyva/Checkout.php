@@ -90,6 +90,16 @@ class Checkout extends Template
     private $paymentRendererComponentsCache;
 
     /**
+     * @var string[]|null
+     */
+    private $shippingRatesValidationComponentsCache;
+
+    /**
+     * @var string[]|null
+     */
+    private $paymentValidationComponentsCache;
+
+    /**
      * @var array|null
      */
     private $checkoutLayoutAssetsCache;
@@ -281,6 +291,84 @@ class Checkout extends Template
     }
 
     /**
+     * Return shipping rates validation components declared by active modules
+     * for the standard Magento checkout handle.
+     *
+     * @return string[]
+     */
+    public function getShippingRatesValidationComponents()
+    {
+        if ($this->shippingRatesValidationComponentsCache !== null) {
+            return $this->shippingRatesValidationComponentsCache;
+        }
+
+        $moduleList = $this->getModuleList();
+        $componentRegistrar = $this->getComponentRegistrar();
+        if ($moduleList === null || $componentRegistrar === null) {
+            $this->shippingRatesValidationComponentsCache = [];
+            return $this->shippingRatesValidationComponentsCache;
+        }
+
+        $components = [];
+        foreach ($moduleList->getNames() as $moduleName) {
+            $modulePath = $componentRegistrar->getPath(ComponentRegistrar::MODULE, $moduleName);
+            if (!$modulePath) {
+                continue;
+            }
+
+            $layoutFile = $modulePath . '/view/frontend/layout/checkout_index_index.xml';
+            if (!is_file($layoutFile)) {
+                continue;
+            }
+
+            $components = array_merge($components, $this->getShippingRatesValidationComponentsFromLayout($layoutFile));
+        }
+
+        $this->shippingRatesValidationComponentsCache = array_values(array_unique($components));
+
+        return $this->shippingRatesValidationComponentsCache;
+    }
+
+    /**
+     * Return payment validator registration components declared by active modules
+     * for the standard Magento checkout handle.
+     *
+     * @return string[]
+     */
+    public function getPaymentValidationComponents()
+    {
+        if ($this->paymentValidationComponentsCache !== null) {
+            return $this->paymentValidationComponentsCache;
+        }
+
+        $moduleList = $this->getModuleList();
+        $componentRegistrar = $this->getComponentRegistrar();
+        if ($moduleList === null || $componentRegistrar === null) {
+            $this->paymentValidationComponentsCache = [];
+            return $this->paymentValidationComponentsCache;
+        }
+
+        $components = [];
+        foreach ($moduleList->getNames() as $moduleName) {
+            $modulePath = $componentRegistrar->getPath(ComponentRegistrar::MODULE, $moduleName);
+            if (!$modulePath) {
+                continue;
+            }
+
+            $layoutFile = $modulePath . '/view/frontend/layout/checkout_index_index.xml';
+            if (!is_file($layoutFile)) {
+                continue;
+            }
+
+            $components = array_merge($components, $this->getPaymentValidationComponentsFromLayout($layoutFile));
+        }
+
+        $this->paymentValidationComponentsCache = array_values(array_unique($components));
+
+        return $this->paymentValidationComponentsCache;
+    }
+
+    /**
      * Return custom layout assets declared in the standard Magento checkout layout (checkout_index_index.xml)
      * of active modules.
      *
@@ -449,6 +537,80 @@ class Checkout extends Template
                             $components[] = $component;
                         }
                     }
+                }
+            }
+
+            return $components;
+        } catch (\Exception $e) {
+            return [];
+        } finally {
+            libxml_clear_errors();
+            libxml_use_internal_errors($previous);
+        }
+    }
+
+    /**
+     * @param string $layoutFile
+     * @return string[]
+     */
+    private function getShippingRatesValidationComponentsFromLayout($layoutFile)
+    {
+        $dom = new \DOMDocument();
+        $previous = libxml_use_internal_errors(true);
+
+        try {
+            if (!$dom->load($layoutFile)) {
+                return [];
+            }
+
+            $xpath = new \DOMXPath($dom);
+            $nodes = $xpath->query(
+                '//*[local-name()="item"][@name="shipping-rates-validation"]' .
+                '//*[local-name()="item"][@name="component"]'
+            );
+
+            $components = [];
+            foreach ($nodes as $node) {
+                $component = trim($node->textContent);
+                if ($component !== '') {
+                    $components[] = $component;
+                }
+            }
+
+            return $components;
+        } catch (\Exception $e) {
+            return [];
+        } finally {
+            libxml_clear_errors();
+            libxml_use_internal_errors($previous);
+        }
+    }
+
+    /**
+     * @param string $layoutFile
+     * @return string[]
+     */
+    private function getPaymentValidationComponentsFromLayout($layoutFile)
+    {
+        $dom = new \DOMDocument();
+        $previous = libxml_use_internal_errors(true);
+
+        try {
+            if (!$dom->load($layoutFile)) {
+                return [];
+            }
+
+            $xpath = new \DOMXPath($dom);
+            $nodes = $xpath->query(
+                '//*[local-name()="item"][@name="additional-payment-validators"]' .
+                '//*[local-name()="item"][@name="component"]'
+            );
+
+            $components = [];
+            foreach ($nodes as $node) {
+                $component = trim($node->textContent);
+                if ($component !== '' && $component !== 'uiComponent') {
+                    $components[] = $component;
                 }
             }
 

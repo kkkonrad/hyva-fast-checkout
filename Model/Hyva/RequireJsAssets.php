@@ -20,6 +20,8 @@ class RequireJsAssets
 
     private const REQUIRED_CONFIG_MARKERS = [
         'Kkkonrad_Fastcheckout/js/mixin/storage-mixin',
+        'Kkkonrad_Fastcheckout/js/mixin/select-shipping-address-mixin',
+        'Kkkonrad_Fastcheckout/js/mixin/shipping-rate-service-mixin',
         'Kkkonrad_Fastcheckout/js/mixin/set-shipping-information-mixin',
         'Kkkonrad_Fastcheckout/js/mixin/set-payment-information-mixin',
         'Kkkonrad_Fastcheckout/js/mixin/set-billing-address-mixin',
