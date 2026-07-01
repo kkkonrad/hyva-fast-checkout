@@ -3966,16 +3966,29 @@ define([
                                 shadow.appendChild(style);
                             }
 
-                            // Wrap activeElement in a container with class fastcheckout-payment-method-ko-container
-                            // to ensure that CSS selectors starting with .fastcheckout-payment-method-ko-container will match perfectly!
-                            var wrapper = document.createElement('div');
-                            wrapper.className = 'fastcheckout-payment-method-ko-container';
-                            wrapper.appendChild(activeElement);
+                            var existingWrapper = shadow.querySelector('.fastcheckout-payment-method-ko-container');
+                            if (existingWrapper && activeElement.parentNode === existingWrapper) {
+                                existingWrapper.classList.remove('hidden');
+                                existingWrapper.style.display = '';
+                                target.classList.remove('hidden');
+                                target.style.display = 'block';
+                                movedToTarget = true;
+                            } else {
+                                shadow.querySelectorAll('.fastcheckout-payment-method-ko-container').forEach(function (w) {
+                                    w.remove();
+                                });
 
-                            shadow.appendChild(wrapper);
-                            target.classList.remove('hidden');
-                            target.style.display = 'block';
-                            movedToTarget = true;
+                                // Wrap activeElement in a container with class fastcheckout-payment-method-ko-container
+                                // to ensure that CSS selectors starting with .fastcheckout-payment-method-ko-container will match perfectly!
+                                var wrapper = document.createElement('div');
+                                wrapper.className = 'fastcheckout-payment-method-ko-container';
+                                wrapper.appendChild(activeElement);
+
+                                shadow.appendChild(wrapper);
+                                target.classList.remove('hidden');
+                                target.style.display = 'block';
+                                movedToTarget = true;
+                            }
                         } else {
                             
                         }
