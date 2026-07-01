@@ -2006,7 +2006,28 @@ define([
                     }
 
                     if (Array.isArray(payload.shipping_rates)) {
-                        shippingService.setShippingRates(payload.shipping_rates);
+                        var currentRates = shippingService.getShippingRates()();
+                        var ratesChanged = false;
+
+                        if (currentRates.length !== payload.shipping_rates.length) {
+                            ratesChanged = true;
+                        } else {
+                            for (var i = 0; i < currentRates.length; i++) {
+                                var cr = currentRates[i];
+                                var nr = payload.shipping_rates[i];
+                                if (cr.carrier_code !== nr.carrier_code ||
+                                    cr.method_code !== nr.method_code ||
+                                    cr.amount !== nr.amount ||
+                                    cr.available !== nr.available) {
+                                    ratesChanged = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (ratesChanged) {
+                            shippingService.setShippingRates(payload.shipping_rates);
+                        }
                     }
 
                     if (payload.selected_payment_method) {
@@ -3904,7 +3925,6 @@ define([
                                     shadow.appendChild(link.cloneNode(true));
                                 });
 
-                                // Clean up the default style borders on the inner .payment-method
                                 var style = document.createElement('style');
                                 style.textContent = `
                                     .payment-method {
@@ -3921,6 +3941,23 @@ define([
                                     .fastcheckout-payment-method-ko-container .actions-toolbar,
                                     .fastcheckout-payment-method-ko-container .payment-method-billing-address {
                                         display: none !important;
+                                    }
+                                    .required-captcha.checkbox {
+                                        position: absolute !important;
+                                        display: block !important;
+                                        visibility: visible !important;
+                                        overflow: hidden !important;
+                                        opacity: 0 !important;
+                                        width: 1px !important;
+                                        height: 1px !important;
+                                        padding: 0 !important;
+                                        border: none !important;
+                                    }
+                                    .recaptcha-checkout-place-order .field {
+                                        margin: 0 !important;
+                                        padding: 0 !important;
+                                        height: 0 !important;
+                                        overflow: hidden !important;
                                     }
                                 `;
                                 shadow.appendChild(style);

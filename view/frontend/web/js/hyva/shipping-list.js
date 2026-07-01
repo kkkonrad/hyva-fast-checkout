@@ -91,6 +91,32 @@ define([
         initialize: function () {
             this._super();
             window.fastcheckoutHyvaShippingListInstance = this;
+
+            // Re-render InPost widget when shipping rates change (e.g. on payment method switch)
+            shippingService.getShippingRates().subscribe(function () {
+                require(['inPostPaczkomaty'], function (inPostPaczkomaty) {
+                    if (inPostPaczkomaty && typeof inPostPaczkomaty.renderInPostData === 'function') {
+                        setTimeout(function () {
+                            inPostPaczkomaty.renderInPostData().then(function() {
+                                inPostPaczkomaty.insertLogoInPost();
+                            });
+                        }, 100);
+                    }
+                });
+            });
+
+            // Re-render InPost widget when shipping method changes
+            quote.shippingMethod.subscribe(function () {
+                require(['inPostPaczkomaty'], function (inPostPaczkomaty) {
+                    if (inPostPaczkomaty && typeof inPostPaczkomaty.renderInPostData === 'function') {
+                        setTimeout(function () {
+                            inPostPaczkomaty.renderInPostData().then(function() {
+                                inPostPaczkomaty.insertLogoInPost();
+                            });
+                        }, 100);
+                    }
+                });
+            });
             
             return this;
         },
@@ -148,12 +174,12 @@ define([
             var hasErr = self.hasError ? self.hasError(method) : false;
 
             if (hasErr) {
-                return 'border-red-400 ring-1 ring-red-400 bg-red-50/10';
+                return 'border-2 border-red-400 bg-red-50/10';
             }
             if (isSelected) {
-                return 'border-blue-500 bg-blue-50/10 shadow-sm ring-1 ring-blue-500';
+                return 'border-2 border-blue-500 bg-blue-50/10 shadow-sm';
             }
-            return 'border-gray-200 hover:border-gray-300 hover:bg-gray-50/50';
+            return 'border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50/50';
         },
 
         isSelectedVal: function (method) {

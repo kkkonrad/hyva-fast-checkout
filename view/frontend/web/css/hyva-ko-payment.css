@@ -75,16 +75,91 @@
     line-height: 1.5;
 }
 
+/* Reset margins/paddings on checkout agreements to prevent content stretch */
+.fastcheckout-ko-payment-root .checkout-agreements-block,
+.fastcheckout-payment-method-ko-container .checkout-agreements-block {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+.fastcheckout-ko-payment-root .checkout-agreements.fieldset,
+.fastcheckout-payment-method-ko-container .checkout-agreements.fieldset {
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+.fastcheckout-ko-payment-root .checkout-agreement.field,
+.fastcheckout-payment-method-ko-container .checkout-agreement.field {
+    margin: 0.375rem 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.5rem !important;
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+.fastcheckout-ko-payment-root .checkout-agreement.field input[type="checkbox"],
+.fastcheckout-payment-method-ko-container .checkout-agreement.field input[type="checkbox"] {
+    margin: 0 !important;
+    flex-shrink: 0 !important;
+}
+
+.fastcheckout-ko-payment-root .checkout-agreement.field label,
+.fastcheckout-payment-method-ko-container .checkout-agreement.field label {
+    margin: 0 !important;
+    padding: 0 !important;
+    display: inline-block !important;
+    font-size: 0.875rem !important;
+    color: #374151 !important;
+    line-height: 1.25 !important;
+}
+
+.fastcheckout-ko-payment-root .checkout-agreement.field label button.action-show,
+.fastcheckout-payment-method-ko-container .checkout-agreement.field label button.action-show {
+    background: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    color: #3b82f6 !important;
+    text-decoration: underline !important;
+    cursor: pointer !important;
+    font-size: 0.875rem !important;
+    font-weight: inherit !important;
+    text-align: left !important;
+    display: inline !important;
+}
+
+
 .fastcheckout-ko-payment-root a,
 .fastcheckout-payment-method-ko-container a {
     color: #2563eb;
     text-decoration: underline;
 }
 
-/* Active payment option highlight — pure CSS, no Magewire re-render needed */
+/* Active payment option highlight — pure CSS, no delay or transition lag */
+[data-fastcheckout-payment-option] {
+    border: 2px solid #e5e7eb !important; /* border-gray-200, 2px */
+    background-color: transparent !important;
+    transition: all 0.2s ease-in-out !important;
+    box-shadow: none !important;
+}
+
+[data-fastcheckout-payment-option]:hover {
+    border-color: #d1d5db !important; /* hover:border-gray-300 */
+}
+
 [data-fastcheckout-payment-option]:has(input[name="payment_method"]:checked) {
-    border-color: #3b82f6 !important;
-    background-color: rgba(239, 246, 255, 0.08);
+    border-color: #2563eb !important; /* border-blue-600 */
+    background-color: rgba(239, 246, 255, 0.1) !important; /* bg-blue-50/10 */
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important; /* shadow-sm */
 }
 
 /* Premium styles for original offline payment contents (checkmo, banktransfer, cashondelivery) */
@@ -550,3 +625,153 @@ body.checkout-submitting .btn-primary {
 .payment-method-content .braintree-hosted-fields-invalid + .hosted-error {
     display: block;
 }
+
+/* Hide recaptcha validation checkbox while keeping it validate-able */
+.required-captcha.checkbox {
+    position: absolute !important;
+    display: block !important;
+    visibility: visible !important;
+    overflow: hidden !important;
+    opacity: 0 !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    border: none !important;
+}
+
+/* Hide recaptcha validation checkbox parent field to remove blank margin */
+.recaptcha-checkout-place-order .field {
+    margin: 0 !important;
+    padding: 0 !important;
+    height: 0 !important;
+    overflow: hidden !important;
+}
+
+/* Magento Modal compatibility for Hyva theme */
+.modal-popup,
+.modal-slide {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    z-index: 9999 !important;
+    transition: opacity 0.3s ease, visibility 0s 0.3s !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    pointer-events: none !important;
+}
+
+.modal-popup._show,
+.modal-slide._show {
+    visibility: visible !important;
+    opacity: 1 !important;
+    transition: opacity 0.3s ease !important;
+    pointer-events: auto !important;
+}
+
+.modals-overlay {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    background: rgba(0, 0, 0, 0.6) !important;
+    backdrop-filter: blur(4px) !important;
+    z-index: 9998 !important;
+}
+
+.modal-popup .modal-inner-wrap,
+.modal-slide .modal-inner-wrap {
+    background: #ffffff !important;
+    border-radius: 0.75rem !important;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+    border: 1px solid #e5e7eb !important;
+    max-width: 600px !important;
+    width: 90% !important;
+    padding: 1.5rem !important;
+    position: relative !important;
+    display: flex !important;
+    flex-direction: column !important;
+    max-height: 85vh !important;
+    pointer-events: auto !important;
+}
+
+.modal-popup .modal-header,
+.modal-slide .modal-header {
+    border-bottom: 1px solid #e5e7eb !important;
+    padding-bottom: 0.75rem !important;
+    margin-bottom: 1rem !important;
+}
+
+.modal-popup .modal-title,
+.modal-slide .modal-title {
+    font-size: 1.25rem !important;
+    font-weight: 600 !important;
+    color: #111827 !important;
+}
+
+.modal-popup .action-close,
+.modal-slide .action-close {
+    position: absolute !important;
+    top: 1rem !important;
+    right: 1rem !important;
+    background: none !important;
+    border: none !important;
+    cursor: pointer !important;
+    color: #9ca3af !important;
+    padding: 0.25rem !important;
+    font-size: 1.5rem !important;
+    line-height: 1 !important;
+}
+
+.modal-popup .action-close:hover,
+.modal-slide .action-close:hover {
+    color: #374151 !important;
+}
+
+.modal-popup .modal-content,
+.modal-slide .modal-content {
+    font-size: 0.875rem !important;
+    color: #374151 !important;
+    line-height: 1.5 !important;
+    overflow-y: auto !important;
+}
+
+.modal-popup .modal-footer,
+.modal-slide .modal-footer {
+    border-top: 1px solid #e5e7eb !important;
+    padding-top: 0.75rem !important;
+    margin-top: 1rem !important;
+    display: flex !important;
+    justify-content: flex-end !important;
+    gap: 0.5rem !important;
+}
+
+.modal-popup .modal-footer button,
+.modal-slide .modal-footer button {
+    padding: 0.5rem 1rem !important;
+    border-radius: 0.375rem !important;
+    font-size: 0.875rem !important;
+    font-weight: 500 !important;
+    cursor: pointer !important;
+}
+
+.modal-popup .modal-footer .action-primary,
+.modal-slide .modal-footer .action-primary {
+    background-color: #3b82f6 !important;
+    color: #ffffff !important;
+    border: none !important;
+}
+
+.modal-popup .modal-footer .action-secondary,
+.modal-slide .modal-footer .action-secondary {
+    background-color: #f3f4f6 !important;
+    color: #374151 !important;
+    border: 1px solid #d1d5db !important;
+}
+
+

@@ -39,7 +39,7 @@
                 $isPaymentMethodAllowed = !$hasPaymentMethodFilter || in_array($methodCode, $allowedPaymentMethodCodes, true);
                 $isSelectedPayment = $isPaymentMethodAllowed && $magewire->paymentMethod === $methodCode;
                 ?>
-                <div class="border rounded transition-all duration-200 <?= $isSelectedPayment ? 'border-blue-600 bg-blue-50/40 ring-1 ring-blue-600 shadow-sm' : 'border-gray-200 hover:border-gray-300' ?>"
+                <div class="border rounded transition-all duration-200 border-gray-200 hover:border-gray-300"
                      wire:key="payment-method-item-<?= $escaper->escapeHtmlAttr($methodCode) ?>"
                      data-fastcheckout-payment-option="<?= $escaper->escapeHtmlAttr($methodCode) ?>"
                      data-fastcheckout-payment-allowed="<?= $isPaymentMethodAllowed ? '1' : '0' ?>"

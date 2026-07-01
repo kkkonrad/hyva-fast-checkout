@@ -61,6 +61,56 @@ $block->ensureRequireJsAssets();
     .fastcheckout-payment-method-ko-container .payment-method-billing-address {
         display: none !important;
     }
+    .required-captcha.checkbox {
+        position: absolute !important;
+        display: block !important;
+        visibility: visible !important;
+        overflow: hidden !important;
+        opacity: 0 !important;
+        width: 1px !important;
+        height: 1px !important;
+        padding: 0 !important;
+        border: none !important;
+    }
+    .recaptcha-checkout-place-order .field {
+        margin: 0 !important;
+        padding: 0 !important;
+        height: 0 !important;
+        overflow: hidden !important;
+    }
+    .modal-popup,
+    .modal-slide {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        z-index: 9999 !important;
+        transition: opacity 0.3s ease, visibility 0s 0.3s !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        pointer-events: none !important;
+    }
+    .modal-popup._show,
+    .modal-slide._show {
+        visibility: visible !important;
+        opacity: 1 !important;
+        transition: opacity 0.3s ease !important;
+        pointer-events: auto !important;
+    }
+    .modals-overlay {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        background: rgba(0, 0, 0, 0.6) !important;
+        backdrop-filter: blur(4px) !important;
+        z-index: 9998 !important;
+    }
 </style>
 
 <?php
