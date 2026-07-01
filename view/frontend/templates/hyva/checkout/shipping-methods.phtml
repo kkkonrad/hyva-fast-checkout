@@ -6,6 +6,26 @@
  * @var \Magento\Framework\Escaper $escaper
  * @var \Kkkonrad\Fastcheckout\Magewire\Checkout $magewire
  */
+$shippingMethods = $magewire->getShippingMethods();
+
+$jsRates = [];
+foreach ($shippingMethods as $carrierCode => $rates) {
+    foreach ($rates as $rate) {
+        $price = (float)$rate->getPrice();
+        $jsRates[] = [
+            'carrier_code' => (string)$rate->getCarrier(),
+            'method_code' => (string)$rate->getMethod(),
+            'carrier_title' => (string)$rate->getCarrierTitle(),
+            'method_title' => (string)$rate->getMethodTitle(),
+            'amount' => $price,
+            'base_amount' => $price,
+            'price_excl_tax' => $price,
+            'price_incl_tax' => $price,
+            'available' => !$rate->getErrorMessage(),
+            'error_message' => (string)$rate->getErrorMessage(),
+        ];
+    }
+}
 ?>
 <!-- Container 2: Shipping Method -->
 <div class="fc-container-2 space-y-6 min-w-0 w-full">
@@ -29,8 +49,56 @@
                  class="fastcheckout-ko-shipping-root"
                  wire:ignore
                  data-bind="scope: 'fastcheckoutHyvaShippingRenderers.shippingList'">
-                <!-- ko template: getTemplate() --><!-- /ko -->
+                <!-- ko template: getTemplate() -->
+                <?php if (empty($shippingMethods)): ?>
+                    <p class="text-sm text-gray-500">
+                        <?= $escaper->escapeHtml(__('Please enter your shipping address details to estimate shipping rates.')) ?>
+                    </p>
+                <?php else: ?>
+                    <div class="grid gap-3 relative">
+                        <?php foreach ($shippingMethods as $carrierCode => $rates): ?>
+                            <?php foreach ($rates as $rate): ?>
+                                <?php 
+                                    $rateCode = $rate->getCarrier() . '_' . $rate->getMethod();
+                                    $isSelected = ($magewire->shippingMethod === $rateCode);
+                                    $cssClass = $isSelected 
+                                        ? 'border-2 border-blue-500 bg-blue-50/10 shadow-sm' 
+                                        : 'border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50/50';
+                                ?>
+                                <div class="rounded p-4 transition-all duration-200 <?= $cssClass ?>">
+                                    <label class="flex items-center justify-between cursor-pointer mb-0 w-full">
+                                        <div class="flex items-center min-w-0">
+                                            <input type="radio" 
+                                                   class="form-radio h-4 w-4 text-blue-600 focus:ring-blue-500 mr-4 shrink-0" 
+                                                   name="shipping_method" 
+                                                   value="<?= $escaper->escapeHtmlAttr($rateCode) ?>"
+                                                   <?= $isSelected ? 'checked' : '' ?>
+                                                   required />
+                                            <div class="min-w-0 pl-4">
+                                                <span class="block text-sm font-semibold text-gray-900 leading-tight">
+                                                    <?= $escaper->escapeHtml($rate->getMethodTitle()) ?>
+                                                </span>
+                                                <span class="block text-xs text-gray-500 mt-1" id="label_carrier_<?= $escaper->escapeHtmlAttr($rate->getMethod() . '_' . $rate->getCarrier()) ?>">
+                                                    <?= $escaper->escapeHtml($rate->getCarrierTitle()) ?>
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div class="text-sm font-bold text-gray-900 shrink-0 pl-3">
+                                            <?= /* @noEscape */ $block->formatPrice($rate->getPrice()) ?>
+                                        </div>
+                                    </label>
+                                    <div id="label_method_<?= $escaper->escapeHtmlAttr($rate->getMethod() . '_' . $rate->getCarrier()) ?>"></div>
+                                </div>
+                            <?php endforeach; ?>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+                <!-- /ko -->
             </div>
         </div>
     </div>
 </div>
+<script>
+    window.fastcheckoutInitialShippingRates = <?= /* @noEscape */ json_encode($jsRates) ?>;
+    window.fastcheckoutInitialShippingMethod = <?= /* @noEscape */ json_encode($magewire->shippingMethod) ?>;
+</script>

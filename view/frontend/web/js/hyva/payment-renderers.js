@@ -2324,6 +2324,26 @@ define([
                 syncPaymentMethods();
                 syncQuoteTotalsFromConfig();
                 syncQuoteTotalsFromDom();
+                if (window.fastcheckoutInitialShippingRates && Array.isArray(window.fastcheckoutInitialShippingRates)) {
+                    shippingService.setShippingRates(window.fastcheckoutInitialShippingRates);
+                    var activeCode = window.fastcheckoutInitialShippingMethod;
+                    if (activeCode) {
+                        var found = null;
+                        window.fastcheckoutInitialShippingRates.forEach(function (rate) {
+                            if (rate.carrier_code + '_' + rate.method_code === activeCode) {
+                                found = rate;
+                            }
+                        });
+                        if (found) {
+                            try {
+                                window.fastcheckoutSuppressShippingSync = true;
+                                selectShippingMethodAction(found);
+                            } finally {
+                                window.fastcheckoutSuppressShippingSync = false;
+                            }
+                        }
+                    }
+                }
                 loadShippingRatesValidationComponents();
                 loadPaymentValidationComponents();
 
@@ -2423,6 +2443,10 @@ define([
                     window.setTimeout(aliasStandardShippingRegistryPaths, delay);
                     window.setTimeout(registerCheckoutProviderAddressAttributeSync, delay);
                 });
+
+                window.setTimeout(function () {
+                    window.fastcheckoutInitialLoad = false;
+                }, 1500);
 
                 function getProperty(wire, name) {
                     if (!wire) return '';
@@ -2972,7 +2996,7 @@ define([
                         }
                     });
 
-                    return operations.length ? Promise.all(operations) : Promise.resolve(true);
+                    return operations.length ? Promise.all(operations).then(function () { return true; }) : Promise.resolve(false);
                 }
 
                 function registerKoStateAdapter() {
@@ -3430,6 +3454,9 @@ define([
                 }
 
                 function syncShippingMethodToMagewire(methodCode) {
+                    if (window.fastcheckoutSuppressShippingSync) {
+                        return;
+                    }
                     persistShippingMethodToCheckoutData(methodCode);
 
                     if (!methodCode || methodCode === lastMagewireShippingMethodCode) {
@@ -3514,20 +3541,20 @@ define([
                     }
 
                     return writeKoAddressToMagewire(address, false)
-                        .then(function () {
-                            if (wire && typeof wire.call === 'function') {
-                                return wire.call('saveShippingAddress', true, true, true);
+                        .then(function (changed) {
+                            if (changed) {
+                                if (wire && typeof wire.call === 'function') {
+                                    return wire.call('saveShippingAddress', true, true, true)
+                                        .then(function () {
+                                            return refreshCheckoutStateFromMagewire();
+                                        })
+                                        .then(function (payload) {
+                                            payload = payload && typeof payload === 'object' ? payload : {};
+                                            return Array.isArray(payload.shipping_rates) ? payload.shipping_rates : [];
+                                        });
+                                }
                             }
-
-                            return true;
-                        })
-                        .then(function () {
-                            return refreshCheckoutStateFromMagewire();
-                        })
-                        .then(function (payload) {
-                            payload = payload && typeof payload === 'object' ? payload : {};
-
-                            return Array.isArray(payload.shipping_rates) ? payload.shipping_rates : [];
+                            return shippingService.getShippingRates()();
                         });
                 }
 
@@ -3828,7 +3855,7 @@ define([
                         return;
                     }
 
-                    if (checkoutTotals && checkoutTotals.isLoading && typeof checkoutTotals.isLoading === 'function') {
+                    if (!window.fastcheckoutInitialLoad && checkoutTotals && checkoutTotals.isLoading && typeof checkoutTotals.isLoading === 'function') {
                         checkoutTotals.isLoading(true);
                     }
                     syncShippingMethodToMagewire(method.carrier_code + '_' + method.method_code);

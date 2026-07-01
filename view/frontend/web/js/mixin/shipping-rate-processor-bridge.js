@@ -63,11 +63,15 @@ define([
                 cacheKey = getAddressKey(address, options.cacheKeyResolver);
                 cache = cacheKey ? rateRegistry.get(cacheKey) : false;
 
-                shippingService.isLoading(true);
+                if (!window.fastcheckoutInitialLoad) {
+                    shippingService.isLoading(true);
+                }
 
                 if (cache) {
                     shippingService.setShippingRates(cache);
-                    shippingService.isLoading(false);
+                    if (!window.fastcheckoutInitialLoad) {
+                        shippingService.isLoading(false);
+                    }
                     return;
                 }
 
@@ -84,7 +88,9 @@ define([
                         processError(response);
                     })
                     .then(function () {
-                        shippingService.isLoading(false);
+                        if (!window.fastcheckoutInitialLoad) {
+                            shippingService.isLoading(false);
+                        }
                     });
             });
             processor.fastcheckoutWrappedRates = true;
