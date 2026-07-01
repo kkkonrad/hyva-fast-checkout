@@ -547,8 +547,8 @@ body.checkout-submitting .btn-primary {
     position: absolute;
     left: 12px !important; /* Align to the left side */
     right: auto !important;
-    top: 50%;
-    transform: translateY(-50%);
+    top: 21px !important;
+    transform: translateY(-50%) !important;
     height: 22px;
     width: auto;
     z-index: 10;
@@ -559,8 +559,8 @@ body.checkout-submitting .btn-primary {
 .payment-method-content .field-tooltip {
     position: absolute;
     right: 12px;
-    top: 50%;
-    transform: translateY(-50%);
+    top: 21px !important;
+    transform: translateY(-50%) !important;
     z-index: 10;
     margin: 0;
     display: inline-flex;
