@@ -1045,6 +1045,84 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
         expect(componentResult.validatorCount).toBeGreaterThan(0);
     });
 
+    test('should not loop Magewire or checkout state requests after selecting payment method', async ({ page }) => {
+        const checkout = new CheckoutPage(page);
+        await checkout.goto();
+
+        await expect.poll(async () => page.evaluate(() => Boolean(
+            window.fastcheckoutHyvaPayment &&
+            typeof window.fastcheckoutHyvaPayment.onSelectPaymentMethodAction === 'function'
+        )), {
+            timeout: 10000
+        }).toBe(true);
+
+        const requests = {
+            magewire: 0,
+            state: 0
+        };
+
+        page.on('request', (request) => {
+            const url = request.url();
+
+            if (url.includes('/magewire/post/livewire/message/kkkonrad.fastcheckout.hyva.checkout')) {
+                requests.magewire += 1;
+            }
+            if (url.includes('/fast-checkout/index/state')) {
+                requests.state += 1;
+            }
+        });
+
+        const selectionResult = await page.evaluate(() => new Promise((resolve) => {
+            window.require([
+                'Magento_Checkout/js/model/payment-service'
+            ], (
+                paymentService
+            ) => {
+                const domInput = document.querySelector('input[name="payment_method"]:not(:disabled)');
+                const methods = typeof paymentService.getAvailablePaymentMethods === 'function'
+                    ? paymentService.getAvailablePaymentMethods()
+                    : [];
+                const methodCode = domInput && domInput.value
+                    ? domInput.value
+                    : methods && methods.length
+                        ? methods[0].method
+                        : '';
+
+                if (!methodCode) {
+                    resolve({
+                        ok: false,
+                        reason: 'No payment method available'
+                    });
+                    return;
+                }
+
+                if (domInput) {
+                    domInput.click();
+                } else {
+                    window.fastcheckoutHyvaPayment.onSelectPaymentMethodAction({ method: methodCode });
+                }
+
+                window.setTimeout(() => {
+                    resolve({
+                        ok: true,
+                        methodCode
+                    });
+                }, 3500);
+            }, (error) => {
+                resolve({
+                    ok: false,
+                    reason: error && (error.requireModules || error.message || String(error))
+                });
+            });
+        }));
+
+        expect(selectionResult, JSON.stringify(selectionResult, null, 2)).toMatchObject({
+            ok: true
+        });
+        expect(requests.state, JSON.stringify(requests, null, 2)).toBeLessThanOrEqual(4);
+        expect(requests.magewire, JSON.stringify(requests, null, 2)).toBeLessThanOrEqual(5);
+    });
+
     test('should route standard Magento KO place-order action through Fastcheckout bridge', async ({ page }) => {
         const checkout = new CheckoutPage(page);
         await checkout.goto();

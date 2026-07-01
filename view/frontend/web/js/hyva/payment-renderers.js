@@ -608,6 +608,8 @@ define([
                 var magewireShippingMethodSyncTimer = null;
                 var lastMagewirePaymentMethodCode = '';
                 var magewirePaymentMethodSyncTimer = null;
+                var isApplyingPaymentMethodFromBridge = false;
+                var checkoutStateRefreshPromise = null;
                 var checkoutDataFallbackWarningShown = false;
                 var optionalValidationComponentsRequested = false;
                 var optionalPaymentDataAssigners = [];
@@ -1380,7 +1382,7 @@ define([
                     }
 
                     if (payload.selected_payment_method) {
-                        quote.paymentMethod({
+                        setQuotePaymentMethodFromBridge({
                             method: payload.selected_payment_method
                         });
                         persistPaymentMethodToCheckoutData(payload.selected_payment_method);
@@ -1401,7 +1403,11 @@ define([
                         return Promise.resolve(false);
                     }
 
-                    return Promise.resolve(wire.call('refreshCheckoutState'))
+                    if (checkoutStateRefreshPromise) {
+                        return checkoutStateRefreshPromise;
+                    }
+
+                    checkoutStateRefreshPromise = Promise.resolve(wire.call('refreshCheckoutState'))
                         .catch(function () {
                             return true;
                         })
@@ -1411,7 +1417,16 @@ define([
                         .then(function (payload) {
                             applyCheckoutStatePayload(payload);
                             return payload;
+                        })
+                        .then(function (payload) {
+                            checkoutStateRefreshPromise = null;
+                            return payload;
+                        }, function (error) {
+                            checkoutStateRefreshPromise = null;
+                            throw error;
                         });
+
+                    return checkoutStateRefreshPromise;
                 }
 
                 function getCheckoutStateUrl(wire) {
@@ -2155,7 +2170,7 @@ define([
                             var wire,
                                 methodCode;
 
-                            if (isSyncingFromKo || !method) {
+                            if (isSyncingFromKo || isApplyingPaymentMethodFromBridge || !method) {
                                 return;
                             }
 
@@ -2203,7 +2218,7 @@ define([
                         if (field === 'paymentMethod' && typeof quote.paymentMethod === 'function') {
                             currentPayment = quote.paymentMethod();
                             if (!currentPayment || currentPayment.method !== value) {
-                                quote.paymentMethod({ method: value });
+                                setQuotePaymentMethodFromBridge(value ? { method: value } : null);
                             }
                         }
 
@@ -2307,9 +2322,7 @@ define([
                         }
 
                         if (pending.selectedPaymentMethod) {
-                            if (quote && typeof quote.paymentMethod === 'function') {
-                                quote.paymentMethod({ method: pending.selectedPaymentMethod });
-                            }
+                            setQuotePaymentMethodFromBridge({ method: pending.selectedPaymentMethod });
                             operations.push(setMagewireValue(wire, 'paymentMethod', pending.selectedPaymentMethod, false));
                         }
 
@@ -2679,6 +2692,33 @@ define([
                     }
 
                     return paymentMethod.method || '';
+                }
+
+                function getQuotePaymentMethodCode() {
+                    var current = quote && typeof quote.paymentMethod === 'function' ? quote.paymentMethod() : null;
+
+                    return getPaymentMethodCode(current);
+                }
+
+                function setQuotePaymentMethodFromBridge(paymentMethod) {
+                    var methodCode = getPaymentMethodCode(paymentMethod);
+
+                    if (!quote || typeof quote.paymentMethod !== 'function') {
+                        return;
+                    }
+
+                    if (getQuotePaymentMethodCode() === methodCode) {
+                        lastMagewirePaymentMethodCode = methodCode;
+                        return;
+                    }
+
+                    isApplyingPaymentMethodFromBridge = true;
+                    try {
+                        quote.paymentMethod(methodCode ? paymentMethod : null);
+                        lastMagewirePaymentMethodCode = methodCode;
+                    } finally {
+                        isApplyingPaymentMethodFromBridge = false;
+                    }
                 }
 
                 function syncPaymentMethodToMagewire(paymentMethod) {
@@ -3207,18 +3247,17 @@ define([
                     }
 
                     method = getMethod(methodCode) || { method: methodCode };
-                    selectPaymentMethodAction(method);
-                    persistPaymentMethodToCheckoutData(methodCode);
                     patchRenderers();
                     renderer = getRendererByMethod(methodCode);
                     patchRenderer(renderer);
                     activeCode = getRendererCode(renderer, methodCode);
                     
                     activeMethod = getMethod(activeCode) || { method: activeCode, title: method.title };
-                    quote.paymentMethod(activeMethod);
-                    persistPaymentMethodToCheckoutData(activeCode);
                     if (renderer && typeof renderer.selectPaymentMethod === 'function') {
                         renderer.selectPaymentMethod();
+                    } else {
+                        selectPaymentMethodAction(activeMethod);
+                        persistPaymentMethodToCheckoutData(activeCode);
                     }
                     return updateActiveRendererClass(methodCode, activeCode);
                 }
@@ -3275,6 +3314,17 @@ define([
                         pendingSelectedMethodCode = '';
                         persistPaymentMethodToCheckoutData(null);
                         hidePaymentPlaceholders();
+                        return;
+                    }
+
+                    if (
+                        getQuotePaymentMethodCode() === methodCode &&
+                        lastMagewirePaymentMethodCode === methodCode &&
+                        !magewirePaymentMethodSyncTimer
+                    ) {
+                        pendingSelectedMethodCode = '';
+                        patchRenderers();
+                        updateActiveRendererClass(methodCode, methodCode);
                         return;
                     }
 
