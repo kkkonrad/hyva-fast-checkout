@@ -1105,7 +1105,8 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
                 window.setTimeout(() => {
                     resolve({
                         ok: true,
-                        methodCode
+                        methodCode,
+                        initCount: window.fastcheckoutKoPaymentBridgeInitCount || 0
                     });
                 }, 3500);
             }, (error) => {
@@ -1117,10 +1118,53 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
         }));
 
         expect(selectionResult, JSON.stringify(selectionResult, null, 2)).toMatchObject({
-            ok: true
+            ok: true,
+            initCount: 1
         });
-        expect(requests.state, JSON.stringify(requests, null, 2)).toBeLessThanOrEqual(4);
-        expect(requests.magewire, JSON.stringify(requests, null, 2)).toBeLessThanOrEqual(5);
+        expect(requests.state, JSON.stringify(requests, null, 2)).toBeLessThanOrEqual(2);
+        expect(requests.magewire, JSON.stringify(requests, null, 2)).toBeLessThanOrEqual(3);
+    });
+
+    test('should lazy load third-party payment renderers', async ({ page }) => {
+        const thirdPartyLoggerRequests = [];
+        const pageErrors = [];
+
+        page.on('pageerror', (error) => {
+            pageErrors.push(error.message);
+        });
+
+        page.on('request', (request) => {
+            const url = request.url();
+            if (
+                url.includes('paypal.com/xoplatform/logger') ||
+                url.includes('merch-prod.snd.payu.com/front/logger')
+            ) {
+                thirdPartyLoggerRequests.push(url);
+            }
+        });
+
+        const checkout = new CheckoutPage(page);
+        await checkout.goto();
+        await page.waitForTimeout(1500);
+
+        const lazyState = await page.evaluate(() => {
+            const selected = document.querySelector('input[name="payment_method"]:checked:not(:disabled)');
+            return {
+                selectedMethod: selected ? selected.value : '',
+                loadedComponents: window.fastcheckoutKoLoadedPaymentRendererComponents || []
+            };
+        });
+
+        const selectedIsThirdParty = /payu|paypal|braintree/.test(lazyState.selectedMethod || '');
+        const loadedThirdPartyComponents = lazyState.loadedComponents.filter((component) => (
+            /PayU_|Paypal|PayPal|Braintree/i.test(component)
+        ));
+
+        if (!selectedIsThirdParty) {
+            expect(loadedThirdPartyComponents, JSON.stringify(lazyState, null, 2)).toEqual([]);
+            expect(thirdPartyLoggerRequests, JSON.stringify(thirdPartyLoggerRequests, null, 2)).toEqual([]);
+        }
+        expect(pageErrors, JSON.stringify(pageErrors, null, 2)).toEqual([]);
     });
 
     test('should route standard Magento KO place-order action through Fastcheckout bridge', async ({ page }) => {

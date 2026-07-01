@@ -4,9 +4,29 @@ define([
     'use strict';
 
     return function (config) {
+        if (window.fastcheckoutKoPaymentBridgeInitialized) {
+            return;
+        }
+
+        window.fastcheckoutKoPaymentBridgeInitialized = true;
+        window.fastcheckoutKoPaymentBridgeInitCount = (window.fastcheckoutKoPaymentBridgeInitCount || 0) + 1;
         
         var scope = config.scope || 'fastcheckoutHyvaPaymentRenderers',
-            rendererComponents = config.rendererComponents || [];
+            rendererComponents = config.rendererComponents || [],
+            rendererComponentMap = config.rendererComponentMap || [],
+            rendererComponentsByMethod = {},
+            loadedRendererComponents = {},
+            loadingRendererComponents = {},
+            patchRenderersHandler = null,
+            syncPaymentRenderersHandler = null;
+
+        rendererComponentMap.forEach(function (entry) {
+            if (entry && entry.method && entry.component) {
+                rendererComponentsByMethod[entry.method] = entry.component;
+            }
+        });
+
+        window.fastcheckoutKoLoadedPaymentRendererComponents = window.fastcheckoutKoLoadedPaymentRendererComponents || [];
 
         window.checkoutConfig = config.checkoutConfig || {};
 
@@ -551,30 +571,78 @@ define([
 
             window.fastcheckoutHyvaPayment = window.fastcheckoutHyvaPayment || {};
 
-            function loadRendererComponents(done) {
-                var remaining = rendererComponents.length;
-
-                if (!remaining) {
-                    done();
+            function rememberLoadedRendererComponent(component) {
+                if (!component) {
                     return;
                 }
 
-                rendererComponents.forEach(function (component) {
-                    require([component], function () {
-                        remaining -= 1;
-                        if (remaining === 0) {
-                            done();
-                        }
-                    }, function (error) {
-                        remaining -= 1;
-                        if (window.console && typeof window.console.warn === 'function') {
-                            window.console.warn('Kkkonrad Fastcheckout: payment renderer could not be loaded', component, error);
-                        }
-                        if (remaining === 0) {
-                            done();
-                        }
-                    });
+                loadedRendererComponents[component] = true;
+                if (window.fastcheckoutKoLoadedPaymentRendererComponents.indexOf(component) === -1) {
+                    window.fastcheckoutKoLoadedPaymentRendererComponents.push(component);
+                }
+            }
+
+            function getRendererComponentForMethod(methodCode) {
+                if (!methodCode) {
+                    return '';
+                }
+
+                return rendererComponentsByMethod[methodCode] || '';
+            }
+
+            function loadRendererForMethod(methodCode) {
+                var component = getRendererComponentForMethod(methodCode),
+                    deferred;
+
+                if (!component) {
+                    return $.Deferred().resolve(false).promise();
+                }
+
+                if (loadedRendererComponents[component]) {
+                    return $.Deferred().resolve(true).promise();
+                }
+
+                if (loadingRendererComponents[component]) {
+                    return loadingRendererComponents[component];
+                }
+
+                deferred = $.Deferred();
+                loadingRendererComponents[component] = deferred.promise();
+
+                require([component], function () {
+                    rememberLoadedRendererComponent(component);
+                    delete loadingRendererComponents[component];
+                    if (typeof patchRenderersHandler === 'function') {
+                        patchRenderersHandler();
+                    }
+                    if (typeof syncPaymentRenderersHandler === 'function') {
+                        syncPaymentRenderersHandler();
+                    }
+                    deferred.resolve(true);
+                }, function (error) {
+                    delete loadingRendererComponents[component];
+                    if (window.console && typeof window.console.warn === 'function') {
+                        window.console.warn('Kkkonrad Fastcheckout: payment renderer could not be loaded', component, error);
+                    }
+                    deferred.resolve(false);
                 });
+
+                return deferred.promise();
+            }
+
+            function ensureRendererForMethod(methodCode) {
+                return loadRendererForMethod(methodCode).then(function () {
+                    return true;
+                });
+            }
+
+            function loadRendererComponents(done) {
+                rendererComponents.forEach(function (component) {
+                    if (!rendererComponentMap.length && component) {
+                        rememberLoadedRendererComponent(component);
+                    }
+                });
+                done();
             }
 
             loadRendererComponents(function () {
@@ -610,6 +678,8 @@ define([
                 var magewirePaymentMethodSyncTimer = null;
                 var isApplyingPaymentMethodFromBridge = false;
                 var checkoutStateRefreshPromise = null;
+                var checkoutStateLastPayload = null;
+                var checkoutStateLastPayloadAt = 0;
                 var checkoutDataFallbackWarningShown = false;
                 var optionalValidationComponentsRequested = false;
                 var optionalPaymentDataAssigners = [];
@@ -1403,6 +1473,10 @@ define([
                         return Promise.resolve(false);
                     }
 
+                    if (checkoutStateLastPayload && Date.now() - checkoutStateLastPayloadAt < 750) {
+                        return Promise.resolve(checkoutStateLastPayload);
+                    }
+
                     if (checkoutStateRefreshPromise) {
                         return checkoutStateRefreshPromise;
                     }
@@ -1416,6 +1490,8 @@ define([
                         })
                         .then(function (payload) {
                             applyCheckoutStatePayload(payload);
+                            checkoutStateLastPayload = payload;
+                            checkoutStateLastPayloadAt = Date.now();
                             return payload;
                         })
                         .then(function (payload) {
@@ -3071,6 +3147,9 @@ define([
                     });
                 }
 
+                patchRenderersHandler = patchRenderers;
+                syncPaymentRenderersHandler = syncKoPaymentRenderers;
+
                 function elementMatchesMethod(element, methodCode, activeCode) {
                     var inputs = element.querySelectorAll('input'),
                         matches = false;
@@ -3239,11 +3318,21 @@ define([
                     
                     var method,
                         renderer,
+                        component,
                         activeCode,
                         activeMethod;
 
                     if (!methodCode) {
                         return false;
+                    }
+
+                    component = getRendererComponentForMethod(methodCode);
+                    if (component && !loadedRendererComponents[component]) {
+                        loadRendererForMethod(methodCode).done(function () {
+                            if (getSelectedMethodCode() === methodCode || pendingSelectedMethodCode === methodCode) {
+                                retryPendingSelectedMethod();
+                            }
+                        });
                     }
 
                     method = getMethod(methodCode) || { method: methodCode };
@@ -3602,16 +3691,16 @@ define([
                     return result;
                 }
 
-                function syncPlaceOrderHookData(wire, hookData) {
+                function syncPlaceOrderHookData(wire, hookData, deferUpdate) {
                     if (!wire || typeof wire.set !== 'function') {
                         return Promise.resolve();
                     }
 
                     hookData = hookData || { headers: {}, payload: {} };
 
-                    return Promise.resolve(wire.set('placeOrderRequestHeaders', sanitizeHookPayload(hookData.headers || {})))
+                    return Promise.resolve(wire.set('placeOrderRequestHeaders', sanitizeHookPayload(hookData.headers || {}), deferUpdate === true))
                         .then(function () {
-                            return wire.set('placeOrderRequestData', sanitizeHookPayload(hookData.payload || {}));
+                            return wire.set('placeOrderRequestData', sanitizeHookPayload(hookData.payload || {}), deferUpdate === true);
                         });
                 }
 
@@ -3686,22 +3775,22 @@ define([
 	                            methodCode = paymentData && paymentData.method ? paymentData.method : getSelectedMethodCode(),
 	                            poNumber = methodCode === 'purchaseorder' ? this.getPurchaseOrderNumber(paymentData) : '';
 
-	                        return Promise.resolve(wire.set('paymentAdditionalData', additionalData))
+	                        return Promise.resolve(wire.set('paymentAdditionalData', additionalData, true))
                                 .then(function () {
                                     if (typeof wire.set === 'function') {
-                                        return wire.set('paymentExtensionAttributes', extensionAttributes);
+                                        return wire.set('paymentExtensionAttributes', extensionAttributes, true);
                                     }
                                     return true;
                                 })
 	                            .then(function () {
 	                                if (poNumber && typeof wire.set === 'function') {
-	                                    return wire.set('poNumber', poNumber);
+	                                    return wire.set('poNumber', poNumber, true);
 	                                }
 	                                return true;
 	                            })
                                 .then(function () {
                                     if (hookData) {
-                                        return syncPlaceOrderHookData(wire, hookData);
+                                        return syncPlaceOrderHookData(wire, hookData, true);
                                     }
 
                                     return true;
@@ -3745,8 +3834,10 @@ define([
                                 input.checked = true;
                             }
                             if (domHasPaymentMethod(methodCode)) {
-                                patchRenderers();
-                                updateActiveRendererClass(methodCode, methodCode);
+                                loadRendererForMethod(methodCode).done(function () {
+                                    patchRenderers();
+                                    updateActiveRendererClass(methodCode, methodCode);
+                                });
                             }
                             syncPaymentMethodToMagewire(paymentMethod);
                         },
@@ -3824,11 +3915,10 @@ define([
                                                 return true;
                                             })
                                             .then(function () {
-                                                return originalAction(messageContainer, paymentData, skipBilling);
+                                                return refreshCheckoutStateFromMagewire();
                                             })
-                                            .then(function (result) {
-                                                syncQuoteTotalsFromDom();
-                                                resolve(result);
+                                            .then(function () {
+                                                resolve(true);
                                             })
                                             .catch(function (error) {
                                                 reject(error);
@@ -3875,7 +3965,9 @@ define([
 	                            setSelectedMethod(selectedMethod);
 	                        }
 
-	                        return prepareCheckoutState(wire).then(function () {
+	                        return ensureRendererForMethod(selectedMethod || getSelectedMethodCode()).then(function () {
+                                return prepareCheckoutState(wire);
+                            }).then(function () {
 	                            component = getActiveRenderer();
 	                            paymentData = component && typeof component.getData === 'function'
 	                                ? applyPaymentDataAssigners(component.getData())

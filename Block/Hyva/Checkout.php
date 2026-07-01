@@ -90,6 +90,11 @@ class Checkout extends Template
     private $paymentRendererComponentsCache;
 
     /**
+     * @var array|null
+     */
+    private $paymentRendererComponentMapCache;
+
+    /**
      * @var string[]|null
      */
     private $shippingRatesValidationComponentsCache;
@@ -288,6 +293,56 @@ class Checkout extends Template
         $this->paymentRendererComponentsCache = array_values(array_unique($components));
 
         return $this->paymentRendererComponentsCache;
+    }
+
+    /**
+     * Return payment renderer components indexed by payment method code.
+     *
+     * @return array[]
+     */
+    public function getPaymentRendererComponentMap()
+    {
+        if ($this->paymentRendererComponentMapCache !== null) {
+            return $this->paymentRendererComponentMapCache;
+        }
+
+        $moduleList = $this->getModuleList();
+        $componentRegistrar = $this->getComponentRegistrar();
+        if ($moduleList === null || $componentRegistrar === null) {
+            $this->paymentRendererComponentMapCache = [];
+            return $this->paymentRendererComponentMapCache;
+        }
+
+        $map = [];
+        foreach ($moduleList->getNames() as $moduleName) {
+            $modulePath = $componentRegistrar->getPath(ComponentRegistrar::MODULE, $moduleName);
+            if (!$modulePath) {
+                continue;
+            }
+
+            $layoutFile = $modulePath . '/view/frontend/layout/checkout_index_index.xml';
+            if (!is_file($layoutFile)) {
+                continue;
+            }
+
+            $map = array_merge($map, $this->getPaymentRendererComponentMapFromLayout($layoutFile));
+        }
+
+        $unique = [];
+        foreach ($map as $entry) {
+            if (empty($entry['method']) || empty($entry['component'])) {
+                continue;
+            }
+
+            $unique[$entry['method'] . '::' . $entry['component']] = [
+                'method' => $entry['method'],
+                'component' => $entry['component']
+            ];
+        }
+
+        $this->paymentRendererComponentMapCache = array_values($unique);
+
+        return $this->paymentRendererComponentMapCache;
     }
 
     /**
@@ -541,6 +596,75 @@ class Checkout extends Template
             }
 
             return $components;
+        } catch (\Exception $e) {
+            return [];
+        } finally {
+            libxml_clear_errors();
+            libxml_use_internal_errors($previous);
+        }
+    }
+
+    /**
+     * @param string $layoutFile
+     * @return array[]
+     */
+    private function getPaymentRendererComponentMapFromLayout($layoutFile)
+    {
+        $dom = new \DOMDocument();
+        $previous = libxml_use_internal_errors(true);
+
+        try {
+            if (!$dom->load($layoutFile)) {
+                return [];
+            }
+
+            $xpath = new \DOMXPath($dom);
+            $nodes = $xpath->query(
+                '//*[local-name()="item"][@name="renders"]' .
+                '/*[local-name()="item"][@name="children"]' .
+                '/*[local-name()="item"]'
+            );
+
+            $map = [];
+            foreach ($nodes as $rendererNode) {
+                $rendererCode = $rendererNode->getAttribute('name');
+                $componentNodes = $xpath->query('./*[local-name()="item"][@name="component"]', $rendererNode);
+                if ($componentNodes->length === 0) {
+                    continue;
+                }
+
+                $component = trim($componentNodes->item(0)->textContent);
+                if ($component === '' || $component === 'uiComponent') {
+                    continue;
+                }
+
+                if ($rendererCode && $this->_scopeConfig->getValue('payment/' . $rendererCode . '/active') === '0') {
+                    continue;
+                }
+
+                $methodNodes = $xpath->query('./*[local-name()="item"][@name="methods"]/*[local-name()="item"]', $rendererNode);
+                if ($methodNodes->length === 0) {
+                    if ($rendererCode && $this->_scopeConfig->getValue('payment/' . $rendererCode . '/active') !== '0') {
+                        $map[] = [
+                            'method' => $rendererCode,
+                            'component' => $component
+                        ];
+                    }
+                    continue;
+                }
+
+                foreach ($methodNodes as $methodNode) {
+                    $methodCode = $methodNode->getAttribute('name');
+                    if ($methodCode && $this->_scopeConfig->getValue('payment/' . $methodCode . '/active') !== '0') {
+                        $map[] = [
+                            'method' => $methodCode,
+                            'component' => $component
+                        ];
+                    }
+                }
+            }
+
+            return $map;
         } catch (\Exception $e) {
             return [];
         } finally {

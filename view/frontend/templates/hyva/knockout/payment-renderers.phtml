@@ -12,12 +12,14 @@ if (!is_array($paymentMethods) || $paymentMethods === []) {
     $paymentMethods = $checkoutConfig['paymentMethods'] ?? [];
 }
 $rendererComponents = $block->getPaymentRendererComponents();
+$rendererComponentMap = $block->getPaymentRendererComponentMap();
 $shippingRatesValidationComponents = $block->getShippingRatesValidationComponents();
 $paymentValidationComponents = $block->getPaymentValidationComponents();
 $layoutScripts = $block->getCheckoutLayoutScripts();
 
 if (
     empty($rendererComponents) &&
+    empty($rendererComponentMap) &&
     empty($shippingRatesValidationComponents) &&
     empty($paymentValidationComponents) &&
     empty($layoutScripts['modules']) &&
@@ -30,6 +32,7 @@ $mageInitConfig = [
     'checkoutConfig' => $checkoutConfig,
     'paymentMethods' => $paymentMethods,
     'rendererComponents' => $rendererComponents,
+    'rendererComponentMap' => $rendererComponentMap,
     'shippingRatesValidationComponents' => $shippingRatesValidationComponents,
     'paymentValidationComponents' => $paymentValidationComponents,
     'layoutScripts' => $layoutScripts['modules'] ?? [],
@@ -228,13 +231,14 @@ foreach ($layoutScripts['external'] as $externalScript) {
     }
 
     function initPaymentRenderers() {
-        if (started || typeof window.require !== 'function') {
+        if (started || window.fastcheckoutKoPaymentRenderersStarted || typeof window.require !== 'function') {
             return;
         }
 
         setupDomOverrides();
 
         started = true;
+        window.fastcheckoutKoPaymentRenderersStarted = true;
         window.require.config({
             baseUrl: staticBaseUrl
         });
