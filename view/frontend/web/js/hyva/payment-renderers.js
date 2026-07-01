@@ -2061,10 +2061,13 @@ define([
                     }
 
                     checkoutStateRefreshPromise = Promise.resolve(wire.call('refreshCheckoutState'))
-                        .catch(function () {
-                            return true;
+                        .then(function (payload) {
+                            if (payload && typeof payload === 'object' && payload.totals) {
+                                return payload;
+                            }
+                            return fetchCheckoutState(wire);
                         })
-                        .then(function () {
+                        .catch(function () {
                             return fetchCheckoutState(wire);
                         })
                         .then(function (payload) {
@@ -4024,6 +4027,8 @@ define([
                 var pendingSelectedMethodCode = '';
                 var paymentRendererObserver = null;
                 var paymentRendererObserverRetryTimer = null;
+                var lastSetSelectedMethodCode = '';
+                var lastSetSelectedMethodAt = 0;
 
                 function dispatchReadyEvent() {
                     if (readyDispatched) { return; }
@@ -4056,7 +4061,7 @@ define([
                         paymentRendererObserverRetryTimer = window.setTimeout(function () {
                             paymentRendererObserverRetryTimer = null;
                             retryPendingSelectedMethod();
-                        }, 0);
+                        }, 50);
                     });
                     paymentRendererObserver.observe(root, {
                         childList: true,
@@ -4065,7 +4070,11 @@ define([
                 }
 
                 function setSelectedMethod(methodCode) {
-                    
+                    if (methodCode && methodCode === lastSetSelectedMethodCode && Date.now() - lastSetSelectedMethodAt < 250) {
+                        return;
+                    }
+                    lastSetSelectedMethodCode = methodCode || '';
+                    lastSetSelectedMethodAt = Date.now();
                     syncPaymentMethods();
 
                     if (!methodCode) {
@@ -4578,7 +4587,9 @@ define([
                                                 return self.syncWirePaymentData(wire, paymentData || self.getActivePaymentData());
                                             })
                                             .then(function () {
-                                                if (methodCode && typeof wire.call === 'function') {
+                                                var currentMagewireMethod = getProperty(wire, 'paymentMethod');
+                                                if (methodCode && methodCode !== currentMagewireMethod && methodCode !== lastMagewirePaymentMethodCode && typeof wire.call === 'function') {
+                                                    lastMagewirePaymentMethodCode = methodCode;
                                                     return wire.call('selectPaymentMethod', methodCode);
                                                 }
                                                 return true;

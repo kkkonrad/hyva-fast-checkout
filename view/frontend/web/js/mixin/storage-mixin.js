@@ -376,6 +376,9 @@ define([
         }
 
         storage.get = wrapper.wrap(storage.get, function (originalGet, url, global, contentType, headers) {
+            if (url && url.indexOf('rest/') === 0) {
+                url = '/' + url;
+            }
             if (shouldIntercept(url, 'GET') && getWire()) {
                 return handleIntercept(url, null, 'GET', headers);
             }
@@ -383,6 +386,9 @@ define([
         });
 
         storage.post = wrapper.wrap(storage.post, function (originalPost, url, data, global, contentType, headers, async) {
+            if (url && url.indexOf('rest/') === 0) {
+                url = '/' + url;
+            }
             if (shouldIntercept(url, 'POST') && getWire()) {
                 return handleIntercept(url, data, 'POST', headers);
             }
@@ -390,6 +396,9 @@ define([
         });
 
         storage.put = wrapper.wrap(storage.put, function (originalPut, url, data, global, contentType, headers) {
+            if (url && url.indexOf('rest/') === 0) {
+                url = '/' + url;
+            }
             if (shouldIntercept(url, 'PUT') && getWire()) {
                 return handleIntercept(url, data, 'PUT', headers);
             }
@@ -397,6 +406,9 @@ define([
         });
 
         storage.delete = wrapper.wrap(storage.delete, function (originalDelete, url, global, contentType, headers) {
+            if (url && url.indexOf('rest/') === 0) {
+                url = '/' + url;
+            }
             if (shouldIntercept(url, 'DELETE') && getWire()) {
                 return handleIntercept(url, null, 'DELETE', headers);
             }
