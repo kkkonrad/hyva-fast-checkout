@@ -2444,10 +2444,6 @@ define([
                     window.setTimeout(registerCheckoutProviderAddressAttributeSync, delay);
                 });
 
-                window.setTimeout(function () {
-                    window.fastcheckoutInitialLoad = false;
-                }, 1500);
-
                 function getProperty(wire, name) {
                     if (!wire) return '';
                     if (typeof wire.get === 'function') {
@@ -3855,7 +3851,7 @@ define([
                         return;
                     }
 
-                    if (!window.fastcheckoutInitialLoad && checkoutTotals && checkoutTotals.isLoading && typeof checkoutTotals.isLoading === 'function') {
+                    if (checkoutTotals && checkoutTotals.isLoading && typeof checkoutTotals.isLoading === 'function') {
                         checkoutTotals.isLoading(true);
                     }
                     syncShippingMethodToMagewire(method.carrier_code + '_' + method.method_code);
