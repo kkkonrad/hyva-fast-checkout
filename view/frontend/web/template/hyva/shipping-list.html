@@ -9,6 +9,9 @@
         </div>
     </div>
     <!-- /ko -->
+    <!-- ko foreach: getRegion('before-shipping-method-form') -->
+        <!-- ko template: getTemplate() --><!-- /ko -->
+    <!-- /ko -->
     <!-- ko foreach: { data: rates(), as: 'method' } -->
         <div class="border rounded p-4 transition-all duration-200"
              data-bind="css: $parent.getMethodCss(method)">
@@ -46,4 +49,9 @@
         <p class="text-sm text-gray-500" data-bind="i18n: 'Please enter your shipping address details to estimate shipping rates.'">
         </p>
     <!-- /ko -->
+    <div id="onepage-checkout-shipping-method-additional-load">
+        <!-- ko foreach: getRegion('shippingAdditional') -->
+            <!-- ko template: getTemplate() --><!-- /ko -->
+        <!-- /ko -->
+    </div>
 </div>

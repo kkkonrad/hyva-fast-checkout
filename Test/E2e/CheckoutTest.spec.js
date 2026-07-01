@@ -1167,6 +1167,386 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
         expect(pageErrors, JSON.stringify(pageErrors, null, 2)).toEqual([]);
     });
 
+    test('should resolve dynamically suffixed payment renderer methods', async ({ page }) => {
+        const pageErrors = [];
+
+        page.on('pageerror', (error) => {
+            pageErrors.push(error.message);
+        });
+
+        const checkout = new CheckoutPage(page);
+        await checkout.goto();
+
+        await expect.poll(async () => page.evaluate(() => Boolean(
+            window.fastcheckoutHyvaPayment &&
+            typeof window.fastcheckoutHyvaPayment.ensureRendererForMethod === 'function'
+        )), {
+            timeout: 10000
+        }).toBe(true);
+
+        const result = await page.evaluate(() => new Promise((resolve) => {
+            const map = window.fastcheckoutKoPaymentRendererComponentMap || [];
+            const entry = map.find((item) => (
+                item &&
+                item.method === 'generic' &&
+                item.matchPrefix &&
+                /Tpay_Magento2/.test(item.component)
+            ));
+
+            if (!entry) {
+                resolve({
+                    ok: true,
+                    skipped: true,
+                    reason: 'No generic dynamic payment renderer entry available'
+                });
+                return;
+            }
+
+            window.fastcheckoutHyvaPayment.ensureRendererForMethod(`${entry.method}-fastcheckout-regression`)
+                .then(() => {
+                    window.setTimeout(() => {
+                        resolve({
+                            ok: true,
+                            component: entry.component,
+                            loadedComponents: window.fastcheckoutKoLoadedPaymentRendererComponents || []
+                        });
+                    }, 250);
+                })
+                .catch((error) => {
+                    resolve({
+                        ok: false,
+                        message: error && (error.message || String(error))
+                    });
+                });
+        }));
+
+        expect(result, JSON.stringify(result, null, 2)).toMatchObject({
+            ok: true
+        });
+        if (!result.skipped) {
+            expect(result.loadedComponents, JSON.stringify(result, null, 2)).toContain(result.component);
+        }
+        expect(pageErrors, JSON.stringify(pageErrors, null, 2)).toEqual([]);
+    });
+
+    test('should expose standard payment before-place-order region children', async ({ page }) => {
+        const pageErrors = [];
+
+        page.on('pageerror', (error) => {
+            pageErrors.push(error.message);
+        });
+
+        const checkout = new CheckoutPage(page);
+        await checkout.goto();
+
+        const result = await page.evaluate(() => new Promise((resolve) => {
+            window.require(['uiRegistry'], (registry) => {
+                const getRegistryItem = (name) => {
+                    try {
+                        return registry.get(name);
+                    } catch (error) {
+                        return null;
+                    }
+                };
+                const paymentList = getRegistryItem('fastcheckoutHyvaPaymentRenderers.paymentList');
+
+                if (!paymentList || typeof paymentList.getRegion !== 'function') {
+                    resolve({
+                        ok: false,
+                        reason: 'Payment list component is missing'
+                    });
+                    return;
+                }
+
+                const beforePlaceOrderRegion = paymentList.getRegion('before-place-order')();
+                const beforePlaceOrderComponent = getRegistryItem(
+                    'fastcheckoutHyvaPaymentRenderers.paymentList.before-place-order'
+                );
+
+                resolve({
+                    ok: true,
+                    regionLength: beforePlaceOrderRegion.length,
+                    componentName: beforePlaceOrderComponent && beforePlaceOrderComponent.name,
+                    hasTemplate: Boolean(
+                        beforePlaceOrderComponent &&
+                        typeof beforePlaceOrderComponent.hasTemplate === 'function' &&
+                        beforePlaceOrderComponent.hasTemplate()
+                    ),
+                    childNames: beforePlaceOrderRegion.map((component) => component.name)
+                });
+            }, (error) => {
+                resolve({
+                    ok: false,
+                    reason: error && (error.requireModules || error.message || String(error))
+                });
+            });
+        }));
+
+        expect(result, JSON.stringify(result, null, 2)).toMatchObject({
+            ok: true,
+            regionLength: expect.any(Number),
+            componentName: 'fastcheckoutHyvaPaymentRenderers.paymentList.before-place-order',
+            hasTemplate: true
+        });
+        expect(result.regionLength, JSON.stringify(result, null, 2)).toBeGreaterThan(0);
+        expect(pageErrors, JSON.stringify(pageErrors, null, 2)).toEqual([]);
+    });
+
+    test('should expose standard payment-level regions', async ({ page }) => {
+        const pageErrors = [];
+
+        page.on('pageerror', (error) => {
+            pageErrors.push(error.message);
+        });
+
+        const checkout = new CheckoutPage(page);
+        await checkout.goto();
+
+        const result = await page.evaluate(() => new Promise((resolve) => {
+            window.require(['uiRegistry'], (registry) => {
+                const getRegistryItem = (name) => {
+                    try {
+                        return registry.get(name);
+                    } catch (error) {
+                        return null;
+                    }
+                };
+                const root = getRegistryItem('fastcheckoutHyvaPaymentRenderers');
+
+                if (!root || typeof root.getRegion !== 'function') {
+                    resolve({
+                        ok: false,
+                        reason: 'Payment root component is missing'
+                    });
+                    return;
+                }
+
+                const afterMethods = root.getRegion('afterMethods')();
+                const captcha = root.getRegion('place-order-captcha')();
+                const afterMethodsComponent = getRegistryItem('fastcheckoutHyvaPaymentRenderers.afterMethods');
+                const captchaComponent = getRegistryItem('fastcheckoutHyvaPaymentRenderers.place-order-captcha');
+
+                resolve({
+                    ok: true,
+                    afterMethodsLength: afterMethods.length,
+                    captchaLength: captcha.length,
+                    afterMethodsComponent: afterMethodsComponent && afterMethodsComponent.name,
+                    captchaComponent: captchaComponent && captchaComponent.name
+                });
+            }, (error) => {
+                resolve({
+                    ok: false,
+                    reason: error && (error.requireModules || error.message || String(error))
+                });
+            });
+        }));
+
+        expect(result, JSON.stringify(result, null, 2)).toMatchObject({
+            ok: true,
+            afterMethodsLength: expect.any(Number),
+            captchaLength: expect.any(Number),
+            afterMethodsComponent: 'fastcheckoutHyvaPaymentRenderers.afterMethods',
+            captchaComponent: 'fastcheckoutHyvaPaymentRenderers.place-order-captcha'
+        });
+        expect(pageErrors, JSON.stringify(pageErrors, null, 2)).toEqual([]);
+    });
+
+    test('should expose standard shipping address extension regions', async ({ page }) => {
+        const pageErrors = [];
+
+        page.on('pageerror', (error) => {
+            pageErrors.push(error.message);
+        });
+
+        const checkout = new CheckoutPage(page);
+        await checkout.goto();
+
+        await expect.poll(async () => page.evaluate(() => new Promise((resolve) => {
+            window.require(['uiRegistry'], (registry) => {
+                try {
+                    resolve(Boolean(registry.get('checkout.steps.shipping-step.shippingAddress')));
+                } catch (error) {
+                    resolve(false);
+                }
+            }, () => resolve(false));
+        })), {
+            timeout: 10000
+        }).toBe(true);
+
+        const result = await page.evaluate(() => new Promise((resolve) => {
+            window.require(['uiRegistry'], (registry) => {
+                const getRegistryItem = (name) => {
+                    try {
+                        return registry.get(name);
+                    } catch (error) {
+                        return null;
+                    }
+                };
+                const root = getRegistryItem('checkout.steps.shipping-step.shippingAddress');
+
+                if (!root || typeof root.getRegion !== 'function') {
+                    resolve({
+                        ok: false,
+                        reason: 'Standard shipping address component is missing'
+                    });
+                    return;
+                }
+
+                const beforeForm = root.getRegion('before-form')();
+                const beforeFields = root.getRegion('before-fields')();
+                const additionalAddresses = root.getRegion('address-list-additional-addresses')();
+                const beforeShippingMethod = getRegistryItem(
+                    'checkout.steps.shipping-step.shippingAddress.before-shipping-method-form'
+                );
+
+                resolve({
+                    ok: true,
+                    beforeFormLength: beforeForm.length,
+                    beforeFieldsLength: beforeFields.length,
+                    additionalAddressesLength: additionalAddresses.length,
+                    beforeFormComponent: getRegistryItem('checkout.steps.shipping-step.shippingAddress.before-form') &&
+                        getRegistryItem('checkout.steps.shipping-step.shippingAddress.before-form').name,
+                    beforeFieldsComponent: getRegistryItem('checkout.steps.shipping-step.shippingAddress.before-fields') &&
+                        getRegistryItem('checkout.steps.shipping-step.shippingAddress.before-fields').name,
+                    additionalAddressesComponent: getRegistryItem(
+                        'checkout.steps.shipping-step.shippingAddress.address-list-additional-addresses'
+                    ) && getRegistryItem(
+                        'checkout.steps.shipping-step.shippingAddress.address-list-additional-addresses'
+                    ).name,
+                    beforeShippingMethodAlias: beforeShippingMethod && beforeShippingMethod.name
+                });
+            }, (error) => {
+                resolve({
+                    ok: false,
+                    reason: error && (error.requireModules || error.message || String(error))
+                });
+            });
+        }));
+
+        expect(result, JSON.stringify(result, null, 2)).toMatchObject({
+            ok: true,
+            beforeFormLength: expect.any(Number),
+            beforeFieldsLength: expect.any(Number),
+            additionalAddressesLength: expect.any(Number),
+            beforeFormComponent: 'checkout.steps.shipping-step.shippingAddress.before-form',
+            beforeFieldsComponent: 'checkout.steps.shipping-step.shippingAddress.before-fields',
+            additionalAddressesComponent: 'checkout.steps.shipping-step.shippingAddress.address-list-additional-addresses',
+            beforeShippingMethodAlias: 'fastcheckoutHyvaShippingRenderers.shippingList.before-shipping-method-form'
+        });
+        expect(result.beforeFormLength, JSON.stringify(result, null, 2)).toBeGreaterThan(0);
+        expect(result.beforeFieldsLength, JSON.stringify(result, null, 2)).toBeGreaterThan(0);
+        expect(result.additionalAddressesLength, JSON.stringify(result, null, 2)).toBeGreaterThan(0);
+        expect(pageErrors, JSON.stringify(pageErrors, null, 2)).toEqual([]);
+    });
+
+    test('should sync checkoutProvider shipping custom attributes to quote and Magewire', async ({ page }) => {
+        const checkout = new CheckoutPage(page);
+        await checkout.goto();
+
+        await expect.poll(async () => page.evaluate(() => Boolean(
+            window.fastcheckoutHyvaPayment &&
+            window.fastcheckoutHyvaShipping &&
+            typeof window.require === 'function'
+        )), {
+            timeout: 10000
+        }).toBe(true);
+
+        const result = await page.evaluate(() => new Promise((resolve) => {
+            window.require([
+                'uiRegistry',
+                'Magento_Checkout/js/model/quote'
+            ], (registry, quote) => {
+                const provider = registry.get('checkoutProvider');
+                const currentAddress = quote.shippingAddress() || {
+                    firstname: 'Provider',
+                    lastname: 'Sync',
+                    street: ['Provider Sync Street'],
+                    city: 'Warszawa',
+                    postcode: '00-001',
+                    countryId: 'PL',
+                    country_id: 'PL',
+                    telephone: '123456789'
+                };
+                const getWire = () => {
+                    const el = document.querySelector('#fastcheckout-checkout[wire\\:id], #fastcheckout-checkout [wire\\:id]');
+                    const livewire = window.Livewire || window.Magewire;
+
+                    if (!el || !livewire || typeof livewire.find !== 'function') {
+                        return null;
+                    }
+
+                    return livewire.find(el.getAttribute('wire:id'));
+                };
+                const getWireValue = (wire, key) => {
+                    if (!wire) {
+                        return undefined;
+                    }
+                    if (typeof wire[key] !== 'undefined') {
+                        return wire[key];
+                    }
+                    if (typeof wire.get === 'function') {
+                        return wire.get(key);
+                    }
+                    if (wire.data && typeof wire.data[key] !== 'undefined') {
+                        return wire.data[key];
+                    }
+
+                    return undefined;
+                };
+
+                quote.shippingAddress(currentAddress);
+                provider.set('shippingAddress.custom_attributes.delivery_note', 'Leave at reception');
+                provider.set('shippingAddress.extension_attributes.delivery_code', 'ABC-123');
+
+                window.setTimeout(() => {
+                    const shippingAddress = quote.shippingAddress() || {};
+
+                    Promise.resolve(
+                        window.fastcheckoutHyvaShipping.onSelectShippingAddressAction(shippingAddress)
+                    ).then(() => {
+                        window.setTimeout(() => {
+                            const wire = getWire();
+
+                            resolve({
+                                providerCustom: provider.get('shippingAddress.custom_attributes.delivery_note'),
+                                providerCustomMap: provider.get('shippingAddress.custom_attributes') || {},
+                                providerExtension: provider.get('shippingAddress.extension_attributes.delivery_code'),
+                                providerExtensionMap: provider.get('shippingAddress.extension_attributes') || {},
+                                quoteCustomMap: shippingAddress.custom_attributes || {},
+                                quoteCustomArray: shippingAddress.customAttributes || [],
+                                quoteExtension: shippingAddress.extension_attributes || {},
+                                wireCustom: getWireValue(wire, 'shippingCustomAttributes') || {},
+                                wireExtension: getWireValue(wire, 'shippingExtensionAttributes') || {}
+                            });
+                        }, 250);
+                    });
+                }, 900);
+            }, (error) => {
+                resolve({
+                    requireError: error && (error.requireModules || error.message || String(error))
+                });
+            });
+        }));
+
+        expect(result.requireError).toBeFalsy();
+        expect(
+            result.providerCustom || result.providerCustomMap.delivery_note,
+            JSON.stringify(result, null, 2)
+        ).toBe('Leave at reception');
+        expect(
+            result.providerExtension || result.providerExtensionMap.delivery_code,
+            JSON.stringify(result, null, 2)
+        ).toBe('ABC-123');
+        expect(result.quoteCustomMap.delivery_note, JSON.stringify(result, null, 2)).toBe('Leave at reception');
+        expect(result.quoteCustomArray, JSON.stringify(result, null, 2)).toContainEqual({
+            attribute_code: 'delivery_note',
+            value: 'Leave at reception'
+        });
+        expect(result.quoteExtension.delivery_code, JSON.stringify(result, null, 2)).toBe('ABC-123');
+        expect(result.wireCustom.delivery_note, JSON.stringify(result, null, 2)).toBe('Leave at reception');
+        expect(result.wireExtension.delivery_code, JSON.stringify(result, null, 2)).toBe('ABC-123');
+    });
+
     test('should route standard Magento KO place-order action through Fastcheckout bridge', async ({ page }) => {
         const checkout = new CheckoutPage(page);
         await checkout.goto();

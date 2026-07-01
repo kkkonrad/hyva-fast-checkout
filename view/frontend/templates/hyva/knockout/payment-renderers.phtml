@@ -15,6 +15,10 @@ $rendererComponents = $block->getPaymentRendererComponents();
 $rendererComponentMap = $block->getPaymentRendererComponentMap();
 $shippingRatesValidationComponents = $block->getShippingRatesValidationComponents();
 $paymentValidationComponents = $block->getPaymentValidationComponents();
+$paymentListChildren = $block->getPaymentListChildren();
+$paymentRegionChildren = $block->getPaymentRegionChildren();
+$shippingListChildren = $block->getShippingListChildren();
+$shippingAddressChildren = $block->getShippingAddressChildren();
 $layoutScripts = $block->getCheckoutLayoutScripts();
 
 if (
@@ -22,6 +26,10 @@ if (
     empty($rendererComponentMap) &&
     empty($shippingRatesValidationComponents) &&
     empty($paymentValidationComponents) &&
+    empty($paymentListChildren) &&
+    empty($paymentRegionChildren) &&
+    empty($shippingListChildren) &&
+    empty($shippingAddressChildren) &&
     empty($layoutScripts['modules']) &&
     empty($layoutScripts['external'])
 ) {
@@ -35,6 +43,10 @@ $mageInitConfig = [
     'rendererComponentMap' => $rendererComponentMap,
     'shippingRatesValidationComponents' => $shippingRatesValidationComponents,
     'paymentValidationComponents' => $paymentValidationComponents,
+    'paymentListChildren' => $paymentListChildren,
+    'paymentRegionChildren' => $paymentRegionChildren,
+    'shippingListChildren' => $shippingListChildren,
+    'shippingAddressChildren' => $shippingAddressChildren,
     'layoutScripts' => $layoutScripts['modules'] ?? [],
     'scope' => 'fastcheckoutHyvaPaymentRenderers'
 ];
@@ -67,7 +79,16 @@ foreach ($layoutScripts['external'] as $externalScript) {
      style="display: none !important;"
      wire:ignore
      data-bind="scope: 'fastcheckoutHyvaPaymentRenderers'">
+    <!-- ko foreach: getRegion('place-order-captcha') -->
+        <!-- ko template: getTemplate() --><!-- /ko -->
+    <!-- /ko -->
+    <!-- ko foreach: getRegion('beforeMethods') -->
+        <!-- ko template: getTemplate() --><!-- /ko -->
+    <!-- /ko -->
     <!-- ko foreach: getRegion('payment-methods-list') -->
+        <!-- ko template: getTemplate() --><!-- /ko -->
+    <!-- /ko -->
+    <!-- ko foreach: getRegion('afterMethods') -->
         <!-- ko template: getTemplate() --><!-- /ko -->
     <!-- /ko -->
 </div>
