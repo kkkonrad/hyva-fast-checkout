@@ -5,6 +5,10 @@ define([
 ], function ($, wrapper, isFastcheckoutActive) {
     'use strict';
 
+    var checkoutStateRefreshPromise = null,
+        checkoutStateLastPayload = null,
+        checkoutStateLastPayloadAt = 0;
+
     function getCheckoutRoot() {
         return isFastcheckoutActive() ? document.getElementById('fastcheckout-checkout') : null;
     }
@@ -75,18 +79,66 @@ define([
         return true;
     }
 
-    function refreshCheckoutState(wire) {
+    function shouldPassThroughMagento(url, type) {
+        var endpoint,
+            method = (type || 'GET').toUpperCase();
+
+        if (!getCheckoutRoot() || !url || typeof url !== 'string') {
+            return false;
+        }
+
+        endpoint = getEndpoint(url);
+
+        return (endpoint === 'shippingInformation' || endpoint === 'billingAddress') && method === 'POST';
+    }
+
+    function refreshCheckoutState(wire, force) {
         if (!wire || typeof wire.call !== 'function') {
             return Promise.reject(new Error('Magewire not available'));
         }
 
-        return Promise.resolve(wire.call('refreshCheckoutState'))
-            .catch(function () {
-                return true;
-            })
-            .then(function () {
+        if (!force && checkoutStateLastPayload && Date.now() - checkoutStateLastPayloadAt < 750) {
+            return Promise.resolve(checkoutStateLastPayload);
+        }
+
+        if (checkoutStateRefreshPromise) {
+            if (force) {
+                return checkoutStateRefreshPromise.catch(function () {
+                    return true;
+                }).then(function () {
+                    return refreshCheckoutState(wire, true);
+                });
+            }
+
+            return checkoutStateRefreshPromise;
+        }
+
+        checkoutStateRefreshPromise = Promise.resolve(wire.call('refreshCheckoutState'))
+            .then(function (payload) {
+                if (payload && typeof payload === 'object' && payload.totals) {
+                    return payload;
+                }
+
                 return fetchCheckoutState(wire);
+            })
+            .catch(function () {
+                return fetchCheckoutState(wire);
+            })
+            .then(function (payload) {
+                checkoutStateLastPayload = payload;
+                checkoutStateLastPayloadAt = Date.now();
+
+                return payload;
+            })
+            .then(function (payload) {
+                checkoutStateRefreshPromise = null;
+                return payload;
+            }, function (error) {
+                checkoutStateRefreshPromise = null;
+                throw error;
             });
+
+        return checkoutStateRefreshPromise;
     }
 
     function parsePayload(data) {
@@ -135,11 +187,11 @@ define([
         if (!wire) {
             return '';
         }
-        if (typeof wire[key] !== 'undefined') {
-            return wire[key];
-        }
         if (typeof wire.get === 'function') {
             return wire.get(key);
+        }
+        if (typeof wire[key] !== 'undefined') {
+            return wire[key];
         }
         if (wire.data && typeof wire.data[key] !== 'undefined') {
             return wire.data[key];
@@ -165,6 +217,87 @@ define([
             type: 'GET',
             dataType: 'json',
             cache: false
+        });
+    }
+
+    function ratesChanged(currentRates, nextRates) {
+        var i,
+            current,
+            next;
+
+        currentRates = Array.isArray(currentRates) ? currentRates : [];
+        nextRates = Array.isArray(nextRates) ? nextRates : [];
+
+        if (currentRates.length !== nextRates.length) {
+            return true;
+        }
+
+        for (i = 0; i < currentRates.length; i++) {
+            current = currentRates[i] || {};
+            next = nextRates[i] || {};
+
+            if (
+                current.carrier_code !== next.carrier_code ||
+                current.method_code !== next.method_code ||
+                current.amount !== next.amount ||
+                current.available !== next.available
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    function applyCheckoutStateToKnockout(state) {
+        return new Promise(function (resolve) {
+            if (!state || typeof state !== 'object' || typeof require !== 'function') {
+                resolve(state);
+                return;
+            }
+
+            require([
+                'Magento_Checkout/js/model/quote',
+                'Magento_Checkout/js/model/payment-service',
+                'Magento_Checkout/js/model/shipping-service'
+            ], function (quote, paymentService, shippingService) {
+                try {
+                    if (state.totals && quote && typeof quote.setTotals === 'function') {
+                        quote.setTotals(state.totals);
+                        if (window.checkoutConfig) {
+                            window.checkoutConfig.totalsData = state.totals;
+                        }
+                    }
+
+                    if (
+                        Array.isArray(state.payment_methods) &&
+                        paymentService &&
+                        typeof paymentService.setPaymentMethods === 'function'
+                    ) {
+                        paymentService.setPaymentMethods(state.payment_methods);
+                    }
+
+                    if (
+                        Array.isArray(state.shipping_rates) &&
+                        shippingService &&
+                        typeof shippingService.setShippingRates === 'function' &&
+                        ratesChanged(
+                            typeof shippingService.getShippingRates === 'function'
+                                ? shippingService.getShippingRates()()
+                                : [],
+                            state.shipping_rates
+                        )
+                    ) {
+                        shippingService.setShippingRates(state.shipping_rates);
+                    }
+                } catch (e) {
+                    // Do not break native Magento storage consumers if KO state hydration fails.
+                }
+
+                resolve(state);
+            }, function () {
+                resolve(state);
+            });
         });
     }
 
@@ -278,6 +411,17 @@ define([
                     return syncAddressToWire(wire, addressInformation.billing_address, true);
                 })
                 .then(function () {
+                    if (addressInformation.extension_attributes) {
+                        return setWireValue(
+                            wire,
+                            'shippingExtensionAttributes',
+                            addressInformation.extension_attributes
+                        );
+                    }
+
+                    return true;
+                })
+                .then(function () {
                     var carrier = addressInformation.shipping_carrier_code || '',
                         method = addressInformation.shipping_method_code || '',
                         code = carrier && method ? carrier + '_' + method : '';
@@ -370,6 +514,39 @@ define([
         return deferred.promise();
     }
 
+    function handleMagentoPassThrough(originalRequest, url, data, type, headers) {
+        var deferred = $.Deferred(),
+            wire = getWire(),
+            endpoint = getEndpoint(url);
+
+        if (!wire) {
+            return originalRequest();
+        }
+
+        syncPayloadToWire(wire, endpoint, data, headers)
+            .then(function () {
+                return originalRequest();
+            })
+            .then(function (response) {
+                return refreshCheckoutState(wire, true)
+                    .then(applyCheckoutStateToKnockout)
+                    .catch(function () {
+                        return true;
+                    })
+                    .then(function () {
+                        return response;
+                    });
+            })
+            .then(function (response) {
+                deferred.resolve(response);
+            })
+            .catch(function (error) {
+                deferred.reject(error);
+            });
+
+        return deferred.promise();
+    }
+
     return function (storage) {
         if (!storage) {
             return storage;
@@ -388,6 +565,11 @@ define([
         storage.post = wrapper.wrap(storage.post, function (originalPost, url, data, global, contentType, headers, async) {
             if (url && url.indexOf('rest/') === 0) {
                 url = '/' + url;
+            }
+            if (shouldPassThroughMagento(url, 'POST')) {
+                return handleMagentoPassThrough(function () {
+                    return originalPost(url, data, global, contentType, headers, async);
+                }, url, data, 'POST', headers);
             }
             if (shouldIntercept(url, 'POST') && getWire()) {
                 return handleIntercept(url, data, 'POST', headers);

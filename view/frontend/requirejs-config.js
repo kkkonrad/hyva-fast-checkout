@@ -31,8 +31,14 @@ var config = {
             'Magento_Checkout/js/model/shipping-rate-service': {
                 'Kkkonrad_Fastcheckout/js/mixin/shipping-rate-service-mixin': true
             },
+            'Magento_Checkout/js/model/checkout-data-resolver': {
+                'Kkkonrad_Fastcheckout/js/mixin/checkout-data-resolver-mixin': true
+            },
             'Magento_Checkout/js/action/place-order': {
                 'Kkkonrad_Fastcheckout/js/mixin/place-order-mixin': true
+            },
+            'Magento_Checkout/js/action/redirect-on-success': {
+                'Kkkonrad_Fastcheckout/js/mixin/redirect-on-success-mixin': true
             },
             'Magento_Checkout/js/action/set-payment-information': {
                 'Kkkonrad_Fastcheckout/js/mixin/set-payment-information-mixin': true

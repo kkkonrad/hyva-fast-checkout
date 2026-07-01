@@ -395,7 +395,8 @@ define([
                 return indexedOptions;
             }
 
-            var checkoutProviderAddressAttributeSyncTimer = null;
+            var checkoutProviderAddressAttributeSyncTimer = null,
+                checkoutProviderMagewireAddressSyncValues = {};
 
             function getCheckoutProvider() {
                 var provider;
@@ -424,24 +425,39 @@ define([
                 return provider;
             }
 
-            function shouldSyncCheckoutProviderAddressPath(path) {
+            function getCheckoutProviderRootPath(path) {
+                if (typeof path !== 'string' || !path.length) {
+                    return '';
+                }
+
+                return path.split('.')[0];
+            }
+
+            function isBillingAddressProviderScope(scope) {
+                return typeof scope === 'string' && /^billingAddress[^.]*$/.test(scope);
+            }
+
+            function isCheckoutProviderAddressAttributePath(path) {
                 return typeof path === 'string' && (
-                    path === 'shippingAddress' ||
-                    path === 'billingAddress' ||
-                    path === 'billingAddressshared' ||
-                    path.indexOf('shippingAddress.custom_attributes') === 0 ||
-                    path.indexOf('shippingAddress.customAttributes') === 0 ||
-                    path.indexOf('shippingAddress.extension_attributes') === 0 ||
-                    path.indexOf('shippingAddress.extensionAttributes') === 0 ||
-                    path.indexOf('billingAddress.custom_attributes') === 0 ||
-                    path.indexOf('billingAddress.customAttributes') === 0 ||
-                    path.indexOf('billingAddress.extension_attributes') === 0 ||
-                    path.indexOf('billingAddress.extensionAttributes') === 0 ||
-                    path.indexOf('billingAddressshared.custom_attributes') === 0 ||
-                    path.indexOf('billingAddressshared.customAttributes') === 0 ||
-                    path.indexOf('billingAddressshared.extension_attributes') === 0 ||
-                    path.indexOf('billingAddressshared.extensionAttributes') === 0
+                    path.indexOf('.custom_attributes') !== -1 ||
+                    path.indexOf('.customAttributes') !== -1 ||
+                    path.indexOf('.extension_attributes') !== -1 ||
+                    path.indexOf('.extensionAttributes') !== -1
                 );
+            }
+
+            function shouldSyncCheckoutProviderAddressPath(path) {
+                var root = getCheckoutProviderRootPath(path);
+
+                if (root === 'shippingAddress') {
+                    return path === root || isCheckoutProviderAddressAttributePath(path);
+                }
+
+                if (isBillingAddressProviderScope(root)) {
+                    return path === root || isCheckoutProviderAddressAttributePath(path);
+                }
+
+                return false;
             }
 
             function readCheckoutProviderValue(provider, path) {
@@ -473,6 +489,45 @@ define([
                 }
 
                 return value && typeof value === 'object' ? value : {};
+            }
+
+            function getCheckoutProviderBillingAddressScopes(provider) {
+                var scopes = {
+                    billingAddress: true,
+                    billingAddressshared: true
+                };
+
+                function addScope(scope) {
+                    if (isBillingAddressProviderScope(scope)) {
+                        scopes[scope] = true;
+                    }
+                }
+
+                if (provider && provider.data && typeof provider.data === 'object') {
+                    Object.keys(provider.data).forEach(addScope);
+                }
+
+                if (window.checkoutConfig && Array.isArray(window.checkoutConfig.paymentMethods)) {
+                    window.checkoutConfig.paymentMethods.forEach(function (method) {
+                        if (method && method.method) {
+                            addScope('billingAddress' + method.method);
+                        }
+                    });
+                }
+
+                if (quote && typeof quote.paymentMethod === 'function' && quote.paymentMethod()) {
+                    addScope('billingAddress' + quote.paymentMethod().method);
+                }
+
+                if (typeof document !== 'undefined') {
+                    Array.prototype.slice.call(document.querySelectorAll('input[name="payment_method"]')).forEach(function (input) {
+                        if (input && input.value) {
+                            addScope('billingAddress' + input.value);
+                        }
+                    });
+                }
+
+                return Object.keys(scopes);
             }
 
             function updateQuoteAddressAttributes(address, customAttributes, extensionAttributes) {
@@ -597,16 +652,18 @@ define([
             }
 
             function getQuoteAddressForCheckoutProviderPath(path) {
+                var root = getCheckoutProviderRootPath(path);
+
                 if (!quote) {
                     return null;
                 }
 
-                if (path === 'shippingAddress' && typeof quote.shippingAddress === 'function') {
+                if (root === 'shippingAddress' && typeof quote.shippingAddress === 'function') {
                     return quote.shippingAddress();
                 }
 
                 if (
-                    (path === 'billingAddress' || path === 'billingAddressshared') &&
+                    isBillingAddressProviderScope(root) &&
                     typeof quote.billingAddress === 'function'
                 ) {
                     return quote.billingAddress();
@@ -654,9 +711,15 @@ define([
             }
 
             function setMagewireValueFromCheckoutProviderSync(wire, field, value) {
-                var currentValue;
+                var currentValue,
+                    cachedValue;
 
                 if (!wire || typeof wire.set !== 'function' || typeof value === 'undefined' || value === null) {
+                    return;
+                }
+
+                cachedValue = checkoutProviderMagewireAddressSyncValues[field];
+                if (typeof cachedValue !== 'undefined' && JSON.stringify(cachedValue || {}) === JSON.stringify(value || {})) {
                     return;
                 }
 
@@ -665,6 +728,7 @@ define([
                     (typeof currentValue === 'object' || typeof value === 'object') &&
                     JSON.stringify(currentValue || {}) === JSON.stringify(value || {})
                 ) {
+                    checkoutProviderMagewireAddressSyncValues[field] = $.extend(true, {}, value);
                     return;
                 }
                 if (
@@ -672,9 +736,13 @@ define([
                     typeof value !== 'object' &&
                     String(currentValue || '') === String(value || '')
                 ) {
+                    checkoutProviderMagewireAddressSyncValues[field] = value;
                     return;
                 }
 
+                checkoutProviderMagewireAddressSyncValues[field] = typeof value === 'object'
+                    ? $.extend(true, {}, value)
+                    : value;
                 wire.set(field, value, true);
             }
 
@@ -682,11 +750,11 @@ define([
                 if (!wire) {
                     return '';
                 }
-                if (typeof wire[name] !== 'undefined') {
-                    return wire[name];
-                }
                 if (typeof wire.get === 'function') {
                     return wire.get(name);
+                }
+                if (typeof wire[name] !== 'undefined') {
+                    return wire[name];
                 }
                 if (wire.data && typeof wire.data[name] !== 'undefined') {
                     return wire.data[name];
@@ -718,6 +786,7 @@ define([
             function syncCheckoutProviderAddressAttributes() {
                 var provider = getCheckoutProvider(),
                     wire = getMagewireComponentForCheckoutProviderSync(),
+                    billingAddressScopes,
                     shippingCustomAttributes,
                     shippingExtensionAttributes,
                     billingCustomAttributes,
@@ -786,6 +855,31 @@ define([
                     ),
                     billingExtensionAttributes
                 );
+                billingAddressScopes = getCheckoutProviderBillingAddressScopes(provider);
+                billingAddressScopes.forEach(function (scope) {
+                    if (scope === 'billingAddress') {
+                        return;
+                    }
+
+                    billingCustomAttributes = mergeCheckoutProviderAttributeData(
+                        billingCustomAttributes,
+                        normalizeCheckoutProviderAddressAttributeMap(getCheckoutProviderAttributeData(
+                            provider,
+                            scope,
+                            'customAttributes',
+                            'custom_attributes'
+                        ))
+                    );
+                    billingExtensionAttributes = mergeCheckoutProviderAttributeData(
+                        billingExtensionAttributes,
+                        getCheckoutProviderAttributeData(
+                            provider,
+                            scope,
+                            'extensionAttributes',
+                            'extension_attributes'
+                        )
+                    );
+                });
 
                 shippingAddress = quote && typeof quote.shippingAddress === 'function' ? quote.shippingAddress() : null;
                 billingAddress = quote && typeof quote.billingAddress === 'function' ? quote.billingAddress() : null;
@@ -813,6 +907,22 @@ define([
                     'billingAddress.extension_attributes',
                     billingExtensionAttributes
                 );
+                billingAddressScopes.forEach(function (scope) {
+                    if (scope === 'billingAddress') {
+                        return;
+                    }
+
+                    writeCheckoutProviderValueIfDifferent(
+                        provider,
+                        scope + '.custom_attributes',
+                        billingCustomAttributes
+                    );
+                    writeCheckoutProviderValueIfDifferent(
+                        provider,
+                        scope + '.extension_attributes',
+                        billingExtensionAttributes
+                    );
+                });
 
                 if (wire) {
                     setMagewireValueFromCheckoutProviderSync(wire, 'shippingCustomAttributes', shippingCustomAttributes);
@@ -855,11 +965,16 @@ define([
                 provider.fastcheckoutAddressAttributeSyncRegistered = true;
                 originalSet = provider.set;
                 provider.set = function (path, value) {
-                    var existingCustomAttributes,
+                    var root = getCheckoutProviderRootPath(path),
+                        isAddressRootPath = path === root && (
+                            root === 'shippingAddress' ||
+                            isBillingAddressProviderScope(root)
+                        ),
+                        existingCustomAttributes,
                         existingExtensionAttributes;
 
                     if (
-                        (path === 'shippingAddress' || path === 'billingAddress' || path === 'billingAddressshared') &&
+                        isAddressRootPath &&
                         value &&
                         typeof value === 'object'
                     ) {
@@ -2311,11 +2426,11 @@ define([
 
                 function getProperty(wire, name) {
                     if (!wire) return '';
-                    if (typeof wire[name] !== 'undefined') {
-                        return wire[name];
-                    }
                     if (typeof wire.get === 'function') {
                         return wire.get(name);
+                    }
+                    if (typeof wire[name] !== 'undefined') {
+                        return wire[name];
                     }
                     if (wire.data && typeof wire.data[name] !== 'undefined') {
                         return wire.data[name];
@@ -2586,7 +2701,8 @@ define([
                 }
 
                 function getMagewireComponent() {
-                    var magewireEl = document.querySelector('[wire\\:id]');
+                    var magewireEl = document.querySelector('[wire\\:id]'),
+                        livewire = window.Livewire || window.Magewire;
 
                     if (magewireEl && magewireEl.__livewire) {
                         return magewireEl.__livewire;
@@ -2594,11 +2710,11 @@ define([
 
                     if (
                         magewireEl &&
-                        window.Livewire &&
-                        typeof window.Livewire.find === 'function' &&
+                        livewire &&
+                        typeof livewire.find === 'function' &&
                         magewireEl.getAttribute('wire:id')
                     ) {
-                        return window.Livewire.find(magewireEl.getAttribute('wire:id'));
+                        return livewire.find(magewireEl.getAttribute('wire:id'));
                     }
 
                     return null;
@@ -3570,20 +3686,30 @@ define([
                         return standardShippingInformationComponent;
                     },
                     onSelectShippingAddressAction: function (shippingAddress) {
-                        var addressData = normalizeKoAddressData(shippingAddress);
+                        var addressData = normalizeKoAddressData(shippingAddress),
+                            currentShippingAddress;
 
                         persistAddressToCheckoutData(addressData, 'shipping');
                         syncAddressDataToCheckoutProvider(addressData, 'shipping');
+                        syncCheckoutProviderAddressAttributes();
+                        currentShippingAddress = quote && typeof quote.shippingAddress === 'function'
+                            ? quote.shippingAddress()
+                            : null;
 
-                        return writeKoAddressToMagewire(shippingAddress, false);
+                        return writeKoAddressToMagewire(currentShippingAddress || shippingAddress, false);
                     },
                     onSelectBillingAddressAction: function (billingAddress) {
-                        var addressData = normalizeKoAddressData(billingAddress);
+                        var addressData = normalizeKoAddressData(billingAddress),
+                            currentBillingAddress;
 
                         persistAddressToCheckoutData(addressData, 'billing');
                         syncAddressDataToCheckoutProvider(addressData, 'billing');
+                        syncCheckoutProviderAddressAttributes();
+                        currentBillingAddress = quote && typeof quote.billingAddress === 'function'
+                            ? quote.billingAddress()
+                            : null;
 
-                        return writeKoAddressToMagewire(billingAddress, true);
+                        return writeKoAddressToMagewire(currentBillingAddress || billingAddress, true);
                     },
                     onSelectShippingMethodAction: function (shippingMethod) {
                         syncShippingMethodToMagewire(getShippingMethodCode(shippingMethod));
