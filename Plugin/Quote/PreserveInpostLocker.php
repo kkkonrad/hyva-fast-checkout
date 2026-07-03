@@ -42,7 +42,9 @@ class PreserveInpostLocker
         }
 
         $extensionAttributes = $quote->getExtensionAttributes();
-        $currentLockerId = ($extensionAttributes !== null) ? $extensionAttributes->getInpostLockerId() : null;
+        $currentLockerId = ($extensionAttributes !== null && method_exists($extensionAttributes, 'getInpostLockerId'))
+            ? $extensionAttributes->getInpostLockerId()
+            : null;
 
         // If not set on extension attributes, check if it's set as direct data
         if ($currentLockerId === null) {
@@ -62,8 +64,10 @@ class PreserveInpostLocker
                     if ($extensionAttributes === null) {
                         $extensionAttributes = $this->cartExtensionFactory->create();
                     }
-                    $extensionAttributes->setInpostLockerId($dbLockerId);
-                    $quote->setExtensionAttributes($extensionAttributes);
+                    if (method_exists($extensionAttributes, 'setInpostLockerId')) {
+                        $extensionAttributes->setInpostLockerId($dbLockerId);
+                        $quote->setExtensionAttributes($extensionAttributes);
+                    }
                     $quote->setData('inpost_locker_id', $dbLockerId);
                 }
             } catch (\Exception $e) {
