@@ -2152,6 +2152,11 @@ define([
                         persistPaymentMethodToCheckoutData(payload.selected_payment_method);
                     }
 
+                    if (payload.customer_email) {
+                        setQuoteGuestEmail(payload.customer_email);
+                        persistEmailToCheckoutData(payload.customer_email);
+                    }
+
                     if (typeof payload.coupon_code !== 'undefined' && window.checkoutConfig && window.checkoutConfig.totalsData) {
                         window.checkoutConfig.totalsData.coupon_code = payload.coupon_code || '';
                     }

@@ -9,6 +9,26 @@ define([
         checkoutStateLastPayload = null,
         checkoutStateLastPayloadAt = 0;
 
+    function getEmailFromDomOrQuote() {
+        var emailEl = document.querySelector('input[name="email"]') ||
+                      document.querySelector('input[type="email"]') ||
+                      document.querySelector('[data-wire-field="email"]');
+
+        if (emailEl && emailEl.value) {
+            return emailEl.value;
+        }
+
+        if (window.checkoutConfig && window.checkoutConfig.customerData && window.checkoutConfig.customerData.email) {
+            return window.checkoutConfig.customerData.email;
+        }
+
+        if (window.checkoutConfig && window.checkoutConfig.quoteData && window.checkoutConfig.quoteData.customer_email) {
+            return window.checkoutConfig.quoteData.customer_email;
+        }
+
+        return '';
+    }
+
     function getCheckoutRoot() {
         return isFastcheckoutActive() ? document.getElementById('fastcheckout-checkout') : null;
     }
@@ -566,6 +586,18 @@ define([
             if (url && url.indexOf('rest/') === 0) {
                 url = '/' + url;
             }
+
+            if (url && url.indexOf('/guest-carts/') !== -1 && (url.indexOf('/payment-information') !== -1 || url.indexOf('/order') !== -1)) {
+                var payload = parsePayload(data);
+                if (payload && typeof payload === 'object' && !payload.email) {
+                    var email = getEmailFromDomOrQuote();
+                    if (email) {
+                        payload.email = email;
+                        data = JSON.stringify(payload);
+                    }
+                }
+            }
+
             if (shouldPassThroughMagento(url, 'POST')) {
                 return handleMagentoPassThrough(function () {
                     return originalPost(url, data, global, contentType, headers, async);

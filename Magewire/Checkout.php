@@ -775,6 +775,7 @@ class Checkout extends Component
                 'shipping_rates' => $this->buildShippingRatesData(),
                 'selected_payment_method' => $this->paymentMethod,
                 'coupon_code' => $this->couponCode,
+                'customer_email' => $quote ? (string)$quote->getCustomerEmail() : '',
             ];
         } catch (\Exception $e) {
             $this->logger->error('Kkkonrad Fastcheckout refreshCheckoutState Error: ' . $e->getMessage(), ['exception' => $e]);
