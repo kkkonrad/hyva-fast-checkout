@@ -10,7 +10,8 @@ define([
         checkoutStateLastPayloadAt = 0;
 
     function getEmailFromDomOrQuote() {
-        var emailEl = document.querySelector('input[name="email"]') ||
+        var emailEl = document.getElementById('co-shipping-email') ||
+                      document.querySelector('input[name="email"]') ||
                       document.querySelector('input[type="email"]') ||
                       document.querySelector('[data-wire-field="email"]');
 
@@ -587,12 +588,17 @@ define([
                 url = '/' + url;
             }
 
-            if (url && url.indexOf('/guest-carts/') !== -1 && (url.indexOf('/payment-information') !== -1 || url.indexOf('/order') !== -1)) {
+            if (url && url.indexOf('/guest-carts/') !== -1 && (url.indexOf('/payment-information') !== -1 || url.indexOf('/set-payment-information') !== -1 || url.indexOf('/order') !== -1)) {
                 var payload = parsePayload(data);
-                if (payload && typeof payload === 'object' && !payload.email) {
+                if (payload && typeof payload === 'object') {
                     var email = getEmailFromDomOrQuote();
                     if (email) {
-                        payload.email = email;
+                        if (!payload.email) {
+                            payload.email = email;
+                        }
+                        if (payload.billingAddress && !payload.billingAddress.email) {
+                            payload.billingAddress.email = email;
+                        }
                         data = JSON.stringify(payload);
                     }
                 }

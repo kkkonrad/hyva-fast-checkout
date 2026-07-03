@@ -1947,7 +1947,8 @@ define([
 
                 function syncQuoteCustomerData() {
                     if (!quote) return;
-                    var emailEl = document.querySelector('input[name="email"]') || 
+                    var emailEl = document.getElementById('co-shipping-email') ||
+                                  document.querySelector('input[name="email"]') || 
                                   document.querySelector('input[type="email"]') ||
                                   document.querySelector('[data-wire-field="email"]');
                     var emailVal = emailEl ? emailEl.value : '';
@@ -2464,7 +2465,8 @@ define([
                 }
 
                 function getEmailForQuote() {
-                    var emailEl = document.querySelector('input[name="email"]') ||
+                    var emailEl = document.getElementById('co-shipping-email') ||
+                        document.querySelector('input[name="email"]') ||
                         document.querySelector('input[type="email"]') ||
                         document.querySelector('[data-wire-field="email"]');
 
