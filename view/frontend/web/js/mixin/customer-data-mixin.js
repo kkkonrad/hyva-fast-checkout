@@ -73,6 +73,20 @@ define([
 
         if (typeof customerData.set === 'function') {
             customerData.set = wrapper.wrap(customerData.set, function (originalSet, sectionName, sectionData) {
+                var isStorageReady = typeof customerData.getInitCustomerData === 'function' &&
+                                     customerData.getInitCustomerData().state() === 'resolved';
+
+                if (!isStorageReady) {
+                    try {
+                        if (window.localStorage) {
+                            var cache = JSON.parse(window.localStorage.getItem('mage-cache-storage') || '{}');
+                            cache[sectionName] = sectionData;
+                            window.localStorage.setItem('mage-cache-storage', JSON.stringify(cache));
+                        }
+                    } catch (e) {}
+                    return;
+                }
+
                 var result = originalSet(sectionName, sectionData);
 
                 if (isFastcheckoutActive() && !isSyncing) {

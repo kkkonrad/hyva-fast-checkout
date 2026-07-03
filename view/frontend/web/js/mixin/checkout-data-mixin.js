@@ -1,7 +1,8 @@
 define([
     'jquery',
-    'Kkkonrad_Fastcheckout/js/mixin/is-fastcheckout-active'
-], function ($, isFastcheckoutActive) {
+    'Kkkonrad_Fastcheckout/js/mixin/is-fastcheckout-active',
+    'Magento_Customer/js/customer-data'
+], function ($, isFastcheckoutActive, customerData) {
     'use strict';
 
     return function (checkoutData) {
@@ -114,6 +115,16 @@ define([
             originalMethod = checkoutData[method];
             checkoutData[method] = function (value) {
                 var result;
+
+                var isStorageReady = customerData &&
+                                     typeof customerData.getInitCustomerData === 'function' &&
+                                     customerData.getInitCustomerData().state() === 'resolved';
+
+                if (!isStorageReady) {
+                    saveSetterFallback(method, value);
+                    dispatchCheckoutDataUpdate(method, value);
+                    return;
+                }
 
                 try {
                     result = originalMethod.apply(checkoutData, arguments);
