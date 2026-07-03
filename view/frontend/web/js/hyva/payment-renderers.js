@@ -1771,7 +1771,7 @@ define([
                 function runStandardShippingViewSelectMethod(shippingMethod) {
                     var component;
 
-                    if (!standardShippingViewSelectMethod || window.fastcheckoutKoShippingViewSelectActive) {
+                    if (!standardShippingViewSelectMethod || !shippingMethod || typeof shippingMethod !== 'object' || window.fastcheckoutKoShippingViewSelectActive) {
                         return;
                     }
 
