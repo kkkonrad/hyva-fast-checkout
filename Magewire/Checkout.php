@@ -130,7 +130,7 @@ class Checkout extends Component
     private $giftMessageRepository;
     private $giftMessageFactory;
     private $agreementsValidator;
-
+    private $paymentMethodsCache = null;
     /**
      * @param CheckoutSession $checkoutSession
      * @param CartRepositoryInterface $cartRepository
@@ -593,12 +593,13 @@ class Checkout extends Component
         if ($shippingAddress && $shippingAddress->getCountryId()) {
             $rates = $shippingAddress->getGroupedAllShippingRates();
             if (!$shippingAddress->getCollectShippingRates() && !empty($rates)) {
-                return $rates;
+                return is_array($rates) ? $rates : [];
             }
 
             $shippingAddress->setCollectShippingRates(true);
             $quote->collectTotals();
-            return $shippingAddress->getGroupedAllShippingRates();
+            $rates = $shippingAddress->getGroupedAllShippingRates();
+            return is_array($rates) ? $rates : [];
         }
         
         return [];
@@ -607,7 +608,7 @@ class Checkout extends Component
     /**
      * Select shipping method
      */
-    public function selectShippingMethod(string $methodCode): void
+    public function selectShippingMethod(string $methodCode): array
     {
         try {
             $this->saveShippingAddress(true, false, false);
@@ -652,16 +653,26 @@ class Checkout extends Component
         } catch (\Exception $e) {
             $this->logger->error('Kkkonrad Fastcheckout selectShippingMethod Error: ' . $e->getMessage(), ['exception' => $e]);
         }
+
+        $this->paymentMethodsCache = null;
+        return $this->refreshCheckoutState();
     }
 
     public function getPaymentMethods(): array
     {
+        if ($this->paymentMethodsCache !== null) {
+            return $this->paymentMethodsCache;
+        }
+
         $quote = $this->checkoutSession->getQuote();
         try {
-            return $this->paymentMethodManagement->getList($quote->getId());
+            $methods = $this->paymentMethodManagement->getList($quote->getId());
+            $this->paymentMethodsCache = is_array($methods) ? $methods : [];
         } catch (\Exception $e) {
-            return [];
+            $this->paymentMethodsCache = [];
         }
+
+        return $this->paymentMethodsCache;
     }
 
     public function getAllowedPaymentMethods(): array
@@ -896,7 +907,7 @@ class Checkout extends Component
     /**
      * Select payment method
      */
-    public function selectPaymentMethod(string $methodCode): void
+    public function selectPaymentMethod(string $methodCode): array
     {
         try {
             $this->saveShippingAddress(true, false, false);
@@ -916,7 +927,7 @@ class Checkout extends Component
 
             if (!$methodAvailable) {
                 $this->paymentMethod = '';
-                return;
+                return $this->refreshCheckoutState();
             }
 
             $payment = $quote->getPayment();
@@ -932,6 +943,8 @@ class Checkout extends Component
         } catch (\Exception $e) {
             $this->logger->error('Kkkonrad Fastcheckout selectPaymentMethod Error: ' . $e->getMessage(), ['exception' => $e]);
         }
+
+        return $this->refreshCheckoutState();
     }
 
     /**

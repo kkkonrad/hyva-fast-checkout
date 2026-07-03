@@ -746,7 +746,7 @@ class CheckoutTest extends TestCase
             ->method('getShippingAddress')
             ->willReturn($shippingAddressMock);
 
-        $this->paymentMethodManagementMock->expects($this->exactly(2))
+        $this->paymentMethodManagementMock->expects($this->exactly(1))
             ->method('getList')
             ->with(42)
             ->willReturn([
