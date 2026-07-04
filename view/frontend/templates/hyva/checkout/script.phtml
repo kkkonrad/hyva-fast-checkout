@@ -72,6 +72,11 @@ function initCheckout() {
                     this.isProcessing = false;
                     document.body.classList.remove('checkout-submitting');
                 });
+                window.Livewire.hook('element.updating', (fromEl, toEl) => {
+                    if (window.fastcheckoutOrderPlaced) {
+                        return false;
+                    }
+                });
             }
         },
 
@@ -502,6 +507,7 @@ window.addEventListener('alpine:init', () => Alpine.data('initCheckout', initChe
             const wire = getWire();
             if (wire) restore(wire);
             window.addEventListener('magewire:order-placed', function (event) {
+                window.fastcheckoutOrderPlaced = true;
                 clearStorage();
                 if (
                     window.fastcheckoutHyvaPayment &&

@@ -3670,17 +3670,8 @@ define([
                             return true;
                         }
 
-                        try {
-                            return Promise.resolve(setShippingInformationAction()).then(function () {
-                                syncPaymentMethods();
-                                if (checkoutTotals && checkoutTotals.isLoading && typeof checkoutTotals.isLoading === 'function') {
-                                    checkoutTotals.isLoading(false);
-                                }
-                                return true;
-                            });
-                        } catch (e) {
-                            return Promise.reject(e);
-                        }
+                        syncPaymentMethods();
+                        return true;
                     });
                 }
 
