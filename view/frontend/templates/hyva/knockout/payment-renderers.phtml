@@ -265,7 +265,12 @@ foreach ($layoutScripts['external'] as $externalScript) {
         };
 
         document.querySelector = function (selector) {
-            var el = originalQuerySelector.call(document, selector);
+            var el = null;
+            try {
+                el = originalQuerySelector.call(document, selector);
+            } catch (e) {
+                throw e;
+            }
             if (!el) {
                 if (shouldSkipShadowLookup(selector)) {
                     return el;
@@ -274,8 +279,12 @@ foreach ($layoutScripts['external'] as $externalScript) {
                 var placeholders = getPaymentPlaceholders();
                 for (var i = 0; i < placeholders.length; i++) {
                     if (placeholders[i].shadowRoot) {
-                        el = placeholders[i].shadowRoot.querySelector(selector);
-                        if (el) break;
+                        try {
+                            el = placeholders[i].shadowRoot.querySelector(selector);
+                            if (el) break;
+                        } catch (e) {
+                            // Ignore query errors in shadow DOM
+                        }
                     }
                 }
             }
@@ -283,7 +292,12 @@ foreach ($layoutScripts['external'] as $externalScript) {
         };
 
         document.querySelectorAll = function (selector) {
-            var lightList = Array.from(originalQuerySelectorAll.call(document, selector));
+            var lightList = [];
+            try {
+                lightList = Array.from(originalQuerySelectorAll.call(document, selector));
+            } catch (e) {
+                throw e;
+            }
             
             if (shouldSkipShadowLookup(selector)) {
                 return lightList;
@@ -293,9 +307,13 @@ foreach ($layoutScripts['external'] as $externalScript) {
             var placeholders = getPaymentPlaceholders();
             for (var i = 0; i < placeholders.length; i++) {
                 if (placeholders[i].shadowRoot) {
-                    placeholders[i].shadowRoot.querySelectorAll(selector).forEach(function (el) {
-                        shadowElements.push(el);
-                    });
+                    try {
+                        placeholders[i].shadowRoot.querySelectorAll(selector).forEach(function (el) {
+                            shadowElements.push(el);
+                        });
+                    } catch (e) {
+                        // Ignore query errors in shadow DOM
+                    }
                 }
             }
             return lightList.concat(shadowElements);
@@ -307,9 +325,13 @@ foreach ($layoutScripts['external'] as $externalScript) {
             var placeholders = getPaymentPlaceholders();
             for (var i = 0; i < placeholders.length; i++) {
                 if (placeholders[i].shadowRoot) {
-                    placeholders[i].shadowRoot.querySelectorAll('.' + className).forEach(function (el) {
-                        shadowElements.push(el);
-                    });
+                    try {
+                        placeholders[i].shadowRoot.querySelectorAll('.' + className).forEach(function (el) {
+                            shadowElements.push(el);
+                        });
+                    } catch (e) {
+                        // Ignore
+                    }
                 }
             }
             return lightList.concat(shadowElements);

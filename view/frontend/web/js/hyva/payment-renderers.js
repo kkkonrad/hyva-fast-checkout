@@ -9,6 +9,41 @@ define([
         }
 
         window.fastcheckoutKoPaymentBridgeInitialized = true;
+        
+        // Apply global jQuery selector override for Shadow DOM elements
+        if ($ && $.fn && typeof $.fn.init === 'function' && !$.fn.init.fastcheckoutPatched) {
+            var originalInit = $.fn.init;
+            $.fn.init = function(selector, context, root) {
+                if (window.fastcheckoutInsideSelectorOverride) {
+                    return originalInit.apply(this, arguments);
+                }
+                var result = originalInit.apply(this, arguments);
+                if (typeof selector === 'string' && result.length === 0 && selector.indexOf('<') !== 0) {
+                    window.fastcheckoutInsideSelectorOverride = true;
+                    try {
+                        var elements = [];
+                        var placeholders = document.querySelectorAll('[data-fastcheckout-payment-method-ko-target]');
+                        placeholders.forEach(function(placeholder) {
+                            if (placeholder.shadowRoot) {
+                                // Use jQuery find to resolve custom/pseudo selectors (like :visible) safely
+                                var shadowElements = $(placeholder.shadowRoot).find(selector);
+                                shadowElements.each(function() {
+                                    elements.push(this);
+                                });
+                            }
+                        });
+                        if (elements.length > 0) {
+                            return originalInit.call(this, elements);
+                        }
+                    } finally {
+                        window.fastcheckoutInsideSelectorOverride = false;
+                    }
+                }
+                return result;
+            };
+            $.fn.init.prototype = $.fn;
+            $.fn.init.fastcheckoutPatched = true;
+        }
         window.fastcheckoutKoPaymentBridgeInitCount = (window.fastcheckoutKoPaymentBridgeInitCount || 0) + 1;
         
         var scope = config.scope || 'fastcheckoutHyvaPaymentRenderers',
@@ -3938,7 +3973,6 @@ define([
                             });
                         }
 
-                        return true;
                     };
                 }
 
