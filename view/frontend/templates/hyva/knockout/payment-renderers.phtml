@@ -218,6 +218,7 @@ foreach ($layoutScripts['external'] as $externalScript) {
     var originalGetElementById = document.getElementById;
     var originalQuerySelector = document.querySelector;
     var originalQuerySelectorAll = document.querySelectorAll;
+    var originalGetElementsByClassName = document.getElementsByClassName;
 
     function getFastcheckoutRoot() {
         return originalGetElementById.call(document, 'fastcheckout-checkout');
@@ -293,6 +294,20 @@ foreach ($layoutScripts['external'] as $externalScript) {
             for (var i = 0; i < placeholders.length; i++) {
                 if (placeholders[i].shadowRoot) {
                     placeholders[i].shadowRoot.querySelectorAll(selector).forEach(function (el) {
+                        shadowElements.push(el);
+                    });
+                }
+            }
+            return lightList.concat(shadowElements);
+        };
+
+        document.getElementsByClassName = function (className) {
+            var lightList = Array.from(originalGetElementsByClassName.call(document, className));
+            var shadowElements = [];
+            var placeholders = getPaymentPlaceholders();
+            for (var i = 0; i < placeholders.length; i++) {
+                if (placeholders[i].shadowRoot) {
+                    placeholders[i].shadowRoot.querySelectorAll('.' + className).forEach(function (el) {
                         shadowElements.push(el);
                     });
                 }

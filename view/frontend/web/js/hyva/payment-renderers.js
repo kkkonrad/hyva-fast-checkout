@@ -4118,6 +4118,9 @@ define([
                                         height: 0 !important;
                                         overflow: hidden !important;
                                     }
+                                    .tpay-groups-wrapper .tpay-group-logo-holder img {
+                                        max-width: 100% !important;
+                                    }
                                 `;
                                 shadow.appendChild(style);
                             }

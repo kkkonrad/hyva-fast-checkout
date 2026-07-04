@@ -20,4 +20,11 @@
         <plugin name="fastcheckout_quote_customermanagement" type="Kkkonrad\Fastcheckout\Plugin\Quote\CustomerManagementPlugin"/>
     </type>
 
+    <type name="Tpay\Magento2\Model\ApiFacade\TpayConfig\ConfigOpen">
+        <plugin name="fastcheckout_tpay_config_open" type="Kkkonrad\Fastcheckout\Plugin\Tpay\PatchTpayChannelsScript"/>
+    </type>
+    <type name="Tpay\Magento2\Model\ApiFacade\TpayConfig\ConfigOrigin">
+        <plugin name="fastcheckout_tpay_config_origin" type="Kkkonrad\Fastcheckout\Plugin\Tpay\PatchTpayChannelsScript"/>
+    </type>
+
 </config>
