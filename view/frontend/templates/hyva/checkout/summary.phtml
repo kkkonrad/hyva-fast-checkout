@@ -53,88 +53,91 @@
         <?php endif; ?>
     </div>
     <!-- Order Summary Sidebar -->
-    <div class="card bg-white p-4 md:p-6 shadow rounded-lg border border-gray-200 sticky top-6 space-y-6 transition-all duration-200 relative"
+    <div class="card bg-white p-4 md:p-6 shadow rounded-lg border border-gray-200 sticky top-6 space-y-6 transition-all duration-200"
          wire:key="checkout-totals-card">
          
-         <!-- Loader Overlay for Order Summary -->
-         <div wire:loading.flex
-              wire:target="countryId,regionId,region,postcode,city,street1,street2,fillFromSavedAddress,selectShippingMethod,applyCoupon,cancelCoupon"
-              class="absolute inset-0 bg-white/80 backdrop-blur-[1px] z-20 rounded items-center justify-center transition-all duration-200"
-              style="display: none;">
-              <svg class="animate-spin h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-         </div>
-        
-        <!-- Order Items list -->
-        <div>
-            <div class="flex items-center justify-between border-b border-gray-200 pb-3 mb-4">
-                <h2 class="text-xl font-semibold text-gray-900">
-                    <?= $escaper->escapeHtml(__('Order Summary')) ?>
-                </h2>
-                <span class="text-xs bg-gray-100 text-gray-800 px-2 py-0.5 rounded-full font-semibold">
-                    <?= $escaper->escapeHtml(__('%1 item(s)', $block->getItemsQty())) ?>
-                </span>
-            </div>
-
-            <ul class="space-y-3 max-h-60 overflow-y-auto pr-1">
-                <?php foreach ($items as $item): ?>
-                    <li class="flex gap-3 py-1">
-                        <img class="h-14 w-14 shrink-0 rounded border border-gray-200 object-contain bg-gray-50"
-                             src="<?= $escaper->escapeUrl($block->getItemImageUrl($item)) ?>"
-                             alt="<?= $escaper->escapeHtmlAttr($item->getName()) ?>"
-                             width="<?= (int)$block->getItemImageWidth($item) ?>"
-                             height="<?= (int)$block->getItemImageHeight($item) ?>"
-                             loading="lazy"/>
-                        <div class="min-w-0 flex-1">
-                            <h3 class="text-sm font-medium text-gray-800 truncate" title="<?= $escaper->escapeHtmlAttr($item->getName()) ?>">
-                                <?= $escaper->escapeHtml($item->getName()) ?>
-                            </h3>
-                            <?php $options = $block->getItemOptions($item); ?>
-                            <?php if (!empty($options)): ?>
-                                <div class="mt-1 space-y-0.5">
-                                    <?php foreach ($options as $option): ?>
-                                        <div class="text-[11px] text-gray-500">
-                                            <span class="font-medium"><?= $escaper->escapeHtml($option['label']) ?>:</span>
-                                            <span><?= $escaper->escapeHtml($option['value']) ?></span>
-                                        </div>
-                                    <?php endforeach; ?>
-                                </div>
-                            <?php endif; ?>
-                            <div class="flex justify-between items-center mt-1.5 text-xs text-gray-500">
-                                <span><?= $escaper->escapeHtml(__('Qty: %1', $item->getQty() * 1)) ?></span>
-                                <div class="text-right">
-                                    <?php if ($block->displayCartBothPrices()): ?>
-                                        <span class="block font-semibold text-gray-900"><?= /* @noEscape */ $block->formatPrice($item->getRowTotalInclTax()) ?> <span class="text-[10px] text-gray-500 font-normal"><?= $escaper->escapeHtml(__('Incl. Tax')) ?></span></span>
-                                        <span class="block text-gray-500 text-[11px]"><?= /* @noEscape */ $block->formatPrice($item->getRowTotal()) ?> <span class="text-[10px] font-normal"><?= $escaper->escapeHtml(__('Excl. Tax')) ?></span></span>
-                                    <?php else: ?>
-                                        <span class="font-semibold text-gray-900"><?= /* @noEscape */ $block->formatPrice($block->getItemRowTotal($item)) ?></span>
-                                    <?php endif; ?>
+         <!-- Products & Totals Container with scoped Loader Overlay -->
+         <div class="relative space-y-6">
+             <!-- Loader Overlay for Order Summary -->
+             <div wire:loading.flex
+                  wire:target="countryId,regionId,region,postcode,city,street1,street2,fillFromSavedAddress,selectShippingMethod,applyCoupon,cancelCoupon"
+                  class="absolute inset-0 bg-white/80 backdrop-blur-[1px] z-20 rounded items-center justify-center transition-all duration-200"
+                  style="display: none;">
+                  <svg class="animate-spin h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+             </div>
+            
+            <!-- Order Items list -->
+            <div>
+                <div class="flex items-center justify-between border-b border-gray-200 pb-3 mb-4">
+                    <h2 class="text-xl font-semibold text-gray-900">
+                        <?= $escaper->escapeHtml(__('Order Summary')) ?>
+                    </h2>
+                    <span class="text-xs bg-gray-100 text-gray-800 px-2 py-0.5 rounded-full font-semibold">
+                        <?= $escaper->escapeHtml(__('%1 item(s)', $block->getItemsQty())) ?>
+                    </span>
+                </div>
+    
+                <ul class="space-y-3 max-h-60 overflow-y-auto pr-1">
+                    <?php foreach ($items as $item): ?>
+                        <li class="flex gap-3 py-1">
+                            <img class="h-14 w-14 shrink-0 rounded border border-gray-200 object-contain bg-gray-50"
+                                 src="<?= $escaper->escapeUrl($block->getItemImageUrl($item)) ?>"
+                                 alt="<?= $escaper->escapeHtmlAttr($item->getName()) ?>"
+                                 width="<?= (int)$block->getItemImageWidth($item) ?>"
+                                 height="<?= (int)$block->getItemImageHeight($item) ?>"
+                                 loading="lazy"/>
+                            <div class="min-w-0 flex-1">
+                                <h3 class="text-sm font-medium text-gray-800 truncate" title="<?= $escaper->escapeHtmlAttr($item->getName()) ?>">
+                                    <?= $escaper->escapeHtml($item->getName()) ?>
+                                </h3>
+                                <?php $options = $block->getItemOptions($item); ?>
+                                <?php if (!empty($options)): ?>
+                                    <div class="mt-1 space-y-0.5">
+                                        <?php foreach ($options as $option): ?>
+                                            <div class="text-[11px] text-gray-500">
+                                                <span class="font-medium"><?= $escaper->escapeHtml($option['label']) ?>:</span>
+                                                <span><?= $escaper->escapeHtml($option['value']) ?></span>
+                                            </div>
+                                        <?php endforeach; ?>
+                                    </div>
+                                <?php endif; ?>
+                                <div class="flex justify-between items-center mt-1.5 text-xs text-gray-500">
+                                    <span><?= $escaper->escapeHtml(__('Qty: %1', $item->getQty() * 1)) ?></span>
+                                    <div class="text-right">
+                                        <?php if ($block->displayCartBothPrices()): ?>
+                                            <span class="block font-semibold text-gray-900"><?= /* @noEscape */ $block->formatPrice($item->getRowTotalInclTax()) ?> <span class="text-[10px] text-gray-500 font-normal"><?= $escaper->escapeHtml(__('Incl. Tax')) ?></span></span>
+                                            <span class="block text-gray-500 text-[11px]"><?= /* @noEscape */ $block->formatPrice($item->getRowTotal()) ?> <span class="text-[10px] font-normal"><?= $escaper->escapeHtml(__('Excl. Tax')) ?></span></span>
+                                        <?php else: ?>
+                                            <span class="font-semibold text-gray-900"><?= /* @noEscape */ $block->formatPrice($block->getItemRowTotal($item)) ?></span>
+                                        <?php endif; ?>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    </li>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+    
+            <!-- Summary Totals -->
+            <dl class="space-y-3 border-t border-gray-200 pt-4"
+                data-fastcheckout-summary-totals>
+                <?php foreach ($block->getSummaryTotals() as $total): ?>
+                    <div class="<?= $total['strong'] ? 'border-t border-gray-200 pt-4 text-lg font-bold text-gray-950' : 'text-sm text-gray-600' ?> flex items-center justify-between gap-4"
+                         data-fastcheckout-total-row
+                         data-code="<?= $escaper->escapeHtmlAttr($total['code']) ?>"
+                         data-label="<?= $escaper->escapeHtmlAttr($total['label']) ?>"
+                         data-value="<?= $escaper->escapeHtmlAttr((string)$total['value']) ?>">
+                        <dt><?= $escaper->escapeHtml($total['label']) ?></dt>
+                        <dd class="<?= $total['strong'] ? 'text-xl' : 'font-semibold text-gray-900' ?>">
+                            <?= /* @noEscape */ $block->formatPrice($total['value']) ?>
+                        </dd>
+                    </div>
                 <?php endforeach; ?>
-            </ul>
-        </div>
-
-        <!-- Summary Totals -->
-        <dl class="space-y-3 border-t border-gray-200 pt-4"
-            data-fastcheckout-summary-totals>
-            <?php foreach ($block->getSummaryTotals() as $total): ?>
-                <div class="<?= $total['strong'] ? 'border-t border-gray-200 pt-4 text-lg font-bold text-gray-950' : 'text-sm text-gray-600' ?> flex items-center justify-between gap-4"
-                     data-fastcheckout-total-row
-                     data-code="<?= $escaper->escapeHtmlAttr($total['code']) ?>"
-                     data-label="<?= $escaper->escapeHtmlAttr($total['label']) ?>"
-                     data-value="<?= $escaper->escapeHtmlAttr((string)$total['value']) ?>">
-                    <dt><?= $escaper->escapeHtml($total['label']) ?></dt>
-                    <dd class="<?= $total['strong'] ? 'text-xl' : 'font-semibold text-gray-900' ?>">
-                        <?= /* @noEscape */ $block->formatPrice($total['value']) ?>
-                    </dd>
-                </div>
-            <?php endforeach; ?>
-        </dl>
+            </dl>
+         </div>
 
         <!-- Newsletter Subscription choice -->
         <label class="flex items-center gap-3 cursor-pointer pt-2">
