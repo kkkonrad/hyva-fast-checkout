@@ -38,7 +38,7 @@
             <?php foreach ($paymentMethods as $method): ?>
                 <?php
                 $methodCode = $method->getCode();
-                $isPaymentMethodAllowed = !$hasPaymentMethodFilter || in_array($methodCode, $allowedPaymentMethodCodes, true);
+                $isPaymentMethodAllowed = $magewire->isPaymentMethodAvailable((string)$methodCode, $allowedPaymentMethodCodes);
                 $isSelectedPayment = $isPaymentMethodAllowed && $magewire->paymentMethod === $methodCode;
                 ?>
                 <div class="border rounded transition-all duration-200 border-gray-200 hover:border-gray-300"

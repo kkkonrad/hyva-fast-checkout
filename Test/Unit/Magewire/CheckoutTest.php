@@ -133,6 +133,47 @@ class CheckoutTest extends TestCase
             ->willReturnCallback(static function ($methodCode): bool {
                 return in_array($methodCode, ['free', 'checkmo', 'banktransfer', 'cashondelivery', 'purchaseorder'], true);
             });
+        $this->helperMock->method('isRestrictPaymentEnable')
+            ->willReturn(false);
+        $this->helperMock->method('getRestrictPaymentMethods')
+            ->willReturn([]);
+        $this->helperMock->method('isPaymentMethodCodeAllowedByRules')
+            ->willReturnCallback(static function ($methodCode, array $allowedRules): bool {
+                $methodCode = (string)$methodCode;
+                foreach ($allowedRules as $rule) {
+                    $rule = trim((string)$rule);
+                    if ($rule === '*' || $rule === $methodCode) {
+                        return true;
+                    }
+                    if (substr($rule, -1) === '*') {
+                        $prefix = rtrim(substr($rule, 0, -1), '_-');
+                        if (
+                            $prefix !== ''
+                            && (
+                                $methodCode === $prefix
+                                || strpos($methodCode, $prefix . '_') === 0
+                                || strpos($methodCode, $prefix . '-') === 0
+                            )
+                        ) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            });
+        $this->helperMock->method('paymentMethodCodeMatches')
+            ->willReturnCallback(static function ($baseCode, $selectedCode): bool {
+                $baseCode = trim((string)$baseCode);
+                $selectedCode = trim((string)$selectedCode);
+
+                return $baseCode !== ''
+                    && $selectedCode !== ''
+                    && (
+                        $baseCode === $selectedCode
+                        || strpos($selectedCode, $baseCode . '_') === 0
+                        || strpos($selectedCode, $baseCode . '-') === 0
+                    );
+            });
 
         $this->checkoutComponent = new Checkout(
             $this->checkoutSessionMock,
@@ -390,10 +431,10 @@ class CheckoutTest extends TestCase
 
         $shippingAddressMock->expects($this->once())
             ->method('setShippingMethod')
-            ->with('flatrate_flatrate');
+            ->with('customcarrier_pickup_point_cod');
 
-        $this->checkoutComponent->selectShippingMethod('flatrate_flatrate');
-        $this->assertEquals('flatrate_flatrate', $this->checkoutComponent->shippingMethod);
+        $this->checkoutComponent->selectShippingMethod('customcarrier_pickup_point_cod');
+        $this->assertEquals('customcarrier_pickup_point_cod', $this->checkoutComponent->shippingMethod);
     }
 
     public function testSelectPaymentMethod(): void
@@ -535,6 +576,68 @@ class CheckoutTest extends TestCase
             ->with($this->quoteMock);
 
         $this->checkoutComponent->selectPaymentMethod('checkmo');
+    }
+
+    public function testSelectPaymentMethodImportsVariantPayloadThroughAvailableBaseMethod(): void
+    {
+        $this->checkoutComponent->shippingMethod = 'customcarrier_pickup';
+
+        $shippingAddressMock = $this->createAddressMock();
+        $shippingAddressMock->expects($this->any())
+            ->method('getShippingMethod')
+            ->willReturn('customcarrier_pickup');
+
+        $this->quoteMock->expects($this->any())
+            ->method('getId')
+            ->willReturn(42);
+        $this->quoteMock->expects($this->any())
+            ->method('getShippingAddress')
+            ->willReturn($shippingAddressMock);
+
+        $this->helperMock->method('getMappedPaymentMethodsForShipping')
+            ->with('customcarrier_pickup')
+            ->willReturn(['payu_*']);
+
+        $this->paymentMethodManagementMock->expects($this->once())
+            ->method('getList')
+            ->with(42)
+            ->willReturn([$this->createPaymentMethodMock('payu')]);
+
+        $paymentMock = $this->getMockBuilder(\Magento\Quote\Model\Quote\Payment::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['importData'])
+            ->getMock();
+
+        $this->quoteMock->expects($this->once())
+            ->method('getPayment')
+            ->willReturn($paymentMock);
+
+        $this->checkoutComponent->placeOrderRequestData = [
+            'paymentMethod' => [
+                'method' => 'payu_blik',
+                'additional_data' => [
+                    'blik_code' => '123456',
+                    'selected_channel' => 'blik',
+                ],
+            ],
+        ];
+
+        $paymentMock->expects($this->once())
+            ->method('importData')
+            ->with($this->callback(static function (array $data): bool {
+                return $data['method'] === 'payu'
+                    && $data['additional_data']['blik_code'] === '123456'
+                    && $data['additional_data']['selected_channel'] === 'blik';
+            }));
+
+        $this->quoteMock->expects($this->once())->method('collectTotals');
+        $this->cartRepositoryMock->expects($this->once())
+            ->method('save')
+            ->with($this->quoteMock);
+
+        $this->checkoutComponent->selectPaymentMethod('payu_blik');
+
+        $this->assertSame('payu_blik', $this->checkoutComponent->paymentMethod);
     }
 
     public function testSelectPaymentMethodRefreshesPayloadWhenSameMethodIsAlreadySelected(): void
@@ -681,6 +784,12 @@ class CheckoutTest extends TestCase
             'method_title' => 'Fixed',
             'price' => 12.5,
             'error_message' => '',
+            'extension_attributes' => [
+                'pickup_point_required' => true,
+                'metadata' => [
+                    'provider' => 'locker_vendor',
+                ],
+            ],
         ]);
 
         $this->quoteMock->expects($this->any())
@@ -729,6 +838,8 @@ class CheckoutTest extends TestCase
         $this->assertSame('Fixed', $state['shipping_rates'][0]['method_title']);
         $this->assertSame(12.5, $state['shipping_rates'][0]['amount']);
         $this->assertTrue($state['shipping_rates'][0]['available']);
+        $this->assertTrue($state['shipping_rates'][0]['extension_attributes']['pickup_point_required']);
+        $this->assertSame('locker_vendor', $state['shipping_rates'][0]['extension_attributes']['metadata']['provider']);
     }
 
     public function testGetAllowedPaymentMethodsFiltersMethodsByShippingMapping(): void
@@ -755,15 +866,10 @@ class CheckoutTest extends TestCase
                 $this->createPaymentMethodMock('payu_gateway'),
             ]);
 
-        $mapping = [
-            '_1' => ['shipping_method' => 'flatrate_flatrate', 'payment_method' => 'cashondelivery'],
-            '_2' => ['shipping_method' => 'flatrate_flatrate', 'payment_method' => 'payu_gateway'],
-            '_3' => ['shipping_method' => 'tablerate_bestway', 'payment_method' => 'checkmo'],
-        ];
-
         $this->helperMock->expects($this->once())
-            ->method('getShippingPaymentMapping')
-            ->willReturn($mapping);
+            ->method('getMappedPaymentMethodsForShipping')
+            ->with('flatrate_flatrate')
+            ->willReturn(['cashondelivery', 'payu_*']);
 
         $methods = $this->checkoutComponent->getPaymentMethods();
 
@@ -776,6 +882,84 @@ class CheckoutTest extends TestCase
         $this->assertSame(['cashondelivery', 'payu_gateway'], array_map(static function (PaymentMethodInterface $method): string {
             return $method->getCode();
         }, $methods));
+    }
+
+    public function testGetAllowedPaymentMethodsAppliesGlobalPaymentRestrictions(): void
+    {
+        $this->quoteMock->expects($this->any())
+            ->method('getId')
+            ->willReturn(42);
+
+        $shippingAddressMock = $this->createAddressMock();
+        $shippingAddressMock->expects($this->any())
+            ->method('getShippingMethod')
+            ->willReturn('customcarrier_pickup');
+
+        $this->quoteMock->expects($this->any())
+            ->method('getShippingAddress')
+            ->willReturn($shippingAddressMock);
+
+        $this->paymentMethodManagementMock->expects($this->once())
+            ->method('getList')
+            ->with(42)
+            ->willReturn([
+                $this->createPaymentMethodMock('checkmo'),
+                $this->createPaymentMethodMock('payu_blik'),
+                $this->createPaymentMethodMock('payu_card'),
+                $this->createPaymentMethodMock('stripe_payments'),
+            ]);
+
+        $helperMock = $this->createMock(\Kkkonrad\Fastcheckout\Helper\Data::class);
+        $helperMock->method('getMappedPaymentMethodsForShipping')
+            ->with('customcarrier_pickup')
+            ->willReturn(['*']);
+        $helperMock->method('isRestrictPaymentEnable')
+            ->willReturn(true);
+        $helperMock->method('getRestrictPaymentMethods')
+            ->willReturn(['payu_*', 'checkmo']);
+        $helperMock->method('isPaymentMethodCodeAllowedByRules')
+            ->willReturnCallback(static function ($methodCode, array $allowedRules): bool {
+                $methodCode = (string)$methodCode;
+                foreach ($allowedRules as $rule) {
+                    $rule = trim((string)$rule);
+                    if ($rule === '*' || $rule === $methodCode) {
+                        return true;
+                    }
+                    if (substr($rule, -1) === '*') {
+                        $prefix = rtrim(substr($rule, 0, -1), '_');
+                        if ($prefix !== '' && strpos($methodCode, $prefix . '_') === 0) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            });
+
+        $component = new Checkout(
+            $this->checkoutSessionMock,
+            $this->cartRepositoryMock,
+            $this->shippingMethodManagementMock,
+            $this->paymentMethodManagementMock,
+            $this->cartManagementMock,
+            $this->countryCollectionFactoryMock,
+            $this->regionCollectionFactoryMock,
+            $this->subscriberFactoryMock,
+            $helperMock,
+            $this->createMock(\Psr\Log\LoggerInterface::class)
+        );
+
+        $methods = $component->getAllowedPaymentMethods();
+
+        $this->assertSame(['checkmo', 'payu_blik', 'payu_card'], array_map(static function (PaymentMethodInterface $method): string {
+            return $method->getCode();
+        }, $methods));
+    }
+
+    public function testIsPaymentMethodAvailableUsesWildcardRules(): void
+    {
+        $this->assertTrue($this->checkoutComponent->isPaymentMethodAvailable('payu_blik', ['payu_*']));
+        $this->assertTrue($this->checkoutComponent->isPaymentMethodAvailable('checkmo', ['checkmo']));
+        $this->assertFalse($this->checkoutComponent->isPaymentMethodAvailable('stripe_payments', ['payu_*', 'checkmo']));
     }
 
     public function testApplyCoupon(): void
@@ -1050,6 +1234,65 @@ class CheckoutTest extends TestCase
         $this->assertStringContainsString('agree to the terms and conditions', $component->orderError);
     }
 
+    public function testAgreementIdsAreReadFromRawPlaceOrderPaymentPayload(): void
+    {
+        $this->checkoutComponent->paymentMethod = 'checkmo';
+        $this->checkoutComponent->paymentExtensionAttributes = [];
+        $this->checkoutComponent->placeOrderRequestData = [
+            'paymentMethod' => [
+                'method' => 'checkmo',
+                'extensionAttributes' => [
+                    'agreement_ids' => ['7', 8],
+                ],
+            ],
+        ];
+
+        $method = new \ReflectionMethod($this->checkoutComponent, 'getAgreementIds');
+        $method->setAccessible(true);
+
+        $this->assertSame(['7', '8'], $method->invoke($this->checkoutComponent));
+    }
+
+    public function testResolveOrderRedirectUrlReadsPaymentAdditionalInformation(): void
+    {
+        $payment = new class {
+            public function getAdditionalInformation($key = null)
+            {
+                $data = [
+                    'checkout_redirect_url' => 'https://payments.example/redirect/123',
+                ];
+
+                if ($key === null) {
+                    return $data;
+                }
+
+                return $data[$key] ?? null;
+            }
+        };
+
+        $order = new class($payment) {
+            private $payment;
+
+            public function __construct($payment)
+            {
+                $this->payment = $payment;
+            }
+
+            public function getPayment()
+            {
+                return $this->payment;
+            }
+        };
+
+        $method = new \ReflectionMethod($this->checkoutComponent, 'resolveOrderRedirectUrl');
+        $method->setAccessible(true);
+
+        $this->assertSame(
+            'https://payments.example/redirect/123',
+            $method->invoke($this->checkoutComponent, 100001, $order)
+        );
+    }
+
     public function testPlaceOrderValidationError(): void
     {
         $this->checkoutComponent->email = 'guest@example.com';
@@ -1278,5 +1521,201 @@ class CheckoutTest extends TestCase
 
         $this->assertSame('', $component->firstname);
         $this->assertSame('', $component->street1);
+    }
+
+    public function testNormalizePaymentPayloadPreservesCompatibleNestedData(): void
+    {
+        $arrayableObject = new class {
+            public function toArray()
+            {
+                return ['token' => 'tok_123'];
+            }
+        };
+        $stringableObject = new class {
+            public function __toString()
+            {
+                return 'string-token';
+            }
+        };
+        $simpleObject = new class {
+            public function __toArray()
+            {
+                return [
+                    'masked_id' => 'abc123',
+                    'nested' => [
+                        'provider' => 'gateway_api',
+                    ],
+                ];
+            }
+        };
+        $dataObject = new \Magento\Framework\DataObject([
+            'fraud_session_id' => 'fraud-1',
+        ]);
+        $attributeObject = new class {
+            public function getAttributeCode()
+            {
+                return 'delivery_note';
+            }
+
+            public function getValue()
+            {
+                return 'call before delivery';
+            }
+        };
+
+        $unsupportedObject = new \stdClass();
+
+        $method = new \ReflectionMethod($this->checkoutComponent, 'normalizePaymentPayload');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->checkoutComponent, [
+            'method' => 'external_gateway',
+            'additionalData' => [
+                'blik_code' => '123456',
+                'nested' => [
+                    'customer' => 'guest',
+                    'unsafe' => $unsupportedObject,
+                ],
+            ],
+            'extensionAttributes' => [
+                'agreement_ids' => [1, '2'],
+            ],
+            'custom_attributes' => [
+                [
+                    'attribute_code' => 'locker_id',
+                    'value' => 'KRA01A',
+                ],
+                $attributeObject,
+            ],
+            'token_data' => $arrayableObject,
+            'string_token' => $stringableObject,
+            'api_object' => $simpleObject,
+            'data_object' => $dataObject,
+            'callback' => static function (): void {
+            },
+        ]);
+
+        $this->assertSame('external_gateway', $result['method']);
+        $this->assertSame('123456', $result['additional_data']['blik_code']);
+        $this->assertSame('guest', $result['additional_data']['nested']['customer']);
+        $this->assertArrayNotHasKey('unsafe', $result['additional_data']['nested']);
+        $this->assertSame([1, '2'], $result['extension_attributes']['agreement_ids']);
+        $this->assertSame('KRA01A', $result['custom_attributes']['locker_id']);
+        $this->assertSame('call before delivery', $result['custom_attributes']['delivery_note']);
+        $this->assertSame('tok_123', $result['token_data']['token']);
+        $this->assertSame('string-token', $result['string_token']);
+        $this->assertSame('abc123', $result['api_object']['masked_id']);
+        $this->assertSame('gateway_api', $result['api_object']['nested']['provider']);
+        $this->assertSame('fraud-1', $result['data_object']['fraud_session_id']);
+        $this->assertArrayNotHasKey('callback', $result);
+        $this->assertArrayNotHasKey('additionalData', $result);
+        $this->assertArrayNotHasKey('extensionAttributes', $result);
+    }
+
+    public function testApplyAddressAttributesPersistsCustomAndExtensionData(): void
+    {
+        $address = new class {
+            public $customAttributes = [];
+            public $data = [];
+            public $extensionAttributes;
+
+            public function __construct()
+            {
+                $this->extensionAttributes = new class {
+                    public $lockerId = null;
+                    public $deliveryComment = null;
+
+                    public function setLockerId($value): void
+                    {
+                        $this->lockerId = $value;
+                    }
+
+                    public function setDeliveryComment($value): void
+                    {
+                        $this->deliveryComment = $value;
+                    }
+                };
+            }
+
+            public function setCustomAttribute($code, $value): void
+            {
+                $this->customAttributes[$code] = $value;
+            }
+
+            public function setData($code, $value): void
+            {
+                $this->data[$code] = $value;
+            }
+
+            public function getExtensionAttributes()
+            {
+                return $this->extensionAttributes;
+            }
+
+            public function setExtensionAttributes($extensionAttributes): void
+            {
+                $this->extensionAttributes = $extensionAttributes;
+            }
+        };
+
+        $stringableComment = new class {
+            public function __toString()
+            {
+                return 'leave at reception';
+            }
+        };
+        $pickupPoint = new class {
+            public function __toArray()
+            {
+                return [
+                    'id' => 'POP-1',
+                    'type' => 'pickup',
+                ];
+            }
+        };
+        $attributeObject = new class {
+            public function getAttributeCode()
+            {
+                return 'floor';
+            }
+
+            public function getValue()
+            {
+                return '3';
+            }
+        };
+
+        $method = new \ReflectionMethod($this->checkoutComponent, 'applyAddressAttributes');
+        $method->setAccessible(true);
+
+        $method->invoke(
+            $this->checkoutComponent,
+            $address,
+            [
+                [
+                    'attribute_code' => 'door_code',
+                    'value' => '12A',
+                ],
+                'delivery_window' => [
+                    'from' => '10:00',
+                    'to' => '12:00',
+                ],
+                'pickup_point' => $pickupPoint,
+                $attributeObject,
+            ],
+            [
+                'locker_id' => 'KRA01A',
+                'delivery_comment' => $stringableComment,
+            ]
+        );
+
+        $this->assertSame('12A', $address->customAttributes['door_code']);
+        $this->assertSame('3', $address->customAttributes['floor']);
+        $this->assertSame(['from' => '10:00', 'to' => '12:00'], $address->customAttributes['delivery_window']);
+        $this->assertSame(['id' => 'POP-1', 'type' => 'pickup'], $address->customAttributes['pickup_point']);
+        $this->assertSame('KRA01A', $address->data['locker_id']);
+        $this->assertSame('leave at reception', $address->data['delivery_comment']);
+        $this->assertSame('KRA01A', $address->extensionAttributes->lockerId);
+        $this->assertSame('leave at reception', $address->extensionAttributes->deliveryComment);
     }
 }

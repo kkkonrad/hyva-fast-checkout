@@ -328,27 +328,8 @@ class Checkout extends Component
 
         // Validate initially loaded payment method based on shipping method mapping
         if ($this->paymentMethod !== '') {
-            $allowedPaymentMethods = $this->getAllowedPaymentMethods();
-            $paymentAllowed = false;
-            foreach ($allowedPaymentMethods as $method) {
-                if ($method->getCode() === $this->paymentMethod) {
-                    $paymentAllowed = true;
-                    break;
-                }
-            }
-            if (!$paymentAllowed) {
-                if (!empty($allowedPaymentMethods)) {
-                    $firstMethod = reset($allowedPaymentMethods);
-                    $this->selectPaymentMethod($firstMethod->getCode());
-                } else {
-                    $this->paymentMethod = '';
-                    $payment = $quote->getPayment();
-                    if ($payment) {
-                        $payment->setMethod('');
-                        $quote->collectTotals();
-                        $this->saveQuote($quote);
-                    }
-                }
+            if (!$this->isSelectedPaymentMethodStillAllowed($this->paymentMethod)) {
+                $this->selectFirstAllowedPaymentMethodOrClear($quote);
             }
         }
 
@@ -626,27 +607,8 @@ class Checkout extends Component
 
                 // Check if the currently selected payment method is still valid under new shipping method
                 if ($this->paymentMethod !== '') {
-                    $allowedPaymentMethods = $this->getAllowedPaymentMethods();
-                    $paymentAllowed = false;
-                    foreach ($allowedPaymentMethods as $method) {
-                        if ($method->getCode() === $this->paymentMethod) {
-                            $paymentAllowed = true;
-                            break;
-                        }
-                    }
-                    if (!$paymentAllowed) {
-                        if (!empty($allowedPaymentMethods)) {
-                            $firstMethod = reset($allowedPaymentMethods);
-                            $this->selectPaymentMethod($firstMethod->getCode());
-                        } else {
-                            $this->paymentMethod = '';
-                            $payment = $quote->getPayment();
-                            if ($payment) {
-                                $payment->setMethod('');
-                                $quote->collectTotals();
-                                $this->saveQuote($quote);
-                            }
-                        }
+                    if (!$this->isSelectedPaymentMethodStillAllowed($this->paymentMethod)) {
+                        $this->selectFirstAllowedPaymentMethodOrClear($quote);
                     }
                 }
             }
@@ -680,13 +642,103 @@ class Checkout extends Component
         $methods = $this->getPaymentMethods();
         $allowedCodes = $this->getAllowedPaymentMethodCodes();
 
-        if (empty($allowedCodes)) {
-            return $methods;
+        return array_values(array_filter($methods, function ($method) use ($allowedCodes) {
+            return $this->isPaymentMethodAllowedByRules((string)$method->getCode(), $allowedCodes);
+        }));
+    }
+
+    public function isPaymentMethodAvailable(string $paymentMethodCode, array $shippingAllowedCodes = null): bool
+    {
+        return $this->isPaymentMethodAllowedByRules(
+            $paymentMethodCode,
+            $shippingAllowedCodes === null ? $this->getAllowedPaymentMethodCodes() : $shippingAllowedCodes
+        );
+    }
+
+    private function isSelectedPaymentMethodStillAllowed(string $paymentMethodCode): bool
+    {
+        return $this->resolveAvailablePaymentMethodCode($paymentMethodCode) !== '';
+    }
+
+    private function selectFirstAllowedPaymentMethodOrClear($quote): void
+    {
+        $allowedPaymentMethods = $this->getAllowedPaymentMethods();
+        if (!empty($allowedPaymentMethods)) {
+            $firstMethod = reset($allowedPaymentMethods);
+            $this->selectPaymentMethod((string)$firstMethod->getCode());
+            return;
         }
 
-        return array_values(array_filter($methods, function ($method) use ($allowedCodes) {
-            return in_array($method->getCode(), $allowedCodes, true);
-        }));
+        $this->paymentMethod = '';
+        $payment = $quote ? $quote->getPayment() : null;
+        if ($payment) {
+            $payment->setMethod('');
+            $quote->collectTotals();
+            $this->saveQuote($quote);
+        }
+    }
+
+    private function isPaymentMethodAllowedByRules(string $paymentMethodCode, array $shippingAllowedCodes = []): bool
+    {
+        if ($shippingAllowedCodes !== [] && !$this->helper->isPaymentMethodCodeAllowedByRules($paymentMethodCode, $shippingAllowedCodes)) {
+            return false;
+        }
+
+        if (!$this->helper->isRestrictPaymentEnable()) {
+            return true;
+        }
+
+        $restrictedPaymentMethods = $this->helper->getRestrictPaymentMethods();
+        if ($restrictedPaymentMethods === []) {
+            return true;
+        }
+
+        return $this->helper->isPaymentMethodCodeAllowedByRules($paymentMethodCode, $restrictedPaymentMethods);
+    }
+
+    private function resolveAvailablePaymentMethodCode(string $paymentMethodCode): string
+    {
+        $paymentMethodCode = trim($paymentMethodCode);
+        if ($paymentMethodCode === '') {
+            return '';
+        }
+
+        $fallbackCode = '';
+        foreach ($this->getAllowedPaymentMethods() as $method) {
+            $availableCode = (string)$method->getCode();
+            if ($availableCode === $paymentMethodCode) {
+                return $availableCode;
+            }
+
+            if ($fallbackCode === '' && $this->paymentMethodCodeMatches($availableCode, $paymentMethodCode)) {
+                $fallbackCode = $availableCode;
+            }
+        }
+
+        return $fallbackCode;
+    }
+
+    private function paymentMethodCodeMatches(string $baseCode, string $selectedCode): bool
+    {
+        if ($baseCode === '' || $selectedCode === '') {
+            return false;
+        }
+
+        if ($baseCode === $selectedCode) {
+            return true;
+        }
+
+        try {
+            $matches = $this->helper->paymentMethodCodeMatches($baseCode, $selectedCode);
+            if (is_bool($matches)) {
+                return $matches;
+            }
+        } catch (\Throwable $e) {
+            // Fall back to local matching for old/mocked helpers.
+        }
+
+        return strpos($selectedCode, $baseCode . '_') === 0
+            || strpos($selectedCode, $baseCode . '-') === 0;
     }
 
     public function getAllowedPaymentMethodCodes(): array
@@ -702,19 +754,7 @@ class Checkout extends Component
             return [];
         }
 
-        $mapping = $this->helper->getShippingPaymentMapping();
-        if (empty($mapping)) {
-            return [];
-        }
-
-        $mappedPayments = [];
-        foreach ($mapping as $rule) {
-            if (isset($rule['shipping_method']) && $rule['shipping_method'] === $shippingMethod && isset($rule['payment_method'])) {
-                $mappedPayments[] = $rule['payment_method'];
-            }
-        }
-
-        return array_values(array_unique($mappedPayments));
+        return $this->helper->getMappedPaymentMethodsForShipping($shippingMethod);
     }
 
     /**
@@ -831,7 +871,7 @@ class Checkout extends Component
                 }
 
                 $price = (float)$rate->getPrice();
-                $ratesData[] = [
+                $rateData = [
                     'carrier_code' => (string)$rate->getCarrier(),
                     'method_code' => (string)$rate->getMethod(),
                     'carrier_title' => (string)$rate->getCarrierTitle(),
@@ -843,10 +883,43 @@ class Checkout extends Component
                     'available' => !$rate->getErrorMessage(),
                     'error_message' => (string)$rate->getErrorMessage(),
                 ];
+
+                $extensionAttributes = $this->getShippingRateExtensionAttributes($rate);
+                if (!empty($extensionAttributes)) {
+                    $rateData['extension_attributes'] = $extensionAttributes;
+                }
+
+                $ratesData[] = $rateData;
             }
         }
 
         return $ratesData;
+    }
+
+    private function getShippingRateExtensionAttributes($rate): array
+    {
+        $extensionAttributes = [];
+
+        if (method_exists($rate, 'getExtensionAttributes')) {
+            try {
+                $extensionAttributes = $this->normalizeGenericData($rate->getExtensionAttributes());
+            } catch (\Throwable $e) {
+                $extensionAttributes = [];
+            }
+        }
+
+        if (empty($extensionAttributes) && method_exists($rate, 'getData')) {
+            try {
+                $extensionAttributes = $this->normalizeGenericData($rate->getData('extension_attributes'));
+                if (empty($extensionAttributes)) {
+                    $extensionAttributes = $this->normalizeGenericData($rate->getData('extensionAttributes'));
+                }
+            } catch (\Throwable $e) {
+                $extensionAttributes = [];
+            }
+        }
+
+        return $extensionAttributes;
     }
 
     private function buildTotalsData($quote): array
@@ -870,7 +943,15 @@ class Checkout extends Component
             'coupon_code' => (string)$quote->getCouponCode(),
         ];
 
-        foreach ($quote->getTotals() as $code => $total) {
+        $totals = $quote->getTotals();
+        if ($totals instanceof \Traversable) {
+            $totals = iterator_to_array($totals);
+        }
+        if (!is_array($totals)) {
+            $totals = [];
+        }
+
+        foreach ($totals as $code => $total) {
             $value = (float)$total->getValue();
 
             $totalsData[(string)$code] = $value;
@@ -892,7 +973,15 @@ class Checkout extends Component
     {
         $items = [];
 
-        foreach ($quote->getAllVisibleItems() as $item) {
+        $visibleItems = $quote->getAllVisibleItems();
+        if ($visibleItems instanceof \Traversable) {
+            $visibleItems = iterator_to_array($visibleItems);
+        }
+        if (!is_array($visibleItems)) {
+            $visibleItems = [];
+        }
+
+        foreach ($visibleItems as $item) {
             $items[] = [
                 'item_id' => (int)$item->getId(),
                 'name' => (string)$item->getName(),
@@ -918,22 +1007,15 @@ class Checkout extends Component
                 $shippingAddress->setCountryId($this->countryId ?: $this->getDefaultCountry());
             }
 
-            $methodAvailable = false;
-            foreach ($this->getAllowedPaymentMethods() as $method) {
-                if ($method->getCode() === $methodCode) {
-                    $methodAvailable = true;
-                    break;
-                }
-            }
-
-            if (!$methodAvailable) {
+            $availableMethodCode = $this->resolveAvailablePaymentMethodCode($methodCode);
+            if ($availableMethodCode === '') {
                 $this->paymentMethod = '';
                 return $this->refreshCheckoutState();
             }
 
             $payment = $quote->getPayment();
             if ($payment) {
-                $this->importPaymentData($payment, $methodCode);
+                $this->importPaymentData($payment, $availableMethodCode, $methodCode);
                 if ($methodCode === 'purchaseorder' && method_exists($payment, 'setPoNumber')) {
                     $payment->setPoNumber($this->poNumber);
                 }
@@ -1074,15 +1156,7 @@ class Checkout extends Component
             return;
         }
 
-        $paymentAllowed = false;
-        foreach ($this->getAllowedPaymentMethods() as $method) {
-            if ($method->getCode() === $this->paymentMethod) {
-                $paymentAllowed = true;
-                break;
-            }
-        }
-
-        if (!$paymentAllowed) {
+        if (!$this->isSelectedPaymentMethodStillAllowed($this->paymentMethod)) {
             $this->orderError = (string)__('The selected payment method is not available for this checkout.');
             $this->logger->info('Fastcheckout placeOrder blocked: payment method not allowed', [
                 'quote_id' => $quote->getId(),
@@ -1119,7 +1193,8 @@ class Checkout extends Component
             }
 
             $payment = $quote->getPayment();
-            $this->importPaymentData($payment, $this->paymentMethod);
+            $availableMethodCode = $this->resolveAvailablePaymentMethodCode($this->paymentMethod);
+            $this->importPaymentData($payment, $availableMethodCode !== '' ? $availableMethodCode : $this->paymentMethod, $this->paymentMethod);
             if ($this->paymentMethod === 'purchaseorder' && method_exists($payment, 'setPoNumber')) {
                 $payment->setPoNumber($this->poNumber);
             }
@@ -1176,34 +1251,7 @@ class Checkout extends Component
                 'payment_method' => $this->paymentMethod,
             ]);
 
-            $redirectUrl = '';
-            try {
-                if (method_exists($this->checkoutSession, 'getData')) {
-                    $redirectUrl = (string)$this->checkoutSession->getData('redirect_url');
-                }
-                if ($redirectUrl === '' && method_exists($this->checkoutSession, 'getRedirectUrl')) {
-                    $redirectUrl = (string)$this->checkoutSession->getRedirectUrl();
-                }
-            } catch (\Throwable $e) {
-                $this->logger->warning('Fastcheckout checkout session redirect URL read failed', ['exception' => $e]);
-            }
-
-            if (!$redirectUrl && $orderId) {
-                try {
-                    $order = $placedOrder;
-                    if (!$order && $this->orderFactory !== null) {
-                        $order = $this->orderFactory->create()->load($orderId);
-                    }
-                    if ($order && $order->getId()) {
-                        $methodInstance = $order->getPayment()->getMethodInstance();
-                        if (method_exists($methodInstance, 'getOrderPlaceRedirectUrl')) {
-                            $redirectUrl = $methodInstance->getOrderPlaceRedirectUrl();
-                        }
-                    }
-                } catch (\Throwable $e) {
-                    // Ignore
-                }
-            }
+            $redirectUrl = $this->resolveOrderRedirectUrl($orderId, $placedOrder);
 
             $this->dispatchBrowserEvent('magewire:order-placed', [
                 'method' => $this->paymentMethod,
@@ -1502,20 +1550,21 @@ class Checkout extends Component
         return $street;
     }
 
-    private function importPaymentData($payment, string $methodCode): void
+    private function importPaymentData($payment, string $methodCode, string $selectedMethodCode = ''): void
     {
         if (!$payment) {
             return;
         }
 
-        $rawPaymentData = $this->getRawPaymentData($methodCode);
+        $selectedMethodCode = $selectedMethodCode !== '' ? $selectedMethodCode : $methodCode;
+        $rawPaymentData = $this->getRawPaymentData($methodCode, $selectedMethodCode);
         $additionalData = array_merge(
-            $this->getGenericAdditionalPaymentData($methodCode),
+            $this->getGenericAdditionalPaymentData($selectedMethodCode),
             $this->normalizePaymentAdditionalData($rawPaymentData['additional_data'] ?? []),
             $this->normalizePaymentAdditionalData($this->paymentAdditionalData)
         );
 
-        $data = $rawPaymentData;
+        $data = $this->normalizePaymentPayload($rawPaymentData);
         $data['method'] = $methodCode;
         $data['additional_data'] = $additionalData;
 
@@ -1535,7 +1584,7 @@ class Checkout extends Component
         $payment->setMethod($methodCode);
     }
 
-    private function getRawPaymentData(string $methodCode): array
+    private function getRawPaymentData(string $methodCode, string $selectedMethodCode = ''): array
     {
         if (!is_array($this->placeOrderRequestData)) {
             return [];
@@ -1546,33 +1595,50 @@ class Checkout extends Component
             return [];
         }
 
-        $paymentData = $this->normalizePaymentAdditionalData($paymentData);
+        $paymentData = $this->normalizePaymentPayload($paymentData);
         $payloadMethod = isset($paymentData['method']) ? (string)$paymentData['method'] : '';
-        if ($payloadMethod !== '' && $payloadMethod !== $methodCode) {
+        if (
+            $payloadMethod !== ''
+            && $payloadMethod !== $methodCode
+            && $payloadMethod !== $selectedMethodCode
+            && !$this->paymentMethodCodeMatches($methodCode, $payloadMethod)
+        ) {
             return [];
         }
 
         return $paymentData;
     }
 
+    private function normalizePaymentPayload(array $paymentData): array
+    {
+        $paymentData = $this->normalizeGenericData($paymentData);
+
+        if (isset($paymentData['additionalData']) && !isset($paymentData['additional_data'])) {
+            $paymentData['additional_data'] = $paymentData['additionalData'];
+        } elseif (isset($paymentData['additionalData']) && is_array($paymentData['additionalData'])) {
+            $paymentData['additional_data'] = array_merge(
+                is_array($paymentData['additional_data'] ?? null) ? $paymentData['additional_data'] : [],
+                $paymentData['additionalData']
+            );
+        }
+
+        if (isset($paymentData['extensionAttributes']) && !isset($paymentData['extension_attributes'])) {
+            $paymentData['extension_attributes'] = $paymentData['extensionAttributes'];
+        } elseif (isset($paymentData['extensionAttributes']) && is_array($paymentData['extensionAttributes'])) {
+            $paymentData['extension_attributes'] = array_merge(
+                is_array($paymentData['extension_attributes'] ?? null) ? $paymentData['extension_attributes'] : [],
+                $paymentData['extensionAttributes']
+            );
+        }
+
+        unset($paymentData['additionalData'], $paymentData['extensionAttributes']);
+
+        return $paymentData;
+    }
+
     private function normalizePaymentAdditionalData($data): array
     {
-        if (!is_array($data)) {
-            return [];
-        }
-
-        $result = [];
-        foreach ($data as $key => $value) {
-            if (!is_string($key) && !is_int($key)) {
-                continue;
-            }
-
-            if (is_scalar($value) || $value === null || is_array($value)) {
-                $result[(string)$key] = $value;
-            }
-        }
-
-        return $result;
+        return $this->normalizeGenericData($data);
     }
 
     private function applyAddressAttributes($address, $customAttributes, $extensionAttributes): void
@@ -1632,7 +1698,8 @@ class Checkout extends Component
 
     private function normalizeGenericData($data): array
     {
-        if (!is_array($data)) {
+        $data = $this->coerceGenericDataArray($data);
+        if ($data === null) {
             return [];
         }
 
@@ -1641,16 +1708,149 @@ class Checkout extends Component
             if (!is_string($key) && !is_int($key)) {
                 continue;
             }
-            if (is_array($value) && isset($value['attribute_code'])) {
-                $key = (string)$value['attribute_code'];
-                $value = $value['value'] ?? null;
+            $attributeData = $this->extractAttributeData($value);
+            if ($attributeData !== null) {
+                $key = $attributeData['code'];
+                $value = $attributeData['value'];
             }
-            if (is_scalar($value) || $value === null || is_array($value)) {
+
+            $value = $this->normalizeGenericValue($value);
+            if ($value !== self::UNSUPPORTED_GENERIC_VALUE) {
                 $result[(string)$key] = $value;
             }
         }
 
         return $result;
+    }
+
+    private const UNSUPPORTED_GENERIC_VALUE = '__FASTCHECKOUT_UNSUPPORTED_GENERIC_VALUE__';
+
+    private function normalizeGenericValue($value, int $depth = 0)
+    {
+        if ($depth > 8) {
+            return self::UNSUPPORTED_GENERIC_VALUE;
+        }
+
+        if ($value === null || is_scalar($value)) {
+            return $value;
+        }
+
+        if (
+            is_object($value) &&
+            !method_exists($value, 'toArray') &&
+            !($value instanceof \JsonSerializable) &&
+            method_exists($value, '__toString')
+        ) {
+            return (string)$value;
+        }
+
+        $arrayValue = $this->coerceGenericDataArray($value);
+        if ($arrayValue === null) {
+            return self::UNSUPPORTED_GENERIC_VALUE;
+        }
+
+        $result = [];
+        foreach ($arrayValue as $key => $item) {
+            if (!is_string($key) && !is_int($key)) {
+                continue;
+            }
+
+            $attributeData = $this->extractAttributeData($item);
+            if ($attributeData !== null) {
+                $key = $attributeData['code'];
+                $item = $attributeData['value'];
+            }
+
+            $normalized = $this->normalizeGenericValue($item, $depth + 1);
+            if ($normalized !== self::UNSUPPORTED_GENERIC_VALUE) {
+                $result[(string)$key] = $normalized;
+            }
+        }
+
+        return $result;
+    }
+
+    private function extractAttributeData($attribute): ?array
+    {
+        if (is_array($attribute) && isset($attribute['attribute_code'])) {
+            return [
+                'code' => (string)$attribute['attribute_code'],
+                'value' => $attribute['value'] ?? null,
+            ];
+        }
+
+        if (
+            is_object($attribute) &&
+            method_exists($attribute, 'getAttributeCode') &&
+            method_exists($attribute, 'getValue')
+        ) {
+            try {
+                $code = (string)$attribute->getAttributeCode();
+                if ($code === '') {
+                    return null;
+                }
+
+                return [
+                    'code' => $code,
+                    'value' => $attribute->getValue(),
+                ];
+            } catch (\Throwable $e) {
+                return null;
+            }
+        }
+
+        return null;
+    }
+
+    private function coerceGenericDataArray($data): ?array
+    {
+        if (is_array($data)) {
+            return $data;
+        }
+
+        if (is_object($data)) {
+            if (method_exists($data, 'toArray')) {
+                try {
+                    $arrayData = $data->toArray();
+                    return is_array($arrayData) ? $arrayData : null;
+                } catch (\Throwable $e) {
+                    return null;
+                }
+            }
+
+            if (method_exists($data, '__toArray') && is_callable([$data, '__toArray'])) {
+                try {
+                    $arrayData = $data->__toArray();
+                    return is_array($arrayData) ? $arrayData : null;
+                } catch (\Throwable $e) {
+                    return null;
+                }
+            }
+
+            if ($data instanceof \Magento\Framework\DataObject) {
+                try {
+                    $arrayData = $data->getData();
+                    return is_array($arrayData) ? $arrayData : null;
+                } catch (\Throwable $e) {
+                    return null;
+                }
+            }
+
+            if ($data instanceof \JsonSerializable) {
+                try {
+                    $arrayData = $data->jsonSerialize();
+                    return is_array($arrayData) ? $arrayData : null;
+                } catch (\Throwable $e) {
+                    return null;
+                }
+            }
+
+            if (method_exists($data, '__toString')) {
+                return ['value' => (string)$data];
+            }
+        }
+
+        return null;
     }
 
     private function validateCheckoutAgreements(): bool
@@ -1669,11 +1869,16 @@ class Checkout extends Component
 
     private function getAgreementIds(): array
     {
-        if (!is_array($this->paymentExtensionAttributes)) {
-            return [];
-        }
-
-        $agreementIds = $this->paymentExtensionAttributes['agreement_ids'] ?? [];
+        $availableMethodCode = $this->resolveAvailablePaymentMethodCode($this->paymentMethod);
+        $rawPaymentData = $this->getRawPaymentData(
+            $availableMethodCode !== '' ? $availableMethodCode : $this->paymentMethod,
+            $this->paymentMethod
+        );
+        $extensionAttributes = array_merge(
+            $this->normalizePaymentAdditionalData($rawPaymentData['extension_attributes'] ?? []),
+            $this->normalizePaymentAdditionalData($this->paymentExtensionAttributes)
+        );
+        $agreementIds = $extensionAttributes['agreement_ids'] ?? [];
         if (!is_array($agreementIds)) {
             $agreementIds = [$agreementIds];
         }
@@ -1686,6 +1891,133 @@ class Checkout extends Component
         }
 
         return $result;
+    }
+
+    private function resolveOrderRedirectUrl($orderId, $placedOrder = null): string
+    {
+        $redirectUrl = $this->getCheckoutSessionRedirectUrl();
+        if ($redirectUrl !== '') {
+            return $redirectUrl;
+        }
+
+        if (!$orderId) {
+            return '';
+        }
+
+        try {
+            $order = $placedOrder;
+            if (!$order && $this->orderFactory !== null) {
+                $order = $this->orderFactory->create()->load($orderId);
+            }
+
+            if (!$order || !method_exists($order, 'getPayment')) {
+                return '';
+            }
+
+            $payment = $order->getPayment();
+            $redirectUrl = $this->getPaymentRedirectUrl($payment);
+            if ($redirectUrl !== '') {
+                return $redirectUrl;
+            }
+
+            if ($payment && method_exists($payment, 'getMethodInstance')) {
+                $methodInstance = $payment->getMethodInstance();
+                if ($methodInstance && method_exists($methodInstance, 'getOrderPlaceRedirectUrl')) {
+                    return (string)$methodInstance->getOrderPlaceRedirectUrl();
+                }
+            }
+        } catch (\Throwable $e) {
+            try {
+                $this->logger->warning('Fastcheckout order redirect URL resolve failed', ['exception' => $e]);
+            } catch (\Exception $ignored) {
+                // ignore
+            }
+        }
+
+        return '';
+    }
+
+    private function getCheckoutSessionRedirectUrl(): string
+    {
+        try {
+            if (method_exists($this->checkoutSession, 'getData')) {
+                $redirectUrl = $this->normalizeRedirectUrl($this->checkoutSession->getData('redirect_url'));
+                if ($redirectUrl !== '') {
+                    return $redirectUrl;
+                }
+            }
+
+            if (method_exists($this->checkoutSession, 'getRedirectUrl')) {
+                return $this->normalizeRedirectUrl($this->checkoutSession->getRedirectUrl());
+            }
+        } catch (\Throwable $e) {
+            $this->logger->warning('Fastcheckout checkout session redirect URL read failed', ['exception' => $e]);
+        }
+
+        return '';
+    }
+
+    private function getPaymentRedirectUrl($payment): string
+    {
+        if (!$payment || !method_exists($payment, 'getAdditionalInformation')) {
+            return '';
+        }
+
+        foreach ($this->getRedirectAdditionalInformationKeys() as $key) {
+            try {
+                $redirectUrl = $this->normalizeRedirectUrl($payment->getAdditionalInformation($key));
+                if ($redirectUrl !== '') {
+                    return $redirectUrl;
+                }
+            } catch (\Throwable $e) {
+                // Keep trying other known keys.
+            }
+        }
+
+        try {
+            $additionalInformation = $payment->getAdditionalInformation();
+            if (is_array($additionalInformation)) {
+                foreach ($this->getRedirectAdditionalInformationKeys() as $key) {
+                    if (array_key_exists($key, $additionalInformation)) {
+                        $redirectUrl = $this->normalizeRedirectUrl($additionalInformation[$key]);
+                        if ($redirectUrl !== '') {
+                            return $redirectUrl;
+                        }
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            // Ignore non-standard payment implementations.
+        }
+
+        return '';
+    }
+
+    private function getRedirectAdditionalInformationKeys(): array
+    {
+        return [
+            'redirect_url',
+            'redirectUrl',
+            'checkout_redirect_url',
+            'checkoutRedirectUrl',
+            'order_place_redirect_url',
+            'orderPlaceRedirectUrl',
+            'payment_redirect_url',
+            'paymentRedirectUrl',
+        ];
+    }
+
+    private function normalizeRedirectUrl($redirectUrl): string
+    {
+        if (is_object($redirectUrl) && method_exists($redirectUrl, '__toString')) {
+            $redirectUrl = (string)$redirectUrl;
+        }
+
+        if (!is_scalar($redirectUrl)) {
+            return '';
+        }
+
+        return trim((string)$redirectUrl);
     }
 
     private function getGenericAdditionalPaymentData(string $methodCode): array

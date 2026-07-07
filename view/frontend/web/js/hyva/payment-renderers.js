@@ -2800,6 +2800,18 @@ define([
                     return value;
                 }
 
+                function mergeAddressObjectValues() {
+                    var result = {};
+
+                    Array.prototype.slice.call(arguments).forEach(function (value) {
+                        if (value && typeof value === 'object') {
+                            $.extend(true, result, value);
+                        }
+                    });
+
+                    return result;
+                }
+
                 function normalizeAddressCustomAttributes(attributes) {
                     var result = [];
 
@@ -2852,17 +2864,14 @@ define([
                 }
 
                 function getAddressAttributes(address, camelKey, snakeKey) {
-                    var value = getAddressValue(address, camelKey, snakeKey);
-
-                    if (!value && address && address[snakeKey]) {
-                        value = address[snakeKey];
-                    }
-
-                    if (!value || typeof value !== 'object') {
+                    if (!address) {
                         return {};
                     }
 
-                    return $.extend(true, {}, value);
+                    return mergeAddressObjectValues(
+                        getAddressValue(address, snakeKey),
+                        getAddressValue(address, camelKey)
+                    );
                 }
 
                 function normalizeKoAddressData(address) {
@@ -3461,6 +3470,16 @@ define([
                     return '';
                 }
 
+                function splitShippingMethodCode(methodCode) {
+                    var parts = String(methodCode || '').split('_'),
+                        carrier = parts.shift() || '';
+
+                    return {
+                        carrier_code: carrier,
+                        method_code: parts.length ? parts.join('_') : carrier
+                    };
+                }
+
                 function syncShippingMethodToMagewireNow(methodCode) {
                     var wire,
                         currentMethod;
@@ -3798,9 +3817,9 @@ define([
                             var methodCode = '';
 
                             if (checkedDomRadio && checkedDomRadio.value) {
-                                var parts = checkedDomRadio.value.split('_');
-                                carrierCode = parts[0] || '';
-                                methodCode = parts[1] || parts[0] || '';
+                                var parsedMethod = splitShippingMethodCode(checkedDomRadio.value);
+                                carrierCode = parsedMethod.carrier_code;
+                                methodCode = parsedMethod.method_code;
                             } else if (activeMethod) {
                                 carrierCode = activeMethod.carrier_code || '';
                                 methodCode = activeMethod.method_code || '';
@@ -3919,6 +3938,22 @@ define([
                     })[0] || null;
                 }
 
+                function paymentMethodCodesMatch(candidateCode, selectedCode) {
+                    candidateCode = candidateCode ? String(candidateCode) : '';
+                    selectedCode = selectedCode ? String(selectedCode) : '';
+
+                    if (!candidateCode || !selectedCode) {
+                        return false;
+                    }
+
+                    if (candidateCode === selectedCode) {
+                        return true;
+                    }
+
+                    return selectedCode.indexOf(candidateCode + '_') === 0 ||
+                        selectedCode.indexOf(candidateCode + '-') === 0;
+                }
+
                 function getRendererByMethod(methodCode) {
                     var found = null;
 
@@ -3931,7 +3966,10 @@ define([
 
                         rendererCode = typeof component.getCode === 'function' ? component.getCode() : '';
 
-                        if (component.item.method === methodCode || rendererCode === methodCode) {
+                        if (
+                            paymentMethodCodesMatch(component.item.method, methodCode) ||
+                            paymentMethodCodesMatch(rendererCode, methodCode)
+                        ) {
                             found = component;
                         }
                     });
@@ -3957,18 +3995,21 @@ define([
                     if (component.messageContainer) {
                         subscribePaymentMessageContainer(component.messageContainer);
                     }
-                    component.selectPaymentMethod = function () {
+                    component.selectPaymentMethod = function (selectedMethodCode) {
                         syncQuoteCustomerData();
                         var paymentData = typeof component.getData === 'function'
                             ? component.getData()
                             : { method: component.item ? component.item.method : null },
-                            rendererCode = getRendererCode(component, paymentData.method);
+                            rendererCode = getRendererCode(component, paymentData.method),
+                            selectedCode = selectedMethodCode || rendererCode;
 
-                        if (paymentData && paymentData.method) {
+                        if (paymentData && paymentData.method && selectedCode) {
+                            paymentData = clonePaymentPayload(paymentData);
+                            paymentData.method = selectedCode;
                             selectPaymentMethodAction(paymentData);
-                            persistPaymentMethodToCheckoutData(rendererCode);
+                            persistPaymentMethodToCheckoutData(selectedCode);
                             quote.paymentMethod({
-                                method: rendererCode,
+                                method: selectedCode,
                                 title: component.item ? component.item.title : null
                             });
                         }
@@ -3991,7 +4032,10 @@ define([
                     var inputs = element.querySelectorAll('input'),
                         matches = false;
 
-                    if (element.id === methodCode || element.id === activeCode) {
+                    if (
+                        paymentMethodCodesMatch(element.id, methodCode) ||
+                        paymentMethodCodesMatch(element.id, activeCode)
+                    ) {
                         return true;
                     }
 
@@ -4000,12 +4044,12 @@ define([
                             return;
                         }
 
-                        matches = input.id === methodCode ||
-                            input.id === activeCode ||
-                            input.value === methodCode ||
-                            input.value === activeCode ||
-                            input.getAttribute('value') === methodCode ||
-                            input.getAttribute('value') === activeCode;
+                        matches = paymentMethodCodesMatch(input.id, methodCode) ||
+                            paymentMethodCodesMatch(input.id, activeCode) ||
+                            paymentMethodCodesMatch(input.value, methodCode) ||
+                            paymentMethodCodesMatch(input.value, activeCode) ||
+                            paymentMethodCodesMatch(input.getAttribute('value'), methodCode) ||
+                            paymentMethodCodesMatch(input.getAttribute('value'), activeCode);
                     });
 
                     return matches;
@@ -4212,7 +4256,7 @@ define([
                     
                     activeMethod = getMethod(activeCode) || { method: activeCode, title: method.title };
                     if (renderer && typeof renderer.selectPaymentMethod === 'function') {
-                        renderer.selectPaymentMethod();
+                        renderer.selectPaymentMethod(methodCode);
                     } else {
                         selectPaymentMethodAction(activeMethod);
                         persistPaymentMethodToCheckoutData(activeCode);
@@ -4329,8 +4373,8 @@ define([
 
                         if (
                             typeof component.getData === 'function' &&
-                            (component.item.method === selectedMethod ||
-                                (typeof component.getCode === 'function' && component.getCode() === selectedMethod))
+                            (paymentMethodCodesMatch(component.item.method, selectedMethod) ||
+                                (typeof component.getCode === 'function' && paymentMethodCodesMatch(component.getCode(), selectedMethod)))
                         ) {
                             found = component;
                         }
@@ -4629,7 +4673,11 @@ define([
 	                        var additionalData = {};
 
 	                        if (paymentData && paymentData.additional_data && typeof paymentData.additional_data === 'object') {
-	                            $.extend(additionalData, paymentData.additional_data);
+	                            $.extend(true, additionalData, paymentData.additional_data);
+	                        }
+
+	                        if (paymentData && paymentData.additionalData && typeof paymentData.additionalData === 'object') {
+	                            $.extend(true, additionalData, paymentData.additionalData);
 	                        }
 
 	                        if ((paymentData && paymentData.method === 'purchaseorder') || getSelectedMethodCode() === 'purchaseorder') {
@@ -4639,6 +4687,20 @@ define([
 	                        return additionalData;
 	                    },
 
+	                    getPaymentExtensionAttributes: function (paymentData) {
+	                        var extensionAttributes = {};
+
+	                        if (paymentData && paymentData.extension_attributes && typeof paymentData.extension_attributes === 'object') {
+	                            $.extend(true, extensionAttributes, paymentData.extension_attributes);
+	                        }
+
+	                        if (paymentData && paymentData.extensionAttributes && typeof paymentData.extensionAttributes === 'object') {
+	                            $.extend(true, extensionAttributes, paymentData.extensionAttributes);
+	                        }
+
+	                        return extensionAttributes;
+	                    },
+
 	                    syncWirePaymentData: function (wire, paymentData, hookData) {
                             paymentData = applyPaymentDataAssigners(
                                 (hookData && hookData.paymentData) || paymentData || this.getActivePaymentData()
@@ -4646,7 +4708,7 @@ define([
                             hookData = hookData || buildPlaceOrderSyncPayload(paymentData);
 
 	                        var additionalData = this.getPaymentAdditionalData(paymentData),
-                                extensionAttributes = paymentData && paymentData.extension_attributes ? paymentData.extension_attributes : {},
+                                extensionAttributes = this.getPaymentExtensionAttributes(paymentData),
 	                            methodCode = paymentData && paymentData.method ? paymentData.method : getSelectedMethodCode(),
 	                            poNumber = methodCode === 'purchaseorder' ? this.getPurchaseOrderNumber(paymentData) : '';
 

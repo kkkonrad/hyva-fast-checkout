@@ -16,6 +16,16 @@ define([
         rates: shippingService.getShippingRates(),
         isLoading: shippingService.isLoading,
 
+        splitMethodCode: function (value) {
+            var parts = String(value || '').split('_'),
+                carrier = parts.shift() || '';
+
+            return {
+                carrier_code: carrier,
+                method_code: parts.length ? parts.join('_') : carrier
+            };
+        },
+
         initObservable: function () {
             var self = this;
             this._super().observe({
@@ -52,10 +62,10 @@ define([
                     });
 
                     if (!found) {
-                        var parts = value.split('_');
+                        var parsed = self.splitMethodCode(value);
                         found = {
-                            carrier_code: parts[0],
-                            method_code: parts[1] || parts[0],
+                            carrier_code: parsed.carrier_code,
+                            method_code: parsed.method_code,
                             carrier_title: '',
                             method_title: '',
                             amount: 0

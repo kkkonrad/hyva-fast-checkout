@@ -47,8 +47,16 @@ class ShippingMethods extends \Magento\Framework\View\Element\Html\Select
     public function _toHtml()
     {
         if (!$this->getOptions()) {
+            $this->addOption('*', __('All Shipping Methods'));
             foreach ($this->shippingSource->toOptionArray() as $shippingOption) {
                 if (is_array($shippingOption['value'])) {
+                    $carrierCode = $this->getCarrierCodeFromMethods($shippingOption['value']);
+                    if ($carrierCode !== '') {
+                        $this->addOption(
+                            $carrierCode . '_*',
+                            __('%1 - All Methods', $shippingOption['label'])
+                        );
+                    }
                     foreach ($shippingOption['value'] as $method) {
                         $this->addOption($method['value'], $method['label']);
                     }
@@ -58,5 +66,17 @@ class ShippingMethods extends \Magento\Framework\View\Element\Html\Select
             }
         }
         return parent::_toHtml();
+    }
+
+    private function getCarrierCodeFromMethods(array $methods): string
+    {
+        foreach ($methods as $method) {
+            if (!empty($method['value']) && is_string($method['value'])) {
+                $parts = explode('_', $method['value'], 2);
+                return (string)($parts[0] ?? '');
+            }
+        }
+
+        return '';
     }
 }

@@ -128,6 +128,114 @@ class Data extends AbstractHelper
         }
     }
 
+    public function getMappedPaymentMethodsForShipping($shippingMethod): array
+    {
+        $shippingMethod = (string)$shippingMethod;
+        if ($shippingMethod === '') {
+            return [];
+        }
+
+        $mapping = $this->getShippingPaymentMapping();
+        if (empty($mapping)) {
+            return [];
+        }
+
+        $mappedPayments = [];
+        foreach ($mapping as $rule) {
+            if (
+                !isset($rule['shipping_method'], $rule['payment_method']) ||
+                (string)$rule['payment_method'] === ''
+            ) {
+                continue;
+            }
+
+            if ($this->shippingMappingRuleMatches((string)$rule['shipping_method'], $shippingMethod)) {
+                $mappedPayments[] = (string)$rule['payment_method'];
+            }
+        }
+
+        return array_values(array_unique($mappedPayments));
+    }
+
+    public function isPaymentMethodCodeAllowedByRules($paymentMethodCode, array $allowedPaymentRules): bool
+    {
+        $paymentMethodCode = (string)$paymentMethodCode;
+        if ($paymentMethodCode === '') {
+            return false;
+        }
+
+        foreach ($allowedPaymentRules as $rule) {
+            $rule = trim((string)$rule);
+            if ($rule === '') {
+                continue;
+            }
+
+            if ($rule === '*' || $rule === $paymentMethodCode) {
+                return true;
+            }
+
+            if (substr($rule, -1) === '*') {
+                $prefix = rtrim(substr($rule, 0, -1), '_-');
+                if ($this->paymentMethodCodeMatches($prefix, $paymentMethodCode)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    public function paymentMethodCodeMatches($baseCode, $selectedCode): bool
+    {
+        $baseCode = trim((string)$baseCode);
+        $selectedCode = trim((string)$selectedCode);
+
+        if ($baseCode === '' || $selectedCode === '') {
+            return false;
+        }
+
+        if ($baseCode === $selectedCode) {
+            return true;
+        }
+
+        return strpos($selectedCode, $baseCode . '_') === 0
+            || strpos($selectedCode, $baseCode . '-') === 0;
+    }
+
+    private function shippingMappingRuleMatches(string $ruleShippingMethod, string $shippingMethod): bool
+    {
+        $ruleShippingMethod = trim($ruleShippingMethod);
+        if ($ruleShippingMethod === '') {
+            return false;
+        }
+
+        if ($ruleShippingMethod === '*' || $ruleShippingMethod === $shippingMethod) {
+            return true;
+        }
+
+        $carrierCode = $this->extractCarrierCode($shippingMethod);
+        if ($carrierCode === '') {
+            return false;
+        }
+
+        if ($ruleShippingMethod === $carrierCode || $ruleShippingMethod === $carrierCode . '_*') {
+            return true;
+        }
+
+        if (substr($ruleShippingMethod, -1) === '*') {
+            $prefix = rtrim(substr($ruleShippingMethod, 0, -1), '_');
+            return $prefix !== '' && strpos($shippingMethod, $prefix . '_') === 0;
+        }
+
+        return false;
+    }
+
+    private function extractCarrierCode(string $shippingMethod): string
+    {
+        $parts = explode('_', $shippingMethod, 2);
+        return (string)($parts[0] ?? '');
+    }
+
     public function getRestrictPaymentMethods()
     {
         $methods = $this->scopeConfig->getValue(self::XML_PATH_RESTRICT_PAYMENT_METHODS, ScopeInterface::SCOPE_STORE);

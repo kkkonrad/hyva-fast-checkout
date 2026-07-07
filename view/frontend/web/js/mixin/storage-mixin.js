@@ -68,6 +68,9 @@ define([
         if (url.indexOf('/payment-information') !== -1) {
             return 'paymentInformation';
         }
+        if (/\/order(?:[?#/]|$)/.test(url)) {
+            return 'placeOrder';
+        }
         if (url.indexOf('/estimate-shipping-methods') !== -1) {
             return 'estimateShippingMethods';
         }
@@ -191,6 +194,47 @@ define([
         }
         if (typeof value === 'function') {
             value = value();
+        }
+
+        return value;
+    }
+
+    function mergeObjectValues() {
+        var result = {};
+
+        Array.prototype.slice.call(arguments).forEach(function (value) {
+            if (value && typeof value === 'object') {
+                $.extend(true, result, value);
+            }
+        });
+
+        return result;
+    }
+
+    function getAddressObjectValue(address, camelKey, snakeKey) {
+        if (!address) {
+            return {};
+        }
+
+        return mergeObjectValues(
+            getAddressValue(address, snakeKey),
+            getAddressValue(address, camelKey)
+        );
+    }
+
+    function getPaymentObjectValue(paymentMethod, snakeKey, camelKey) {
+        var value = {};
+
+        if (!paymentMethod) {
+            return value;
+        }
+
+        if (paymentMethod[snakeKey] && typeof paymentMethod[snakeKey] === 'object') {
+            $.extend(true, value, paymentMethod[snakeKey]);
+        }
+
+        if (paymentMethod[camelKey] && typeof paymentMethod[camelKey] === 'object') {
+            $.extend(true, value, paymentMethod[camelKey]);
         }
 
         return value;
@@ -325,8 +369,8 @@ define([
     function syncAddressToWire(wire, address, isBilling) {
         var prefix = isBilling ? 'billing' : '',
             street = getAddressValue(address, 'street'),
-            customAttributes = getAddressValue(address, 'customAttributes', 'custom_attributes'),
-            extensionAttributes = getAddressValue(address, 'extensionAttributes', 'extension_attributes'),
+            customAttributes = getAddressObjectValue(address, 'customAttributes', 'custom_attributes'),
+            extensionAttributes = getAddressObjectValue(address, 'extensionAttributes', 'extension_attributes'),
             sequence = Promise.resolve();
 
         if (!address) {
@@ -388,14 +432,23 @@ define([
 
         return setWireValue(wire, 'paymentMethod', paymentMethod.method)
             .then(function () {
-                return setWireValue(wire, 'paymentAdditionalData', paymentMethod.additional_data || {});
+                return setWireValue(
+                    wire,
+                    'paymentAdditionalData',
+                    getPaymentObjectValue(paymentMethod, 'additional_data', 'additionalData')
+                );
             })
             .then(function () {
-                return setWireValue(wire, 'paymentExtensionAttributes', paymentMethod.extension_attributes || {});
+                return setWireValue(
+                    wire,
+                    'paymentExtensionAttributes',
+                    getPaymentObjectValue(paymentMethod, 'extension_attributes', 'extensionAttributes')
+                );
             })
             .then(function () {
                 var poNumber = paymentMethod.po_number ||
-                    (paymentMethod.additional_data && paymentMethod.additional_data.po_number);
+                    (paymentMethod.additional_data && paymentMethod.additional_data.po_number) ||
+                    (paymentMethod.additionalData && paymentMethod.additionalData.po_number);
 
                 return poNumber ? setWireValue(wire, 'poNumber', poNumber) : true;
             })
@@ -432,11 +485,16 @@ define([
                     return syncAddressToWire(wire, addressInformation.billing_address, true);
                 })
                 .then(function () {
-                    if (addressInformation.extension_attributes) {
+                    var shippingExtensionAttributes = mergeObjectValues(
+                        addressInformation.extension_attributes,
+                        addressInformation.extensionAttributes
+                    );
+
+                    if (Object.keys(shippingExtensionAttributes).length) {
                         return setWireValue(
                             wire,
                             'shippingExtensionAttributes',
-                            addressInformation.extension_attributes
+                            shippingExtensionAttributes
                         );
                     }
 
@@ -483,6 +541,12 @@ define([
             });
         }
 
+        if (endpoint === 'placeOrder') {
+            sequence = sequence.then(function () {
+                return syncPaymentToWire(wire, payload.paymentMethod);
+            });
+        }
+
         if (headers || Object.keys(payload).length) {
             sequence = sequence
                 .then(function () {
@@ -511,6 +575,23 @@ define([
         }).then(function (state) {
             if (!state || typeof state !== 'object') {
                 deferred.resolve({});
+                return;
+            }
+
+            if (endpoint === 'placeOrder') {
+                var paymentMethod = parsePayload(data).paymentMethod || {},
+                    methodCode = paymentMethod.method || '';
+
+                if (typeof wire.call !== 'function') {
+                    deferred.reject(new Error('Magewire placeOrder is not available'));
+                    return;
+                }
+
+                Promise.resolve(wire.call('placeOrder', methodCode)).then(function (result) {
+                    deferred.resolve(result || true);
+                }).catch(function (error) {
+                    deferred.reject(error);
+                });
                 return;
             }
 
