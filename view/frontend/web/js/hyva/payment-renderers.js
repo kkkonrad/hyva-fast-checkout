@@ -1944,7 +1944,13 @@ define([
                     }
 
                     getDomPaymentMethods().forEach(function (method) {
-                        if (method.method === methodCode && !method.disabled) {
+                        if (
+                            !method.disabled &&
+                            (
+                                paymentMethodCodesMatch(method.method, methodCode) ||
+                                paymentMethodCodesMatch(methodCode, method.method)
+                            )
+                        ) {
                             found = true;
                         }
                     });
@@ -2132,7 +2138,9 @@ define([
                 }
 
                 function applyCheckoutStatePayload(payload) {
-                    var methodsJson;
+                    var methodsJson,
+                        selectedPaymentMethod,
+                        selectedShippingMethod;
 
                     if (!payload || typeof payload !== 'object') {
                         syncQuoteTotalsFromDom();
@@ -2169,7 +2177,15 @@ define([
                                 if (cr.carrier_code !== nr.carrier_code ||
                                     cr.method_code !== nr.method_code ||
                                     cr.amount !== nr.amount ||
-                                    cr.available !== nr.available) {
+                                    cr.base_amount !== nr.base_amount ||
+                                    cr.price_excl_tax !== nr.price_excl_tax ||
+                                    cr.price_incl_tax !== nr.price_incl_tax ||
+                                    cr.available !== nr.available ||
+                                    cr.error_message !== nr.error_message ||
+                                    cr.carrier_title !== nr.carrier_title ||
+                                    cr.method_title !== nr.method_title ||
+                                    JSON.stringify(cr.extension_attributes || {}) !== JSON.stringify(nr.extension_attributes || {}) ||
+                                    JSON.stringify(cr.extensionAttributes || {}) !== JSON.stringify(nr.extensionAttributes || {})) {
                                     ratesChanged = true;
                                     break;
                                 }
@@ -2181,11 +2197,17 @@ define([
                         }
                     }
 
-                    if (payload.selected_payment_method) {
+                    selectedPaymentMethod = getStateSelectedPaymentMethod(payload);
+                    if (selectedPaymentMethod) {
                         setQuotePaymentMethodFromBridge({
-                            method: payload.selected_payment_method
+                            method: selectedPaymentMethod
                         });
-                        persistPaymentMethodToCheckoutData(payload.selected_payment_method);
+                        persistPaymentMethodToCheckoutData(selectedPaymentMethod);
+                    }
+
+                    selectedShippingMethod = getStateSelectedShippingMethod(payload);
+                    if (selectedShippingMethod) {
+                        syncSelectedShippingMethodToKnockout(selectedShippingMethod);
                     }
 
                     if (payload.customer_email) {
@@ -2198,6 +2220,62 @@ define([
                     }
 
                     return true;
+                }
+
+                function getStateSelectedPaymentMethod(payload) {
+                    if (!payload || typeof payload !== 'object') {
+                        return '';
+                    }
+
+                    if (payload.selected_payment_method) {
+                        return String(payload.selected_payment_method);
+                    }
+
+                    if (payload.selectedPaymentMethod) {
+                        return String(payload.selectedPaymentMethod);
+                    }
+
+                    if (payload.paymentMethod && typeof payload.paymentMethod === 'string') {
+                        return payload.paymentMethod;
+                    }
+
+                    if (payload.paymentMethod && typeof payload.paymentMethod === 'object' && payload.paymentMethod.method) {
+                        return String(payload.paymentMethod.method);
+                    }
+
+                    return '';
+                }
+
+                function getStateSelectedShippingMethod(payload) {
+                    if (!payload || typeof payload !== 'object') {
+                        return '';
+                    }
+
+                    if (payload.selected_shipping_method) {
+                        return String(payload.selected_shipping_method);
+                    }
+
+                    if (payload.selectedShippingMethod) {
+                        return String(payload.selectedShippingMethod);
+                    }
+
+                    if (payload.selected_shipping_rate) {
+                        return String(payload.selected_shipping_rate);
+                    }
+
+                    if (payload.selectedShippingRate) {
+                        return String(payload.selectedShippingRate);
+                    }
+
+                    if (payload.shippingMethod && typeof payload.shippingMethod === 'string') {
+                        return payload.shippingMethod;
+                    }
+
+                    if (payload.shippingMethod && typeof payload.shippingMethod === 'object') {
+                        return getShippingMethodCode(payload.shippingMethod);
+                    }
+
+                    return '';
                 }
 
                 function refreshCheckoutStateFromMagewire() {
@@ -3923,7 +4001,9 @@ define([
                     var quoteMethod = (quote && typeof quote.paymentMethod === 'function' && quote.paymentMethod()) ? quote.paymentMethod().method : '';
                     var domMethod = getCheckedDomPaymentMethod();
 
-                    
+                    if (quoteMethod && domMethod && paymentMethodCodesMatch(domMethod, quoteMethod)) {
+                        return quoteMethod;
+                    }
 
                     if (domMethod) {
                         return domMethod;
@@ -3934,7 +4014,8 @@ define([
 
                 function getMethod(methodCode) {
                     return methodList().filter(function (method) {
-                        return method.method === methodCode;
+                        return paymentMethodCodesMatch(method.method, methodCode) ||
+                            paymentMethodCodesMatch(methodCode, method.method);
                     })[0] || null;
                 }
 
@@ -4763,7 +4844,13 @@ define([
 
                             persistPaymentMethodToCheckoutData(methodCode);
                             document.querySelectorAll('input[name="payment_method"]').forEach(function (element) {
-                                if (!input && element.value === methodCode) {
+                                if (
+                                    !input &&
+                                    (
+                                        paymentMethodCodesMatch(element.value, methodCode) ||
+                                        paymentMethodCodesMatch(methodCode, element.value)
+                                    )
+                                ) {
                                     input = element;
                                 }
                             });
@@ -4921,6 +5008,10 @@ define([
 	                                return this.syncPaymentData(wire).then(function () {
 	                                    return wire.call('placeOrder', selectedMethod || (paymentData && paymentData.method) || getSelectedMethodCode());
 	                                }).then(function (result) {
+                                        if (result && typeof result === 'object' && result.success === false) {
+                                            throw new Error(result.message || result.error || translateFastcheckoutMessage('The order was not placed.'));
+                                        }
+                                        window.fastcheckoutLastPlaceOrderResult = result || {};
                                         runPlaceOrderAfterRequestListeners();
                                         return result;
 	                                }).catch(function (err) {

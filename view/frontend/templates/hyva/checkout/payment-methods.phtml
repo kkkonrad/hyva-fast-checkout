@@ -39,7 +39,7 @@
                 <?php
                 $methodCode = $method->getCode();
                 $isPaymentMethodAllowed = $magewire->isPaymentMethodAvailable((string)$methodCode, $allowedPaymentMethodCodes);
-                $isSelectedPayment = $isPaymentMethodAllowed && $magewire->paymentMethod === $methodCode;
+                $isSelectedPayment = $isPaymentMethodAllowed && $magewire->isPaymentMethodSelected((string)$methodCode);
                 ?>
                 <div class="border rounded transition-all duration-200 border-gray-200 hover:border-gray-300"
                      wire:key="payment-method-item-<?= $escaper->escapeHtmlAttr($methodCode) ?>"
@@ -52,7 +52,7 @@
                                name="payment_method"
                                value="<?= $escaper->escapeHtmlAttr($methodCode) ?>"
                                data-fastcheckout-payment-option-input="<?= $escaper->escapeHtmlAttr($methodCode) ?>"
-                               <?= $isPaymentMethodAllowed && $magewire->paymentMethod === $methodCode ? 'checked' : '' ?>
+                               <?= $isSelectedPayment ? 'checked' : '' ?>
                                 <?= $isPaymentMethodAllowed ? '' : 'disabled' ?>
                                required/>
                         <span class="font-medium text-sm text-gray-800"><?= $escaper->escapeHtml($method->getTitle()) ?></span>

@@ -240,6 +240,270 @@ define([
         return value;
     }
 
+    function normalizePaymentMethodPayload(paymentMethod) {
+        if (!paymentMethod) {
+            return {};
+        }
+
+        if (typeof paymentMethod === 'string' || typeof paymentMethod === 'number') {
+            return paymentMethod ? { method: String(paymentMethod) } : {};
+        }
+
+        return typeof paymentMethod === 'object' ? mergeObjectValues(paymentMethod) : {};
+    }
+
+    function getPayloadPaymentMethod(payload) {
+        var paymentMethod;
+
+        payload = payload || {};
+        paymentMethod = mergeObjectValues(
+            normalizePaymentMethodPayload(payload.payment_method),
+            normalizePaymentMethodPayload(payload.paymentMethod),
+            normalizePaymentMethodPayload(payload.payment)
+        );
+
+        if (Object.keys(paymentMethod).length) {
+            return paymentMethod;
+        }
+
+        if (
+            payload.method ||
+            payload.additional_data ||
+            payload.additionalData ||
+            payload.extension_attributes ||
+            payload.extensionAttributes ||
+            payload.po_number
+        ) {
+            return normalizePaymentMethodPayload(payload);
+        }
+
+        return {};
+    }
+
+    function getStateSelectedPaymentMethod(state) {
+        if (!state || typeof state !== 'object') {
+            return '';
+        }
+
+        if (state.selected_payment_method) {
+            return String(state.selected_payment_method);
+        }
+
+        if (state.selectedPaymentMethod) {
+            return String(state.selectedPaymentMethod);
+        }
+
+        if (state.paymentMethod && typeof state.paymentMethod === 'string') {
+            return state.paymentMethod;
+        }
+
+        if (state.paymentMethod && typeof state.paymentMethod === 'object' && state.paymentMethod.method) {
+            return String(state.paymentMethod.method);
+        }
+
+        return '';
+    }
+
+    function getStateSelectedShippingMethod(state) {
+        if (!state || typeof state !== 'object') {
+            return '';
+        }
+
+        if (state.selected_shipping_method) {
+            return String(state.selected_shipping_method);
+        }
+
+        if (state.selectedShippingMethod) {
+            return String(state.selectedShippingMethod);
+        }
+
+        if (state.selected_shipping_rate) {
+            return String(state.selected_shipping_rate);
+        }
+
+        if (state.selectedShippingRate) {
+            return String(state.selectedShippingRate);
+        }
+
+        if (state.shippingMethod && typeof state.shippingMethod === 'string') {
+            return state.shippingMethod;
+        }
+
+        if (state.shippingMethod && typeof state.shippingMethod === 'object') {
+            return getShippingMethodCode(state.shippingMethod);
+        }
+
+        return '';
+    }
+
+    function applySelectedShippingMethodToQuote(quote, shippingService, methodCode) {
+        var rates,
+            found = null,
+            parts,
+            carrier;
+
+        if (!quote || typeof quote.shippingMethod !== 'function' || !methodCode) {
+            return;
+        }
+
+        rates = shippingService && typeof shippingService.getShippingRates === 'function'
+            ? shippingService.getShippingRates()()
+            : [];
+
+        if (Array.isArray(rates)) {
+            rates.some(function (rate) {
+                if (rate && (rate.carrier_code + '_' + rate.method_code) === methodCode) {
+                    found = rate;
+                    return true;
+                }
+
+                return false;
+            });
+        }
+
+        if (found) {
+            quote.shippingMethod(found);
+            return;
+        }
+
+        parts = String(methodCode || '').split('_');
+        carrier = parts.shift() || '';
+        if (carrier) {
+            quote.shippingMethod({
+                carrier_code: carrier,
+                method_code: parts.length ? parts.join('_') : carrier
+            });
+        }
+    }
+
+    function getPayloadBillingAddress(payload) {
+        payload = payload || {};
+
+        return mergeObjectValues(
+            payload.billing_address,
+            payload.billingAddress
+        );
+    }
+
+    function getPayloadShippingAddress(payload) {
+        payload = payload || {};
+
+        return mergeObjectValues(
+            payload.shipping_address,
+            payload.shippingAddress
+        );
+    }
+
+    function getPayloadEmail(payload) {
+        var addressInformation,
+            billingAddress,
+            shippingAddress,
+            candidates,
+            i;
+
+        payload = payload || {};
+        addressInformation = mergeObjectValues(payload.address_information, payload.addressInformation);
+        billingAddress = mergeObjectValues(
+            getPayloadBillingAddress(payload),
+            addressInformation.billing_address,
+            addressInformation.billingAddress
+        );
+        shippingAddress = mergeObjectValues(
+            getPayloadShippingAddress(payload),
+            addressInformation.shipping_address,
+            addressInformation.shippingAddress
+        );
+
+        candidates = [
+            payload.email,
+            payload.customer_email,
+            payload.customerEmail,
+            billingAddress.email,
+            billingAddress.customer_email,
+            billingAddress.customerEmail,
+            shippingAddress.email,
+            shippingAddress.customer_email,
+            shippingAddress.customerEmail,
+            addressInformation.email,
+            addressInformation.customer_email,
+            addressInformation.customerEmail
+        ];
+
+        for (i = 0; i < candidates.length; i++) {
+            if (candidates[i]) {
+                return String(candidates[i]).trim();
+            }
+        }
+
+        return '';
+    }
+
+    function getShippingMethodCode(source) {
+        var carrier,
+            method,
+            nested,
+            i,
+            nestedKeys = ['shipping_method', 'shippingMethod', 'shipping_method_data', 'shippingMethodData'];
+
+        source = source && typeof source === 'object' ? source : {};
+        carrier = source.shipping_carrier_code || source.shippingCarrierCode || source.carrier_code || source.carrierCode || '';
+        method = source.shipping_method_code || source.shippingMethodCode || source.method_code || source.methodCode || '';
+
+        if (carrier && method) {
+            return carrier + '_' + method;
+        }
+
+        if (typeof source.shipping_method === 'string' && source.shipping_method) {
+            return source.shipping_method;
+        }
+
+        if (typeof source.shippingMethod === 'string' && source.shippingMethod) {
+            return source.shippingMethod;
+        }
+
+        if (typeof source.method === 'string' && source.method) {
+            return source.method;
+        }
+
+        for (i = 0; i < nestedKeys.length; i++) {
+            nested = source[nestedKeys[i]];
+            if (nested && typeof nested === 'object') {
+                method = getShippingMethodCode(nested);
+                if (method) {
+                    return method;
+                }
+            }
+        }
+
+        return '';
+    }
+
+    function mergeAddressPayloadAttributes(address, payload) {
+        var mergedAddress = mergeObjectValues(address || {}),
+            customAttributes = mergeObjectValues(
+                getAddressObjectValue(address, 'customAttributes', 'custom_attributes'),
+                payload && payload.custom_attributes,
+                payload && payload.customAttributes
+            ),
+            extensionAttributes = mergeObjectValues(
+                getAddressObjectValue(address, 'extensionAttributes', 'extension_attributes'),
+                payload && payload.extension_attributes,
+                payload && payload.extensionAttributes
+            );
+
+        if (Object.keys(customAttributes).length) {
+            mergedAddress.custom_attributes = customAttributes;
+            mergedAddress.customAttributes = customAttributes;
+        }
+
+        if (Object.keys(extensionAttributes).length) {
+            mergedAddress.extension_attributes = extensionAttributes;
+            mergedAddress.extensionAttributes = extensionAttributes;
+        }
+
+        return mergedAddress;
+    }
+
     function setWireValue(wire, key, value) {
         if (!wire || typeof wire.set !== 'function' || typeof value === 'undefined') {
             return Promise.resolve();
@@ -305,7 +569,15 @@ define([
                 current.carrier_code !== next.carrier_code ||
                 current.method_code !== next.method_code ||
                 current.amount !== next.amount ||
-                current.available !== next.available
+                current.base_amount !== next.base_amount ||
+                current.price_excl_tax !== next.price_excl_tax ||
+                current.price_incl_tax !== next.price_incl_tax ||
+                current.available !== next.available ||
+                current.error_message !== next.error_message ||
+                current.carrier_title !== next.carrier_title ||
+                current.method_title !== next.method_title ||
+                JSON.stringify(current.extension_attributes || {}) !== JSON.stringify(next.extension_attributes || {}) ||
+                JSON.stringify(current.extensionAttributes || {}) !== JSON.stringify(next.extensionAttributes || {})
             ) {
                 return true;
             }
@@ -342,6 +614,10 @@ define([
                         paymentService.setPaymentMethods(state.payment_methods);
                     }
 
+                    if (quote && typeof quote.paymentMethod === 'function' && getStateSelectedPaymentMethod(state)) {
+                        quote.paymentMethod({ method: getStateSelectedPaymentMethod(state) });
+                    }
+
                     if (
                         Array.isArray(state.shipping_rates) &&
                         shippingService &&
@@ -355,6 +631,12 @@ define([
                     ) {
                         shippingService.setShippingRates(state.shipping_rates);
                     }
+
+                    applySelectedShippingMethodToQuote(
+                        quote,
+                        shippingService,
+                        getStateSelectedShippingMethod(state)
+                    );
                 } catch (e) {
                     // Do not break native Magento storage consumers if KO state hydration fails.
                 }
@@ -426,6 +708,8 @@ define([
     }
 
     function syncPaymentToWire(wire, paymentMethod) {
+        paymentMethod = normalizePaymentMethodPayload(paymentMethod);
+
         if (!paymentMethod || !paymentMethod.method) {
             return Promise.resolve();
         }
@@ -464,28 +748,60 @@ define([
     function syncPayloadToWire(wire, endpoint, data, headers) {
         var payload = parsePayload(data),
             sequence = Promise.resolve(),
-            addressInformation = payload.addressInformation || {};
+            addressInformation = mergeObjectValues(payload.address_information, payload.addressInformation);
 
         if (!wire) {
             return sequence;
         }
 
-        if (payload.email) {
+        if (getPayloadEmail(payload)) {
             sequence = sequence.then(function () {
-                return setWireValue(wire, 'email', payload.email);
+                return setWireValue(wire, 'email', getPayloadEmail(payload));
             });
         }
 
-        if (endpoint === 'shippingInformation' && addressInformation) {
+        if (endpoint === 'shippingInformation' && Object.keys(addressInformation).length) {
             sequence = sequence
                 .then(function () {
-                    return syncAddressToWire(wire, addressInformation.shipping_address, false);
+                    var shippingAddress = mergeObjectValues(
+                        addressInformation.shipping_address,
+                        addressInformation.shippingAddress
+                    );
+
+                    return syncAddressToWire(
+                        wire,
+                        mergeAddressPayloadAttributes(
+                            shippingAddress,
+                            addressInformation
+                        ),
+                        false
+                    );
                 })
                 .then(function () {
-                    return syncAddressToWire(wire, addressInformation.billing_address, true);
+                    var billingAddress = mergeObjectValues(
+                        addressInformation.billing_address,
+                        addressInformation.billingAddress
+                    );
+
+                    return syncAddressToWire(
+                        wire,
+                        Object.keys(billingAddress).length
+                            ? mergeAddressPayloadAttributes(billingAddress, billingAddress)
+                            : null,
+                        true
+                    );
                 })
                 .then(function () {
+                    var shippingAddress = mergeObjectValues(
+                        addressInformation.shipping_address,
+                        addressInformation.shippingAddress
+                    );
                     var shippingExtensionAttributes = mergeObjectValues(
+                        getAddressObjectValue(
+                            shippingAddress,
+                            'extensionAttributes',
+                            'extension_attributes'
+                        ),
                         addressInformation.extension_attributes,
                         addressInformation.extensionAttributes
                     );
@@ -501,9 +817,7 @@ define([
                     return true;
                 })
                 .then(function () {
-                    var carrier = addressInformation.shipping_carrier_code || '',
-                        method = addressInformation.shipping_method_code || '',
-                        code = carrier && method ? carrier + '_' + method : '';
+                    var code = getShippingMethodCode(addressInformation);
 
                     return code && typeof wire.call === 'function'
                         ? wire.call('selectShippingMethod', code)
@@ -513,7 +827,16 @@ define([
 
         if (endpoint === 'estimateShippingMethods') {
             sequence = sequence.then(function () {
-                return syncAddressToWire(wire, payload.address || payload, false);
+                var estimateAddress = mergeObjectValues(payload.address, payload.shipping_address, payload.shippingAddress);
+
+                return syncAddressToWire(
+                    wire,
+                    mergeAddressPayloadAttributes(
+                        Object.keys(estimateAddress).length ? estimateAddress : payload,
+                        payload
+                    ),
+                    false
+                );
             }).then(function () {
                 if (typeof wire.call === 'function') {
                     return wire.call('saveShippingAddress', true, true, true);
@@ -525,7 +848,11 @@ define([
 
         if (endpoint === 'billingAddress') {
             sequence = sequence.then(function () {
-                return syncAddressToWire(wire, payload.address, true);
+                return syncAddressToWire(
+                    wire,
+                    mergeAddressPayloadAttributes(payload.address || payload, payload),
+                    true
+                );
             }).then(function () {
                 if (typeof wire.call === 'function') {
                     return wire.call('saveBillingAddress', true);
@@ -536,15 +863,61 @@ define([
         }
 
         if (endpoint === 'setPaymentInformation') {
-            sequence = sequence.then(function () {
-                return syncPaymentToWire(wire, payload.paymentMethod);
-            });
+            sequence = sequence
+                .then(function () {
+                    var billingAddress = getPayloadBillingAddress(payload);
+
+                    if (!Object.keys(billingAddress).length) {
+                        return false;
+                    }
+
+                    return syncAddressToWire(
+                        wire,
+                        mergeAddressPayloadAttributes(billingAddress, billingAddress),
+                        true
+                    ).then(function () {
+                        return true;
+                    });
+                })
+                .then(function (billingAddressSynced) {
+                    if (billingAddressSynced && typeof wire.call === 'function') {
+                        return wire.call('saveBillingAddress', true);
+                    }
+
+                    return true;
+                })
+                .then(function () {
+                    return syncPaymentToWire(wire, getPayloadPaymentMethod(payload));
+                });
         }
 
         if (endpoint === 'placeOrder') {
-            sequence = sequence.then(function () {
-                return syncPaymentToWire(wire, payload.paymentMethod);
-            });
+            sequence = sequence
+                .then(function () {
+                    var shippingAddress = getPayloadShippingAddress(payload);
+
+                    return Object.keys(shippingAddress).length
+                        ? syncAddressToWire(
+                            wire,
+                            mergeAddressPayloadAttributes(shippingAddress, shippingAddress),
+                            false
+                        )
+                        : true;
+                })
+                .then(function () {
+                    var billingAddress = getPayloadBillingAddress(payload);
+
+                    return Object.keys(billingAddress).length
+                        ? syncAddressToWire(
+                            wire,
+                            mergeAddressPayloadAttributes(billingAddress, billingAddress),
+                            true
+                        )
+                        : true;
+                })
+                .then(function () {
+                    return syncPaymentToWire(wire, getPayloadPaymentMethod(payload));
+                });
         }
 
         if (headers || Object.keys(payload).length) {
@@ -579,7 +952,7 @@ define([
             }
 
             if (endpoint === 'placeOrder') {
-                var paymentMethod = parsePayload(data).paymentMethod || {},
+                var paymentMethod = getPayloadPaymentMethod(parsePayload(data)),
                     methodCode = paymentMethod.method || '';
 
                 if (typeof wire.call !== 'function') {
@@ -588,6 +961,12 @@ define([
                 }
 
                 Promise.resolve(wire.call('placeOrder', methodCode)).then(function (result) {
+                    if (result && typeof result === 'object' && result.success === false) {
+                        deferred.reject(new Error(result.message || result.error || 'The order was not placed.'));
+                        return;
+                    }
+
+                    window.fastcheckoutLastPlaceOrderResult = result || {};
                     deferred.resolve(result || true);
                 }).catch(function (error) {
                     deferred.reject(error);

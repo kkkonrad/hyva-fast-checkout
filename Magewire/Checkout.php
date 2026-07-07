@@ -385,10 +385,11 @@ class Checkout extends Component
             
             $shippingAddress->setTelephone($this->telephone);
             $shippingAddress->setCompany($this->company);
+            $this->applyAddressEmail($shippingAddress);
             $this->applyAddressAttributes(
                 $shippingAddress,
-                $this->shippingCustomAttributes,
-                $this->shippingExtensionAttributes
+                $this->getMergedAddressCustomAttributes(false),
+                $this->getMergedAddressExtensionAttributes(false)
             );
             
             $shippingAddress->setShouldIgnoreValidation($ignoreValidation);
@@ -440,10 +441,11 @@ class Checkout extends Component
                 $billingAddress->setRegion($this->region);
                 $billingAddress->setTelephone($this->telephone);
                 $billingAddress->setCompany($this->company);
+                $this->applyAddressEmail($billingAddress);
                 $this->applyAddressAttributes(
                     $billingAddress,
-                    $this->shippingCustomAttributes,
-                    $this->shippingExtensionAttributes
+                    $this->getMergedAddressCustomAttributes(false),
+                    $this->getMergedAddressExtensionAttributes(false)
                 );
             } else {
                 $billingAddress->setFirstname($this->billingFirstname);
@@ -479,10 +481,11 @@ class Checkout extends Component
                 
                 $billingAddress->setTelephone($this->billingTelephone);
                 $billingAddress->setCompany($this->billingCompany);
+                $this->applyAddressEmail($billingAddress);
                 $this->applyAddressAttributes(
                     $billingAddress,
-                    $this->billingCustomAttributes,
-                    $this->billingExtensionAttributes
+                    $this->getMergedAddressCustomAttributes(true),
+                    $this->getMergedAddressExtensionAttributes(true)
                 );
             }
             $billingAddress->setShouldIgnoreValidation($ignoreValidation);
@@ -655,6 +658,18 @@ class Checkout extends Component
         );
     }
 
+    public function isPaymentMethodSelected(string $paymentMethodCode): bool
+    {
+        $selectedPaymentMethod = (string)$this->paymentMethod;
+
+        return $selectedPaymentMethod !== ''
+            && (
+                $selectedPaymentMethod === $paymentMethodCode
+                || $this->paymentMethodCodeMatches($paymentMethodCode, $selectedPaymentMethod)
+                || $this->paymentMethodCodeMatches($selectedPaymentMethod, $paymentMethodCode)
+            );
+    }
+
     private function isSelectedPaymentMethodStillAllowed(string $paymentMethodCode): bool
     {
         return $this->resolveAvailablePaymentMethodCode($paymentMethodCode) !== '';
@@ -814,6 +829,12 @@ class Checkout extends Component
                 'payment_methods' => $this->buildPaymentMethodsData(),
                 'shipping_rates' => $this->buildShippingRatesData(),
                 'selected_payment_method' => $this->paymentMethod,
+                'selectedPaymentMethod' => $this->paymentMethod,
+                'paymentMethod' => $this->paymentMethod,
+                'selected_shipping_method' => $this->getSelectedShippingMethodCode($quote),
+                'selectedShippingMethod' => $this->getSelectedShippingMethodCode($quote),
+                'selected_shipping_rate' => $this->getSelectedShippingMethodCode($quote),
+                'selectedShippingRate' => $this->getSelectedShippingMethodCode($quote),
                 'coupon_code' => $this->couponCode,
                 'customer_email' => $quote ? (string)$quote->getCustomerEmail() : '',
             ];
@@ -831,8 +852,30 @@ class Checkout extends Component
                 'payment_methods' => [],
                 'shipping_rates' => [],
                 'selected_payment_method' => $this->paymentMethod,
+                'selectedPaymentMethod' => $this->paymentMethod,
+                'paymentMethod' => $this->paymentMethod,
+                'selected_shipping_method' => $this->shippingMethod,
+                'selectedShippingMethod' => $this->shippingMethod,
+                'selected_shipping_rate' => $this->shippingMethod,
+                'selectedShippingRate' => $this->shippingMethod,
                 'coupon_code' => $this->couponCode,
             ];
+        }
+    }
+
+    private function getSelectedShippingMethodCode($quote = null): string
+    {
+        if ($this->shippingMethod !== '') {
+            return (string)$this->shippingMethod;
+        }
+
+        try {
+            $quote = $quote ?: $this->checkoutSession->getQuote();
+            $shippingAddress = $quote ? $quote->getShippingAddress() : null;
+
+            return $shippingAddress ? (string)$shippingAddress->getShippingMethod() : '';
+        } catch (\Throwable $e) {
+            return '';
         }
     }
 
@@ -870,16 +913,19 @@ class Checkout extends Component
                     continue;
                 }
 
-                $price = (float)$rate->getPrice();
+                $price = $this->getShippingRateNumericValue($rate, ['price'], 0.0);
+                if ($price === 0.0 && method_exists($rate, 'getPrice')) {
+                    $price = (float)$rate->getPrice();
+                }
                 $rateData = [
                     'carrier_code' => (string)$rate->getCarrier(),
                     'method_code' => (string)$rate->getMethod(),
                     'carrier_title' => (string)$rate->getCarrierTitle(),
                     'method_title' => (string)$rate->getMethodTitle(),
-                    'amount' => $price,
-                    'base_amount' => $price,
-                    'price_excl_tax' => $price,
-                    'price_incl_tax' => $price,
+                    'amount' => $this->getShippingRateNumericValue($rate, ['amount'], $price),
+                    'base_amount' => $this->getShippingRateNumericValue($rate, ['base_amount', 'baseAmount'], $price),
+                    'price_excl_tax' => $this->getShippingRateNumericValue($rate, ['price_excl_tax', 'priceExclTax'], $price),
+                    'price_incl_tax' => $this->getShippingRateNumericValue($rate, ['price_incl_tax', 'priceInclTax'], $price),
                     'available' => !$rate->getErrorMessage(),
                     'error_message' => (string)$rate->getErrorMessage(),
                 ];
@@ -887,6 +933,7 @@ class Checkout extends Component
                 $extensionAttributes = $this->getShippingRateExtensionAttributes($rate);
                 if (!empty($extensionAttributes)) {
                     $rateData['extension_attributes'] = $extensionAttributes;
+                    $rateData['extensionAttributes'] = $extensionAttributes;
                 }
 
                 $ratesData[] = $rateData;
@@ -894,6 +941,36 @@ class Checkout extends Component
         }
 
         return $ratesData;
+    }
+
+    private function getShippingRateNumericValue($rate, array $keys, float $default): float
+    {
+        foreach ($keys as $key) {
+            if (method_exists($rate, 'getData')) {
+                try {
+                    $value = $rate->getData($key);
+                    if ($value !== null && $value !== '' && is_numeric($value)) {
+                        return (float)$value;
+                    }
+                } catch (\Throwable $e) {
+                    // Try an explicit getter below.
+                }
+            }
+
+            $getter = 'get' . str_replace(' ', '', ucwords(str_replace('_', ' ', (string)$key)));
+            if (method_exists($rate, $getter)) {
+                try {
+                    $value = $rate->{$getter}();
+                    if ($value !== null && $value !== '' && is_numeric($value)) {
+                        return (float)$value;
+                    }
+                } catch (\Throwable $e) {
+                    // Keep the fallback value.
+                }
+            }
+        }
+
+        return $default;
     }
 
     private function getShippingRateExtensionAttributes($rate): array
@@ -1091,7 +1168,7 @@ class Checkout extends Component
     /**
      * Place order
      */
-    public function placeOrder(string $selectedPaymentMethod = ''): void
+    public function placeOrder(string $selectedPaymentMethod = ''): array
     {
         // Payment method passed directly from client DOM — no wire:click request needed
         if ($selectedPaymentMethod !== '') {
@@ -1101,11 +1178,12 @@ class Checkout extends Component
         $this->orderError = '';
         if ($this->isIdempotencyKeyAlreadyUsed()) {
             $this->orderError = (string)__('This order is already being processed. Please wait.');
-            return;
+            return $this->buildPlaceOrderResponse(false);
         }
 
         $quote = $this->checkoutSession->getQuote();
         $isVirtual = (bool)$quote->isVirtual();
+        $this->applyRawEmailIfMissing();
 
         $this->logger->info('Fastcheckout placeOrder started', [
             'quote_id' => $quote->getId(),
@@ -1118,13 +1196,13 @@ class Checkout extends Component
         if (!$quote->hasItems()) {
             $this->orderError = (string)__('Your cart is empty.');
             $this->logger->info('Fastcheckout placeOrder blocked: empty cart', ['quote_id' => $quote->getId()]);
-            return;
+            return $this->buildPlaceOrderResponse(false);
         }
 
         if (empty($this->email)) {
             $this->orderError = (string)__('Please enter your email address.');
             $this->logger->info('Fastcheckout placeOrder blocked: missing email', ['quote_id' => $quote->getId()]);
-            return;
+            return $this->buildPlaceOrderResponse(false);
         }
 
         if (!$quote->getCustomerId()) {
@@ -1135,25 +1213,26 @@ class Checkout extends Component
         try {
             $this->saveShippingAddress(false);
             $this->saveBillingAddress(false);
+            $this->applyRawShippingMethodIfMissing($quote);
         } catch (\Exception $e) {
             $this->logger->warning('Fastcheckout placeOrder blocked: address validation failed', [
                 'quote_id' => $quote->getId(),
                 'exception' => $e,
             ]);
             $this->orderError = (string)__('Please check your address details and try again.');
-            return;
+            return $this->buildPlaceOrderResponse(false);
         }
         
         if (!$isVirtual && empty($this->shippingMethod)) {
             $this->orderError = (string)__('Please select a shipping method.');
             $this->logger->info('Fastcheckout placeOrder blocked: missing shipping method', ['quote_id' => $quote->getId()]);
-            return;
+            return $this->buildPlaceOrderResponse(false);
         }
 
         if (empty($this->paymentMethod)) {
             $this->orderError = (string)__('Please select a payment method.');
             $this->logger->info('Fastcheckout placeOrder blocked: missing payment method', ['quote_id' => $quote->getId()]);
-            return;
+            return $this->buildPlaceOrderResponse(false);
         }
 
         if (!$this->isSelectedPaymentMethodStillAllowed($this->paymentMethod)) {
@@ -1162,7 +1241,7 @@ class Checkout extends Component
                 'quote_id' => $quote->getId(),
                 'payment_method' => $this->paymentMethod,
             ]);
-            return;
+            return $this->buildPlaceOrderResponse(false);
         }
 
         if ($this->paymentMethod === 'purchaseorder' && empty($this->poNumber) && isset($this->paymentAdditionalData['po_number'])) {
@@ -1172,7 +1251,7 @@ class Checkout extends Component
         if ($this->paymentMethod === 'purchaseorder' && empty($this->poNumber)) {
             $this->orderError = (string)__('Purchase Order Number is a required field.');
             $this->logger->info('Fastcheckout placeOrder blocked: missing purchase order number', ['quote_id' => $quote->getId()]);
-            return;
+            return $this->buildPlaceOrderResponse(false);
         }
 
         if (!$this->validateCheckoutAgreements()) {
@@ -1183,13 +1262,13 @@ class Checkout extends Component
                 'quote_id' => $quote->getId(),
                 'payment_method' => $this->paymentMethod,
             ]);
-            return;
+            return $this->buildPlaceOrderResponse(false);
         }
 
         try {
             if (!$this->claimIdempotencyKey()) {
                 $this->orderError = (string)__('This order is already being processed. Please wait.');
-                return;
+                return $this->buildPlaceOrderResponse(false);
             }
 
             $payment = $quote->getPayment();
@@ -1258,6 +1337,8 @@ class Checkout extends Component
                 'orderId' => $orderId,
                 'redirectUrl' => $redirectUrl ?: ''
             ]);
+
+            return $this->buildPlaceOrderResponse(true, $orderId, $redirectUrl);
         } catch (\Exception $e) {
             $this->orderError = (string)__('Something went wrong while processing your order. Please try again later.');
             $this->logger->error('Fastcheckout placeOrder failed', [
@@ -1267,7 +1348,33 @@ class Checkout extends Component
             ]);
             // Regenerate idempotency key on failure so the user can submit again
             $this->idempotencyKey = bin2hex(random_bytes(16));
+
+            return $this->buildPlaceOrderResponse(false);
         }
+    }
+
+    private function buildPlaceOrderResponse(bool $success, $orderId = null, string $redirectUrl = ''): array
+    {
+        $response = [
+            'success' => $success,
+            'message' => $success ? '' : (string)$this->orderError,
+            'error' => $success ? '' : (string)$this->orderError,
+            'method' => (string)$this->paymentMethod,
+            'payment_method' => (string)$this->paymentMethod,
+        ];
+
+        if ($orderId) {
+            $response['orderId'] = $orderId;
+            $response['order_id'] = $orderId;
+        }
+
+        if ($redirectUrl !== '') {
+            $response['redirectUrl'] = $redirectUrl;
+            $response['redirect_url'] = $redirectUrl;
+            $response['redirectUri'] = $redirectUrl;
+        }
+
+        return $response;
     }
 
     private function claimIdempotencyKey(): bool
@@ -1558,7 +1665,7 @@ class Checkout extends Component
 
         $selectedMethodCode = $selectedMethodCode !== '' ? $selectedMethodCode : $methodCode;
         $rawPaymentData = $this->getRawPaymentData($methodCode, $selectedMethodCode);
-        $additionalData = array_merge(
+        $additionalData = $this->mergeGenericData(
             $this->getGenericAdditionalPaymentData($selectedMethodCode),
             $this->normalizePaymentAdditionalData($rawPaymentData['additional_data'] ?? []),
             $this->normalizePaymentAdditionalData($this->paymentAdditionalData)
@@ -1568,7 +1675,7 @@ class Checkout extends Component
         $data['method'] = $methodCode;
         $data['additional_data'] = $additionalData;
 
-        $extensionAttributes = array_merge(
+        $extensionAttributes = $this->mergeGenericData(
             $this->normalizePaymentAdditionalData($rawPaymentData['extension_attributes'] ?? []),
             $this->normalizePaymentAdditionalData($this->paymentExtensionAttributes)
         );
@@ -1590,8 +1697,8 @@ class Checkout extends Component
             return [];
         }
 
-        $paymentData = $this->placeOrderRequestData['paymentMethod'] ?? [];
-        if (!is_array($paymentData)) {
+        $paymentData = $this->getRawPaymentPayloadData();
+        if (empty($paymentData)) {
             return [];
         }
 
@@ -1609,6 +1716,48 @@ class Checkout extends Component
         return $paymentData;
     }
 
+    private function getRawPaymentPayloadData(): array
+    {
+        if (!is_array($this->placeOrderRequestData)) {
+            return [];
+        }
+
+        $payload = $this->placeOrderRequestData;
+        $paymentData = $this->mergeGenericData(
+            $this->coercePaymentMethodPayload($payload['payment_method'] ?? []),
+            $this->coercePaymentMethodPayload($payload['paymentMethod'] ?? []),
+            $this->coercePaymentMethodPayload($payload['payment'] ?? [])
+        );
+
+        if (!empty($paymentData)) {
+            return $paymentData;
+        }
+
+        return $this->payloadLooksLikePaymentData($payload)
+            ? $this->normalizeGenericData($payload)
+            : [];
+    }
+
+    private function coercePaymentMethodPayload($paymentMethod): array
+    {
+        if (is_scalar($paymentMethod) && (string)$paymentMethod !== '') {
+            return ['method' => (string)$paymentMethod];
+        }
+
+        return $this->normalizeGenericData($paymentMethod);
+    }
+
+    private function payloadLooksLikePaymentData(array $payload): bool
+    {
+        foreach (['method', 'additional_data', 'additionalData', 'extension_attributes', 'extensionAttributes', 'po_number'] as $key) {
+            if (array_key_exists($key, $payload)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function normalizePaymentPayload(array $paymentData): array
     {
         $paymentData = $this->normalizeGenericData($paymentData);
@@ -1616,8 +1765,8 @@ class Checkout extends Component
         if (isset($paymentData['additionalData']) && !isset($paymentData['additional_data'])) {
             $paymentData['additional_data'] = $paymentData['additionalData'];
         } elseif (isset($paymentData['additionalData']) && is_array($paymentData['additionalData'])) {
-            $paymentData['additional_data'] = array_merge(
-                is_array($paymentData['additional_data'] ?? null) ? $paymentData['additional_data'] : [],
+            $paymentData['additional_data'] = $this->mergeGenericData(
+                $paymentData['additional_data'] ?? [],
                 $paymentData['additionalData']
             );
         }
@@ -1625,8 +1774,8 @@ class Checkout extends Component
         if (isset($paymentData['extensionAttributes']) && !isset($paymentData['extension_attributes'])) {
             $paymentData['extension_attributes'] = $paymentData['extensionAttributes'];
         } elseif (isset($paymentData['extensionAttributes']) && is_array($paymentData['extensionAttributes'])) {
-            $paymentData['extension_attributes'] = array_merge(
-                is_array($paymentData['extension_attributes'] ?? null) ? $paymentData['extension_attributes'] : [],
+            $paymentData['extension_attributes'] = $this->mergeGenericData(
+                $paymentData['extension_attributes'] ?? [],
                 $paymentData['extensionAttributes']
             );
         }
@@ -1639,6 +1788,240 @@ class Checkout extends Component
     private function normalizePaymentAdditionalData($data): array
     {
         return $this->normalizeGenericData($data);
+    }
+
+    private function getMergedAddressCustomAttributes(bool $isBilling): array
+    {
+        $componentAttributes = $isBilling ? $this->billingCustomAttributes : $this->shippingCustomAttributes;
+
+        return $this->mergeGenericData(
+            $this->getRawAddressCustomAttributes($isBilling),
+            $componentAttributes
+        );
+    }
+
+    private function getMergedAddressExtensionAttributes(bool $isBilling): array
+    {
+        $componentAttributes = $isBilling ? $this->billingExtensionAttributes : $this->shippingExtensionAttributes;
+
+        return $this->mergeGenericData(
+            $this->getRawAddressExtensionAttributes($isBilling),
+            $componentAttributes
+        );
+    }
+
+    private function getRawAddressCustomAttributes(bool $isBilling): array
+    {
+        $addressData = $this->getRawAddressData($isBilling);
+
+        return $this->mergeGenericData(
+            $addressData['custom_attributes'] ?? [],
+            $addressData['customAttributes'] ?? []
+        );
+    }
+
+    private function getRawAddressExtensionAttributes(bool $isBilling): array
+    {
+        $addressData = $this->getRawAddressData($isBilling);
+
+        $extensionAttributes = $this->mergeGenericData(
+            $addressData['extension_attributes'] ?? [],
+            $addressData['extensionAttributes'] ?? []
+        );
+
+        if (!$isBilling) {
+            $addressInformation = $this->getRawAddressInformationData();
+            $extensionAttributes = $this->mergeGenericData(
+                $extensionAttributes,
+                $addressInformation['extension_attributes'] ?? [],
+                $addressInformation['extensionAttributes'] ?? []
+            );
+        }
+
+        return $extensionAttributes;
+    }
+
+    private function getRawAddressData(bool $isBilling): array
+    {
+        if (!is_array($this->placeOrderRequestData)) {
+            return [];
+        }
+
+        $addressInformation = $this->getRawAddressInformationData();
+        $addressKey = $isBilling ? 'billing_address' : 'shipping_address';
+        $camelAddressKey = $isBilling ? 'billingAddress' : 'shippingAddress';
+
+        $addressData = $this->mergeGenericData(
+            $addressInformation[$addressKey] ?? [],
+            $addressInformation[$camelAddressKey] ?? []
+        );
+
+        $addressData = $this->mergeGenericData(
+            $addressData,
+            $this->placeOrderRequestData[$camelAddressKey] ?? [],
+            $this->placeOrderRequestData[$addressKey] ?? []
+        );
+
+        return $addressData;
+    }
+
+    private function getRawAddressInformationData(): array
+    {
+        if (!is_array($this->placeOrderRequestData)) {
+            return [];
+        }
+
+        return $this->mergeGenericData(
+            $this->placeOrderRequestData['addressInformation'] ?? [],
+            $this->placeOrderRequestData['address_information'] ?? []
+        );
+    }
+
+    private function applyRawEmailIfMissing(): void
+    {
+        if (trim((string)$this->email) !== '') {
+            return;
+        }
+
+        $email = $this->getRawEmailFromPayload();
+        if ($email !== '') {
+            $this->email = $email;
+        }
+    }
+
+    private function getRawEmailFromPayload(): string
+    {
+        if (!is_array($this->placeOrderRequestData)) {
+            return '';
+        }
+
+        $addressInformation = $this->getRawAddressInformationData();
+
+        foreach ([
+            $this->placeOrderRequestData,
+            $this->getRawAddressData(true),
+            $this->getRawAddressData(false),
+            $addressInformation,
+            $addressInformation['billing_address'] ?? [],
+            $addressInformation['billingAddress'] ?? [],
+            $addressInformation['shipping_address'] ?? [],
+            $addressInformation['shippingAddress'] ?? [],
+        ] as $source) {
+            $email = $this->extractEmailFromPayloadSource($source);
+            if ($email !== '') {
+                return $email;
+            }
+        }
+
+        return '';
+    }
+
+    private function extractEmailFromPayloadSource($source): string
+    {
+        $source = $this->normalizeGenericData($source);
+        foreach (['email', 'customer_email', 'customerEmail'] as $key) {
+            if (!empty($source[$key]) && is_scalar($source[$key])) {
+                return trim((string)$source[$key]);
+            }
+        }
+
+        return '';
+    }
+
+    private function applyAddressEmail($address): void
+    {
+        $email = trim((string)$this->email);
+        if ($email === '') {
+            return;
+        }
+
+        if (method_exists($address, 'setEmail')) {
+            $address->setEmail($email);
+            return;
+        }
+
+        if (method_exists($address, 'setData')) {
+            $address->setData('email', $email);
+        }
+    }
+
+    private function applyRawShippingMethodIfMissing($quote): void
+    {
+        if ($this->shippingMethod !== '') {
+            return;
+        }
+
+        $shippingMethod = $this->getRawShippingMethodCode();
+        if ($shippingMethod === '') {
+            return;
+        }
+
+        $this->shippingMethod = $shippingMethod;
+        $shippingAddress = $quote ? $quote->getShippingAddress() : null;
+        if ($shippingAddress && method_exists($shippingAddress, 'setShippingMethod')) {
+            $shippingAddress->setShippingMethod($shippingMethod);
+        }
+    }
+
+    private function getRawShippingMethodCode(): string
+    {
+        $addressInformation = $this->getRawAddressInformationData();
+        $shippingAddress = $this->getRawAddressData(false);
+
+        foreach ([$addressInformation, $shippingAddress, $this->placeOrderRequestData] as $source) {
+            $shippingMethod = $this->extractShippingMethodCode($source);
+            if ($shippingMethod !== '') {
+                return $shippingMethod;
+            }
+        }
+
+        return '';
+    }
+
+    private function extractShippingMethodCode($source): string
+    {
+        $source = $this->normalizeGenericData($source);
+        if ($source === []) {
+            return '';
+        }
+
+        $carrier = (string)($source['shipping_carrier_code'] ?? $source['shippingCarrierCode'] ?? $source['carrier_code'] ?? $source['carrierCode'] ?? '');
+        $method = (string)($source['shipping_method_code'] ?? $source['shippingMethodCode'] ?? $source['method_code'] ?? $source['methodCode'] ?? '');
+
+        if ($carrier !== '' && $method !== '') {
+            return $carrier . '_' . $method;
+        }
+
+        foreach (['shipping_method', 'shippingMethod', 'method'] as $key) {
+            if (!empty($source[$key]) && is_scalar($source[$key])) {
+                return (string)$source[$key];
+            }
+        }
+
+        foreach (['shipping_method', 'shippingMethod', 'shipping_method_data', 'shippingMethodData'] as $key) {
+            if (!empty($source[$key]) && is_array($source[$key])) {
+                $shippingMethod = $this->extractShippingMethodCode($source[$key]);
+                if ($shippingMethod !== '') {
+                    return $shippingMethod;
+                }
+            }
+        }
+
+        return '';
+    }
+
+    private function mergeGenericData(...$values): array
+    {
+        $result = [];
+
+        foreach ($values as $value) {
+            $normalized = $this->normalizeGenericData($value);
+            if ($normalized !== []) {
+                $result = array_replace_recursive($result, $normalized);
+            }
+        }
+
+        return $result;
     }
 
     private function applyAddressAttributes($address, $customAttributes, $extensionAttributes): void
@@ -1772,11 +2155,27 @@ class Checkout extends Component
 
     private function extractAttributeData($attribute): ?array
     {
-        if (is_array($attribute) && isset($attribute['attribute_code'])) {
+        if (is_array($attribute) && (isset($attribute['attribute_code']) || isset($attribute['attributeCode']))) {
             return [
-                'code' => (string)$attribute['attribute_code'],
+                'code' => (string)($attribute['attribute_code'] ?? $attribute['attributeCode']),
                 'value' => $attribute['value'] ?? null,
             ];
+        }
+
+        if (is_array($attribute) && array_key_exists('value', $attribute)) {
+            $code = null;
+            if (array_key_exists('code', $attribute) && !$this->hasUnsupportedAttributeArrayKeys($attribute, ['code', 'value', 'label'])) {
+                $code = $attribute['code'];
+            } elseif (array_key_exists('name', $attribute) && !$this->hasUnsupportedAttributeArrayKeys($attribute, ['name', 'value', 'label'])) {
+                $code = $attribute['name'];
+            }
+
+            if ($code !== null && (string)$code !== '') {
+                return [
+                    'code' => (string)$code,
+                    'value' => $attribute['value'],
+                ];
+            }
         }
 
         if (
@@ -1799,7 +2198,38 @@ class Checkout extends Component
             }
         }
 
+        if (is_object($attribute) && method_exists($attribute, 'getValue')) {
+            try {
+                $code = null;
+                if (method_exists($attribute, 'getCode')) {
+                    $code = $attribute->getCode();
+                } elseif (method_exists($attribute, 'getName')) {
+                    $code = $attribute->getName();
+                }
+
+                if ($code !== null && (string)$code !== '') {
+                    return [
+                        'code' => (string)$code,
+                        'value' => $attribute->getValue(),
+                    ];
+                }
+            } catch (\Throwable $e) {
+                return null;
+            }
+        }
+
         return null;
+    }
+
+    private function hasUnsupportedAttributeArrayKeys(array $attribute, array $supportedKeys): bool
+    {
+        foreach (array_keys($attribute) as $key) {
+            if (!in_array((string)$key, $supportedKeys, true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function coerceGenericDataArray($data): ?array
@@ -1874,7 +2304,7 @@ class Checkout extends Component
             $availableMethodCode !== '' ? $availableMethodCode : $this->paymentMethod,
             $this->paymentMethod
         );
-        $extensionAttributes = array_merge(
+        $extensionAttributes = $this->mergeGenericData(
             $this->normalizePaymentAdditionalData($rawPaymentData['extension_attributes'] ?? []),
             $this->normalizePaymentAdditionalData($this->paymentExtensionAttributes)
         );

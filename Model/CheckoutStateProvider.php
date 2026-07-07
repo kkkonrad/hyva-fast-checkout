@@ -65,12 +65,19 @@ class CheckoutStateProvider
             $selectedPaymentMethod = $selectedPaymentMethod !== ''
                 ? $selectedPaymentMethod
                 : ($payment ? (string)$payment->getMethod() : '');
+            $selectedShippingMethod = $this->getSelectedShippingMethodCode($quote);
 
             return [
                 'totals' => $this->buildTotalsData($quote),
                 'payment_methods' => $this->buildPaymentMethodsData($quote),
                 'shipping_rates' => $this->buildShippingRatesData($quote),
                 'selected_payment_method' => $selectedPaymentMethod,
+                'selectedPaymentMethod' => $selectedPaymentMethod,
+                'paymentMethod' => $selectedPaymentMethod,
+                'selected_shipping_method' => $selectedShippingMethod,
+                'selectedShippingMethod' => $selectedShippingMethod,
+                'selected_shipping_rate' => $selectedShippingMethod,
+                'selectedShippingRate' => $selectedShippingMethod,
                 'coupon_code' => $quote ? (string)$quote->getCouponCode() : '',
             ];
         } catch (\Throwable $exception) {
@@ -90,8 +97,25 @@ class CheckoutStateProvider
                 'payment_methods' => [],
                 'shipping_rates' => [],
                 'selected_payment_method' => $selectedPaymentMethod,
+                'selectedPaymentMethod' => $selectedPaymentMethod,
+                'paymentMethod' => $selectedPaymentMethod,
+                'selected_shipping_method' => '',
+                'selectedShippingMethod' => '',
+                'selected_shipping_rate' => '',
+                'selectedShippingRate' => '',
                 'coupon_code' => '',
             ];
+        }
+    }
+
+    private function getSelectedShippingMethodCode($quote): string
+    {
+        try {
+            $shippingAddress = $quote ? $quote->getShippingAddress() : null;
+
+            return $shippingAddress ? (string)$shippingAddress->getShippingMethod() : '';
+        } catch (\Throwable $exception) {
+            return '';
         }
     }
 
@@ -199,16 +223,19 @@ class CheckoutStateProvider
                     continue;
                 }
 
-                $price = (float)$rate->getPrice();
+                $price = $this->getShippingRateNumericValue($rate, ['price'], 0.0);
+                if ($price === 0.0 && method_exists($rate, 'getPrice')) {
+                    $price = (float)$rate->getPrice();
+                }
                 $rateData = [
                     'carrier_code' => (string)$rate->getCarrier(),
                     'method_code' => (string)$rate->getMethod(),
                     'carrier_title' => (string)$rate->getCarrierTitle(),
                     'method_title' => (string)$rate->getMethodTitle(),
-                    'amount' => $price,
-                    'base_amount' => $price,
-                    'price_excl_tax' => $price,
-                    'price_incl_tax' => $price,
+                    'amount' => $this->getShippingRateNumericValue($rate, ['amount'], $price),
+                    'base_amount' => $this->getShippingRateNumericValue($rate, ['base_amount', 'baseAmount'], $price),
+                    'price_excl_tax' => $this->getShippingRateNumericValue($rate, ['price_excl_tax', 'priceExclTax'], $price),
+                    'price_incl_tax' => $this->getShippingRateNumericValue($rate, ['price_incl_tax', 'priceInclTax'], $price),
                     'available' => !$rate->getErrorMessage(),
                     'error_message' => (string)$rate->getErrorMessage(),
                 ];
@@ -216,6 +243,7 @@ class CheckoutStateProvider
                 $extensionAttributes = $this->getShippingRateExtensionAttributes($rate);
                 if (!empty($extensionAttributes)) {
                     $rateData['extension_attributes'] = $extensionAttributes;
+                    $rateData['extensionAttributes'] = $extensionAttributes;
                 }
 
                 $ratesData[] = $rateData;
@@ -223,6 +251,36 @@ class CheckoutStateProvider
         }
 
         return $ratesData;
+    }
+
+    private function getShippingRateNumericValue($rate, array $keys, float $default): float
+    {
+        foreach ($keys as $key) {
+            if (method_exists($rate, 'getData')) {
+                try {
+                    $value = $rate->getData($key);
+                    if ($value !== null && $value !== '' && is_numeric($value)) {
+                        return (float)$value;
+                    }
+                } catch (\Throwable $exception) {
+                    // Try an explicit getter below.
+                }
+            }
+
+            $getter = 'get' . str_replace(' ', '', ucwords(str_replace('_', ' ', (string)$key)));
+            if (method_exists($rate, $getter)) {
+                try {
+                    $value = $rate->{$getter}();
+                    if ($value !== null && $value !== '' && is_numeric($value)) {
+                        return (float)$value;
+                    }
+                } catch (\Throwable $exception) {
+                    // Keep the fallback value.
+                }
+            }
+        }
+
+        return $default;
     }
 
     private function getShippingRateExtensionAttributes($rate): array
@@ -399,11 +457,27 @@ class CheckoutStateProvider
 
     private function extractAttributeData($attribute): ?array
     {
-        if (is_array($attribute) && isset($attribute['attribute_code'])) {
+        if (is_array($attribute) && (isset($attribute['attribute_code']) || isset($attribute['attributeCode']))) {
             return [
-                'code' => (string)$attribute['attribute_code'],
+                'code' => (string)($attribute['attribute_code'] ?? $attribute['attributeCode']),
                 'value' => $attribute['value'] ?? null,
             ];
+        }
+
+        if (is_array($attribute) && array_key_exists('value', $attribute)) {
+            $code = null;
+            if (array_key_exists('code', $attribute) && !$this->hasUnsupportedAttributeArrayKeys($attribute, ['code', 'value', 'label'])) {
+                $code = $attribute['code'];
+            } elseif (array_key_exists('name', $attribute) && !$this->hasUnsupportedAttributeArrayKeys($attribute, ['name', 'value', 'label'])) {
+                $code = $attribute['name'];
+            }
+
+            if ($code !== null && (string)$code !== '') {
+                return [
+                    'code' => (string)$code,
+                    'value' => $attribute['value'],
+                ];
+            }
         }
 
         if (
@@ -426,7 +500,38 @@ class CheckoutStateProvider
             }
         }
 
+        if (is_object($attribute) && method_exists($attribute, 'getValue')) {
+            try {
+                $code = null;
+                if (method_exists($attribute, 'getCode')) {
+                    $code = $attribute->getCode();
+                } elseif (method_exists($attribute, 'getName')) {
+                    $code = $attribute->getName();
+                }
+
+                if ($code !== null && (string)$code !== '') {
+                    return [
+                        'code' => (string)$code,
+                        'value' => $attribute->getValue(),
+                    ];
+                }
+            } catch (\Throwable $exception) {
+                return null;
+            }
+        }
+
         return null;
+    }
+
+    private function hasUnsupportedAttributeArrayKeys(array $attribute, array $supportedKeys): bool
+    {
+        foreach (array_keys($attribute) as $key) {
+            if (!in_array((string)$key, $supportedKeys, true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function coerceGenericDataArray($data): ?array
