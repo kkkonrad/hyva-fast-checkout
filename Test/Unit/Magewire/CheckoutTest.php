@@ -142,37 +142,11 @@ class CheckoutTest extends TestCase
                 $methodCode = (string)$methodCode;
                 foreach ($allowedRules as $rule) {
                     $rule = trim((string)$rule);
-                    if ($rule === '*' || $rule === $methodCode) {
+                    if ($rule === $methodCode) {
                         return true;
-                    }
-                    if (substr($rule, -1) === '*') {
-                        $prefix = rtrim(substr($rule, 0, -1), '_-');
-                        if (
-                            $prefix !== ''
-                            && (
-                                $methodCode === $prefix
-                                || strpos($methodCode, $prefix . '_') === 0
-                                || strpos($methodCode, $prefix . '-') === 0
-                            )
-                        ) {
-                            return true;
-                        }
                     }
                 }
                 return false;
-            });
-        $this->helperMock->method('paymentMethodCodeMatches')
-            ->willReturnCallback(static function ($baseCode, $selectedCode): bool {
-                $baseCode = trim((string)$baseCode);
-                $selectedCode = trim((string)$selectedCode);
-
-                return $baseCode !== ''
-                    && $selectedCode !== ''
-                    && (
-                        $baseCode === $selectedCode
-                        || strpos($selectedCode, $baseCode . '_') === 0
-                        || strpos($selectedCode, $baseCode . '-') === 0
-                    );
             });
 
         $this->checkoutComponent = new Checkout(
@@ -662,7 +636,7 @@ class CheckoutTest extends TestCase
         $this->checkoutComponent->selectPaymentMethod('checkmo');
     }
 
-    public function testSelectPaymentMethodImportsVariantPayloadThroughAvailableBaseMethod(): void
+    public function testSelectPaymentMethodRejectsVariantWhenOnlyBaseMethodIsAvailable(): void
     {
         $this->checkoutComponent->shippingMethod = 'customcarrier_pickup';
 
@@ -687,14 +661,8 @@ class CheckoutTest extends TestCase
             ->with(42)
             ->willReturn([$this->createPaymentMethodMock('payu')]);
 
-        $paymentMock = $this->getMockBuilder(\Magento\Quote\Model\Quote\Payment::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['importData'])
-            ->getMock();
-
-        $this->quoteMock->expects($this->once())
-            ->method('getPayment')
-            ->willReturn($paymentMock);
+        $this->quoteMock->expects($this->never())
+            ->method('getPayment');
 
         $this->checkoutComponent->placeOrderRequestData = [
             'paymentMethod' => [
@@ -706,22 +674,12 @@ class CheckoutTest extends TestCase
             ],
         ];
 
-        $paymentMock->expects($this->once())
-            ->method('importData')
-            ->with($this->callback(static function (array $data): bool {
-                return $data['method'] === 'payu'
-                    && $data['additional_data']['blik_code'] === '123456'
-                    && $data['additional_data']['selected_channel'] === 'blik';
-            }));
-
-        $this->quoteMock->expects($this->once())->method('collectTotals');
-        $this->cartRepositoryMock->expects($this->once())
-            ->method('save')
-            ->with($this->quoteMock);
+        $this->quoteMock->expects($this->never())->method('collectTotals');
+        $this->cartRepositoryMock->expects($this->never())->method('save');
 
         $this->checkoutComponent->selectPaymentMethod('payu_blik');
 
-        $this->assertSame('payu_blik', $this->checkoutComponent->paymentMethod);
+        $this->assertSame('', $this->checkoutComponent->paymentMethod);
     }
 
     public function testSelectPaymentMethodRefreshesPayloadWhenSameMethodIsAlreadySelected(): void
@@ -984,7 +942,7 @@ class CheckoutTest extends TestCase
 
         $methods = $this->checkoutComponent->getAllowedPaymentMethods();
 
-        $this->assertSame(['cashondelivery', 'payu_gateway'], array_map(static function (PaymentMethodInterface $method): string {
+        $this->assertSame(['cashondelivery'], array_map(static function (PaymentMethodInterface $method): string {
             return $method->getCode();
         }, $methods));
     }
@@ -1017,24 +975,18 @@ class CheckoutTest extends TestCase
         $helperMock = $this->createMock(\Kkkonrad\Fastcheckout\Helper\Data::class);
         $helperMock->method('getMappedPaymentMethodsForShipping')
             ->with('customcarrier_pickup')
-            ->willReturn(['*']);
+            ->willReturn(['checkmo', 'payu_blik', 'payu_card', 'stripe_payments']);
         $helperMock->method('isRestrictPaymentEnable')
             ->willReturn(true);
         $helperMock->method('getRestrictPaymentMethods')
-            ->willReturn(['payu_*', 'checkmo']);
+            ->willReturn(['payu_blik', 'checkmo']);
         $helperMock->method('isPaymentMethodCodeAllowedByRules')
             ->willReturnCallback(static function ($methodCode, array $allowedRules): bool {
                 $methodCode = (string)$methodCode;
                 foreach ($allowedRules as $rule) {
                     $rule = trim((string)$rule);
-                    if ($rule === '*' || $rule === $methodCode) {
+                    if ($rule === $methodCode) {
                         return true;
-                    }
-                    if (substr($rule, -1) === '*') {
-                        $prefix = rtrim(substr($rule, 0, -1), '_');
-                        if ($prefix !== '' && strpos($methodCode, $prefix . '_') === 0) {
-                            return true;
-                        }
                     }
                 }
                 return false;
@@ -1055,29 +1007,40 @@ class CheckoutTest extends TestCase
 
         $methods = $component->getAllowedPaymentMethods();
 
-        $this->assertSame(['checkmo', 'payu_blik', 'payu_card'], array_map(static function (PaymentMethodInterface $method): string {
+        $this->assertSame(['checkmo', 'payu_blik'], array_map(static function (PaymentMethodInterface $method): string {
             return $method->getCode();
         }, $methods));
     }
 
-    public function testIsPaymentMethodAvailableUsesWildcardRules(): void
+    public function testIsPaymentMethodAvailableUsesExactRules(): void
     {
-        $this->assertTrue($this->checkoutComponent->isPaymentMethodAvailable('payu_blik', ['payu_*']));
+        $this->assertFalse($this->checkoutComponent->isPaymentMethodAvailable('payu_blik', ['payu_*']));
         $this->assertTrue($this->checkoutComponent->isPaymentMethodAvailable('checkmo', ['checkmo']));
+        $this->assertFalse($this->checkoutComponent->isPaymentMethodAvailable('stripe_payments', ['*']));
         $this->assertFalse($this->checkoutComponent->isPaymentMethodAvailable('stripe_payments', ['payu_*', 'checkmo']));
     }
 
-    public function testIsPaymentMethodSelectedMatchesBaseAndVariantCodes(): void
+    public function testIsPaymentMethodSelectedMatchesExactCodeOnly(): void
     {
         $this->checkoutComponent->paymentMethod = 'payu_blik';
 
-        $this->assertTrue($this->checkoutComponent->isPaymentMethodSelected('payu'));
+        $this->assertFalse($this->checkoutComponent->isPaymentMethodSelected('payu'));
         $this->assertTrue($this->checkoutComponent->isPaymentMethodSelected('payu_blik'));
         $this->assertFalse($this->checkoutComponent->isPaymentMethodSelected('paypal'));
 
         $this->checkoutComponent->paymentMethod = 'payu';
 
-        $this->assertTrue($this->checkoutComponent->isPaymentMethodSelected('payu_blik'));
+        $this->assertFalse($this->checkoutComponent->isPaymentMethodSelected('payu_blik'));
+
+        $this->checkoutComponent->paymentMethod = 'braintree_cc_vault';
+
+        $this->assertTrue($this->checkoutComponent->isPaymentMethodSelected('braintree_cc_vault'));
+        $this->assertFalse($this->checkoutComponent->isPaymentMethodSelected('braintree'));
+
+        $this->checkoutComponent->paymentMethod = 'braintree';
+
+        $this->assertTrue($this->checkoutComponent->isPaymentMethodSelected('braintree'));
+        $this->assertFalse($this->checkoutComponent->isPaymentMethodSelected('braintree_cc_vault'));
     }
 
     public function testApplyCoupon(): void

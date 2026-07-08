@@ -662,12 +662,7 @@ class Checkout extends Component
     {
         $selectedPaymentMethod = (string)$this->paymentMethod;
 
-        return $selectedPaymentMethod !== ''
-            && (
-                $selectedPaymentMethod === $paymentMethodCode
-                || $this->paymentMethodCodeMatches($paymentMethodCode, $selectedPaymentMethod)
-                || $this->paymentMethodCodeMatches($selectedPaymentMethod, $paymentMethodCode)
-            );
+        return $selectedPaymentMethod !== '' && $selectedPaymentMethod === $paymentMethodCode;
     }
 
     private function isSelectedPaymentMethodStillAllowed(string $paymentMethodCode): bool
@@ -718,42 +713,14 @@ class Checkout extends Component
             return '';
         }
 
-        $fallbackCode = '';
         foreach ($this->getAllowedPaymentMethods() as $method) {
             $availableCode = (string)$method->getCode();
             if ($availableCode === $paymentMethodCode) {
                 return $availableCode;
             }
-
-            if ($fallbackCode === '' && $this->paymentMethodCodeMatches($availableCode, $paymentMethodCode)) {
-                $fallbackCode = $availableCode;
-            }
         }
 
-        return $fallbackCode;
-    }
-
-    private function paymentMethodCodeMatches(string $baseCode, string $selectedCode): bool
-    {
-        if ($baseCode === '' || $selectedCode === '') {
-            return false;
-        }
-
-        if ($baseCode === $selectedCode) {
-            return true;
-        }
-
-        try {
-            $matches = $this->helper->paymentMethodCodeMatches($baseCode, $selectedCode);
-            if (is_bool($matches)) {
-                return $matches;
-            }
-        } catch (\Throwable $e) {
-            // Fall back to local matching for old/mocked helpers.
-        }
-
-        return strpos($selectedCode, $baseCode . '_') === 0
-            || strpos($selectedCode, $baseCode . '-') === 0;
+        return '';
     }
 
     public function getAllowedPaymentMethodCodes(): array
@@ -1708,7 +1675,6 @@ class Checkout extends Component
             $payloadMethod !== ''
             && $payloadMethod !== $methodCode
             && $payloadMethod !== $selectedMethodCode
-            && !$this->paymentMethodCodeMatches($methodCode, $payloadMethod)
         ) {
             return [];
         }

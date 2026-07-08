@@ -170,36 +170,12 @@ class Data extends AbstractHelper
                 continue;
             }
 
-            if ($rule === '*' || $rule === $paymentMethodCode) {
+            if ($rule === $paymentMethodCode) {
                 return true;
-            }
-
-            if (substr($rule, -1) === '*') {
-                $prefix = rtrim(substr($rule, 0, -1), '_-');
-                if ($this->paymentMethodCodeMatches($prefix, $paymentMethodCode)) {
-                    return true;
-                }
             }
         }
 
         return false;
-    }
-
-    public function paymentMethodCodeMatches($baseCode, $selectedCode): bool
-    {
-        $baseCode = trim((string)$baseCode);
-        $selectedCode = trim((string)$selectedCode);
-
-        if ($baseCode === '' || $selectedCode === '') {
-            return false;
-        }
-
-        if ($baseCode === $selectedCode) {
-            return true;
-        }
-
-        return strpos($selectedCode, $baseCode . '_') === 0
-            || strpos($selectedCode, $baseCode . '-') === 0;
     }
 
     private function shippingMappingRuleMatches(string $ruleShippingMethod, string $shippingMethod): bool

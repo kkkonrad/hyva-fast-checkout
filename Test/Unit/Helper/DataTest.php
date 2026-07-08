@@ -62,29 +62,19 @@ class DataTest extends TestCase
         );
     }
 
-    public function testIsPaymentMethodCodeAllowedByRulesMatchesExactAndPrefixWildcards(): void
+    public function testIsPaymentMethodCodeAllowedByRulesMatchesExactCodesOnly(): void
     {
         $helper = $this->createHelper('', $this->createMock(JsonHelper::class));
 
-        $this->assertTrue($helper->isPaymentMethodCodeAllowedByRules('payu', ['payu_*']));
-        $this->assertTrue($helper->isPaymentMethodCodeAllowedByRules('payu_blik', ['payu_*']));
-        $this->assertTrue($helper->isPaymentMethodCodeAllowedByRules('payu-card', ['payu_*']));
-        $this->assertTrue($helper->isPaymentMethodCodeAllowedByRules('payu_card', ['checkmo', 'payu_*']));
-        $this->assertTrue($helper->isPaymentMethodCodeAllowedByRules('stripe_payments', ['*']));
         $this->assertTrue($helper->isPaymentMethodCodeAllowedByRules('checkmo', ['checkmo']));
+        $this->assertTrue($helper->isPaymentMethodCodeAllowedByRules('payu_blik', ['checkmo', 'payu_blik']));
+        $this->assertFalse($helper->isPaymentMethodCodeAllowedByRules('payu', ['payu_*']));
+        $this->assertFalse($helper->isPaymentMethodCodeAllowedByRules('payu_blik', ['payu_*']));
+        $this->assertFalse($helper->isPaymentMethodCodeAllowedByRules('payu-card', ['payu_*']));
+        $this->assertFalse($helper->isPaymentMethodCodeAllowedByRules('payu_card', ['checkmo', 'payu_*']));
+        $this->assertFalse($helper->isPaymentMethodCodeAllowedByRules('stripe_payments', ['*']));
         $this->assertFalse($helper->isPaymentMethodCodeAllowedByRules('payu_blik', ['checkmo', 'banktransfer']));
         $this->assertFalse($helper->isPaymentMethodCodeAllowedByRules('', ['*']));
-    }
-
-    public function testPaymentMethodCodeMatchesBaseCodeAndSeparatedVariants(): void
-    {
-        $helper = $this->createHelper('', $this->createMock(JsonHelper::class));
-
-        $this->assertTrue($helper->paymentMethodCodeMatches('payu', 'payu'));
-        $this->assertTrue($helper->paymentMethodCodeMatches('payu', 'payu_blik'));
-        $this->assertTrue($helper->paymentMethodCodeMatches('payu', 'payu-card'));
-        $this->assertFalse($helper->paymentMethodCodeMatches('pay', 'paypal'));
-        $this->assertFalse($helper->paymentMethodCodeMatches('', 'payu_blik'));
     }
 
     private function createHelper(

@@ -1947,8 +1947,8 @@ define([
                         if (
                             !method.disabled &&
                             (
-                                paymentMethodCodesMatch(method.method, methodCode) ||
-                                paymentMethodCodesMatch(methodCode, method.method)
+                                paymentMethodCodesEqual(method.method, methodCode) ||
+                                paymentMethodCodesEqual(methodCode, method.method)
                             )
                         ) {
                             found = true;
@@ -4001,7 +4001,7 @@ define([
                     var quoteMethod = (quote && typeof quote.paymentMethod === 'function' && quote.paymentMethod()) ? quote.paymentMethod().method : '';
                     var domMethod = getCheckedDomPaymentMethod();
 
-                    if (quoteMethod && domMethod && paymentMethodCodesMatch(domMethod, quoteMethod)) {
+                    if (quoteMethod && domMethod && paymentMethodCodesEqual(domMethod, quoteMethod)) {
                         return quoteMethod;
                     }
 
@@ -4014,25 +4014,16 @@ define([
 
                 function getMethod(methodCode) {
                     return methodList().filter(function (method) {
-                        return paymentMethodCodesMatch(method.method, methodCode) ||
-                            paymentMethodCodesMatch(methodCode, method.method);
+                        return paymentMethodCodesEqual(method.method, methodCode) ||
+                            paymentMethodCodesEqual(methodCode, method.method);
                     })[0] || null;
                 }
 
-                function paymentMethodCodesMatch(candidateCode, selectedCode) {
+                function paymentMethodCodesEqual(candidateCode, selectedCode) {
                     candidateCode = candidateCode ? String(candidateCode) : '';
                     selectedCode = selectedCode ? String(selectedCode) : '';
 
-                    if (!candidateCode || !selectedCode) {
-                        return false;
-                    }
-
-                    if (candidateCode === selectedCode) {
-                        return true;
-                    }
-
-                    return selectedCode.indexOf(candidateCode + '_') === 0 ||
-                        selectedCode.indexOf(candidateCode + '-') === 0;
+                    return candidateCode !== '' && candidateCode === selectedCode;
                 }
 
                 function getRendererByMethod(methodCode) {
@@ -4048,8 +4039,8 @@ define([
                         rendererCode = typeof component.getCode === 'function' ? component.getCode() : '';
 
                         if (
-                            paymentMethodCodesMatch(component.item.method, methodCode) ||
-                            paymentMethodCodesMatch(rendererCode, methodCode)
+                            paymentMethodCodesEqual(component.item.method, methodCode) ||
+                            paymentMethodCodesEqual(rendererCode, methodCode)
                         ) {
                             found = component;
                         }
@@ -4114,8 +4105,8 @@ define([
                         matches = false;
 
                     if (
-                        paymentMethodCodesMatch(element.id, methodCode) ||
-                        paymentMethodCodesMatch(element.id, activeCode)
+                        paymentMethodCodesEqual(element.id, methodCode) ||
+                        paymentMethodCodesEqual(element.id, activeCode)
                     ) {
                         return true;
                     }
@@ -4125,12 +4116,12 @@ define([
                             return;
                         }
 
-                        matches = paymentMethodCodesMatch(input.id, methodCode) ||
-                            paymentMethodCodesMatch(input.id, activeCode) ||
-                            paymentMethodCodesMatch(input.value, methodCode) ||
-                            paymentMethodCodesMatch(input.value, activeCode) ||
-                            paymentMethodCodesMatch(input.getAttribute('value'), methodCode) ||
-                            paymentMethodCodesMatch(input.getAttribute('value'), activeCode);
+                        matches = paymentMethodCodesEqual(input.id, methodCode) ||
+                            paymentMethodCodesEqual(input.id, activeCode) ||
+                            paymentMethodCodesEqual(input.value, methodCode) ||
+                            paymentMethodCodesEqual(input.value, activeCode) ||
+                            paymentMethodCodesEqual(input.getAttribute('value'), methodCode) ||
+                            paymentMethodCodesEqual(input.getAttribute('value'), activeCode);
                     });
 
                     return matches;
@@ -4454,8 +4445,8 @@ define([
 
                         if (
                             typeof component.getData === 'function' &&
-                            (paymentMethodCodesMatch(component.item.method, selectedMethod) ||
-                                (typeof component.getCode === 'function' && paymentMethodCodesMatch(component.getCode(), selectedMethod)))
+                            (paymentMethodCodesEqual(component.item.method, selectedMethod) ||
+                                (typeof component.getCode === 'function' && paymentMethodCodesEqual(component.getCode(), selectedMethod)))
                         ) {
                             found = component;
                         }
@@ -4847,8 +4838,8 @@ define([
                                 if (
                                     !input &&
                                     (
-                                        paymentMethodCodesMatch(element.value, methodCode) ||
-                                        paymentMethodCodesMatch(methodCode, element.value)
+                                        paymentMethodCodesEqual(element.value, methodCode) ||
+                                        paymentMethodCodesEqual(methodCode, element.value)
                                     )
                                 ) {
                                     input = element;
