@@ -143,6 +143,7 @@ class Data extends AbstractHelper
         $mappedPayments = [];
         foreach ($mapping as $rule) {
             if (
+                !is_array($rule) ||
                 !isset($rule['shipping_method'], $rule['payment_method']) ||
                 (string)$rule['payment_method'] === ''
             ) {
@@ -215,7 +216,17 @@ class Data extends AbstractHelper
     public function getRestrictPaymentMethods()
     {
         $methods = $this->scopeConfig->getValue(self::XML_PATH_RESTRICT_PAYMENT_METHODS, ScopeInterface::SCOPE_STORE);
-        return $methods ? $this->jsonHelper->jsonDecode($methods) : [];
+        if (empty($methods)) {
+            return [];
+        }
+
+        try {
+            $decoded = $this->jsonHelper->jsonDecode($methods);
+            return is_array($decoded) ? $decoded : [];
+        } catch (\Exception $e) {
+            $this->_logger->warning('Invalid fastcheckout restricted payment methods', ['exception' => $e]);
+            return [];
+        }
     }
 
     public function isRestrictPaymentEnable()

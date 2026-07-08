@@ -272,7 +272,8 @@ define([
             payload.additionalData ||
             payload.extension_attributes ||
             payload.extensionAttributes ||
-            payload.po_number
+            payload.po_number ||
+            payload.poNumber
         ) {
             return normalizePaymentMethodPayload(payload);
         }
@@ -731,8 +732,9 @@ define([
             })
             .then(function () {
                 var poNumber = paymentMethod.po_number ||
-                    (paymentMethod.additional_data && paymentMethod.additional_data.po_number) ||
-                    (paymentMethod.additionalData && paymentMethod.additionalData.po_number);
+                    paymentMethod.poNumber ||
+                    (paymentMethod.additional_data && (paymentMethod.additional_data.po_number || paymentMethod.additional_data.poNumber)) ||
+                    (paymentMethod.additionalData && (paymentMethod.additionalData.po_number || paymentMethod.additionalData.poNumber));
 
                 return poNumber ? setWireValue(wire, 'poNumber', poNumber) : true;
             })

@@ -83,7 +83,7 @@ Wszystkie parametry modułu konfiguruje się w sekcji **Sklepy > Konfiguracja > 
 ### Najważniejsze grupy ustawień:
 - **General Settings**: Włączenie modułu oraz wybór domyślnej metody płatności i dostawy.
 - **Extended Options**: Zarządzanie widocznością sekcji kuponów rabatowych, komentarzy, zgody na newsletter i wiadomości prezentowej.
-- **Shipping-Payment Method Mapping**: Tabela mapowania określająca, które płatności są dostępne dla poszczególnych kurierów.
+- **Shipping-Payment Method Mapping**: Tabela mapowania określająca, które płatności są dostępne dla poszczególnych kurierów. Metody dostawy mogą używać wildcardów typu `carrier_*`, ale metody płatności są zawsze dopasowywane po dokładnym kodzie.
 - **RequireJS Auto-Generation**: Automatyczne generowanie plików RequireJS dla motywów Hyvä.
 
 ---

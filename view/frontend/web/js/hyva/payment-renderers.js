@@ -4725,9 +4725,12 @@ define([
 	                        var poNumber = '';
 
 	                        if (paymentData) {
-	                            poNumber = paymentData.po_number || '';
+	                            poNumber = paymentData.po_number || paymentData.poNumber || '';
 	                            if (!poNumber && paymentData.additional_data) {
-	                                poNumber = paymentData.additional_data.po_number || '';
+	                                poNumber = paymentData.additional_data.po_number || paymentData.additional_data.poNumber || '';
+	                            }
+	                            if (!poNumber && paymentData.additionalData) {
+	                                poNumber = paymentData.additionalData.po_number || paymentData.additionalData.poNumber || '';
 	                            }
 	                        }
 

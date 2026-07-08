@@ -131,13 +131,79 @@ class CheckoutStateProvider
             $code = (string)$method->getCode();
             $title = method_exists($method, 'getTitle') ? (string)$method->getTitle() : $code;
 
-            $methods[] = [
+            $methodData = [
                 'method' => $code,
                 'title' => $title !== '' ? $title : $code,
             ];
+
+            $additionalData = $this->getPaymentMethodAdditionalData($method);
+            if (!empty($additionalData)) {
+                $methodData['additional_data'] = $additionalData;
+                $methodData['additionalData'] = $additionalData;
+            }
+
+            $extensionAttributes = $this->getPaymentMethodExtensionAttributes($method);
+            if (!empty($extensionAttributes)) {
+                $methodData['extension_attributes'] = $extensionAttributes;
+                $methodData['extensionAttributes'] = $extensionAttributes;
+            }
+
+            $methods[] = $methodData;
         }
 
         return $methods;
+    }
+
+    private function getPaymentMethodAdditionalData($method): array
+    {
+        if (method_exists($method, 'getAdditionalData')) {
+            try {
+                $additionalData = $this->normalizeGenericData($method->getAdditionalData());
+                if (!empty($additionalData)) {
+                    return $additionalData;
+                }
+            } catch (\Throwable $exception) {
+                // Try data keys below.
+            }
+        }
+
+        return $this->getPaymentMethodDataByKeys($method, ['additional_data', 'additionalData']);
+    }
+
+    private function getPaymentMethodExtensionAttributes($method): array
+    {
+        if (method_exists($method, 'getExtensionAttributes')) {
+            try {
+                $extensionAttributes = $this->normalizeGenericData($method->getExtensionAttributes());
+                if (!empty($extensionAttributes)) {
+                    return $extensionAttributes;
+                }
+            } catch (\Throwable $exception) {
+                // Try data keys below.
+            }
+        }
+
+        return $this->getPaymentMethodDataByKeys($method, ['extension_attributes', 'extensionAttributes']);
+    }
+
+    private function getPaymentMethodDataByKeys($method, array $keys): array
+    {
+        if (!method_exists($method, 'getData')) {
+            return [];
+        }
+
+        foreach ($keys as $key) {
+            try {
+                $data = $this->normalizeGenericData($method->getData($key));
+                if (!empty($data)) {
+                    return $data;
+                }
+            } catch (\Throwable $exception) {
+                // Try the next key.
+            }
+        }
+
+        return [];
     }
 
     private function getAllowedPaymentMethods($quote): array
@@ -227,17 +293,18 @@ class CheckoutStateProvider
                 if ($price === 0.0 && method_exists($rate, 'getPrice')) {
                     $price = (float)$rate->getPrice();
                 }
+                $errorMessage = $this->getShippingRateStringValue($rate, ['error_message', 'errorMessage'], '');
                 $rateData = [
-                    'carrier_code' => (string)$rate->getCarrier(),
-                    'method_code' => (string)$rate->getMethod(),
-                    'carrier_title' => (string)$rate->getCarrierTitle(),
-                    'method_title' => (string)$rate->getMethodTitle(),
+                    'carrier_code' => $this->getShippingRateStringValue($rate, ['carrier', 'carrier_code', 'carrierCode'], ''),
+                    'method_code' => $this->getShippingRateStringValue($rate, ['method', 'method_code', 'methodCode'], ''),
+                    'carrier_title' => $this->getShippingRateStringValue($rate, ['carrier_title', 'carrierTitle'], ''),
+                    'method_title' => $this->getShippingRateStringValue($rate, ['method_title', 'methodTitle'], ''),
                     'amount' => $this->getShippingRateNumericValue($rate, ['amount'], $price),
                     'base_amount' => $this->getShippingRateNumericValue($rate, ['base_amount', 'baseAmount'], $price),
                     'price_excl_tax' => $this->getShippingRateNumericValue($rate, ['price_excl_tax', 'priceExclTax'], $price),
                     'price_incl_tax' => $this->getShippingRateNumericValue($rate, ['price_incl_tax', 'priceInclTax'], $price),
-                    'available' => !$rate->getErrorMessage(),
-                    'error_message' => (string)$rate->getErrorMessage(),
+                    'available' => $errorMessage === '',
+                    'error_message' => $errorMessage,
                 ];
 
                 $extensionAttributes = $this->getShippingRateExtensionAttributes($rate);
@@ -246,11 +313,47 @@ class CheckoutStateProvider
                     $rateData['extensionAttributes'] = $extensionAttributes;
                 }
 
+                $customAttributes = $this->getShippingRateCustomAttributes($rate);
+                if (!empty($customAttributes)) {
+                    $rateData['custom_attributes'] = $customAttributes;
+                    $rateData['customAttributes'] = $customAttributes;
+                }
+
                 $ratesData[] = $rateData;
             }
         }
 
         return $ratesData;
+    }
+
+    private function getShippingRateStringValue($rate, array $keys, string $default): string
+    {
+        foreach ($keys as $key) {
+            if (method_exists($rate, 'getData')) {
+                try {
+                    $value = $rate->getData($key);
+                    if ($value !== null && $value !== '' && is_scalar($value)) {
+                        return (string)$value;
+                    }
+                } catch (\Throwable $exception) {
+                    // Try an explicit getter below.
+                }
+            }
+
+            $getter = 'get' . str_replace(' ', '', ucwords(str_replace('_', ' ', (string)$key)));
+            if (method_exists($rate, $getter)) {
+                try {
+                    $value = $rate->{$getter}();
+                    if ($value !== null && $value !== '' && is_scalar($value)) {
+                        return (string)$value;
+                    }
+                } catch (\Throwable $exception) {
+                    // Keep the fallback value.
+                }
+            }
+        }
+
+        return $default;
     }
 
     private function getShippingRateNumericValue($rate, array $keys, float $default): float
@@ -307,6 +410,35 @@ class CheckoutStateProvider
         }
 
         return $extensionAttributes;
+    }
+
+    private function getShippingRateCustomAttributes($rate): array
+    {
+        if (method_exists($rate, 'getCustomAttributes')) {
+            try {
+                $customAttributes = $this->normalizeGenericData($rate->getCustomAttributes());
+                if (!empty($customAttributes)) {
+                    return $customAttributes;
+                }
+            } catch (\Throwable $exception) {
+                // Try data keys below.
+            }
+        }
+
+        if (!method_exists($rate, 'getData')) {
+            return [];
+        }
+
+        try {
+            $customAttributes = $this->normalizeGenericData($rate->getData('custom_attributes'));
+            if (!empty($customAttributes)) {
+                return $customAttributes;
+            }
+
+            return $this->normalizeGenericData($rate->getData('customAttributes'));
+        } catch (\Throwable $exception) {
+            return [];
+        }
     }
 
     private function buildTotalsData($quote): array

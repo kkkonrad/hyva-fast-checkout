@@ -74,9 +74,10 @@
                     <label>Default Payment Method</label>
                     <source_model>Kkkonrad\Fastcheckout\Model\Config\Source\Payment</source_model>
                 </field>
-                <field id="shipping_payment_mapping" translate="label" type="text"
+                <field id="shipping_payment_mapping" translate="label comment" type="text"
                        sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Payment Methods by Shipping Method</label>
+                    <comment>Shipping methods may use wildcard entries such as carrier_*. Payment methods must be selected by exact method code.</comment>
                     <frontend_model>Kkkonrad\Fastcheckout\Block\Adminhtml\System\Config\ShippingPaymentMapping</frontend_model>
                     <backend_model>Kkkonrad\Fastcheckout\Model\Config\Backend\Json</backend_model>
                 </field>
@@ -92,7 +93,7 @@
                 <field id="methods" translate="label comment" type="text"
                        sortOrder="2" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Restricted Payment Methods</label>
-                    <comment>Provide JSON array of allowed payment methods, for example: ["checkmo","banktransfer"]</comment>
+                    <comment>Provide JSON array of exact allowed payment method codes, for example: ["checkmo","banktransfer"]. Wildcards such as * or payu_* are not supported.</comment>
                     <backend_model>Kkkonrad\Fastcheckout\Model\Config\Backend\Json</backend_model>
                 </field>
             </group>

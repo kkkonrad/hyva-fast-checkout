@@ -172,6 +172,32 @@ class CheckoutTest extends TestCase
         return $method;
     }
 
+    private function createPaymentMethodDataObject(string $code, string $title, array $data): PaymentMethodInterface
+    {
+        return new class($code, $title, $data) extends \Magento\Framework\DataObject implements PaymentMethodInterface {
+            private $code;
+
+            private $title;
+
+            public function __construct(string $code, string $title, array $data)
+            {
+                $this->code = $code;
+                $this->title = $title;
+                parent::__construct($data);
+            }
+
+            public function getCode()
+            {
+                return $this->code;
+            }
+
+            public function getTitle()
+            {
+                return $this->title;
+            }
+        };
+    }
+
     private function createAddressMock(array $additionalMethods = []): MockObject
     {
         $realMethods = [
@@ -807,7 +833,23 @@ class CheckoutTest extends TestCase
             ->with(42)
             ->willReturn([
                 $this->createPaymentMethodMock('checkmo', 'Check / Money order'),
-                $this->createPaymentMethodMock('tpay', 'Tpay'),
+                $this->createPaymentMethodDataObject('tpay', 'Tpay', [
+                    'additional_data' => [
+                        'gateway_family' => 'tpay',
+                        'channels' => [
+                            [
+                                'code' => 'blik',
+                                'value' => 'BLIK',
+                            ],
+                        ],
+                    ],
+                    'extension_attributes' => [
+                        'is_deferred' => false,
+                        'risk' => [
+                            'provider' => 'tpay-risk',
+                        ],
+                    ],
+                ]),
             ]);
 
         $this->checkoutComponent->paymentMethod = 'checkmo';
@@ -827,6 +869,12 @@ class CheckoutTest extends TestCase
         $this->assertSame('grand_total', $state['totals']['total_segments'][1]['code']);
         $this->assertSame('tpay', $state['payment_methods'][1]['method']);
         $this->assertSame('Tpay', $state['payment_methods'][1]['title']);
+        $this->assertSame('tpay', $state['payment_methods'][1]['additional_data']['gateway_family']);
+        $this->assertSame('BLIK', $state['payment_methods'][1]['additional_data']['channels']['blik']);
+        $this->assertSame($state['payment_methods'][1]['additional_data'], $state['payment_methods'][1]['additionalData']);
+        $this->assertFalse($state['payment_methods'][1]['extension_attributes']['is_deferred']);
+        $this->assertSame('tpay-risk', $state['payment_methods'][1]['extension_attributes']['risk']['provider']);
+        $this->assertSame($state['payment_methods'][1]['extension_attributes'], $state['payment_methods'][1]['extensionAttributes']);
     }
 
     public function testRefreshCheckoutStateReturnsFlattenedShippingRates(): void
@@ -847,6 +895,12 @@ class CheckoutTest extends TestCase
                 'pickup_point_required' => true,
                 'metadata' => [
                     'provider' => 'locker_vendor',
+                ],
+            ],
+            'custom_attributes' => [
+                [
+                    'attribute_code' => 'pickup_location_code',
+                    'value' => 'POP-42',
                 ],
             ],
         ]);
@@ -903,6 +957,8 @@ class CheckoutTest extends TestCase
         $this->assertTrue($state['shipping_rates'][0]['extension_attributes']['pickup_point_required']);
         $this->assertSame('locker_vendor', $state['shipping_rates'][0]['extension_attributes']['metadata']['provider']);
         $this->assertSame($state['shipping_rates'][0]['extension_attributes'], $state['shipping_rates'][0]['extensionAttributes']);
+        $this->assertSame('POP-42', $state['shipping_rates'][0]['custom_attributes']['pickup_location_code']);
+        $this->assertSame($state['shipping_rates'][0]['custom_attributes'], $state['shipping_rates'][0]['customAttributes']);
     }
 
     public function testGetAllowedPaymentMethodsFiltersMethodsByShippingMapping(): void
@@ -1233,6 +1289,110 @@ class CheckoutTest extends TestCase
         $this->assertSame(100001, $response['order_id']);
         $this->assertSame('checkmo', $response['method']);
         $this->assertSame('checkmo', $response['payment_method']);
+    }
+
+    public function testPlaceOrderWithPurchaseOrderReadsPoNumberFromRawPaymentPayload(): void
+    {
+        $this->checkoutComponent->email = 'guest@example.com';
+        $this->checkoutComponent->paymentMethod = 'purchaseorder';
+        $this->checkoutComponent->shippingMethod = 'flatrate_flatrate';
+        $this->checkoutComponent->placeOrderRequestData = [
+            'paymentMethod' => [
+                'method' => 'purchaseorder',
+                'po_number' => 'PO-123',
+                'additional_data' => null,
+            ],
+        ];
+
+        $this->quoteMock->expects($this->once())
+            ->method('hasItems')
+            ->willReturn(true);
+        $this->checkoutComponent->billingSameAsShipping = false;
+
+        $this->quoteMock->expects($this->once())
+            ->method('getCustomerId')
+            ->willReturn(null);
+
+        $this->quoteMock->expects($this->once())
+            ->method('setCustomerEmail')
+            ->with('guest@example.com');
+
+        $this->quoteMock->expects($this->once())
+            ->method('setCheckoutMethod')
+            ->with(\Magento\Checkout\Model\Type\Onepage::METHOD_GUEST);
+
+        $shippingAddressMock = $this->createAddressMock();
+        $billingAddressMock = $this->createAddressMock();
+
+        $this->quoteMock->expects($this->any())
+            ->method('getShippingAddress')
+            ->willReturn($shippingAddressMock);
+
+        $this->quoteMock->expects($this->any())
+            ->method('getBillingAddress')
+            ->willReturn($billingAddressMock);
+
+        $this->checkoutComponent->regionId = '';
+        $this->checkoutComponent->billingRegionId = '';
+
+        $shippingAddressMock->expects($this->once())->method('setShouldIgnoreValidation')->with(false);
+        $billingAddressMock->expects($this->once())->method('setShouldIgnoreValidation')->with(false);
+
+        $this->quoteMock->expects($this->once())
+            ->method('isVirtual')
+            ->willReturn(false);
+
+        $paymentMock = $this->getMockBuilder(\Magento\Quote\Model\Quote\Payment::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['importData', 'setPoNumber'])
+            ->getMock();
+
+        $this->quoteMock->expects($this->any())
+            ->method('getPayment')
+            ->willReturn($paymentMock);
+
+        $paymentMock->expects($this->once())
+            ->method('importData')
+            ->with($this->callback(static function (array $data): bool {
+                return $data['method'] === 'purchaseorder'
+                    && $data['po_number'] === 'PO-123'
+                    && $data['additional_data']['accept_tos'] === true
+                    && $data['additional_data']['terms_accept'] === true;
+            }));
+
+        $paymentMock->expects($this->once())
+            ->method('setPoNumber')
+            ->with('PO-123');
+
+        $this->cartRepositoryMock->expects($this->any())
+            ->method('save')
+            ->with($this->quoteMock);
+
+        $this->quoteMock->expects($this->any())
+            ->method('getId')
+            ->willReturn(42);
+
+        $this->paymentMethodManagementMock->expects($this->once())
+            ->method('getList')
+            ->with(42)
+            ->willReturn([$this->createPaymentMethodMock('purchaseorder')]);
+
+        $this->cartManagementMock->expects($this->once())
+            ->method('placeOrder')
+            ->with(42)
+            ->willReturn(100002);
+
+        $this->checkoutSessionMock->expects($this->once())
+            ->method('clearHelperData');
+
+        $response = $this->checkoutComponent->placeOrder();
+
+        $this->assertEquals('', $this->checkoutComponent->orderError);
+        $this->assertSame('PO-123', $this->checkoutComponent->poNumber);
+        $this->assertTrue($response['success']);
+        $this->assertSame(100002, $response['orderId']);
+        $this->assertSame('purchaseorder', $response['method']);
+        $this->assertSame('purchaseorder', $response['payment_method']);
     }
 
     public function testPlaceOrderStopsWhenCheckoutAgreementsAreInvalid(): void
