@@ -226,6 +226,66 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
         expect(compatibility.bridges.shipping).toEqual([]);
     });
 
+    test('should ignore an empty totals request while restoring a guest address snapshot', async ({ page }) => {
+        const checkout = new CheckoutPage(page);
+        const pageErrors = [];
+        let magewireRequests = 0;
+
+        page.on('pageerror', (error) => {
+            pageErrors.push(error.message);
+        });
+
+        await checkout.goto();
+
+        page.on('request', (request) => {
+            if (request.url().includes('/magewire/post/livewire/message/kkkonrad.fastcheckout.hyva.checkout')) {
+                magewireRequests += 1;
+            }
+        });
+
+        const result = await page.evaluate(() => new Promise((resolve, reject) => {
+            window.require(['jquery', 'mage/storage'], ($, storage) => {
+                const previousRestoreState = window.fastcheckoutGuestAddressSnapshotRestorePending;
+
+                window.fastcheckoutGuestAddressSnapshotRestorePending = true;
+                $.when(storage.post(
+                    '/V1/guest-carts/fastcheckout-test/totals-information',
+                    JSON.stringify({
+                        address: {
+                            street: [],
+                            city: '',
+                            region_id: null,
+                            region: '',
+                            country_id: 'PL',
+                            postcode: '',
+                            firstname: '',
+                            lastname: '',
+                            company: '',
+                            telephone: '',
+                            custom_attributes: []
+                        }
+                    })
+                )).done((response) => {
+                    window.fastcheckoutGuestAddressSnapshotRestorePending = previousRestoreState;
+                    window.setTimeout(() => resolve({
+                        resolved: true,
+                        responseType: typeof response
+                    }), 300);
+                }).fail((error) => {
+                    window.fastcheckoutGuestAddressSnapshotRestorePending = previousRestoreState;
+                    reject(error || new Error('The empty totals request was rejected.'));
+                });
+            }, reject);
+        }));
+
+        expect(result).toMatchObject({
+            resolved: true,
+            responseType: 'object'
+        });
+        expect(magewireRequests).toBe(0);
+        expect(pageErrors).toEqual([]);
+    });
+
     test('should execute standard Magento KO checkout actions through Fastcheckout bridge', async ({ page }) => {
         const checkout = new CheckoutPage(page);
         await checkout.goto();

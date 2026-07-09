@@ -682,7 +682,9 @@ window.addEventListener('alpine:init', () => Alpine.data('initCheckout', initChe
                 .then(function (result) {
                     lastGuestRestoreServerSyncing = false;
                     lastGuestRestoreServerSynced = result !== false;
-                    window.fastcheckoutGuestAddressSnapshotRestorePending = !lastGuestRestoreServerSynced;
+                    // Keep empty KO transport requests from rendering the pre-restore component state.
+                    // The flag is cleared when the short DOM stabilization window expires.
+                    window.fastcheckoutGuestAddressSnapshotRestorePending = lastGuestRestoreServerSynced;
                     return lastGuestRestoreServerSynced;
                 })
                 .catch(function () {

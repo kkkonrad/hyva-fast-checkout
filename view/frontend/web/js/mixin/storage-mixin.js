@@ -282,6 +282,19 @@ define([
             Boolean(getPayloadEmail(payload));
     }
 
+    function isGuestAddressSnapshotRestorePending() {
+        return window.fastcheckoutGuestAddressSnapshotRestorePending === true;
+    }
+
+    function resolveEmptyIntercept(deferred, endpoint) {
+        if (endpoint === 'estimateShippingMethods') {
+            deferred.resolve([]);
+            return;
+        }
+
+        deferred.resolve((checkoutStateLastPayload || {}).totals || {});
+    }
+
     function getAddressObjectValue(address, camelKey, snakeKey) {
         if (!address) {
             return {};
@@ -1133,8 +1146,14 @@ define([
             return deferred.promise();
         }
 
-        if (endpoint === 'estimateShippingMethods' && !hasMeaningfulRequestPayload(payload)) {
-            deferred.resolve([]);
+        if (
+            !hasMeaningfulRequestPayload(payload) &&
+            (
+                endpoint === 'estimateShippingMethods' ||
+                (endpoint === 'totals' && isGuestAddressSnapshotRestorePending())
+            )
+        ) {
+            resolveEmptyIntercept(deferred, endpoint);
             return deferred.promise();
         }
 
