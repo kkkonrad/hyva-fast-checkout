@@ -2,8 +2,29 @@ define([
     'jquery',
     'Kkkonrad_Fastcheckout/js/hyva/renderer-manager',
     'Kkkonrad_Fastcheckout/js/hyva/shadow-selector-bridge',
-    'Kkkonrad_Fastcheckout/js/hyva/checkout-provider-bridge'
-], function ($, createRendererManager, initShadowSelectorBridge, createCheckoutProviderBridge) {
+    'Kkkonrad_Fastcheckout/js/hyva/checkout-provider-bridge',
+    'Kkkonrad_Fastcheckout/js/hyva/address-attributes-bridge',
+    'Kkkonrad_Fastcheckout/js/hyva/form-data-collector',
+    'Kkkonrad_Fastcheckout/js/hyva/payment-message-bridge',
+    'Kkkonrad_Fastcheckout/js/hyva/payment-validation-registry',
+    'Kkkonrad_Fastcheckout/js/hyva/shipping-compatibility-bridge',
+    'Kkkonrad_Fastcheckout/js/hyva/checkout-compatibility',
+    'Kkkonrad_Fastcheckout/js/hyva/checkout-data-persistence',
+    'Kkkonrad_Fastcheckout/js/hyva/checkout-totals-sync',
+    'Kkkonrad_Fastcheckout/js/hyva/checkout-layout-bridge',
+    'Kkkonrad_Fastcheckout/js/hyva/address-data-builder',
+    'Kkkonrad_Fastcheckout/js/hyva/checkout-state-bridge',
+    'Kkkonrad_Fastcheckout/js/hyva/payment-dom-bridge',
+    'Kkkonrad_Fastcheckout/js/hyva/place-order-hooks-bridge',
+    'Kkkonrad_Fastcheckout/js/hyva/shipping-attributes-sync',
+    'Kkkonrad_Fastcheckout/js/hyva/checkout-component-fallbacks',
+    'Kkkonrad_Fastcheckout/js/hyva/magewire-utils',
+    'Kkkonrad_Fastcheckout/js/hyva/payment-method-sync',
+    'Kkkonrad_Fastcheckout/js/hyva/customer-email-sync',
+    'Kkkonrad_Fastcheckout/js/hyva/checkout-agreements-fallback',
+    'Kkkonrad_Fastcheckout/js/hyva/shipping-method-sync',
+    'Kkkonrad_Fastcheckout/js/hyva/shipping-error-bridge'
+], function ($, createRendererManager, initShadowSelectorBridge, createCheckoutProviderBridge, createAddressAttributesBridge, formDataCollector, createPaymentMessageBridge, createPaymentValidationRegistry, createShippingCompatibilityBridge, checkoutCompatibility, createCheckoutDataPersistence, createCheckoutTotalsSync, createCheckoutLayoutBridge, createAddressDataBuilder, createCheckoutStateBridge, createPaymentDomBridge, createPlaceOrderHooksBridge, createShippingAttributesSync, createCheckoutComponentFallbacks, magewireUtils, createPaymentMethodSync, createCustomerEmailSync, checkoutAgreementsFallback, createShippingMethodSync, createShippingErrorBridge) {
     'use strict';
 
     return function (config) {
@@ -108,91 +129,8 @@ define([
             placeOrderHooks,
             $t
         ) {
-            if (quote && quote.billingAddress) {
-                var currentBilling = quote.billingAddress();
-                if (currentBilling && typeof currentBilling.getCacheKey !== 'function') {
-                    currentBilling.getCacheKey = function () {
-                        return 'billing-address-placeholder';
-                    };
-                }
-                var originalBillingAddress = quote.billingAddress;
-                quote.billingAddress = function (value) {
-                    if (arguments.length > 0) {
-                        if (value && typeof value.getCacheKey !== 'function') {
-                            value.getCacheKey = function () {
-                                return 'billing-address-placeholder';
-                            };
-                        }
-                    }
-                    return originalBillingAddress.apply(this, arguments);
-                };
-                Object.keys(originalBillingAddress).forEach(function (key) {
-                    quote.billingAddress[key] = originalBillingAddress[key];
-                });
-                quote.billingAddress.subscribe = originalBillingAddress.subscribe.bind(originalBillingAddress);
-            }
-
-            if (quote && quote.shippingAddress) {
-                var currentShipping = quote.shippingAddress();
-                if (currentShipping && typeof currentShipping.getCacheKey !== 'function') {
-                    currentShipping.getCacheKey = function () {
-                        return 'shipping-address-placeholder';
-                    };
-                }
-                var originalShippingAddress = quote.shippingAddress;
-                quote.shippingAddress = function (value) {
-                    if (arguments.length > 0) {
-                        if (value && typeof value.getCacheKey !== 'function') {
-                            value.getCacheKey = function () {
-                                return 'shipping-address-placeholder';
-                            };
-                        }
-                    }
-                    return originalShippingAddress.apply(this, arguments);
-                };
-                Object.keys(originalShippingAddress).forEach(function (key) {
-                    quote.shippingAddress[key] = originalShippingAddress[key];
-                });
-                quote.shippingAddress.subscribe = originalShippingAddress.subscribe.bind(originalShippingAddress);
-            }
-
-            if (checkoutData) {
-                var cacheKey = 'checkout-data';
-                var getLocalData = function () {
-                    try {
-                        var raw = window.localStorage ? window.localStorage.getItem(cacheKey) : null;
-                        return raw ? JSON.parse(raw) : {};
-                    } catch (e) { return {}; }
-                };
-                var saveLocalData = function (data) {
-                    try { if (window.localStorage) window.localStorage.setItem(cacheKey, JSON.stringify(data)); } catch (e) {}
-                };
-
-                if (typeof checkoutData.setShippingInPostPoint !== 'function') {
-                    checkoutData.setShippingInPostPoint = function (data) {
-                        var obj = getLocalData();
-                        obj.shippingInPostPointData = data;
-                        saveLocalData(obj);
-                    };
-                }
-                if (typeof checkoutData.getShippingInPostPoint !== 'function') {
-                    checkoutData.getShippingInPostPoint = function () {
-                        return getLocalData().shippingInPostPointData || null;
-                    };
-                }
-                if (typeof checkoutData.setShippingInPostMode !== 'function') {
-                    checkoutData.setShippingInPostMode = function (data) {
-                        var obj = getLocalData();
-                        obj.shippingInPostModeData = data;
-                        saveLocalData(obj);
-                    };
-                }
-                if (typeof checkoutData.getShippingInPostMode !== 'function') {
-                    checkoutData.getShippingInPostMode = function () {
-                        return getLocalData().shippingInPostModeData || null;
-                    };
-                }
-            }
+            checkoutCompatibility.ensureQuoteAddressCacheKeys(quote);
+            checkoutCompatibility.ensureCheckoutDataInPostFallback(checkoutData);
 
             var checkoutProviderBridge = createCheckoutProviderBridge({
                 registry: registry,
@@ -201,8 +139,18 @@ define([
                 }
             });
 
-            var checkoutProviderAddressAttributeSyncTimer = null,
-                checkoutProviderMagewireAddressSyncValues = {};
+            var addressAttributesBridge = createAddressAttributesBridge({
+                quote: quote,
+                getCheckoutProvider: getCheckoutProvider
+            });
+
+            var checkoutComponentFallbacks = createCheckoutComponentFallbacks({
+                ko: ko,
+                registry: registry,
+                quote: quote,
+                getCheckoutProvider: getCheckoutProvider,
+                translate: $t
+            });
 
             function getCountryDictionaryOptions() {
                 return checkoutProviderBridge.getCountryDictionaryOptions();
@@ -216,759 +164,24 @@ define([
                 return checkoutProviderBridge.getCheckoutProvider();
             }
 
-            function getCheckoutProviderRootPath(path) {
-                if (typeof path !== 'string' || !path.length) {
-                    return '';
-                }
-
-                return path.split('.')[0];
-            }
-
-            function isBillingAddressProviderScope(scope) {
-                return typeof scope === 'string' && /^billingAddress[^.]*$/.test(scope);
-            }
-
-            function isCheckoutProviderAddressAttributePath(path) {
-                return typeof path === 'string' && (
-                    path.indexOf('.custom_attributes') !== -1 ||
-                    path.indexOf('.customAttributes') !== -1 ||
-                    path.indexOf('.extension_attributes') !== -1 ||
-                    path.indexOf('.extensionAttributes') !== -1
-                );
-            }
-
-            function shouldSyncCheckoutProviderAddressPath(path) {
-                var root = getCheckoutProviderRootPath(path);
-
-                if (root === 'shippingAddress') {
-                    return path === root || isCheckoutProviderAddressAttributePath(path);
-                }
-
-                if (isBillingAddressProviderScope(root)) {
-                    return path === root || isCheckoutProviderAddressAttributePath(path);
-                }
-
-                return false;
-            }
-
-            function readCheckoutProviderValue(provider, path) {
-                if (!provider || !path) {
-                    return undefined;
-                }
-
-                if (typeof provider.get === 'function') {
-                    try {
-                        return provider.get(path);
-                    } catch (e) {}
-                }
-
-                return undefined;
-            }
-
-            function getCheckoutProviderAttributeData(provider, addressScope, camelKey, snakeKey) {
-                var value = readCheckoutProviderValue(provider, addressScope + '.' + snakeKey);
-
-                if (typeof value === 'undefined') {
-                    value = readCheckoutProviderValue(provider, addressScope + '.' + camelKey);
-                }
-
-                if (typeof value === 'undefined') {
-                    value = readCheckoutProviderValue(provider, addressScope);
-                    if (value && typeof value === 'object') {
-                        value = value[snakeKey] || value[camelKey];
-                    }
-                }
-
-                return value && typeof value === 'object' ? value : {};
-            }
-
-            function getCheckoutProviderBillingAddressScopes(provider) {
-                var scopes = {
-                    billingAddress: true,
-                    billingAddressshared: true
-                };
-
-                function addScope(scope) {
-                    if (isBillingAddressProviderScope(scope)) {
-                        scopes[scope] = true;
-                    }
-                }
-
-                if (provider && provider.data && typeof provider.data === 'object') {
-                    Object.keys(provider.data).forEach(addScope);
-                }
-
-                if (window.checkoutConfig && Array.isArray(window.checkoutConfig.paymentMethods)) {
-                    window.checkoutConfig.paymentMethods.forEach(function (method) {
-                        if (method && method.method) {
-                            addScope('billingAddress' + method.method);
-                        }
-                    });
-                }
-
-                if (quote && typeof quote.paymentMethod === 'function' && quote.paymentMethod()) {
-                    addScope('billingAddress' + quote.paymentMethod().method);
-                }
-
-                if (typeof document !== 'undefined') {
-                    Array.prototype.slice.call(document.querySelectorAll('input[name="payment_method"]')).forEach(function (input) {
-                        if (input && input.value) {
-                            addScope('billingAddress' + input.value);
-                        }
-                    });
-                }
-
-                return Object.keys(scopes);
-            }
-
             function updateQuoteAddressAttributes(address, customAttributes, extensionAttributes) {
-                if (!address) {
-                    return;
-                }
-
-                address.custom_attributes = customAttributes;
-                address.customAttributes = normalizeCheckoutProviderAddressCustomAttributes(customAttributes);
-                address.extension_attributes = extensionAttributes;
-                address.extensionAttributes = extensionAttributes;
-            }
-
-            function normalizeCheckoutProviderAddressCustomAttributes(attributes) {
-                var result = [];
-
-                if (!attributes) {
-                    return result;
-                }
-
-                if (Array.isArray(attributes)) {
-                    attributes.forEach(function (attribute) {
-                        if (attribute && typeof attribute === 'object' && attribute.attribute_code) {
-                            result.push({
-                                attribute_code: attribute.attribute_code,
-                                value: attribute.value
-                            });
-                        }
-                    });
-                    Object.keys(attributes).forEach(function (key) {
-                        if (/^\d+$/.test(key)) {
-                            return;
-                        }
-                        result.push({
-                            attribute_code: key,
-                            value: attributes[key]
-                        });
-                    });
-                    return result;
-                }
-
-                if (typeof attributes === 'object') {
-                    Object.keys(attributes).forEach(function (key) {
-                        var value = attributes[key];
-
-                        if (value && typeof value === 'object' && value.attribute_code) {
-                            result.push({
-                                attribute_code: value.attribute_code,
-                                value: value.value
-                            });
-                            return;
-                        }
-
-                        result.push({
-                            attribute_code: key,
-                            value: value
-                        });
-                    });
-                }
-
-                return result;
-            }
-
-            function normalizeCheckoutProviderAttributeContainerAfterSet(provider, path, value) {
-                var lastDot,
-                    containerPath,
-                    attributeCode,
-                    container,
-                    normalized;
-
-                if (
-                    typeof path !== 'string' ||
-                    (
-                        path.indexOf('.custom_attributes.') === -1 &&
-                        path.indexOf('.customAttributes.') === -1 &&
-                        path.indexOf('.extension_attributes.') === -1 &&
-                        path.indexOf('.extensionAttributes.') === -1
-                    )
-                ) {
-                    return;
-                }
-
-                lastDot = path.lastIndexOf('.');
-                if (lastDot === -1) {
-                    return;
-                }
-
-                containerPath = path.substring(0, lastDot);
-                attributeCode = path.substring(lastDot + 1);
-                container = readCheckoutProviderValue(provider, containerPath);
-
-                if (!Array.isArray(container)) {
-                    return;
-                }
-
-                normalized = {};
-                container.forEach(function (attribute) {
-                    if (attribute && typeof attribute === 'object' && attribute.attribute_code) {
-                        normalized[attribute.attribute_code] = attribute.value;
-                    }
-                });
-                Object.keys(container).forEach(function (key) {
-                    if (!/^\d+$/.test(key)) {
-                        normalized[key] = container[key];
-                    }
-                });
-                normalized[attributeCode] = value;
-
-                provider.set(containerPath, normalized);
-            }
-
-            function normalizeCheckoutProviderAddressAttributeMap(attributes) {
-                var result = {};
-
-                normalizeCheckoutProviderAddressCustomAttributes(attributes).forEach(function (attribute) {
-                    if (attribute && attribute.attribute_code) {
-                        result[attribute.attribute_code] = attribute.value;
-                    }
-                });
-
-                return result;
-            }
-
-            function getQuoteAddressForCheckoutProviderPath(path) {
-                var root = getCheckoutProviderRootPath(path);
-
-                if (!quote) {
-                    return null;
-                }
-
-                if (root === 'shippingAddress' && typeof quote.shippingAddress === 'function') {
-                    return quote.shippingAddress();
-                }
-
-                if (
-                    isBillingAddressProviderScope(root) &&
-                    typeof quote.billingAddress === 'function'
-                ) {
-                    return quote.billingAddress();
-                }
-
-                return null;
-            }
-
-            function getQuoteAddressAttributeDataForProviderPath(path, camelKey, snakeKey) {
-                var address = getQuoteAddressForCheckoutProviderPath(path),
-                    value;
-
-                if (!address) {
-                    return {};
-                }
-
-                value = address[snakeKey] || address[camelKey];
-
-                if (!value || typeof value !== 'object') {
-                    return {};
-                }
-
-                return camelKey === 'customAttributes'
-                    ? normalizeCheckoutProviderAddressAttributeMap(value)
-                    : value;
-            }
-
-            function mergeCheckoutProviderAttributeData(primary, secondary) {
-                return $.extend(true, {}, primary || {}, secondary || {});
-            }
-
-            function writeCheckoutProviderValueIfDifferent(provider, path, value) {
-                var current;
-
-                if (!provider || typeof provider.set !== 'function' || typeof value === 'undefined') {
-                    return;
-                }
-
-                current = readCheckoutProviderValue(provider, path);
-                if (JSON.stringify(current || {}) === JSON.stringify(value || {})) {
-                    return;
-                }
-
-                provider.set(path, value);
-            }
-
-            function setMagewireValueFromCheckoutProviderSync(wire, field, value) {
-                var currentValue,
-                    cachedValue;
-
-                if (!wire || typeof wire.set !== 'function' || typeof value === 'undefined' || value === null) {
-                    return;
-                }
-
-                cachedValue = checkoutProviderMagewireAddressSyncValues[field];
-                if (typeof cachedValue !== 'undefined' && JSON.stringify(cachedValue || {}) === JSON.stringify(value || {})) {
-                    return;
-                }
-
-                currentValue = getPropertyFromCheckoutProviderWire(wire, field);
-                if (
-                    (typeof currentValue === 'object' || typeof value === 'object') &&
-                    JSON.stringify(currentValue || {}) === JSON.stringify(value || {})
-                ) {
-                    checkoutProviderMagewireAddressSyncValues[field] = $.extend(true, {}, value);
-                    return;
-                }
-                if (
-                    typeof currentValue !== 'object' &&
-                    typeof value !== 'object' &&
-                    String(currentValue || '') === String(value || '')
-                ) {
-                    checkoutProviderMagewireAddressSyncValues[field] = value;
-                    return;
-                }
-
-                checkoutProviderMagewireAddressSyncValues[field] = typeof value === 'object'
-                    ? $.extend(true, {}, value)
-                    : value;
-                wire.set(field, value, true);
-            }
-
-            function getPropertyFromCheckoutProviderWire(wire, name) {
-                if (!wire) {
-                    return '';
-                }
-                if (typeof wire.get === 'function') {
-                    return wire.get(name);
-                }
-                if (typeof wire[name] !== 'undefined') {
-                    return wire[name];
-                }
-                if (wire.data && typeof wire.data[name] !== 'undefined') {
-                    return wire.data[name];
-                }
-
-                return '';
-            }
-
-            function getMagewireComponentForCheckoutProviderSync() {
-                var magewireEl = document.querySelector('[wire\\:id]'),
-                    livewire = window.Livewire || window.Magewire;
-
-                if (magewireEl && magewireEl.__livewire) {
-                    return magewireEl.__livewire;
-                }
-
-                if (
-                    magewireEl &&
-                    livewire &&
-                    typeof livewire.find === 'function' &&
-                    magewireEl.getAttribute('wire:id')
-                ) {
-                    return livewire.find(magewireEl.getAttribute('wire:id'));
-                }
-
-                return null;
+                addressAttributesBridge.updateQuoteAddressAttributes(address, customAttributes, extensionAttributes);
             }
 
             function syncCheckoutProviderAddressAttributes() {
-                var provider = getCheckoutProvider(),
-                    wire = getMagewireComponentForCheckoutProviderSync(),
-                    billingAddressScopes,
-                    shippingCustomAttributes,
-                    shippingExtensionAttributes,
-                    billingCustomAttributes,
-                    billingExtensionAttributes,
-                    shippingAddress,
-                    billingAddress;
-
-                checkoutProviderAddressAttributeSyncTimer = null;
-                if (!provider) {
-                    return;
-                }
-
-                shippingCustomAttributes = normalizeCheckoutProviderAddressAttributeMap(getCheckoutProviderAttributeData(
-                    provider,
-                    'shippingAddress',
-                    'customAttributes',
-                    'custom_attributes'
-                ));
-                shippingCustomAttributes = mergeCheckoutProviderAttributeData(
-                    getQuoteAddressAttributeDataForProviderPath(
-                        'shippingAddress',
-                        'customAttributes',
-                        'custom_attributes'
-                    ),
-                    shippingCustomAttributes
-                );
-                shippingExtensionAttributes = getCheckoutProviderAttributeData(
-                    provider,
-                    'shippingAddress',
-                    'extensionAttributes',
-                    'extension_attributes'
-                );
-                shippingExtensionAttributes = mergeCheckoutProviderAttributeData(
-                    getQuoteAddressAttributeDataForProviderPath(
-                        'shippingAddress',
-                        'extensionAttributes',
-                        'extension_attributes'
-                    ),
-                    shippingExtensionAttributes
-                );
-                billingCustomAttributes = normalizeCheckoutProviderAddressAttributeMap(getCheckoutProviderAttributeData(
-                    provider,
-                    'billingAddress',
-                    'customAttributes',
-                    'custom_attributes'
-                ));
-                billingCustomAttributes = mergeCheckoutProviderAttributeData(
-                    getQuoteAddressAttributeDataForProviderPath(
-                        'billingAddress',
-                        'customAttributes',
-                        'custom_attributes'
-                    ),
-                    billingCustomAttributes
-                );
-                billingExtensionAttributes = getCheckoutProviderAttributeData(
-                    provider,
-                    'billingAddress',
-                    'extensionAttributes',
-                    'extension_attributes'
-                );
-                billingExtensionAttributes = mergeCheckoutProviderAttributeData(
-                    getQuoteAddressAttributeDataForProviderPath(
-                        'billingAddress',
-                        'extensionAttributes',
-                        'extension_attributes'
-                    ),
-                    billingExtensionAttributes
-                );
-                billingAddressScopes = getCheckoutProviderBillingAddressScopes(provider);
-                billingAddressScopes.forEach(function (scope) {
-                    if (scope === 'billingAddress') {
-                        return;
-                    }
-
-                    billingCustomAttributes = mergeCheckoutProviderAttributeData(
-                        billingCustomAttributes,
-                        normalizeCheckoutProviderAddressAttributeMap(getCheckoutProviderAttributeData(
-                            provider,
-                            scope,
-                            'customAttributes',
-                            'custom_attributes'
-                        ))
-                    );
-                    billingExtensionAttributes = mergeCheckoutProviderAttributeData(
-                        billingExtensionAttributes,
-                        getCheckoutProviderAttributeData(
-                            provider,
-                            scope,
-                            'extensionAttributes',
-                            'extension_attributes'
-                        )
-                    );
-                });
-
-                shippingAddress = quote && typeof quote.shippingAddress === 'function' ? quote.shippingAddress() : null;
-                billingAddress = quote && typeof quote.billingAddress === 'function' ? quote.billingAddress() : null;
-
-                updateQuoteAddressAttributes(shippingAddress, shippingCustomAttributes, shippingExtensionAttributes);
-                updateQuoteAddressAttributes(billingAddress, billingCustomAttributes, billingExtensionAttributes);
-
-                writeCheckoutProviderValueIfDifferent(
-                    provider,
-                    'shippingAddress.custom_attributes',
-                    shippingCustomAttributes
-                );
-                writeCheckoutProviderValueIfDifferent(
-                    provider,
-                    'shippingAddress.extension_attributes',
-                    shippingExtensionAttributes
-                );
-                writeCheckoutProviderValueIfDifferent(
-                    provider,
-                    'billingAddress.custom_attributes',
-                    billingCustomAttributes
-                );
-                writeCheckoutProviderValueIfDifferent(
-                    provider,
-                    'billingAddress.extension_attributes',
-                    billingExtensionAttributes
-                );
-                billingAddressScopes.forEach(function (scope) {
-                    if (scope === 'billingAddress') {
-                        return;
-                    }
-
-                    writeCheckoutProviderValueIfDifferent(
-                        provider,
-                        scope + '.custom_attributes',
-                        billingCustomAttributes
-                    );
-                    writeCheckoutProviderValueIfDifferent(
-                        provider,
-                        scope + '.extension_attributes',
-                        billingExtensionAttributes
-                    );
-                });
-
-                if (wire) {
-                    setMagewireValueFromCheckoutProviderSync(wire, 'shippingCustomAttributes', shippingCustomAttributes);
-                    setMagewireValueFromCheckoutProviderSync(wire, 'shippingExtensionAttributes', shippingExtensionAttributes);
-                    setMagewireValueFromCheckoutProviderSync(wire, 'billingCustomAttributes', billingCustomAttributes);
-                    setMagewireValueFromCheckoutProviderSync(wire, 'billingExtensionAttributes', billingExtensionAttributes);
-                }
-            }
-
-            function scheduleCheckoutProviderAddressAttributeSync(path) {
-                if (!shouldSyncCheckoutProviderAddressPath(path)) {
-                    return;
-                }
-
-                if (checkoutProviderAddressAttributeSyncTimer) {
-                    window.clearTimeout(checkoutProviderAddressAttributeSyncTimer);
-                }
-                checkoutProviderAddressAttributeSyncTimer = window.setTimeout(syncCheckoutProviderAddressAttributes, 50);
-
-                if (
-                    path.indexOf('.custom_attributes.') !== -1 ||
-                    path.indexOf('.customAttributes.') !== -1 ||
-                    path.indexOf('.extension_attributes.') !== -1 ||
-                    path.indexOf('.extensionAttributes.') !== -1
-                ) {
-                    [200, 600].forEach(function (delay) {
-                        window.setTimeout(syncCheckoutProviderAddressAttributes, delay);
-                    });
-                }
+                addressAttributesBridge.sync();
             }
 
             function registerCheckoutProviderAddressAttributeSync() {
-                var provider = getCheckoutProvider(),
-                    originalSet;
-
-                if (!provider || provider.fastcheckoutAddressAttributeSyncRegistered || typeof provider.set !== 'function') {
-                    return;
-                }
-
-                provider.fastcheckoutAddressAttributeSyncRegistered = true;
-                originalSet = provider.set;
-                provider.set = function (path, value) {
-                    var root = getCheckoutProviderRootPath(path),
-                        isAddressRootPath = path === root && (
-                            root === 'shippingAddress' ||
-                            isBillingAddressProviderScope(root)
-                        ),
-                        existingCustomAttributes,
-                        existingExtensionAttributes;
-
-                    if (
-                        isAddressRootPath &&
-                        value &&
-                        typeof value === 'object'
-                    ) {
-                        existingCustomAttributes = getCheckoutProviderAttributeData(
-                            provider,
-                            path,
-                            'customAttributes',
-                            'custom_attributes'
-                        );
-                        if (!Object.keys(existingCustomAttributes).length) {
-                            existingCustomAttributes = getQuoteAddressAttributeDataForProviderPath(
-                                path,
-                                'customAttributes',
-                                'custom_attributes'
-                            );
-                        }
-                        existingExtensionAttributes = getCheckoutProviderAttributeData(
-                            provider,
-                            path,
-                            'extensionAttributes',
-                            'extension_attributes'
-                        );
-                        if (!Object.keys(existingExtensionAttributes).length) {
-                            existingExtensionAttributes = getQuoteAddressAttributeDataForProviderPath(
-                                path,
-                                'extensionAttributes',
-                                'extension_attributes'
-                            );
-                        }
-
-                        if (
-                            Object.keys(existingCustomAttributes).length &&
-                            !value.custom_attributes &&
-                            !value.customAttributes
-                        ) {
-                            value.custom_attributes = existingCustomAttributes;
-                            value.customAttributes = existingCustomAttributes;
-                        }
-                        if (
-                            Object.keys(existingExtensionAttributes).length &&
-                            !value.extension_attributes &&
-                            !value.extensionAttributes
-                        ) {
-                            value.extension_attributes = existingExtensionAttributes;
-                            value.extensionAttributes = existingExtensionAttributes;
-                        }
-                    }
-
-                    var result = originalSet.apply(provider, arguments);
-
-                    normalizeCheckoutProviderAttributeContainerAfterSet(provider, path, value);
-
-                    scheduleCheckoutProviderAddressAttributeSync(path);
-
-                    return result;
-                };
-            }
-
-            function createShippingAddressComponentFallback() {
-                var component = {
-                    name: 'fastcheckout.shippingAddress',
-                    index: 'shippingAddress',
-                    isFormInline: true,
-                    source: getCheckoutProvider(),
-                    errorValidationMessage: function (message) {
-                        if (arguments.length) {
-                            component.errorMessage = message || false;
-                            if (message && typeof document !== 'undefined') {
-                                document.dispatchEvent(new CustomEvent('fastcheckout:shipping-error', {
-                                    detail: {
-                                        message: message
-                                    }
-                                }));
-                            }
-                        }
-
-                        return component.errorMessage || false;
-                    },
-                    validateShippingInformation: function () {
-                        var provider = getCheckoutProvider(),
-                            isValid = true;
-
-                        if (provider && typeof provider.set === 'function') {
-                            provider.set('params.invalid', false);
-                        }
-
-                        if (!quote.isVirtual || !quote.isVirtual()) {
-                            if (!quote.shippingMethod || !quote.shippingMethod()) {
-                                this.errorValidationMessage($t('The shipping method is missing. Select the shipping method and try again.'));
-                                if (provider && typeof provider.set === 'function') {
-                                    provider.set('params.invalid', true);
-                                }
-                                return false;
-                            }
-                        }
-
-                        if (
-                            window.fastcheckoutHyvaShipping &&
-                            typeof window.fastcheckoutHyvaShipping.validate === 'function'
-                        ) {
-                            isValid = window.fastcheckoutHyvaShipping.validate();
-                        }
-
-                        if (!isValid && provider && typeof provider.set === 'function') {
-                            provider.set('params.invalid', true);
-                        }
-
-                        return isValid && !(provider && provider.get && provider.get('params.invalid'));
-                    },
-                    triggerShippingDataValidateEvent: function () {
-                        var provider = getCheckoutProvider();
-
-                        if (provider && typeof provider.trigger === 'function') {
-                            provider.trigger('shippingAddress.data.validate');
-                        }
-                    },
-                    focusInvalid: function () {
-                        var invalid = document.querySelector('#co-checkout-form [aria-invalid="true"], #co-checkout-form .mage-error, #co-checkout-form .field-error');
-
-                        if (invalid) {
-                            invalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        }
-                    },
-                    setShippingInformation: function () {
-                        return this.validateShippingInformation();
-                    }
-                };
-
-                component.errorMessage = false;
-
-                return component;
+                addressAttributesBridge.register();
             }
 
             function getShippingAddressComponent() {
-                var component;
-
-                try {
-                    component = registry.get('index = shippingAddress');
-                } catch (e) {
-                    component = null;
-                }
-
-                if (!component) {
-                    component = createShippingAddressComponentFallback();
-                    try {
-                        registry.set('fastcheckout.shippingAddress', component);
-                    } catch (e) {
-                        if (window.console && typeof window.console.warn === 'function') {
-                            window.console.warn('Kkkonrad Fastcheckout: could not register fallback shippingAddress component.', e);
-                        }
-                    }
-                }
-
-                return component;
-            }
-
-            function createBillingAddressComponentFallback() {
-                var component = {
-                    name: 'fastcheckout.billingAddress',
-                    index: 'billingAddress',
-                    isAddressSameAsShipping: ko.observable(true),
-                    isAddressFormVisible: ko.observable(false),
-                    isAddressDetailsVisible: ko.observable(true),
-                    errorValidationMessage: ko.observable(false),
-                    errorMessage: false,
-                    
-                    updateAddress: function () {
-                        // Empty mock
-                    },
-                    useShippingAddress: function () {
-                        this.isAddressSameAsShipping(true);
-                    },
-                    editAddress: function () {
-                        this.isAddressSameAsShipping(false);
-                    },
-                    cancelAddressEdit: function () {
-                        this.isAddressSameAsShipping(true);
-                    }
-                };
-                return component;
+                return checkoutComponentFallbacks.getShippingAddressComponent();
             }
 
             function getBillingAddressComponent() {
-                var component;
-
-                try {
-                    component = registry.get('index = billingAddress');
-                } catch (e) {
-                    component = null;
-                }
-
-                if (!component) {
-                    component = createBillingAddressComponentFallback();
-                    try {
-                        registry.set('fastcheckout.billingAddress', component);
-                    } catch (e) {
-                        if (window.console && typeof window.console.warn === 'function') {
-                            window.console.warn('Kkkonrad Fastcheckout: could not register fallback billingAddress component.', e);
-                        }
-                    }
-                }
-
-                return component;
+                return checkoutComponentFallbacks.getBillingAddressComponent();
             }
 
             getCheckoutProvider();
@@ -1027,679 +240,202 @@ define([
                     }
                 });
 
-                var lastMethodsJson = '';
-                var lastMagewireShippingMethodCode = '';
-                var magewireShippingMethodSyncTimer = null;
-                var lastMagewirePaymentMethodCode = '';
-                var magewirePaymentMethodSyncTimer = null;
-                var isApplyingPaymentMethodFromBridge = false;
-                var checkoutStateRefreshPromise = null;
-                var checkoutStateLastPayload = null;
-                var checkoutStateLastPayloadAt = 0;
-                var checkoutDataFallbackWarningShown = false;
-                var optionalValidationComponentsRequested = false;
-                var optionalPaymentDataAssigners = [];
-                window.fastcheckoutPaymentDataAssigners = window.fastcheckoutPaymentDataAssigners || [];
-                window.fastcheckoutPaymentValidators = window.fastcheckoutPaymentValidators || [];
-                window.fastcheckoutCustomShippingValidators = window.fastcheckoutCustomShippingValidators || [];
-                var bridgeMessageContainer = new Messages();
-                var standardShippingViewSelectMethod = null;
-                var standardShippingInformationComponent = null;
-                var standardEmailComponent = null;
-                var localTranslations = {
-                    'Checkout session is not ready. Please refresh the page and try again.': 'Sesja checkoutu nie jest gotowa. Odśwież stronę i spróbuj ponownie.',
-                    'Please check the selected payment method and try again.': 'Sprawdź wybraną metodę płatności i spróbuj ponownie.',
-                    'The selected payment method is not ready. Please try again.': 'Wybrana metoda płatności nie jest jeszcze gotowa. Spróbuj ponownie.',
-                    'The selected payment method did not start order placement. Please try again.': 'Wybrana metoda płatności nie rozpoczęła składania zamówienia. Spróbuj ponownie.',
-                    'We could not place your order. Please try again.': 'Nie udało się złożyć zamówienia. Spróbuj ponownie.',
-                    'Something went wrong while processing your order. Please try again later.': 'Coś poszło nie tak podczas przetwarzania zamówienia. Spróbuj ponownie później.'
-                };
-
-                function isPolishLocale() {
-                    var locale = (window.LOCALE || (window.checkoutConfig && window.checkoutConfig.locale) || '').toLowerCase();
-
-                    return locale.indexOf('pl') === 0;
-                }
+                var paymentMessageBridge = createPaymentMessageBridge({
+                    registry: registry,
+                    Messages: Messages,
+                    globalMessageList: globalMessageList,
+                    errorProcessor: errorProcessor,
+                    fullScreenLoader: fullScreenLoader,
+                    translate: $t
+                });
+                var paymentValidationRegistry = createPaymentValidationRegistry({
+                    config: config,
+                    additionalValidators: additionalValidators
+                });
+                var shippingCompatibilityBridge = createShippingCompatibilityBridge({
+                    ko: ko,
+                    registry: registry,
+                    getShippingAddressComponent: getShippingAddressComponent,
+                    getCheckoutProvider: getCheckoutProvider,
+                    getCountryOptionsByValue: getCountryOptionsByValue,
+                    getBridgeMessageContainer: getBridgeMessageContainer,
+                    getCheckoutErrorsComponent: getCheckoutErrorsComponent
+                });
+                var checkoutDataPersistence = createCheckoutDataPersistence({
+                    checkoutData: checkoutData
+                });
+                var checkoutTotalsSync = createCheckoutTotalsSync({
+                    config: config,
+                    quote: quote,
+                    checkoutTotals: checkoutTotals
+                });
+                var checkoutLayoutBridge = createCheckoutLayoutBridge({
+                    config: config,
+                    registry: registry
+                });
+                var addressDataBuilder = createAddressDataBuilder({
+                    quote: quote,
+                    getProperty: getProperty,
+                    normalizeCustomAttributes: normalizeAddressCustomAttributes
+                });
+                var paymentDomBridge = createPaymentDomBridge({
+                    compareMethodCodes: paymentMethodCodesEqual
+                });
+                var checkoutStateBridge = createCheckoutStateBridge({
+                    config: config,
+                    paymentService: paymentService,
+                    methodConverter: methodConverter,
+                    quote: quote,
+                    checkoutTotals: checkoutTotals,
+                    shippingService: shippingService,
+                    selectPaymentMethodAction: selectPaymentMethodAction,
+                    selectShippingMethodAction: selectShippingMethodAction,
+                    callbacks: {
+                        syncQuoteTotals: syncQuoteTotals,
+                        syncQuoteTotalsFromDom: syncQuoteTotalsFromDom,
+                        syncQuoteCustomerData: syncQuoteCustomerData,
+                        getDomPaymentMethods: getDomPaymentMethods,
+                        domHasPaymentMethod: domHasPaymentMethod,
+                        persistPaymentMethodToCheckoutData: persistPaymentMethodToCheckoutData,
+                        hidePaymentPlaceholders: hidePaymentPlaceholders,
+                        syncKoPaymentRenderers: syncKoPaymentRenderers,
+                        setQuotePaymentMethodFromBridge: setQuotePaymentMethodFromBridge,
+                        persistEmailToCheckoutData: persistEmailToCheckoutData,
+                        syncSelectedShippingMethodToKnockout: syncSelectedShippingMethodToKnockout,
+                        setQuoteGuestEmail: setQuoteGuestEmail,
+                        getShippingMethodCode: getShippingMethodCode,
+                        getMagewireComponent: getMagewireComponent,
+                        getProperty: getProperty,
+                        handlePaymentError: handlePaymentError,
+                        getBridgeMessageContainer: getBridgeMessageContainer
+                    }
+                });
+                var placeOrderHooksBridge = createPlaceOrderHooksBridge({
+                    quote: quote,
+                    placeOrderHooks: placeOrderHooks,
+                    getEmailForQuote: getEmailForQuote
+                });
+                var shippingAttributesSync = createShippingAttributesSync({
+                    checkoutData: checkoutData,
+                    quote: quote,
+                    getShippingMethodCode: getShippingMethodCode,
+                    collectStructuredFields: collectFastcheckoutStructuredFields,
+                    getShippingFormRoots: getFastcheckoutShippingFormRoots,
+                    normalizeAddressAttributeMap: normalizeAddressAttributeMap,
+                    getAddressAttributes: getAddressAttributes,
+                    updateQuoteAddressAttributes: updateQuoteAddressAttributes,
+                    getMagewireComponent: getMagewireComponent,
+                    getProperty: getProperty,
+                    setMagewireValue: setMagewireValue
+                });
+                var paymentMethodSync = createPaymentMethodSync({
+                    quote: quote,
+                    getMagewireComponent: getMagewireComponent,
+                    getProperty: getProperty,
+                    persistPaymentMethod: persistPaymentMethodToCheckoutData
+                });
+                var customerEmailSync = createCustomerEmailSync({
+                    quote: quote,
+                    persistEmail: persistEmailToCheckoutData
+                });
+                var shippingMethodSync = createShippingMethodSync({
+                    quote: quote,
+                    shippingService: shippingService,
+                    selectShippingMethodAction: selectShippingMethodAction,
+                    getMagewireComponent: getMagewireComponent,
+                    getProperty: getProperty,
+                    persistShippingMethod: persistShippingMethodToCheckoutData
+                });
+                var shippingErrorBridge = createShippingErrorBridge({
+                    registry: registry
+                });
 
                 function translateFastcheckoutMessage(message) {
-                    var translated;
-
-                    if (!message) {
-                        return '';
-                    }
-
-                    translated = $t(message);
-                    if (translated !== message) {
-                        return translated;
-                    }
-
-                    if (isPolishLocale() && localTranslations[message]) {
-                        return localTranslations[message];
-                    }
-
-                    return translated;
-                }
-
-                function getMessageText(message) {
-                    if (!message) {
-                        return '';
-                    }
-
-                    if (typeof message === 'string') {
-                        return translateFastcheckoutMessage(message);
-                    }
-
-                    if (message.message) {
-                        return translateFastcheckoutMessage(message.message);
-                    }
-
-                    return String(message);
-                }
-
-                function dispatchPaymentMessage(type, message) {
-                    var text = getMessageText(message);
-
-                    if (!text) {
-                        return;
-                    }
-
-                    document.dispatchEvent(new CustomEvent('fastcheckout:payment-message', {
-                        detail: {
-                            type: type,
-                            message: text
-                        }
-                    }));
-
-                    if (type === 'error') {
-                        document.dispatchEvent(new CustomEvent('fastcheckout:payment-error', {
-                            detail: {
-                                message: text
-                            }
-                        }));
-                    }
+                    return paymentMessageBridge.translate(message);
                 }
 
                 function subscribePaymentMessageContainer(messageContainer) {
-                    if (!messageContainer || messageContainer.fastcheckoutHyvaSubscribed) {
-                        return messageContainer;
-                    }
-
-                    messageContainer.fastcheckoutHyvaSubscribed = true;
-
-                    if (
-                        typeof messageContainer.errorMessages === 'function' &&
-                        typeof messageContainer.errorMessages.subscribe === 'function'
-                    ) {
-                        messageContainer.errorMessages.subscribe(function (messages) {
-                            if (messages && messages.length) {
-                                dispatchPaymentMessage('error', messages[messages.length - 1]);
-                            }
-                        });
-                    }
-
-                    if (
-                        typeof messageContainer.successMessages === 'function' &&
-                        typeof messageContainer.successMessages.subscribe === 'function'
-                    ) {
-                        messageContainer.successMessages.subscribe(function (messages) {
-                            if (messages && messages.length) {
-                                dispatchPaymentMessage('success', messages[messages.length - 1]);
-                            }
-                        });
-                    }
-
-                    return messageContainer;
+                    return paymentMessageBridge.subscribe(messageContainer);
                 }
 
                 function getBridgeMessageContainer() {
-                    return subscribePaymentMessageContainer(bridgeMessageContainer);
+                    return paymentMessageBridge.getContainer();
                 }
 
                 function getCheckoutErrorsComponent() {
-                    var component;
-
-                    try {
-                        component = registry.get('checkout.errors');
-                    } catch (e) {
-                        component = null;
-                    }
-
-                    if (!component) {
-                        component = {
-                            name: 'checkout.errors',
-                            index: 'checkout.errors',
-                            messageContainer: getBridgeMessageContainer()
-                        };
-
-                        try {
-                            registry.set('checkout.errors', component);
-                        } catch (e) {
-                            if (window.console && typeof window.console.warn === 'function') {
-                                window.console.warn('Kkkonrad Fastcheckout: could not register fallback checkout.errors component.', e);
-                            }
-                        }
-                    } else if (!component.messageContainer) {
-                        component.messageContainer = getBridgeMessageContainer();
-                    } else {
-                        subscribePaymentMessageContainer(component.messageContainer);
-                    }
-
-                    return component;
+                    return paymentMessageBridge.getCheckoutErrorsComponent();
                 }
 
                 function clearPaymentMessages() {
-                    if (bridgeMessageContainer && typeof bridgeMessageContainer.clear === 'function') {
-                        bridgeMessageContainer.clear();
-                    }
-                    if (globalMessageList && typeof globalMessageList.clear === 'function') {
-                        globalMessageList.clear();
-                    }
-                }
-
-                function messageContainerHasMessages(messageContainer) {
-                    return !!(
-                        messageContainer &&
-                        typeof messageContainer.hasMessages === 'function' &&
-                        messageContainer.hasMessages()
-                    );
+                    paymentMessageBridge.clear();
                 }
 
                 function handlePaymentError(error, messageContainer) {
-                    var container = subscribePaymentMessageContainer(messageContainer) || getBridgeMessageContainer(),
-                        message = error && error.message
-                            ? translateFastcheckoutMessage(error.message)
-                            : translateFastcheckoutMessage('Something went wrong while processing your order. Please try again later.');
-
-                    if (fullScreenLoader && typeof fullScreenLoader.stopLoader === 'function') {
-                        fullScreenLoader.stopLoader(true);
-                    }
-
-                    if (error && (error.responseText || error.status)) {
-                        try {
-                            errorProcessor.process(error, container);
-                            return;
-                        } catch (e) {}
-                    }
-
-                    if (messageContainerHasMessages(container)) {
-                        return;
-                    }
-
-                    if (container && typeof container.addErrorMessage === 'function') {
-                        container.addErrorMessage({ message: message });
-                    } else {
-                        dispatchPaymentMessage('error', message);
-                    }
+                    paymentMessageBridge.handleError(error, messageContainer);
                 }
 
                 subscribePaymentMessageContainer(globalMessageList);
                 getCheckoutErrorsComponent();
 
-                function prepareShippingViewCompatibilityComponent() {
-                    var component = getShippingAddressComponent(),
-                        provider = getCheckoutProvider();
-
-                    if (!component) {
-                        return null;
-                    }
-
-                    component.source = provider;
-                    component.isFormInline = true;
-                    component.countryOptions = getCountryOptionsByValue();
-                    component.messageContainer = component.messageContainer || getBridgeMessageContainer();
-
-                    if (typeof component.errorValidationMessage !== 'function') {
-                        component.errorValidationMessage = ko.observable(false);
-                    }
-
-                    if (typeof component.triggerShippingDataValidateEvent !== 'function') {
-                        component.triggerShippingDataValidateEvent = function () {
-                            if (provider && typeof provider.trigger === 'function') {
-                                provider.trigger('shippingAddress.data.validate');
-                                provider.trigger('shippingAddress.custom_attributes.data.validate');
-                            }
-                        };
-                    }
-
-                    if (typeof component.focusInvalid !== 'function') {
-                        component.focusInvalid = function () {
-                            var invalid = document.querySelector('#co-checkout-form [aria-invalid="true"], #co-checkout-form .mage-error, #co-checkout-form .field-error');
-
-                            if (invalid) {
-                                invalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                            }
-                        };
-                    }
-
-                    getCheckoutErrorsComponent();
-
-                    return component;
-                }
-
-                function registerShippingViewCompatibilityValidator() {
-                    if (window.fastcheckoutKoShippingViewValidatorRegistered) {
-                        return;
-                    }
-
-                    window.fastcheckoutKoShippingViewValidatorRegistered = true;
-                    window.fastcheckoutCustomShippingValidators = window.fastcheckoutCustomShippingValidators || [];
-
-                    require([
-                        'Magento_Checkout/js/view/shipping'
-                    ], function (ShippingView) {
-                        var validateMethod = ShippingView &&
-                                ShippingView.prototype &&
-                                ShippingView.prototype.validateShippingInformation,
-                            validator;
-
-                        if (typeof validateMethod !== 'function') {
-                            return;
-                        }
-
-                        standardShippingViewSelectMethod = ShippingView &&
-                            ShippingView.prototype &&
-                            typeof ShippingView.prototype.selectShippingMethod === 'function'
-                            ? ShippingView.prototype.selectShippingMethod
-                            : null;
-
-                        validator = function () {
-                            var component;
-
-                            if (window.fastcheckoutKoShippingViewValidationActive) {
-                                return true;
-                            }
-
-                            component = prepareShippingViewCompatibilityComponent();
-                            if (!component) {
-                                return true;
-                            }
-
-                            window.fastcheckoutKoShippingViewValidationActive = true;
-                            try {
-                                return validateMethod.call(component) !== false;
-                            } catch (e) {
-                                if (window.console && typeof window.console.warn === 'function') {
-                                    window.console.warn('Kkkonrad Fastcheckout: standard shipping view validation could not run.', e);
-                                }
-
-                                return true;
-                            } finally {
-                                window.fastcheckoutKoShippingViewValidationActive = false;
-                            }
-                        };
-
-                        validator.fastcheckoutKoShippingView = true;
-
-                        if (!window.fastcheckoutCustomShippingValidators.some(function (item) {
-                            return item && item.fastcheckoutKoShippingView;
-                        })) {
-                            window.fastcheckoutCustomShippingValidators.push(validator);
-                        }
-                    }, function (error) {
-                        if (window.console && typeof window.console.warn === 'function') {
-                            window.console.warn('Kkkonrad Fastcheckout: standard shipping view validator could not be loaded.', error);
-                        }
-                    });
-                }
-
-                registerShippingViewCompatibilityValidator();
-
-                function registerShippingInformationCompatibilityComponent() {
-                    if (window.fastcheckoutKoShippingInformationRegistered) {
-                        return;
-                    }
-
-                    window.fastcheckoutKoShippingInformationRegistered = true;
-
-                    require([
-                        'Magento_Checkout/js/view/shipping-information'
-                    ], function (ShippingInformation) {
-                        if (typeof ShippingInformation !== 'function') {
-                            return;
-                        }
-
-                        try {
-                            standardShippingInformationComponent = ShippingInformation({
-                                name: 'fastcheckout.shippingInformation',
-                                index: 'shipping-information',
-                                displayArea: 'shipping-information'
-                            });
-
-                            if (standardShippingInformationComponent) {
-                                registry.set('fastcheckout.shippingInformation', standardShippingInformationComponent);
-                            }
-                        } catch (e) {
-                            standardShippingInformationComponent = null;
-                            if (window.console && typeof window.console.warn === 'function') {
-                                window.console.warn('Kkkonrad Fastcheckout: standard shipping information component could not be initialized.', e);
-                            }
-                        }
-                    }, function (error) {
-                        if (window.console && typeof window.console.warn === 'function') {
-                            window.console.warn('Kkkonrad Fastcheckout: standard shipping information component could not be loaded.', error);
-                        }
-                    });
-                }
-
-                registerShippingInformationCompatibilityComponent();
-
                 function syncEmailCompatibilityComponent(value, triggerChange) {
-                    var component = standardEmailComponent || window.fastcheckoutKoEmailCompatibilityComponent;
-
-                    if (!component || typeof component.email !== 'function' || typeof value === 'undefined') {
-                        return;
-                    }
-
-                    if (component.email() !== value) {
-                        component.email(value || '');
-                    }
-
-                    if (triggerChange && typeof component.emailHasChanged === 'function') {
-                        component.emailHasChanged();
-                    }
+                    shippingCompatibilityBridge.syncEmailCompatibilityComponent(value, triggerChange);
                 }
 
-                function registerEmailCompatibilityComponent() {
-                    if (window.fastcheckoutKoEmailComponentRegistered) {
-                        return;
-                    }
-
-                    window.fastcheckoutKoEmailComponentRegistered = true;
-
-                    require([
-                        'Magento_Checkout/js/view/form/element/email'
-                    ], function (EmailComponent) {
-                        var input;
-
-                        if (typeof EmailComponent !== 'function') {
-                            return;
-                        }
-
-                        try {
-                            standardEmailComponent = EmailComponent({
-                                name: 'checkout.steps.shipping-step.shippingAddress.customer-email',
-                                index: 'customer-email',
-                                emailInputId: '#co-shipping-email'
-                            });
-                            window.fastcheckoutKoEmailCompatibilityComponent = standardEmailComponent;
-                            registry.set('checkout.steps.shipping-step.shippingAddress.customer-email', standardEmailComponent);
-
-                            input = document.getElementById('co-shipping-email');
-                            if (input) {
-                                syncEmailCompatibilityComponent(input.value || '', false);
-                                input.addEventListener('input', function () {
-                                    syncEmailCompatibilityComponent(input.value || '', true);
-                                });
-                                input.addEventListener('blur', function () {
-                                    if (
-                                        standardEmailComponent &&
-                                        typeof standardEmailComponent.validateEmail === 'function'
-                                    ) {
-                                        standardEmailComponent.validateEmail(false);
-                                    }
-                                });
-                            }
-                        } catch (e) {
-                            standardEmailComponent = null;
-                            if (window.console && typeof window.console.warn === 'function') {
-                                window.console.warn('Kkkonrad Fastcheckout: standard email component could not be initialized.', e);
-                            }
-                        }
-                    }, function (error) {
-                        if (window.console && typeof window.console.warn === 'function') {
-                            window.console.warn('Kkkonrad Fastcheckout: standard email component could not be loaded.', error);
-                        }
-                    });
-                }
-
-                registerEmailCompatibilityComponent();
+                shippingCompatibilityBridge.init();
 
                 function runStandardShippingViewSelectMethod(shippingMethod) {
-                    var component;
-
-                    if (!standardShippingViewSelectMethod || !shippingMethod || typeof shippingMethod !== 'object' || window.fastcheckoutKoShippingViewSelectActive) {
-                        return;
-                    }
-
-                    component = prepareShippingViewCompatibilityComponent();
-                    if (!component) {
-                        return;
-                    }
-
-                    window.fastcheckoutKoShippingViewSelectActive = true;
-                    try {
-                        standardShippingViewSelectMethod.call(component, shippingMethod);
-                    } catch (e) {
-                        if (window.console && typeof window.console.warn === 'function') {
-                            window.console.warn('Kkkonrad Fastcheckout: standard shipping view method selection could not run.', e);
-                        }
-                    } finally {
-                        window.fastcheckoutKoShippingViewSelectActive = false;
-                    }
-                }
-
-                function registerAdditionalValidatorOnce(validator) {
-                    if (!additionalValidators || !validator || typeof validator.validate !== 'function') {
-                        return;
-                    }
-
-                    if (
-                        typeof additionalValidators.getValidators === 'function' &&
-                        additionalValidators.getValidators().indexOf(validator) !== -1
-                    ) {
-                        return;
-                    }
-
-                    if (typeof additionalValidators.registerValidator === 'function') {
-                        additionalValidators.registerValidator(validator);
-                    }
+                    shippingCompatibilityBridge.runStandardShippingViewSelectMethod(shippingMethod);
                 }
 
                 function registerPaymentValidator(validator) {
-                    if (!validator || typeof validator.validate !== 'function') {
-                        return;
-                    }
-
-                    if (window.fastcheckoutPaymentValidators.indexOf(validator) === -1) {
-                        window.fastcheckoutPaymentValidators.push(validator);
-                    }
-
-                    registerAdditionalValidatorOnce(validator);
-                }
-
-                function registerPaymentDataAssignerOnce(assigner) {
-                    if (typeof assigner !== 'function' || optionalPaymentDataAssigners.indexOf(assigner) !== -1) {
-                        return;
-                    }
-
-                    optionalPaymentDataAssigners.push(assigner);
+                    paymentValidationRegistry.registerPaymentValidator(validator);
                 }
 
                 function registerPaymentDataAssigner(assigner) {
-                    if (typeof assigner !== 'function') {
-                        return;
-                    }
-
-                    if (window.fastcheckoutPaymentDataAssigners.indexOf(assigner) === -1) {
-                        window.fastcheckoutPaymentDataAssigners.push(assigner);
-                    }
-
-                    registerPaymentDataAssignerOnce(assigner);
+                    paymentValidationRegistry.registerPaymentDataAssigner(assigner);
                 }
 
                 function registerShippingValidator(validator) {
-                    if (typeof validator !== 'function' || window.fastcheckoutCustomShippingValidators.indexOf(validator) !== -1) {
-                        return;
-                    }
-
-                    window.fastcheckoutCustomShippingValidators.push(validator);
+                    paymentValidationRegistry.registerShippingValidator(validator);
                 }
 
-                window.fastcheckoutPaymentDataAssigners.forEach(registerPaymentDataAssignerOnce);
-                window.fastcheckoutPaymentValidators.forEach(registerAdditionalValidatorOnce);
-
                 function loadOptionalValidationComponents() {
-                    if (optionalValidationComponentsRequested) {
-                        return;
-                    }
-
-                    optionalValidationComponentsRequested = true;
-
-                    if (
-                        !window.checkoutConfig ||
-                        !window.checkoutConfig.checkoutAgreements ||
-                        !window.checkoutConfig.checkoutAgreements.isEnabled
-                    ) {
-                        return;
-                    }
-
-                    require([
-                        'Magento_CheckoutAgreements/js/model/agreement-validator',
-                        'Magento_CheckoutAgreements/js/model/agreements-assigner'
-                    ], function (agreementValidator, agreementsAssigner) {
-                        registerAdditionalValidatorOnce(agreementValidator);
-                        registerPaymentDataAssignerOnce(agreementsAssigner);
-                    }, function (error) {
-                        if (window.console && typeof window.console.warn === 'function') {
-                            window.console.warn('Kkkonrad Fastcheckout: optional checkout agreements validators could not be loaded.', error);
-                        }
-                    });
+                    paymentValidationRegistry.loadOptionalValidationComponents();
                 }
 
                 function loadShippingRatesValidationComponents() {
-                    var components = config.shippingRatesValidationComponents || [];
-
-                    if (window.fastcheckoutShippingRatesValidationComponentsLoaded || !components.length) {
-                        return;
-                    }
-
-                    window.fastcheckoutShippingRatesValidationComponentsLoaded = true;
-                    window.fastcheckoutShippingRatesValidationComponentNames = components.slice(0);
-                    require(components, function () {}, function (error) {
-                        if (window.console && typeof window.console.warn === 'function') {
-                            window.console.warn(
-                                'Kkkonrad Fastcheckout: shipping rates validation components could not be loaded.',
-                                error
-                            );
-                        }
-                    });
+                    paymentValidationRegistry.loadShippingRatesValidationComponents();
                 }
 
                 function loadPaymentValidationComponents() {
-                    var components = config.paymentValidationComponents || [];
-
-                    if (window.fastcheckoutPaymentValidationComponentsLoaded || !components.length) {
-                        return;
-                    }
-
-                    window.fastcheckoutPaymentValidationComponentsLoaded = true;
-                    window.fastcheckoutPaymentValidationComponentNames = components.slice(0);
-                    require(components, function () {}, function (error) {
-                        if (window.console && typeof window.console.warn === 'function') {
-                            window.console.warn(
-                                'Kkkonrad Fastcheckout: payment validation components could not be loaded.',
-                                error
-                            );
-                        }
-                    });
+                    paymentValidationRegistry.loadPaymentValidationComponents();
                 }
 
                 function getDomPaymentMethods() {
-                    var methods = [];
-
-                    document.querySelectorAll('input[name="payment_method"]').forEach(function (input) {
-                        var label = input.closest('label');
-                        var titleElement = label ? label.querySelector('span') : null;
-
-                        methods.push({
-                            method: input.value,
-                            title: titleElement ? titleElement.textContent.trim() : '',
-                            checked: !!input.checked,
-                            disabled: !!input.disabled
-                        });
-                    });
-
-                    return methods;
+                    return paymentDomBridge.getMethods();
                 }
 
                 function domHasPaymentMethod(methodCode) {
-                    var found = false;
-
-                    if (!methodCode) {
-                        return false;
-                    }
-
-                    getDomPaymentMethods().forEach(function (method) {
-                        if (
-                            !method.disabled &&
-                            (
-                                paymentMethodCodesEqual(method.method, methodCode) ||
-                                paymentMethodCodesEqual(methodCode, method.method)
-                            )
-                        ) {
-                            found = true;
-                        }
-                    });
-
-                    return found;
+                    return paymentDomBridge.hasMethod(methodCode);
                 }
 
                 function getCheckedDomPaymentMethod() {
-                    var selected = document.querySelector('input[name="payment_method"]:checked:not(:disabled)');
-
-                    return selected ? selected.value : '';
+                    return paymentDomBridge.getCheckedMethod();
                 }
 
                 function hidePaymentPlaceholders() {
-                    document.querySelectorAll('.fastcheckout-payment-method-ko-container').forEach(function (placeholder) {
-                        placeholder.classList.add('hidden');
-                        placeholder.style.display = 'none';
-                    });
+                    paymentDomBridge.hidePlaceholders();
                 }
 
                 function setQuoteGuestEmail(email) {
-                    if (!quote || !email) {
-                        return;
-                    }
-
-                    if (typeof quote.guestEmail === 'function') {
-                        if (quote.guestEmail() !== email) {
-                            quote.guestEmail(email);
-                        }
-                        return;
-                    }
-
-                    quote.guestEmail = email;
+                    customerEmailSync.setGuestEmail(email);
                 }
 
                 function syncQuoteCustomerData() {
-                    if (!quote) return;
-                    var emailEl = document.getElementById('co-shipping-email') ||
-                                  document.querySelector('input[name="email"]') || 
-                                  document.querySelector('input[type="email"]') ||
-                                  document.querySelector('[data-wire-field="email"]');
-                    var emailVal = emailEl ? emailEl.value : '';
-                    if (!emailVal && window.checkoutConfig && window.checkoutConfig.customerData) {
-                        emailVal = window.checkoutConfig.customerData.email || '';
-                    }
-                    if (!emailVal && window.checkoutConfig && window.checkoutConfig.quoteData) {
-                        emailVal = window.checkoutConfig.quoteData.customer_email || '';
-                    }
-                    if (emailVal) {
-                        setQuoteGuestEmail(emailVal);
-                        persistEmailToCheckoutData(emailVal);
-                        var billing = typeof quote.billingAddress === 'function' ? quote.billingAddress() : null;
-                        if (billing && typeof billing.getCacheKey === 'function') {
-                            billing.email = emailVal;
-                        }
-                    }
+                    customerEmailSync.sync();
                 }
 
-                document.addEventListener('input', function (e) {
-                    if (e.target && (e.target.name === 'email' || e.target.type === 'email' || e.target.getAttribute('data-wire-field') === 'email')) {
-                        syncQuoteCustomerData();
-                    }
-                });
+                customerEmailSync.registerInputListener();
 
                 function syncKoPaymentRenderers() {
                     syncQuoteCustomerData();
@@ -1708,501 +444,40 @@ define([
                     }
                 }
 
-                function normalizeTotalsData(totalsData) {
-                    var data = $.extend(true, {}, totalsData || {}),
-                        quoteItems = (window.checkoutConfig && window.checkoutConfig.quoteItemData) ||
-                            (config.checkoutConfig && config.checkoutConfig.quoteItemData) ||
-                            [];
-
-                    if (!Array.isArray(data.items)) {
-                        data.items = quoteItems;
-                    }
-                    if (!Array.isArray(data.total_segments)) {
-                        data.total_segments = [];
-                    }
-                    ['subtotal', 'grand_total', 'shipping_amount', 'tax_amount', 'discount_amount'].forEach(function (code) {
-                        if (typeof data[code] === 'undefined' || data[code] === null || data[code] === '') {
-                            data[code] = 0;
-                        }
-                        data[code] = parseFloat(data[code]) || 0;
-                    });
-                    if (typeof data.subtotal_with_discount === 'undefined' || data.subtotal_with_discount === null || data.subtotal_with_discount === '') {
-                        data.subtotal_with_discount = data.subtotal + (parseFloat(data.discount_amount) || 0);
-                    }
-                    data.subtotal_with_discount = parseFloat(data.subtotal_with_discount) || data.subtotal || 0;
-
-                    return data;
-                }
-
-                function getCheckoutConfigTotalsData() {
-                    if (window.checkoutConfig && window.checkoutConfig.totalsData) {
-                        return window.checkoutConfig.totalsData;
-                    }
-                    if (config.checkoutConfig && config.checkoutConfig.totalsData) {
-                        return config.checkoutConfig.totalsData;
-                    }
-
-                    return null;
-                }
-
-                function readSummaryTotalsFromDom() {
-                    var rows = document.querySelectorAll('[data-fastcheckout-total-row]'),
-                        currentTotals = quote && typeof quote.totals === 'function' ? quote.totals() : null,
-                        data,
-                        segmentsByCode = {};
-
-                    if (!rows.length) {
-                        return null;
-                    }
-
-                    data = normalizeTotalsData(currentTotals || getCheckoutConfigTotalsData());
-                    data.total_segments.forEach(function (segment) {
-                        if (segment && segment.code) {
-                            segmentsByCode[segment.code] = segment;
-                        }
-                    });
-
-                    rows.forEach(function (row) {
-                        var code = row.getAttribute('data-code'),
-                            label = row.getAttribute('data-label') || code,
-                            value = parseFloat(row.getAttribute('data-value'));
-
-                        if (!code || isNaN(value)) {
-                            return;
-                        }
-
-                        data[code] = value;
-                        if (!segmentsByCode[code]) {
-                            segmentsByCode[code] = {
-                                code: code
-                            };
-                            data.total_segments.push(segmentsByCode[code]);
-                        }
-                        segmentsByCode[code].title = label;
-                        segmentsByCode[code].value = value;
-                    });
-
-                    return normalizeTotalsData(data);
-                }
-
                 function syncQuoteTotals(totalsData) {
-                    var data = normalizeTotalsData(totalsData);
-
-                    if (!quote || typeof quote.setTotals !== 'function') {
-                        return false;
-                    }
-
-                    quote.setTotals(data);
-                    if (window.checkoutConfig) {
-                        window.checkoutConfig.totalsData = data;
-                    }
-                    if (checkoutTotals && checkoutTotals.isLoading && typeof checkoutTotals.isLoading === 'function') {
-                        checkoutTotals.isLoading(false);
-                    }
-
-                    return true;
+                    return checkoutTotalsSync.sync(totalsData);
                 }
 
                 function syncQuoteTotalsFromConfig() {
-                    var totalsData = getCheckoutConfigTotalsData();
-
-                    if (!totalsData) {
-                        return false;
-                    }
-
-                    return syncQuoteTotals(totalsData);
+                    return checkoutTotalsSync.syncFromConfig();
                 }
 
                 function syncQuoteTotalsFromDom() {
-                    var totalsData = readSummaryTotalsFromDom();
-
-                    if (!totalsData) {
-                        return false;
-                    }
-
-                    return syncQuoteTotals(totalsData);
-                }
-
-                function applyCheckoutStatePayload(payload) {
-                    var methodsJson,
-                        selectedPaymentMethod,
-                        selectedShippingMethod;
-
-                    if (!payload || typeof payload !== 'object') {
-                        syncQuoteTotalsFromDom();
-                        syncPaymentMethods();
-                        return false;
-                    }
-
-                    if (payload.totals) {
-                        syncQuoteTotals(payload.totals);
-                    } else {
-                        syncQuoteTotalsFromDom();
-                    }
-
-                    if (Array.isArray(payload.payment_methods)) {
-                        paymentService.setPaymentMethods(payload.payment_methods);
-                        methodsJson = JSON.stringify(payload.payment_methods);
-                        if (methodsJson) {
-                            lastMethodsJson = methodsJson;
-                        }
-                    } else {
-                        syncPaymentMethods();
-                    }
-
-                    if (Array.isArray(payload.shipping_rates)) {
-                        var currentRates = shippingService.getShippingRates()();
-                        var ratesChanged = false;
-
-                        if (currentRates.length !== payload.shipping_rates.length) {
-                            ratesChanged = true;
-                        } else {
-                            for (var i = 0; i < currentRates.length; i++) {
-                                var cr = currentRates[i];
-                                var nr = payload.shipping_rates[i];
-                                if (cr.carrier_code !== nr.carrier_code ||
-                                    cr.method_code !== nr.method_code ||
-                                    cr.amount !== nr.amount ||
-                                    cr.base_amount !== nr.base_amount ||
-                                    cr.price_excl_tax !== nr.price_excl_tax ||
-                                    cr.price_incl_tax !== nr.price_incl_tax ||
-                                    cr.available !== nr.available ||
-                                    cr.error_message !== nr.error_message ||
-                                    cr.carrier_title !== nr.carrier_title ||
-                                    cr.method_title !== nr.method_title ||
-                                    JSON.stringify(cr.extension_attributes || {}) !== JSON.stringify(nr.extension_attributes || {}) ||
-                                    JSON.stringify(cr.extensionAttributes || {}) !== JSON.stringify(nr.extensionAttributes || {})) {
-                                    ratesChanged = true;
-                                    break;
-                                }
-                            }
-                        }
-
-                        if (ratesChanged) {
-                            shippingService.setShippingRates(payload.shipping_rates);
-                        }
-                    }
-
-                    selectedPaymentMethod = getStateSelectedPaymentMethod(payload);
-                    if (selectedPaymentMethod) {
-                        setQuotePaymentMethodFromBridge({
-                            method: selectedPaymentMethod
-                        });
-                        persistPaymentMethodToCheckoutData(selectedPaymentMethod);
-                    }
-
-                    selectedShippingMethod = getStateSelectedShippingMethod(payload);
-                    if (selectedShippingMethod) {
-                        syncSelectedShippingMethodToKnockout(selectedShippingMethod);
-                    }
-
-                    if (payload.customer_email) {
-                        setQuoteGuestEmail(payload.customer_email);
-                        persistEmailToCheckoutData(payload.customer_email);
-                    }
-
-                    if (typeof payload.coupon_code !== 'undefined' && window.checkoutConfig && window.checkoutConfig.totalsData) {
-                        window.checkoutConfig.totalsData.coupon_code = payload.coupon_code || '';
-                    }
-
-                    return true;
-                }
-
-                function getStateSelectedPaymentMethod(payload) {
-                    if (!payload || typeof payload !== 'object') {
-                        return '';
-                    }
-
-                    if (payload.selected_payment_method) {
-                        return String(payload.selected_payment_method);
-                    }
-
-                    if (payload.selectedPaymentMethod) {
-                        return String(payload.selectedPaymentMethod);
-                    }
-
-                    if (payload.paymentMethod && typeof payload.paymentMethod === 'string') {
-                        return payload.paymentMethod;
-                    }
-
-                    if (payload.paymentMethod && typeof payload.paymentMethod === 'object' && payload.paymentMethod.method) {
-                        return String(payload.paymentMethod.method);
-                    }
-
-                    return '';
-                }
-
-                function getStateSelectedShippingMethod(payload) {
-                    if (!payload || typeof payload !== 'object') {
-                        return '';
-                    }
-
-                    if (payload.selected_shipping_method) {
-                        return String(payload.selected_shipping_method);
-                    }
-
-                    if (payload.selectedShippingMethod) {
-                        return String(payload.selectedShippingMethod);
-                    }
-
-                    if (payload.selected_shipping_rate) {
-                        return String(payload.selected_shipping_rate);
-                    }
-
-                    if (payload.selectedShippingRate) {
-                        return String(payload.selectedShippingRate);
-                    }
-
-                    if (payload.shippingMethod && typeof payload.shippingMethod === 'string') {
-                        return payload.shippingMethod;
-                    }
-
-                    if (payload.shippingMethod && typeof payload.shippingMethod === 'object') {
-                        return getShippingMethodCode(payload.shippingMethod);
-                    }
-
-                    return '';
+                    return checkoutTotalsSync.syncFromDom();
                 }
 
                 function refreshCheckoutStateFromMagewire() {
-                    var wire = getMagewireComponent();
-
-                    if (!wire || typeof wire.call !== 'function') {
-                        applyCheckoutStatePayload(null);
-                        return Promise.resolve(false);
-                    }
-
-                    if (checkoutStateLastPayload && Date.now() - checkoutStateLastPayloadAt < 750) {
-                        return Promise.resolve(checkoutStateLastPayload);
-                    }
-
-                    if (checkoutStateRefreshPromise) {
-                        return checkoutStateRefreshPromise;
-                    }
-
-                    checkoutStateRefreshPromise = Promise.resolve(wire.call('refreshCheckoutState'))
-                        .then(function (payload) {
-                            if (payload && typeof payload === 'object' && payload.totals) {
-                                return payload;
-                            }
-                            return fetchCheckoutState(wire);
-                        })
-                        .catch(function () {
-                            return fetchCheckoutState(wire);
-                        })
-                        .then(function (payload) {
-                            applyCheckoutStatePayload(payload);
-                            checkoutStateLastPayload = payload;
-                            checkoutStateLastPayloadAt = Date.now();
-                            return payload;
-                        })
-                        .then(function (payload) {
-                            checkoutStateRefreshPromise = null;
-                            return payload;
-                        }, function (error) {
-                            checkoutStateRefreshPromise = null;
-                            throw error;
-                        });
-
-                    return checkoutStateRefreshPromise;
-                }
-
-                function getCheckoutStateUrl(wire) {
-                    var baseUrl = window.BASE_URL || '/',
-                        paymentMethod = wire ? getProperty(wire, 'paymentMethod') : '';
-
-                    if (baseUrl.charAt(baseUrl.length - 1) !== '/') {
-                        baseUrl += '/';
-                    }
-
-                    return baseUrl + 'fast-checkout/index/state' + (paymentMethod ? '?payment_method=' + encodeURIComponent(paymentMethod) : '');
-                }
-
-                function fetchCheckoutState(wire) {
-                    return $.ajax({
-                        url: getCheckoutStateUrl(wire),
-                        type: 'GET',
-                        dataType: 'json',
-                        cache: false
-                    });
+                    return checkoutStateBridge.refresh();
                 }
 
                 function resolveCheckoutStateRefresh(callbacks, deferred, messageContainer) {
-                    var proceed = true;
-
-                    callbacks = Array.isArray(callbacks) ? callbacks : [];
-                    deferred = deferred || $.Deferred();
-
-                    if (checkoutTotals && checkoutTotals.isLoading && typeof checkoutTotals.isLoading === 'function') {
-                        checkoutTotals.isLoading(true);
-                    }
-
-                    refreshCheckoutStateFromMagewire()
-                        .then(function (payload) {
-                            callbacks.forEach(function (callback) {
-                                if (typeof callback === 'function') {
-                                    proceed = proceed && callback();
-                                }
-                            });
-
-                            if (!proceed) {
-                                deferred.reject();
-                                return;
-                            }
-
-                            if (checkoutTotals && checkoutTotals.isLoading && typeof checkoutTotals.isLoading === 'function') {
-                                checkoutTotals.isLoading(false);
-                            }
-                            deferred.resolve(payload);
-                        })
-                        .catch(function (error) {
-                            if (checkoutTotals && checkoutTotals.isLoading && typeof checkoutTotals.isLoading === 'function') {
-                                checkoutTotals.isLoading(false);
-                            }
-                            handlePaymentError(error, messageContainer || getBridgeMessageContainer());
-                            deferred.reject(error);
-                        });
-
-                    return deferred.promise();
+                    return checkoutStateBridge.resolveRefresh(callbacks, deferred, messageContainer);
                 }
 
                 function refreshShippingRatesFromMagewire() {
-                    if (shippingService && shippingService.isLoading && typeof shippingService.isLoading === 'function') {
-                        shippingService.isLoading(true);
-                    }
-
-                    return refreshCheckoutStateFromMagewire()
-                        .then(function (payload) {
-                            if (shippingService && shippingService.isLoading && typeof shippingService.isLoading === 'function') {
-                                shippingService.isLoading(false);
-                            }
-                            return payload;
-                        })
-                        .catch(function (error) {
-                            if (shippingService && shippingService.isLoading && typeof shippingService.isLoading === 'function') {
-                                shippingService.isLoading(false);
-                            }
-                            handlePaymentError(error, getBridgeMessageContainer());
-                            throw error;
-                        });
+                    return checkoutStateBridge.refreshShippingRates();
                 }
 
                 function syncPaymentMethods() {
-                    syncQuoteCustomerData();
-                    var domMethods = getDomPaymentMethods();
-                    var methods = domMethods.map(function (method) {
-                        return {
-                            method: method.method,
-                            title: method.title
-                        };
-                    });
-                    var currentMethodsJson = JSON.stringify(methods);
-                    var quoteMethod = (quote && typeof quote.paymentMethod === 'function' && quote.paymentMethod()) ? quote.paymentMethod().method : '';
-
-                    if (quoteMethod && !domHasPaymentMethod(quoteMethod)) {
-                        
-                        selectPaymentMethodAction(null);
-                        persistPaymentMethodToCheckoutData(null);
-                        hidePaymentPlaceholders();
-                    }
-
-                    if (currentMethodsJson === lastMethodsJson) {
-                        syncKoPaymentRenderers();
-                        return domMethods;
-                    }
-                    lastMethodsJson = currentMethodsJson;
-
-                    
-
-                    if (methods.length > 0) {
-                        paymentService.setPaymentMethods(methods);
-                    } else {
-                        var fallbackMethods = methodConverter(config.paymentMethods || window.checkoutConfig.paymentMethods || []);
-                        paymentService.setPaymentMethods(fallbackMethods);
-                    }
-
-                    window.setTimeout(syncKoPaymentRenderers, 0);
-
-                    return domMethods;
+                    return checkoutStateBridge.syncPaymentMethods();
                 }
 
                 syncPaymentMethods();
                 syncQuoteTotalsFromConfig();
                 syncQuoteTotalsFromDom();
-                if (window.fastcheckoutInitialShippingRates && Array.isArray(window.fastcheckoutInitialShippingRates)) {
-                    shippingService.setShippingRates(window.fastcheckoutInitialShippingRates);
-                    var activeCode = window.fastcheckoutInitialShippingMethod;
-                    if (activeCode) {
-                        var found = null;
-                        window.fastcheckoutInitialShippingRates.forEach(function (rate) {
-                            if (rate.carrier_code + '_' + rate.method_code === activeCode) {
-                                found = rate;
-                            }
-                        });
-                        if (found) {
-                            try {
-                                window.fastcheckoutSuppressShippingSync = true;
-                                selectShippingMethodAction(found);
-                            } finally {
-                                window.fastcheckoutSuppressShippingSync = false;
-                            }
-                        }
-                    }
-                }
+                checkoutStateBridge.applyInitialShippingRates();
                 loadShippingRatesValidationComponents();
                 loadPaymentValidationComponents();
-
-                var paymentListChildren = $.extend(true, {}, config.paymentListChildren || {});
-                var paymentRegionChildren = $.extend(true, {}, config.paymentRegionChildren || {});
-                var shippingListChildren = $.extend(true, {}, config.shippingListChildren || {});
-                var shippingAddressChildren = $.extend(true, {}, config.shippingAddressChildren || {});
-                paymentRegionChildren.paymentList = {
-                    component: 'Kkkonrad_Fastcheckout/js/hyva/payment-list',
-                    displayArea: 'payment-methods-list',
-                    children: paymentListChildren
-                };
-
-                function getRegistryItem(name) {
-                    try {
-                        return registry.get(name);
-                    } catch (error) {
-                        return null;
-                    }
-                }
-
-                function aliasRegistryComponent(sourceName, targetName) {
-                    var source;
-
-                    if (getRegistryItem(targetName)) {
-                        return;
-                    }
-
-                    source = getRegistryItem(sourceName);
-                    if (source) {
-                        registry.set(targetName, source);
-                    }
-                }
-
-                function aliasConfiguredComponentTree(children, sourcePrefix, targetPrefix) {
-                    Object.keys(children || {}).forEach(function (childName) {
-                        var sourceName = sourcePrefix + '.' + childName,
-                            targetName = targetPrefix + '.' + childName,
-                            child = children[childName] || {};
-
-                        aliasRegistryComponent(sourceName, targetName);
-                        if (child.children) {
-                            aliasConfiguredComponentTree(child.children, sourceName, targetName);
-                        }
-                    });
-                }
-
-                function aliasStandardShippingRegistryPaths() {
-                    aliasConfiguredComponentTree(
-                        shippingListChildren,
-                        'fastcheckoutHyvaShippingRenderers.shippingList',
-                        'checkout.steps.shipping-step.shippingAddress'
-                    );
-                }
 
                 registerCheckoutProviderAddressAttributeSync();
 
@@ -2210,7 +485,7 @@ define([
                     components: {
                         [scope]: {
                             component: 'uiComponent',
-                            children: paymentRegionChildren
+                            children: checkoutLayoutBridge.paymentRegionChildren
                         },
                         'fastcheckoutHyvaShippingRenderers': {
                             component: 'uiComponent',
@@ -2218,7 +493,7 @@ define([
                                 shippingList: {
                                     component: 'Kkkonrad_Fastcheckout/js/hyva/shipping-list',
                                     displayArea: 'shipping-methods-list',
-                                    children: shippingListChildren
+                                    children: checkoutLayoutBridge.shippingListChildren
                                 }
                             }
                         },
@@ -2233,7 +508,7 @@ define([
                                             children: {
                                                 shippingAddress: {
                                                     component: 'uiComponent',
-                                                    children: shippingAddressChildren
+                                                    children: checkoutLayoutBridge.shippingAddressChildren
                                                 }
                                             }
                                         }
@@ -2245,232 +520,37 @@ define([
                 });
 
                 [0, 50, 250, 750].forEach(function (delay) {
-                    window.setTimeout(aliasStandardShippingRegistryPaths, delay);
+                    window.setTimeout(checkoutLayoutBridge.aliasStandardShippingRegistryPaths, delay);
                     window.setTimeout(registerCheckoutProviderAddressAttributeSync, delay);
                 });
 
                 function getProperty(wire, name) {
-                    if (!wire) return '';
-                    if (typeof wire.get === 'function') {
-                        return wire.get(name);
-                    }
-                    if (typeof wire[name] !== 'undefined') {
-                        return wire[name];
-                    }
-                    if (wire.data && typeof wire.data[name] !== 'undefined') {
-                        return wire.data[name];
-                    }
-                    return '';
+                    return magewireUtils.getProperty(wire, name);
                 }
 
                 function getEmailForQuote() {
-                    var emailEl = document.getElementById('co-shipping-email') ||
-                        document.querySelector('input[name="email"]') ||
-                        document.querySelector('input[type="email"]') ||
-                        document.querySelector('[data-wire-field="email"]');
-
-                    if (emailEl && emailEl.value) {
-                        return emailEl.value;
-                    }
-
-                    if (quote && quote.guestEmail) {
-                        return typeof quote.guestEmail === 'function' ? quote.guestEmail() : quote.guestEmail;
-                    }
-
-                    if (window.checkoutConfig && window.checkoutConfig.customerData && window.checkoutConfig.customerData.email) {
-                        return window.checkoutConfig.customerData.email;
-                    }
-
-                    if (window.checkoutConfig && window.checkoutConfig.quoteData && window.checkoutConfig.quoteData.customer_email) {
-                        return window.checkoutConfig.quoteData.customer_email;
-                    }
-
-                    return '';
+                    return addressDataBuilder.getEmailForQuote();
                 }
 
-                function getStreetLines(magewire, prefix) {
-                    var street = [],
-                        isBilling = prefix === 'billing',
-                        line1 = getProperty(magewire, isBilling ? 'billingStreet1' : 'street1'),
-                        line2 = getProperty(magewire, isBilling ? 'billingStreet2' : 'street2'),
-                        line3 = getProperty(magewire, isBilling ? 'billingStreet3' : 'street3'),
-                        line4 = getProperty(magewire, isBilling ? 'billingStreet4' : 'street4');
-
-                    [line1, line2, line3, line4].forEach(function (line) {
-                        if (line) {
-                            street.push(line);
-                        }
-                    });
-
-                    return street;
-                }
 
                 function buildAddressData(magewire, prefix) {
-                    var isBilling = prefix === 'billing',
-                        countryId = getProperty(magewire, isBilling ? 'billingCountryId' : 'countryId'),
-                        regionId = getProperty(magewire, isBilling ? 'billingRegionId' : 'regionId'),
-                        region = getProperty(magewire, isBilling ? 'billingRegion' : 'region'),
-                        customAttributes = getProperty(magewire, isBilling ? 'billingCustomAttributes' : 'shippingCustomAttributes') || {},
-                        extensionAttributes = getProperty(magewire, isBilling ? 'billingExtensionAttributes' : 'shippingExtensionAttributes') || {};
-
-                    return {
-                        email: getEmailForQuote(),
-                        firstname: getProperty(magewire, isBilling ? 'billingFirstname' : 'firstname'),
-                        lastname: getProperty(magewire, isBilling ? 'billingLastname' : 'lastname'),
-                        company: getProperty(magewire, isBilling ? 'billingCompany' : 'company'),
-                        street: getStreetLines(magewire, prefix),
-                        city: getProperty(magewire, isBilling ? 'billingCity' : 'city'),
-                        postcode: getProperty(magewire, isBilling ? 'billingPostcode' : 'postcode'),
-                        countryId: countryId,
-                        country_id: countryId,
-                        regionId: regionId && parseInt(regionId, 10) > 0 ? parseInt(regionId, 10) : null,
-                        region_id: regionId && parseInt(regionId, 10) > 0 ? parseInt(regionId, 10) : null,
-                        region: region,
-                        telephone: getProperty(magewire, isBilling ? 'billingTelephone' : 'telephone'),
-                        prefix: getProperty(magewire, isBilling ? 'billingPrefix' : 'prefix'),
-                        middlename: getProperty(magewire, isBilling ? 'billingMiddlename' : 'middlename'),
-                        suffix: getProperty(magewire, isBilling ? 'billingSuffix' : 'suffix'),
-                        fax: getProperty(magewire, isBilling ? 'billingFax' : 'fax'),
-                        vat_id: getProperty(magewire, isBilling ? 'billingVatId' : 'vatId'),
-                        custom_attributes: customAttributes,
-                        customAttributes: normalizeAddressCustomAttributes(customAttributes),
-                        extension_attributes: extensionAttributes,
-                        extensionAttributes: extensionAttributes,
-                        save_in_address_book: 0
-                    };
-                }
-
-                function getCheckoutDataFallbackStoreCode() {
-                    return (window.checkoutConfig && window.checkoutConfig.storeCode) || 'default';
-                }
-
-                function readCheckoutDataFallback() {
-                    var cache;
-
-                    try {
-                        cache = window.localStorage ? JSON.parse(window.localStorage.getItem('mage-cache-storage') || '{}') : {};
-                    } catch (e) {
-                        cache = {};
-                    }
-
-                    return {
-                        cache: cache,
-                        data: cache['checkout-data'] || {}
-                    };
-                }
-
-                function writeCheckoutDataFallback(data) {
-                    var fallback = readCheckoutDataFallback();
-
-                    fallback.cache['checkout-data'] = data;
-
-                    try {
-                        if (window.localStorage) {
-                            window.localStorage.setItem('mage-cache-storage', JSON.stringify(fallback.cache));
-                        }
-                    } catch (e) {}
-                }
-
-                function updateCheckoutDataFallback(update) {
-                    var fallback = readCheckoutDataFallback();
-
-                    update(fallback.data);
-                    writeCheckoutDataFallback(fallback.data);
-                }
-
-                function setAddressByStoreFallback(currentValue, addressData) {
-                    var byStore = currentValue || {};
-
-                    byStore[getCheckoutDataFallbackStoreCode()] = addressData;
-                    return byStore;
-                }
-
-                function safeCheckoutDataSet(methodName, value, fallback) {
-                    if (checkoutData && typeof checkoutData[methodName] === 'function') {
-                        try {
-                            window.fastcheckoutSuppressCheckoutDataBridge = true;
-                            checkoutData[methodName](value);
-                            return;
-                        } catch (e) {
-                            if (!checkoutDataFallbackWarningShown && window.console && typeof window.console.warn === 'function') {
-                                checkoutDataFallbackWarningShown = true;
-                                window.console.warn(
-                                    'Kkkonrad Fastcheckout: checkout-data storage is not ready, using local fallback.',
-                                    e
-                                );
-                            }
-                        } finally {
-                            window.fastcheckoutSuppressCheckoutDataBridge = false;
-                        }
-                    }
-
-                    if (typeof fallback === 'function') {
-                        fallback(value);
-                    }
+                    return addressDataBuilder.buildAddressData(magewire, prefix);
                 }
 
                 function persistEmailToCheckoutData(email) {
-                    if (!email) {
-                        return;
-                    }
-
-                    safeCheckoutDataSet('setValidatedEmailValue', email, function (value) {
-                        updateCheckoutDataFallback(function (data) {
-                            data.validatedEmailValue = value;
-                        });
-                    });
-                    safeCheckoutDataSet('setInputFieldEmailValue', email, function (value) {
-                        updateCheckoutDataFallback(function (data) {
-                            data.inputFieldEmailValue = value;
-                        });
-                    });
+                    checkoutDataPersistence.persistEmail(email);
                 }
 
                 function persistAddressToCheckoutData(addressData, type) {
-                    if (!addressData) {
-                        return;
-                    }
-
-                    if (type === 'billing') {
-                        safeCheckoutDataSet('setBillingAddressFromData', addressData, function (value) {
-                            updateCheckoutDataFallback(function (data) {
-                                data.billingAddressFromData = value;
-                            });
-                        });
-                        safeCheckoutDataSet('setNewCustomerBillingAddress', addressData, function (value) {
-                            updateCheckoutDataFallback(function (data) {
-                                data.newCustomerBillingAddress = value;
-                            });
-                        });
-                        return;
-                    }
-
-                    safeCheckoutDataSet('setShippingAddressFromData', addressData, function (value) {
-                        updateCheckoutDataFallback(function (data) {
-                            data.shippingAddressFromData = setAddressByStoreFallback(data.shippingAddressFromData, value);
-                        });
-                    });
-                    safeCheckoutDataSet('setNewCustomerShippingAddress', addressData, function (value) {
-                        updateCheckoutDataFallback(function (data) {
-                            data.newCustomerShippingAddress = setAddressByStoreFallback(data.newCustomerShippingAddress, value);
-                        });
-                    });
+                    checkoutDataPersistence.persistAddress(addressData, type);
                 }
 
                 function persistShippingMethodToCheckoutData(methodCode) {
-                    safeCheckoutDataSet('setSelectedShippingRate', methodCode || null, function (value) {
-                        updateCheckoutDataFallback(function (data) {
-                            data.selectedShippingRate = value;
-                        });
-                    });
+                    checkoutDataPersistence.persistShippingMethod(methodCode);
                 }
 
                 function persistPaymentMethodToCheckoutData(methodCode) {
-                    safeCheckoutDataSet('setSelectedPaymentMethod', methodCode || null, function (value) {
-                        updateCheckoutDataFallback(function (data) {
-                            data.selectedPaymentMethod = value;
-                        });
-                    });
+                    checkoutDataPersistence.persistPaymentMethod(methodCode);
                 }
 
                 function syncAddressDataToCheckoutProvider(addressData, type) {
@@ -2478,439 +558,31 @@ define([
                 }
 
                 function getMagewireComponent() {
-                    var magewireEl = document.querySelector('[wire\\:id]'),
-                        livewire = window.Livewire || window.Magewire;
-
-                    if (magewireEl && magewireEl.__livewire) {
-                        return magewireEl.__livewire;
-                    }
-
-                    if (
-                        magewireEl &&
-                        livewire &&
-                        typeof livewire.find === 'function' &&
-                        magewireEl.getAttribute('wire:id')
-                    ) {
-                        return livewire.find(magewireEl.getAttribute('wire:id'));
-                    }
-
-                    return null;
+                    return magewireUtils.getComponent();
                 }
 
                 function getAddressValue(address, camelKey, snakeKey) {
-                    var value;
-
-                    if (!address) {
-                        return undefined;
-                    }
-
-                    value = address[camelKey];
-                    if (typeof value === 'undefined' && snakeKey) {
-                        value = address[snakeKey];
-                    }
-                    if (typeof value === 'function') {
-                        value = value();
-                    }
-
-                    return value;
-                }
-
-                function mergeAddressObjectValues() {
-                    var result = {};
-
-                    Array.prototype.slice.call(arguments).forEach(function (value) {
-                        if (value && typeof value === 'object') {
-                            $.extend(true, result, value);
-                        }
-                    });
-
-                    return result;
+                    return formDataCollector.getAddressValue(address, camelKey, snakeKey);
                 }
 
                 function normalizeAddressCustomAttributes(attributes) {
-                    var result = [];
-
-                    if (!attributes) {
-                        return result;
-                    }
-
-                    if (Array.isArray(attributes)) {
-                        attributes.forEach(function (attribute) {
-                            if (attribute && typeof attribute === 'object' && attribute.attribute_code) {
-                                result.push({
-                                    attribute_code: attribute.attribute_code,
-                                    value: attribute.value
-                                });
-                            }
-                        });
-                        return result;
-                    }
-
-                    if (typeof attributes === 'object') {
-                        Object.keys(attributes).forEach(function (key) {
-                            var value = attributes[key];
-                            if (value && typeof value === 'object' && value.attribute_code) {
-                                result.push({
-                                    attribute_code: value.attribute_code,
-                                    value: value.value
-                                });
-                            } else {
-                                result.push({
-                                    attribute_code: key,
-                                    value: value
-                                });
-                            }
-                        });
-                    }
-
-                    return result;
+                    return formDataCollector.normalizeAddressCustomAttributes(attributes);
                 }
 
                 function normalizeAddressAttributeMap(attributes) {
-                    var result = {};
-
-                    normalizeAddressCustomAttributes(attributes).forEach(function (attribute) {
-                        if (attribute && attribute.attribute_code) {
-                            result[attribute.attribute_code] = attribute.value;
-                        }
-                    });
-
-                    return result;
+                    return formDataCollector.normalizeAddressAttributeMap(attributes);
                 }
 
                 function getAddressAttributes(address, camelKey, snakeKey) {
-                    if (!address) {
-                        return {};
-                    }
-
-                    return mergeAddressObjectValues(
-                        getAddressValue(address, snakeKey),
-                        getAddressValue(address, camelKey)
-                    );
-                }
-
-                function parseFastcheckoutFieldPath(name) {
-                    var parts;
-
-                    if (!name || typeof name !== 'string') {
-                        return [];
-                    }
-
-                    if (name.indexOf('[') !== -1) {
-                        parts = name.replace(/\]/g, '').split('[');
-                    } else {
-                        parts = name.split('.');
-                    }
-
-                    return parts.filter(function (part) {
-                        return part !== '';
-                    });
-                }
-
-                function setFastcheckoutPathValue(target, path, value) {
-                    var cursor = target,
-                        key,
-                        existing;
-
-                    if (!target || !Array.isArray(path) || !path.length) {
-                        return;
-                    }
-
-                    while (path.length > 1) {
-                        key = path.shift();
-                        if (!cursor[key] || typeof cursor[key] !== 'object' || Array.isArray(cursor[key])) {
-                            cursor[key] = {};
-                        }
-                        cursor = cursor[key];
-                    }
-
-                    key = path.shift();
-                    existing = cursor[key];
-                    if (typeof existing === 'undefined') {
-                        cursor[key] = value;
-                        return;
-                    }
-
-                    if (Array.isArray(existing)) {
-                        existing.push(value);
-                        return;
-                    }
-
-                    cursor[key] = [existing, value];
-                }
-
-                function getFastcheckoutFieldValue(element) {
-                    var tagName,
-                        selected = [];
-
-                    if (!element || element.disabled) {
-                        return undefined;
-                    }
-
-                    tagName = String(element.tagName || '').toLowerCase();
-                    if (tagName === 'button' || element.type === 'button' || element.type === 'submit' || element.type === 'file') {
-                        return undefined;
-                    }
-
-                    if (element.type === 'checkbox') {
-                        return element.checked ? (element.value || true) : undefined;
-                    }
-
-                    if (element.type === 'radio') {
-                        return element.checked ? element.value : undefined;
-                    }
-
-                    if (tagName === 'select' && element.multiple) {
-                        Array.prototype.slice.call(element.options || []).forEach(function (option) {
-                            if (option.selected) {
-                                selected.push(option.value);
-                            }
-                        });
-                        return selected;
-                    }
-
-                    if (typeof element.value !== 'undefined') {
-                        return element.value;
-                    }
-
-                    return undefined;
-                }
-
-                function getFastcheckoutDatasetPath(element, keys) {
-                    var i,
-                        value;
-
-                    if (!element || !element.dataset) {
-                        return '';
-                    }
-
-                    for (i = 0; i < keys.length; i++) {
-                        value = element.dataset[keys[i]];
-                        if (value) {
-                            return value;
-                        }
-                    }
-
-                    return '';
+                    return formDataCollector.getAddressAttributes(address, camelKey, snakeKey);
                 }
 
                 function collectFastcheckoutStructuredFields(roots, options) {
-                    var result = {
-                            additionalData: {},
-                            extensionAttributes: {},
-                            customAttributes: {},
-                            topLevel: {}
-                        },
-                        mode,
-                        selector = [
-                            'input[name]',
-                            'select[name]',
-                            'textarea[name]',
-                            '[data-fastcheckout-payment-additional-field]',
-                            '[data-fastcheckout-additional-field]',
-                            '[data-fastcheckout-payment-extension-field]',
-                            '[data-fastcheckout-extension-field]',
-                            '[data-fastcheckout-shipping-custom-field]',
-                            '[data-fastcheckout-custom-field]',
-                            '[data-fastcheckout-shipping-extension-field]'
-                        ].join(',');
-
-                    options = options || {};
-                    mode = options.mode || '';
-                    function isKnownPaymentAdditionalField(field) {
-                        return [
-                            'accept_tos',
-                            'terms_accept',
-                            'group',
-                            'groupId',
-                            'group_id',
-                            'channel',
-                            'channelId',
-                            'channel_id',
-                            'blik_code',
-                            'blikCode',
-                            'blik_alias',
-                            'blikAlias',
-                            'saveAlias',
-                            'regulation_accept',
-                            'regulationAccept',
-                            'method',
-                            'methodId',
-                            'method_id',
-                            'statement',
-                            'standalone',
-                            'payment_method_nonce',
-                            'device_data',
-                            'public_hash',
-                            'payments_order_id',
-                            'payment_source',
-                            'cardBin',
-                            'holderName',
-                            'cardLast4',
-                            'cardExpiryMonth',
-                            'cardExpiryYear',
-                            'selected_issuer',
-                            'selected_terminal',
-                            'card_token',
-                            'mollie_save_card',
-                            'mollie_mandate_id',
-                            'mollie_consent_timestamp',
-                            'applepay_payment_token',
-                            'limited_methods',
-                            'card_data',
-                            'cardData',
-                            'card_save',
-                            'cardSave',
-                            'card_id',
-                            'cardId',
-                            'savedId',
-                            'card_vendor',
-                            'cardVendor',
-                            'card_short_code',
-                            'cardShortCode',
-                            'short_code',
-                            'shortCode',
-                            'sessionId',
-                            'session_id',
-                            'refId',
-                            'ref_id',
-                            'cardType',
-                            'card_type',
-                            'cardDate',
-                            'card_date',
-                            'cardMask',
-                            'card_mask'
-                        ].indexOf(field) !== -1;
-                    }
-
-                    roots.forEach(function (root) {
-                        if (!root || typeof root.querySelectorAll !== 'function') {
-                            return;
-                        }
-
-                        Array.prototype.slice.call(root.querySelectorAll(selector)).forEach(function (element) {
-                            var value = getFastcheckoutFieldValue(element),
-                                name = element.getAttribute('name') || '',
-                                path = parseFastcheckoutFieldPath(name),
-                                explicitAdditionalPath,
-                                explicitExtensionPath,
-                                explicitCustomPath,
-                                first,
-                                second;
-
-                            if (typeof value === 'undefined') {
-                                return;
-                            }
-
-                            explicitAdditionalPath = getFastcheckoutDatasetPath(element, [
-                                'fastcheckoutPaymentAdditionalField',
-                                'fastcheckoutAdditionalField'
-                            ]);
-                            explicitExtensionPath = getFastcheckoutDatasetPath(element, [
-                                'fastcheckoutPaymentExtensionField',
-                                'fastcheckoutShippingExtensionField',
-                                'fastcheckoutExtensionField'
-                            ]);
-                            explicitCustomPath = getFastcheckoutDatasetPath(element, [
-                                'fastcheckoutShippingCustomField',
-                                'fastcheckoutCustomField'
-                            ]);
-
-                            if (explicitAdditionalPath && mode !== 'shipping') {
-                                setFastcheckoutPathValue(result.additionalData, parseFastcheckoutFieldPath(explicitAdditionalPath), value);
-                                return;
-                            }
-
-                            if (explicitCustomPath && mode !== 'payment') {
-                                setFastcheckoutPathValue(result.customAttributes, parseFastcheckoutFieldPath(explicitCustomPath), value);
-                                return;
-                            }
-
-                            if (explicitExtensionPath) {
-                                setFastcheckoutPathValue(result.extensionAttributes, parseFastcheckoutFieldPath(explicitExtensionPath), value);
-                                return;
-                            }
-
-                            first = path[0] || '';
-                            second = path[1] || '';
-
-                            if (mode !== 'shipping' && (first === 'additional_data' || first === 'additionalData')) {
-                                setFastcheckoutPathValue(result.additionalData, path.slice(1), value);
-                                return;
-                            }
-
-                            if (mode !== 'payment' && (first === 'custom_attributes' || first === 'customAttributes')) {
-                                setFastcheckoutPathValue(result.customAttributes, path.slice(1), value);
-                                return;
-                            }
-
-                            if (first === 'extension_attributes' || first === 'extensionAttributes') {
-                                setFastcheckoutPathValue(result.extensionAttributes, path.slice(1), value);
-                                return;
-                            }
-
-                            if (mode !== 'shipping' && first === 'payment') {
-                                if (second === 'additional_data' || second === 'additionalData') {
-                                    setFastcheckoutPathValue(result.additionalData, path.slice(2), value);
-                                } else if (second === 'extension_attributes' || second === 'extensionAttributes') {
-                                    setFastcheckoutPathValue(result.extensionAttributes, path.slice(2), value);
-                                } else if (second === 'po_number' || second === 'poNumber') {
-                                    result.topLevel.po_number = value;
-                                    result.additionalData.po_number = value;
-                                }
-                                return;
-                            }
-
-                            if (mode !== 'payment' && first === 'shipping') {
-                                if (second === 'custom_attributes' || second === 'customAttributes') {
-                                    setFastcheckoutPathValue(result.customAttributes, path.slice(2), value);
-                                } else if (second === 'extension_attributes' || second === 'extensionAttributes') {
-                                    setFastcheckoutPathValue(result.extensionAttributes, path.slice(2), value);
-                                }
-                                return;
-                            }
-
-                            if (mode !== 'shipping' && (first === 'po_number' || first === 'poNumber')) {
-                                result.topLevel.po_number = value;
-                                result.additionalData.po_number = value;
-                                return;
-                            }
-
-                            if (mode === 'payment' && path.length === 1 && isKnownPaymentAdditionalField(first)) {
-                                result.additionalData[first] = value;
-                                return;
-                            }
-
-                            if (mode === 'shipping' && (first === 'pickup_location_code' || first === 'pickupLocationCode')) {
-                                result.extensionAttributes.pickup_location_code = value;
-                            }
-                        });
-                    });
-
-                    return result;
+                    return formDataCollector.collectStructuredFields(roots, options);
                 }
 
                 function getFastcheckoutShippingFormRoots() {
-                    var roots = [],
-                        selectors = [
-                            '#onepage-checkout-shipping-method-additional-load',
-                            '#fastcheckout-ko-shipping-root',
-                            '.fastcheckout-ko-shipping-root',
-                            '.fastcheckout-ko-shipping-container',
-                            '[data-fastcheckout-shipping-fields]'
-                        ];
-
-                    function addRoot(root) {
-                        if (root && roots.indexOf(root) === -1) {
-                            roots.push(root);
-                        }
-                    }
-
-                    selectors.forEach(function (selector) {
-                        Array.prototype.slice.call(document.querySelectorAll(selector)).forEach(addRoot);
-                    });
-
-                    return roots;
+                    return formDataCollector.getShippingFormRoots();
                 }
 
                 function normalizeKoAddressData(address) {
@@ -2988,28 +660,7 @@ define([
                 }
 
                 function setMagewireValue(wire, field, value, deferUpdate) {
-                    var currentValue;
-
-                    if (!wire || typeof wire.set !== 'function' || typeof value === 'undefined' || value === null) {
-                        return null;
-                    }
-
-                    currentValue = getProperty(wire, field);
-                    if (
-                        (typeof currentValue === 'object' || typeof value === 'object') &&
-                        JSON.stringify(currentValue || {}) === JSON.stringify(value || {})
-                    ) {
-                        return null;
-                    }
-                    if (
-                        typeof currentValue !== 'object' &&
-                        typeof value !== 'object' &&
-                        String(currentValue || '') === String(value || '')
-                    ) {
-                        return null;
-                    }
-
-                    return wire.set(field, value, deferUpdate === true);
+                    return magewireUtils.setValue(wire, field, value, deferUpdate);
                 }
 
                 function writeKoAddressToMagewire(address, isBilling, deferUpdates) {
@@ -3085,206 +736,8 @@ define([
                     return operations.length ? Promise.all(operations).then(function () { return true; }) : Promise.resolve(false);
                 }
 
-                function getCurrentShippingMethodCodeForAttributeSync() {
-                    var checkedDomRadio = document.querySelector('input[name="shipping_method"]:checked'),
-                        activeMethod = quote && typeof quote.shippingMethod === 'function' ? quote.shippingMethod() : null;
-
-                    if (checkedDomRadio && checkedDomRadio.value) {
-                        return checkedDomRadio.value;
-                    }
-                    if (activeMethod) {
-                        return getShippingMethodCode(activeMethod);
-                    }
-
-                    return '';
-                }
-
-                function isInPostPickupShippingMethodCode(methodCode) {
-                    methodCode = String(methodCode || '').toLowerCase();
-                    if (!methodCode) {
-                        return false;
-                    }
-
-                    return methodCode.indexOf('inpostlocker') !== -1 ||
-                        methodCode.indexOf('paczkomat') !== -1 ||
-                        (
-                            methodCode.indexOf('inpost') !== -1 &&
-                            (
-                                methodCode.indexOf('locker') !== -1 ||
-                                methodCode.indexOf('box') !== -1 ||
-                                methodCode.indexOf('point') !== -1
-                            )
-	                        );
-                }
-
-                function isMagentoStorePickupShippingMethodCode(methodCode) {
-                    methodCode = String(methodCode || '').toLowerCase();
-
-                    return methodCode === 'instore_pickup' ||
-                        methodCode === 'pickup_instore' ||
-                        methodCode === 'instore' ||
-                        methodCode.indexOf('storepickup') !== -1 ||
-                        methodCode.indexOf('store_pickup') !== -1 ||
-                        methodCode.indexOf('in_store_pickup') !== -1;
-                }
-
-                function getInPostLockerIdFromCheckoutData() {
-                    var pointData;
-
-                    if (!checkoutData || typeof checkoutData.getShippingInPostPoint !== 'function') {
-                        return '';
-                    }
-
-                    pointData = checkoutData.getShippingInPostPoint();
-                    if (!pointData) {
-                        return '';
-                    }
-                    if (typeof pointData === 'string') {
-                        return pointData;
-                    }
-
-                    return String(
-                        pointData.name ||
-                        pointData.id ||
-                        pointData.code ||
-                        pointData.value ||
-                        pointData.inpost_locker_id ||
-                        pointData.inpostLockerId ||
-	                        ''
-	                    );
-                }
-
-                function getPickupLocationCodeFromAddressData(addressData) {
-                    var extensionAttributes;
-
-                    if (!addressData) {
-                        return '';
-                    }
-                    if (typeof addressData === 'string') {
-                        return addressData;
-                    }
-
-                    extensionAttributes = addressData.extension_attributes ||
-                        addressData.extensionAttributes ||
-                        {};
-
-                    return String(
-                        extensionAttributes.pickup_location_code ||
-                        extensionAttributes.pickupLocationCode ||
-                        addressData.pickup_location_code ||
-                        addressData.pickupLocationCode ||
-                        addressData.code ||
-                        addressData.id ||
-                        ''
-                    );
-                }
-
-                function getStorePickupLocationCodeFromCheckoutData() {
-                    if (!checkoutData || typeof checkoutData.getSelectedPickupAddress !== 'function') {
-                        return '';
-                    }
-
-                    return getPickupLocationCodeFromAddressData(checkoutData.getSelectedPickupAddress());
-                }
-
-                function applyInPostLockerSelectionToShippingAttributes(customAttributes, extensionAttributes) {
-                    var lockerId;
-
-                    if (!isInPostPickupShippingMethodCode(getCurrentShippingMethodCodeForAttributeSync())) {
-                        return;
-                    }
-
-                    lockerId = getInPostLockerIdFromCheckoutData();
-                    if (!lockerId) {
-                        return;
-                    }
-
-                    extensionAttributes.inpost_locker_id = lockerId;
-                    extensionAttributes.inpostLockerId = lockerId;
-                    customAttributes.inpost_locker_id = lockerId;
-                }
-
-                function applyStorePickupSelectionToShippingAttributes(customAttributes, extensionAttributes) {
-                    var pickupLocationCode;
-
-                    if (!isMagentoStorePickupShippingMethodCode(getCurrentShippingMethodCodeForAttributeSync())) {
-                        return;
-                    }
-
-                    pickupLocationCode = getStorePickupLocationCodeFromCheckoutData();
-                    if (!pickupLocationCode) {
-                        return;
-                    }
-
-                    extensionAttributes.pickup_location_code = pickupLocationCode;
-                    customAttributes.pickup_location_code = pickupLocationCode;
-                }
-
                 function syncDomShippingAttributesToMagewire(wire, deferUpdates) {
-                    var collected = collectFastcheckoutStructuredFields(getFastcheckoutShippingFormRoots(), { mode: 'shipping' }),
-                        customAttributes = collected.customAttributes || {},
-                        extensionAttributes = collected.extensionAttributes || {},
-                        shippingAddress = quote && typeof quote.shippingAddress === 'function' ? quote.shippingAddress() : null,
-                        operations = [];
-
-                    applyInPostLockerSelectionToShippingAttributes(customAttributes, extensionAttributes);
-                    applyStorePickupSelectionToShippingAttributes(customAttributes, extensionAttributes);
-
-                    if (!Object.keys(customAttributes).length && !Object.keys(extensionAttributes).length) {
-                        return Promise.resolve(false);
-                    }
-
-                    if (shippingAddress) {
-                        customAttributes = $.extend(
-                            true,
-                            {},
-                            normalizeAddressAttributeMap(getAddressAttributes(shippingAddress, 'customAttributes', 'custom_attributes')),
-                            customAttributes
-                        );
-                        extensionAttributes = $.extend(
-                            true,
-                            {},
-                            getAddressAttributes(shippingAddress, 'extensionAttributes', 'extension_attributes'),
-                            extensionAttributes
-                        );
-                        updateQuoteAddressAttributes(shippingAddress, customAttributes, extensionAttributes);
-                    }
-
-                    wire = wire || getMagewireComponent();
-                    if (!wire || typeof wire.set !== 'function') {
-                        return Promise.resolve(false);
-                    }
-
-                    customAttributes = $.extend(
-                        true,
-                        {},
-                        getProperty(wire, 'shippingCustomAttributes') || {},
-                        customAttributes
-                    );
-                    extensionAttributes = $.extend(
-                        true,
-                        {},
-                        getProperty(wire, 'shippingExtensionAttributes') || {},
-                        extensionAttributes
-                    );
-
-                    [
-                        ['shippingCustomAttributes', customAttributes],
-                        ['shippingExtensionAttributes', extensionAttributes]
-                    ].forEach(function (attributeData) {
-                        var operation;
-
-                        if (!Object.keys(attributeData[1] || {}).length) {
-                            return;
-                        }
-
-                        operation = setMagewireValue(wire, attributeData[0], attributeData[1], deferUpdates === true);
-                        if (operation && typeof operation.then === 'function') {
-                            operations.push(operation);
-                        }
-                    });
-
-                    return operations.length ? Promise.all(operations).then(function () { return true; }) : Promise.resolve(false);
+                    return shippingAttributesSync.sync(wire, deferUpdates);
                 }
 
                 function registerKoStateAdapter() {
@@ -3330,7 +783,7 @@ define([
                             var wire,
                                 methodCode;
 
-                            if (isSyncingFromKo || isApplyingPaymentMethodFromBridge || !method) {
+                            if (isSyncingFromKo || paymentMethodSync.isApplyingFromBridge() || !method) {
                                 return;
                             }
 
@@ -3581,27 +1034,24 @@ define([
                 }
 
                 function resolveAsKoDeferred(promise, messageContainer) {
-                    var deferred = $.Deferred();
-
-                    Promise.resolve(promise)
-                        .then(function (result) {
+                    return magewireUtils.resolveAsKoDeferred(
+                        promise,
+                        messageContainer,
+                        function (error, container) {
+                            if (checkoutTotals && checkoutTotals.isLoading && typeof checkoutTotals.isLoading === 'function') {
+                                checkoutTotals.isLoading(false);
+                            }
+                            handlePaymentError(error, container || getBridgeMessageContainer());
+                        },
+                        function () {
                             if (fullScreenLoader && typeof fullScreenLoader.stopLoader === 'function') {
                                 fullScreenLoader.stopLoader(true);
                             }
                             if (checkoutTotals && checkoutTotals.isLoading && typeof checkoutTotals.isLoading === 'function') {
                                 checkoutTotals.isLoading(false);
                             }
-                            deferred.resolve(result);
-                        })
-                        .catch(function (error) {
-                            if (checkoutTotals && checkoutTotals.isLoading && typeof checkoutTotals.isLoading === 'function') {
-                                checkoutTotals.isLoading(false);
-                            }
-                            handlePaymentError(error, messageContainer || getBridgeMessageContainer());
-                            deferred.reject(error);
-                        });
-
-                    return deferred.promise();
+                        }
+                    );
                 }
 
                 function addressesMatch(currentAddress, newAddress) {
@@ -3665,134 +1115,23 @@ define([
                 }
 
                 function syncSelectedShippingMethodToKnockout(methodCode) {
-                    persistShippingMethodToCheckoutData(methodCode);
-
-                    if (!methodCode) {
-                        quote.shippingMethod(null);
-                        return;
-                    }
-
-                    var rates = shippingService.getShippingRates()(),
-                        found = null;
-
-                    rates.some(function (rate) {
-                        if ((rate.carrier_code + '_' + rate.method_code) === methodCode) {
-                            found = rate;
-                            return true;
-                        }
-                        return false;
-                    });
-
-                    if (found) {
-                        var active = quote.shippingMethod();
-                        if (!active || active.carrier_code !== found.carrier_code || active.method_code !== found.method_code) {
-                            selectShippingMethodAction(found);
-                        }
-                    }
+                    shippingMethodSync.syncSelectedToKnockout(methodCode);
                 }
 
                 function getShippingMethodCode(shippingMethod) {
-                    if (!shippingMethod) {
-                        return '';
-                    }
-                    if (typeof shippingMethod === 'string') {
-                        return shippingMethod;
-                    }
-                    if (shippingMethod.carrier_code && shippingMethod.method_code) {
-                        return shippingMethod.carrier_code + '_' + shippingMethod.method_code;
-                    }
-                    if (shippingMethod.carrierCode && shippingMethod.methodCode) {
-                        return shippingMethod.carrierCode + '_' + shippingMethod.methodCode;
-                    }
-                    if (shippingMethod.method) {
-                        return shippingMethod.method;
-                    }
-
-                    return '';
+                    return shippingMethodSync.getCode(shippingMethod);
                 }
 
                 function splitShippingMethodCode(methodCode) {
-                    var parts = String(methodCode || '').split('_'),
-                        carrier = parts.shift() || '';
-
-                    return {
-                        carrier_code: carrier,
-                        method_code: parts.length ? parts.join('_') : carrier
-                    };
+                    return shippingMethodSync.splitCode(methodCode);
                 }
 
                 function syncShippingMethodToMagewireNow(methodCode) {
-                    var wire,
-                        currentMethod;
-
-                    persistShippingMethodToCheckoutData(methodCode);
-
-                    if (magewireShippingMethodSyncTimer) {
-                        window.clearTimeout(magewireShippingMethodSyncTimer);
-                        magewireShippingMethodSyncTimer = null;
-                    }
-
-                    if (!methodCode) {
-                        return Promise.resolve(false);
-                    }
-
-                    wire = getMagewireComponent();
-                    if (!wire || typeof wire.call !== 'function') {
-                        return Promise.resolve(false);
-                    }
-
-                    currentMethod = getProperty(wire, 'shippingMethod');
-                    lastMagewireShippingMethodCode = methodCode;
-
-                    if (currentMethod === methodCode) {
-                        return Promise.resolve(true);
-                    }
-
-                    return Promise.resolve(wire.call('selectShippingMethod', methodCode));
+                    return shippingMethodSync.syncToMagewireNow(methodCode);
                 }
 
                 function syncShippingMethodToMagewire(methodCode) {
-                    if (window.fastcheckoutSuppressShippingSync) {
-                        return;
-                    }
-                    persistShippingMethodToCheckoutData(methodCode);
-
-                    if (!methodCode || methodCode === lastMagewireShippingMethodCode) {
-                        return;
-                    }
-
-                    lastMagewireShippingMethodCode = methodCode;
-
-                    if (magewireShippingMethodSyncTimer) {
-                        window.clearTimeout(magewireShippingMethodSyncTimer);
-                    }
-
-                    magewireShippingMethodSyncTimer = window.setTimeout(function () {
-                        var magewireEl = document.querySelector('[wire\\:id]'),
-                            wire,
-                            currentMethod;
-
-                        magewireShippingMethodSyncTimer = null;
-
-                        if (!magewireEl || !magewireEl.__livewire) {
-                            return;
-                        }
-
-                        wire = magewireEl.__livewire;
-                        currentMethod = getProperty(wire, 'shippingMethod');
-                        if (currentMethod !== methodCode && typeof wire.call === 'function') {
-                            wire.call('selectShippingMethod', methodCode);
-                        }
-                    }, 0);
-                }
-
-                function buildShippingInformationResponse(payload) {
-                    payload = payload && typeof payload === 'object' ? payload : {};
-
-                    return {
-                        totals: payload.totals || (quote && typeof quote.totals === 'function' ? quote.totals() : {}),
-                        payment_methods: Array.isArray(payload.payment_methods) ? payload.payment_methods : []
-                    };
+                    shippingMethodSync.syncToMagewire(methodCode);
                 }
 
                 function resolveShippingInformationAction(originalAction) {
@@ -3857,89 +1196,19 @@ define([
                 }
 
                 function getPaymentMethodCode(paymentMethod) {
-                    if (!paymentMethod) {
-                        return '';
-                    }
-                    if (typeof paymentMethod === 'string') {
-                        return paymentMethod;
-                    }
-
-                    return paymentMethod.method || '';
+                    return paymentMethodSync.getCode(paymentMethod);
                 }
 
                 function getQuotePaymentMethodCode() {
-                    var current = quote && typeof quote.paymentMethod === 'function' ? quote.paymentMethod() : null;
-
-                    return getPaymentMethodCode(current);
+                    return paymentMethodSync.getQuoteCode();
                 }
 
                 function setQuotePaymentMethodFromBridge(paymentMethod) {
-                    var methodCode = getPaymentMethodCode(paymentMethod);
-
-                    if (!quote || typeof quote.paymentMethod !== 'function') {
-                        return;
-                    }
-
-                    if (getQuotePaymentMethodCode() === methodCode) {
-                        lastMagewirePaymentMethodCode = methodCode;
-                        return;
-                    }
-
-                    isApplyingPaymentMethodFromBridge = true;
-                    try {
-                        quote.paymentMethod(methodCode ? paymentMethod : null);
-                        lastMagewirePaymentMethodCode = methodCode;
-                    } finally {
-                        isApplyingPaymentMethodFromBridge = false;
-                    }
+                    paymentMethodSync.setQuoteFromBridge(paymentMethod);
                 }
 
                 function syncPaymentMethodToMagewire(paymentMethod) {
-                    var methodCode = getPaymentMethodCode(paymentMethod);
-
-                    persistPaymentMethodToCheckoutData(methodCode || null);
-
-                    if (!methodCode) {
-                        lastMagewirePaymentMethodCode = '';
-                        if (magewirePaymentMethodSyncTimer) {
-                            window.clearTimeout(magewirePaymentMethodSyncTimer);
-                        }
-                        magewirePaymentMethodSyncTimer = window.setTimeout(function () {
-                            var wire = getMagewireComponent();
-
-                            magewirePaymentMethodSyncTimer = null;
-                            if (wire && typeof wire.set === 'function') {
-                                wire.set('paymentMethod', '');
-                            }
-                        }, 50);
-                        return;
-                    }
-
-                    if (methodCode === lastMagewirePaymentMethodCode) {
-                        return;
-                    }
-
-                    lastMagewirePaymentMethodCode = methodCode;
-
-                    if (magewirePaymentMethodSyncTimer) {
-                        window.clearTimeout(magewirePaymentMethodSyncTimer);
-                    }
-
-                    magewirePaymentMethodSyncTimer = window.setTimeout(function () {
-                        var wire = getMagewireComponent(),
-                            currentMethod;
-
-                        magewirePaymentMethodSyncTimer = null;
-
-                        if (!wire || typeof wire.call !== 'function') {
-                            return;
-                        }
-
-                        currentMethod = getProperty(wire, 'paymentMethod');
-                        if (currentMethod !== methodCode) {
-                            wire.call('selectPaymentMethod', methodCode);
-                        }
-                    }, 50);
+                    paymentMethodSync.syncToMagewire(paymentMethod);
                 }
 
                 function prepareCheckoutState(magewire) {
@@ -3972,28 +1241,12 @@ define([
                     });
                 }
 
-                function getShippingListComponent() {
-                    return window.fastcheckoutHyvaShippingListInstance || (typeof registry !== 'undefined' && registry.get('fastcheckoutHyvaShippingRenderers.shippingList')) || null;
-                }
-
                 function clearShippingFieldError() {
-                    var component = getShippingListComponent();
-                    if (component && typeof component.clearError === 'function') {
-                        component.clearError();
-                    }
+                    shippingErrorBridge.clear();
                 }
 
                 function showShippingFieldError(methodCode, carrierCode, errorMessage) {
-                    var component = getShippingListComponent();
-                    if (component && typeof component.setError === 'function') {
-                        component.setError(carrierCode + '_' + methodCode, errorMessage);
-                    }
-                    var el = document.getElementById('label_method_' + methodCode + '_' + carrierCode) ||
-                             document.getElementById('fastcheckout-ko-shipping-root') ||
-                             document.querySelector('[name="shipping_method"]');
-                    if (el) {
-                        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }
+                    shippingErrorBridge.show(methodCode, carrierCode, errorMessage);
                 }
 
                 window.fastcheckoutHyvaShipping = {
@@ -4001,7 +1254,7 @@ define([
                     syncShippingMethod: syncSelectedShippingMethodToKnockout,
                     syncShippingMethodToMagewire: syncShippingMethodToMagewire,
                     getShippingInformationComponent: function () {
-                        return standardShippingInformationComponent;
+                        return shippingCompatibilityBridge.getShippingInformationComponent();
                     },
                     onSelectShippingAddressAction: function (shippingAddress) {
                         var addressData = normalizeKoAddressData(shippingAddress),
@@ -4567,11 +1820,7 @@ define([
                         return;
                     }
 
-                    if (
-                        getQuotePaymentMethodCode() === methodCode &&
-                        lastMagewirePaymentMethodCode === methodCode &&
-                        !magewirePaymentMethodSyncTimer
-                    ) {
+                    if (paymentMethodSync.isSynced(methodCode)) {
                         pendingSelectedMethodCode = '';
                         runPatchRenderers();
                         updateActiveRendererClass(methodCode, methodCode);
@@ -4725,31 +1974,7 @@ define([
                 }
 
                 function assignCheckoutAgreementsFallback(paymentData) {
-                    var agreementIds = [];
-
-                    if (
-                        !paymentData ||
-                        !window.checkoutConfig ||
-                        !window.checkoutConfig.checkoutAgreements ||
-                        !window.checkoutConfig.checkoutAgreements.isEnabled
-                    ) {
-                        return paymentData;
-                    }
-
-                    $('.payment-method._active div[data-role=checkout-agreements] input').serializeArray().forEach(function (item) {
-                        agreementIds.push(item.value);
-                    });
-
-                    if (!agreementIds.length) {
-                        return paymentData;
-                    }
-
-                    paymentData.extension_attributes = paymentData.extension_attributes || {};
-                    if (!paymentData.extension_attributes.agreement_ids) {
-                        paymentData.extension_attributes.agreement_ids = agreementIds;
-                    }
-
-                    return paymentData;
+                    return checkoutAgreementsFallback.assign(paymentData);
                 }
 
                 function annotatePaymentDataWithFastcheckoutSelection(paymentData) {
@@ -4773,48 +1998,7 @@ define([
                 }
 
                 function validateCheckoutAgreementsFallback(hideError) {
-                    var inputs,
-                        isValid = true,
-                        firstInvalid = null;
-
-                    if (
-                        !window.checkoutConfig ||
-                        !window.checkoutConfig.checkoutAgreements ||
-                        !window.checkoutConfig.checkoutAgreements.isEnabled
-                    ) {
-                        return true;
-                    }
-
-                    inputs = $('.payment-method._active div.checkout-agreements input');
-                    if (!inputs.length) {
-                        return true;
-                    }
-
-                    inputs.each(function (index, element) {
-                        var valid = true;
-
-                        if ($.validator && typeof $.validator.validateSingleElement === 'function') {
-                            valid = $.validator.validateSingleElement(element, {
-                                errorElement: 'div',
-                                hideError: !!hideError
-                            });
-                        } else if ((element.type === 'checkbox' || element.type === 'radio') && !element.checked) {
-                            valid = false;
-                        }
-
-                        if (!valid) {
-                            isValid = false;
-                            if (!firstInvalid) {
-                                firstInvalid = element;
-                            }
-                        }
-                    });
-
-                    if (!isValid && firstInvalid && !hideError) {
-                        firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }
-
-                    return isValid;
+                    return checkoutAgreementsFallback.validate(hideError);
                 }
 
                 function applyPaymentDataAssigners(paymentData) {
@@ -4823,16 +2007,7 @@ define([
                     loadPaymentValidationComponents();
                     loadOptionalValidationComponents();
 
-                    optionalPaymentDataAssigners.forEach(function (assigner) {
-                        try {
-                            assigner(paymentData);
-                        } catch (e) {
-                            if (window.console && typeof window.console.warn === 'function') {
-                                window.console.warn('Kkkonrad Fastcheckout: payment data assigner failed.', e);
-                            }
-                        }
-                    });
-
+                    paymentValidationRegistry.applyPaymentDataAssigners(paymentData);
                     paymentData = mergeActivePaymentFormData(paymentData);
                     paymentData = annotatePaymentDataWithFastcheckoutSelection(paymentData);
 
@@ -4843,148 +2018,32 @@ define([
                     loadPaymentValidationComponents();
                     loadOptionalValidationComponents();
 
-                    var isValid = true;
-
-                    if (!additionalValidators || typeof additionalValidators.validate !== 'function') {
+                    return paymentValidationRegistry.validateAdditionalValidators(hideError, function () {
                         return validateCheckoutAgreementsFallback(hideError);
-                    }
-
-                    try {
-                        isValid = additionalValidators.validate(!!hideError);
-                    } catch (e) {
-                        if (window.console && typeof window.console.warn === 'function') {
-                            window.console.warn('Kkkonrad Fastcheckout: additional checkout validation failed.', e);
-                        }
-                        return false;
-                    }
-
-                    return isValid && validateCheckoutAgreementsFallback(hideError);
+                    });
                 }
 
                 loadOptionalValidationComponents();
                 loadPaymentValidationComponents();
 
                 function clonePaymentPayload(paymentData) {
-                    if (!paymentData || typeof paymentData !== 'object') {
-                        return paymentData || {};
-                    }
-
-                    return $.extend(true, {}, paymentData);
+                    return placeOrderHooksBridge.clonePaymentPayload(paymentData);
                 }
 
                 function runPlaceOrderRequestModifiers(paymentData, includeBillingAddress, clonePaymentData) {
-                    paymentData = clonePaymentData ? clonePaymentPayload(paymentData) : (paymentData || {});
-
-                    var headers = {},
-                        payload = {
-                            cartId: quote && typeof quote.getQuoteId === 'function' ? quote.getQuoteId() : null,
-                            paymentMethod: paymentData
-                        };
-
-                    if (includeBillingAddress === true && quote && typeof quote.billingAddress === 'function') {
-                        payload.billingAddress = quote.billingAddress();
-                    }
-                    if (getEmailForQuote()) {
-                        payload.email = getEmailForQuote();
-                    }
-
-                    if (placeOrderHooks && Array.isArray(placeOrderHooks.requestModifiers)) {
-                        placeOrderHooks.requestModifiers.forEach(function (modifier) {
-                            if (typeof modifier === 'function') {
-                                modifier(headers, payload);
-                            }
-                        });
-                    }
-
-                    return {
-                        headers: headers,
-                        payload: payload,
-                        paymentData: payload.paymentMethod || paymentData || {}
-                    };
+                    return placeOrderHooksBridge.runRequestModifiers(paymentData, includeBillingAddress, clonePaymentData);
                 }
 
                 function buildPlaceOrderSyncPayload(paymentData) {
-                    var payload = {
-                        cartId: quote && typeof quote.getQuoteId === 'function' ? quote.getQuoteId() : null,
-                        paymentMethod: paymentData || {}
-                    };
-
-                    if (quote && typeof quote.billingAddress === 'function') {
-                        payload.billingAddress = quote.billingAddress();
-                    }
-                    if (getEmailForQuote()) {
-                        payload.email = getEmailForQuote();
-                    }
-
-                    return {
-                        headers: {},
-                        payload: payload,
-                        paymentData: paymentData || {}
-                    };
+                    return placeOrderHooksBridge.buildSyncPayload(paymentData);
                 }
 
                 function runPlaceOrderAfterRequestListeners() {
-                    if (!placeOrderHooks || !Array.isArray(placeOrderHooks.afterRequestListeners)) {
-                        return;
-                    }
-
-                    placeOrderHooks.afterRequestListeners.forEach(function (listener) {
-                        if (typeof listener === 'function') {
-                            try {
-                                listener();
-                            } catch (e) {
-                                if (window.console && typeof window.console.warn === 'function') {
-                                    window.console.warn('Kkkonrad Fastcheckout: place-order after request listener failed.', e);
-                                }
-                            }
-                        }
-                    });
-                }
-
-                function sanitizeHookPayload(value, depth) {
-                    var result;
-
-                    depth = depth || 0;
-                    if (depth > 6 || value === null || typeof value === 'undefined') {
-                        return value === undefined ? null : value;
-                    }
-                    if (typeof value === 'function') {
-                        return null;
-                    }
-                    if (typeof value !== 'object') {
-                        return value;
-                    }
-                    if (Array.isArray(value)) {
-                        return value.map(function (item) {
-                            return sanitizeHookPayload(item, depth + 1);
-                        });
-                    }
-                    if (value.nodeType || value.window === value) {
-                        return null;
-                    }
-
-                    result = {};
-                    Object.keys(value).forEach(function (key) {
-                        if (key === '__disableTmpl') {
-                            return;
-                        }
-                        result[key] = sanitizeHookPayload(value[key], depth + 1);
-                    });
-
-                    return result;
+                    placeOrderHooksBridge.runAfterRequestListeners();
                 }
 
                 function syncPlaceOrderHookData(wire, hookData, deferUpdate) {
-                    if (!wire || typeof wire.set !== 'function') {
-                        return Promise.resolve();
-                    }
-
-                    hookData = hookData || { headers: {}, payload: {} };
-
-                    return Promise.resolve(wire.set('placeOrderRequestHeaders', sanitizeHookPayload(hookData.headers || {}), deferUpdate === true))
-                        .then(function () {
-                            return wire.set('placeOrderRequestData', sanitizeHookPayload(hookData.payload || {}), deferUpdate === true);
-	                        });
+                    return placeOrderHooksBridge.syncHookData(wire, hookData, deferUpdate);
                 }
 
                 function watchRendererPlaceOrderResult(result, component, reject) {
@@ -5326,8 +2385,8 @@ define([
                                             })
                                             .then(function () {
                                                 var currentMagewireMethod = getProperty(wire, 'paymentMethod');
-                                                if (methodCode && methodCode !== currentMagewireMethod && methodCode !== lastMagewirePaymentMethodCode && typeof wire.call === 'function') {
-                                                    lastMagewirePaymentMethodCode = methodCode;
+                                                if (methodCode && methodCode !== currentMagewireMethod && !paymentMethodSync.isSynced(methodCode) && typeof wire.call === 'function') {
+                                                    paymentMethodSync.markSynced(methodCode);
                                                     return wire.call('selectPaymentMethod', methodCode);
                                                 }
                                                 return true;
