@@ -177,7 +177,17 @@ function initCheckout() {
          * Validate select on change.
          */
         onSelectChange() {
-            this._validateEl(this.$el);
+            const el = this.$el;
+            const field = el.dataset.wireField ||
+                el.getAttribute('wire:model.blur') ||
+                el.getAttribute('wire:model') ||
+                el.getAttribute('wire:model.defer');
+
+            if (field && this.$wire && typeof this.$wire.set === 'function') {
+                this.$wire.set(field, el.value);
+            }
+
+            this._validateEl(el);
         },
 
         /**

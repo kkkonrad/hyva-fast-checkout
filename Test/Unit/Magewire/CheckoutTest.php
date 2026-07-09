@@ -276,6 +276,57 @@ class CheckoutTest extends TestCase
         $this->assertEquals('Gdansk', $this->checkoutComponent->billingCity);
     }
 
+    public function testMountResolvesShippingRegionIdFromRegionName(): void
+    {
+        $shippingAddressMock = $this->createAddressMock();
+        $billingAddressMock = $this->createAddressMock();
+
+        $this->quoteMock->method('getCustomerEmail')->willReturn('test@example.com');
+        $this->quoteMock->method('getCouponCode')->willReturn('');
+        $this->quoteMock->method('getShippingAddress')->willReturn($shippingAddressMock);
+        $this->quoteMock->method('getBillingAddress')->willReturn($billingAddressMock);
+
+        $shippingAddressMock->method('getFirstname')->willReturn('John');
+        $shippingAddressMock->method('getLastname')->willReturn('Doe');
+        $shippingAddressMock->method('getStreet')->willReturn(['123 Street St']);
+        $shippingAddressMock->method('getCity')->willReturn('Warsaw');
+        $shippingAddressMock->method('getPostcode')->willReturn('00-001');
+        $shippingAddressMock->method('getCountryId')->willReturn('PL');
+        $shippingAddressMock->method('getRegionId')->willReturn(null);
+        $shippingAddressMock->method('getRegion')->willReturn('Mazowieckie');
+        $shippingAddressMock->method('getTelephone')->willReturn('123456789');
+        $shippingAddressMock->method('getShippingMethod')->willReturn('flatrate_flatrate');
+
+        $billingAddressMock->method('getStreet')->willReturn([]);
+        $billingAddressMock->method('getCountryId')->willReturn('PL');
+        $billingAddressMock->method('getRegionId')->willReturn(null);
+        $billingAddressMock->method('getRegion')->willReturn('');
+
+        $regionCollectionMock = $this->getMockBuilder(\Magento\Directory\Model\ResourceModel\Region\Collection::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['addCountryFilter', 'addRegionCodeOrNameFilter', 'getFirstItem'])
+            ->getMock();
+        $regionCollectionMock->expects($this->once())
+            ->method('addCountryFilter')
+            ->with('PL')
+            ->willReturnSelf();
+        $regionCollectionMock->expects($this->once())
+            ->method('addRegionCodeOrNameFilter')
+            ->with('Mazowieckie')
+            ->willReturnSelf();
+        $regionCollectionMock->expects($this->once())
+            ->method('getFirstItem')
+            ->willReturn(new \Magento\Framework\DataObject(['id' => 10]));
+
+        $this->regionCollectionFactoryMock->expects($this->once())
+            ->method('create')
+            ->willReturn($regionCollectionMock);
+
+        $this->checkoutComponent->mount();
+
+        $this->assertSame('10', $this->checkoutComponent->regionId);
+    }
+
     public function testSaveShippingAddress(): void
     {
         $shippingAddressMock = $this->createAddressMock();

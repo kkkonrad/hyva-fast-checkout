@@ -276,9 +276,8 @@ class Checkout extends Component
             if (!$shippingAddress->getCountryId()) {
                 $shippingAddress->setCountryId($this->countryId);
             }
-            $regionIdVal = $shippingAddress->getRegionId();
-            $this->regionId = (int)$regionIdVal > 0 ? (string)$regionIdVal : '';
-            $this->region = (string) $shippingAddress->getRegion();
+            $this->region = $this->resolveAddressRegionName($shippingAddress);
+            $this->regionId = $this->resolveAddressRegionId($shippingAddress, $this->countryId, $this->region);
             $this->telephone = (string) $shippingAddress->getTelephone();
             
             if ($shippingAddress->getShippingMethod()) {
@@ -312,9 +311,8 @@ class Checkout extends Component
             $this->billingCity = (string) $billingAddress->getCity();
             $this->billingPostcode = (string) $billingAddress->getPostcode();
             $this->billingCountryId = (string) ($billingAddress->getCountryId() ?: $this->getDefaultCountry());
-            $billingRegionIdVal = $billingAddress->getRegionId();
-            $this->billingRegionId = (int)$billingRegionIdVal > 0 ? (string)$billingRegionIdVal : '';
-            $this->billingRegion = (string) $billingAddress->getRegion();
+            $this->billingRegion = $this->resolveAddressRegionName($billingAddress);
+            $this->billingRegionId = $this->resolveAddressRegionId($billingAddress, $this->billingCountryId, $this->billingRegion);
             $this->billingTelephone = (string) $billingAddress->getTelephone();
         }
 
@@ -373,6 +371,11 @@ class Checkout extends Component
             $shippingAddress->setCity($this->city);
             $shippingAddress->setPostcode($this->postcode);
             $shippingAddress->setCountryId($this->countryId);
+            $this->regionId = $this->normalizeRegionId(
+                $this->regionId,
+                $this->countryId,
+                $this->region
+            );
             
             if ($this->regionId) {
                 $shippingAddress->setRegionId((int)$this->regionId);
@@ -443,6 +446,11 @@ class Checkout extends Component
                 $billingAddress->setCity($this->city);
                 $billingAddress->setPostcode($this->postcode);
                 $billingAddress->setCountryId($this->countryId);
+                $this->regionId = $this->normalizeRegionId(
+                    $this->regionId,
+                    $this->countryId,
+                    $this->region
+                );
                 $billingAddress->setRegionId($this->regionId ? (int)$this->regionId : null);
                 $billingAddress->setRegion($this->region);
                 $billingAddress->setTelephone($this->telephone);
@@ -470,6 +478,11 @@ class Checkout extends Component
                 $billingAddress->setCity($this->billingCity);
                 $billingAddress->setPostcode($this->billingPostcode);
                 $billingAddress->setCountryId($this->billingCountryId);
+                $this->billingRegionId = $this->normalizeRegionId(
+                    $this->billingRegionId,
+                    $this->billingCountryId,
+                    $this->billingRegion
+                );
                 
                 if ($this->billingRegionId) {
                     $billingAddress->setRegionId((int)$this->billingRegionId);
@@ -1758,8 +1771,8 @@ class Checkout extends Component
 
             $region = $address->getRegion();
             if ($region) {
-                $this->regionId = (string) ($region->getRegionId() ?: '');
-                $this->region   = (string) ($region->getRegion() ?: '');
+                $this->region = $this->resolveAddressRegionName($address);
+                $this->regionId = $this->resolveAddressRegionId($address, $this->countryId, $this->region);
             }
 
             $this->saveShippingAddress(true, true, true);
@@ -1777,6 +1790,124 @@ class Checkout extends Component
             return (string)$this->directoryHelper->getDefaultCountry();
         }
         return 'US';
+    }
+
+    private function resolveAddressRegionId($address, string $countryId, string $regionName = ''): string
+    {
+        $regionId = '';
+
+        try {
+            $regionIdVal = $address && is_callable([$address, 'getRegionId'])
+                ? $address->getRegionId()
+                : null;
+            if ((int)$regionIdVal > 0) {
+                return (string)(int)$regionIdVal;
+            }
+
+            $region = $address && is_callable([$address, 'getRegion'])
+                ? $address->getRegion()
+                : null;
+            if (is_object($region)) {
+                if (is_callable([$region, 'getRegionId']) && (int)$region->getRegionId() > 0) {
+                    return (string)(int)$region->getRegionId();
+                }
+                if ($regionName === '' && is_callable([$region, 'getRegion'])) {
+                    $regionName = (string)$region->getRegion();
+                }
+                if ($regionName === '' && is_callable([$region, 'getRegionCode'])) {
+                    $regionName = (string)$region->getRegionCode();
+                }
+            } elseif ($regionName === '' && is_scalar($region)) {
+                $regionName = (string)$region;
+            }
+
+            $regionId = $this->resolveRegionIdByCountryAndName($countryId, $regionName);
+        } catch (\Throwable $e) {
+            try {
+                $this->logger->warning('Fastcheckout region id resolve failed', ['exception' => $e]);
+            } catch (\Throwable $logEx) {
+                // ignore
+            }
+        }
+
+        return $regionId;
+    }
+
+    private function resolveAddressRegionName($address): string
+    {
+        try {
+            $region = $address && is_callable([$address, 'getRegion'])
+                ? $address->getRegion()
+                : null;
+
+            if (is_object($region)) {
+                if (is_callable([$region, 'getRegion']) && (string)$region->getRegion() !== '') {
+                    return (string)$region->getRegion();
+                }
+                if (is_callable([$region, 'getRegionCode']) && (string)$region->getRegionCode() !== '') {
+                    return (string)$region->getRegionCode();
+                }
+                if (is_callable([$region, 'getName']) && (string)$region->getName() !== '') {
+                    return (string)$region->getName();
+                }
+                return '';
+            }
+
+            return is_scalar($region) ? (string)$region : '';
+        } catch (\Throwable $e) {
+            try {
+                $this->logger->warning('Fastcheckout region name resolve failed', ['exception' => $e]);
+            } catch (\Throwable $logEx) {
+                // ignore
+            }
+        }
+
+        return '';
+    }
+
+    private function normalizeRegionId($regionId, string $countryId, string $regionName = ''): string
+    {
+        if ((int)$regionId > 0) {
+            return (string)(int)$regionId;
+        }
+
+        return $this->resolveRegionIdByCountryAndName($countryId, $regionName);
+    }
+
+    private function resolveRegionIdByCountryAndName(string $countryId, string $regionName): string
+    {
+        $countryId = trim($countryId);
+        $regionName = trim($regionName);
+        if ($countryId === '' || $regionName === '') {
+            return '';
+        }
+
+        try {
+            $collection = $this->regionCollectionFactory->create()
+                ->addCountryFilter($countryId);
+
+            if (is_callable([$collection, 'addRegionCodeOrNameFilter'])) {
+                $collection->addRegionCodeOrNameFilter($regionName);
+            } else {
+                $collection->addFieldToFilter(
+                    ['main_table.code', 'main_table.default_name'],
+                    [$regionName, $regionName]
+                );
+            }
+
+            $region = $collection->getFirstItem();
+            if ($region && (int)$region->getId() > 0) {
+                return (string)(int)$region->getId();
+            }
+        } catch (\Throwable $e) {
+            try {
+                $this->logger->warning('Fastcheckout region lookup failed', ['exception' => $e]);
+            } catch (\Throwable $logEx) {
+                // ignore
+            }
+        }
+
+        return '';
     }
 
     private function buildStreetLines($line1, $line2, $line3 = '', $line4 = ''): array

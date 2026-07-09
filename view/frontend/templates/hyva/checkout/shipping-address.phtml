@@ -180,7 +180,7 @@
                    data-wire-field="street1"
                    @input="onFieldInput"
                    @blur="onFieldBlur"
-                   placeholder="<?= $escaper->escapeHtmlAttr(__('Line 1')) ?>" required/>
+                   placeholder="<?= $escaper->escapeHtmlAttr(__('Line %1', 1)) ?>" required/>
             
             <?php for ($i = 2; $i <= $streetLinesCount; $i++): ?>
             <input id="co-shipping-street<?= (int)$i ?>" class="form-input mt-2 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
@@ -196,9 +196,9 @@
         <label for="co-shipping-country-id" class="block">
             <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Country')) ?> *</span>
             <select id="co-shipping-country-id" class="form-select mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                    wire:model.blur="countryId" @change="onSelectChange" autocomplete="country" required>
+                    wire:model.blur="countryId" data-wire-field="countryId" @change="onSelectChange" autocomplete="country" required>
                 <?php foreach ($countries as $country): ?>
-                    <option value="<?= $escaper->escapeHtmlAttr($country['value']) ?>">
+                    <option value="<?= $escaper->escapeHtmlAttr($country['value']) ?>" <?= (string)$magewire->countryId === (string)$country['value'] ? 'selected' : '' ?>>
                         <?= $escaper->escapeHtml($country['label']) ?>
                     </option>
                 <?php endforeach; ?>
@@ -210,9 +210,9 @@
             <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('State/Province')) ?><?= $isRegionRequired ? ' *' : '' ?></span>
             <?php $regions = $magewire->getRegions(); ?>
             <?php if ($regions): ?>
-                <select name="region_id" class="form-select mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" wire:model.blur="regionId" autocomplete="address-level1" <?= $isRegionRequired ? 'required' : '' ?>>
+                <select id="co-shipping-region-id" name="region_id" class="form-select mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" wire:model.blur="regionId" data-wire-field="regionId" @change="onSelectChange" autocomplete="address-level1" <?= $isRegionRequired ? 'required' : '' ?>>
                     <?php foreach ($regions as $regionOption): ?>
-                        <option value="<?= $escaper->escapeHtmlAttr($regionOption['value']) ?>">
+                        <option value="<?= $escaper->escapeHtmlAttr($regionOption['value']) ?>" <?= (string)$magewire->regionId === (string)$regionOption['value'] ? 'selected' : '' ?>>
                             <?= $escaper->escapeHtml($regionOption['label']) ?>
                         </option>
                     <?php endforeach; ?>
@@ -401,7 +401,7 @@
                             data-wire-field="billingStreet1"
                             @input="onFieldInput"
                             @blur="onFieldBlur"
-                            placeholder="<?= $escaper->escapeHtmlAttr(__('Line 1')) ?>" required/>
+                            placeholder="<?= $escaper->escapeHtmlAttr(__('Line %1', 1)) ?>" required/>
                      
                      <?php for ($i = 2; $i <= $streetLinesCount; $i++): ?>
                      <input class="form-input mt-2 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
@@ -418,10 +418,11 @@
                     <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('Country')) ?> *</span>
                     <select class="form-select mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                             wire:model.blur="billingCountryId"
+                            data-wire-field="billingCountryId"
                             @change="onSelectChange" autocomplete="country"
                             required>
                         <?php foreach ($countries as $country): ?>
-                            <option value="<?= $escaper->escapeHtmlAttr($country['value']) ?>">
+                            <option value="<?= $escaper->escapeHtmlAttr($country['value']) ?>" <?= (string)$magewire->billingCountryId === (string)$country['value'] ? 'selected' : '' ?>>
                                 <?= $escaper->escapeHtml($country['label']) ?>
                             </option>
                         <?php endforeach; ?>
@@ -433,13 +434,14 @@
                     <span class="text-sm font-medium text-gray-700"><?= $escaper->escapeHtml(__('State/Province')) ?><?= $isBillingRegionRequired ? ' *' : '' ?></span>
                     <?php $billingRegions = $magewire->getBillingRegions(); ?>
                     <?php if ($billingRegions): ?>
-                        <select name="billing_region_id"
+                        <select id="co-billing-region-id" name="billing_region_id"
                                 class="form-select mt-1 block w-full rounded border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                                 wire:model.blur="billingRegionId"
+                                data-wire-field="billingRegionId"
                                 @change="onSelectChange" autocomplete="address-level1"
                                 <?= $isBillingRegionRequired ? 'required' : '' ?>>
                             <?php foreach ($billingRegions as $regionOption): ?>
-                                <option value="<?= $escaper->escapeHtmlAttr($regionOption['value']) ?>">
+                                <option value="<?= $escaper->escapeHtmlAttr($regionOption['value']) ?>" <?= (string)$magewire->billingRegionId === (string)$regionOption['value'] ? 'selected' : '' ?>>
                                     <?= $escaper->escapeHtml($regionOption['label']) ?>
                                 </option>
                             <?php endforeach; ?>

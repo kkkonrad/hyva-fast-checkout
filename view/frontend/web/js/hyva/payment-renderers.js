@@ -5085,7 +5085,7 @@ define([
                     return paymentData;
                 }
 
-                function getActivePurchaseOrderInput() {
+                function getScopedPurchaseOrderInput() {
                     var roots = getActivePaymentFormRoots(),
                         input = null;
 
@@ -5097,15 +5097,13 @@ define([
                     return input || document.querySelector('.payment-method._active input[name="payment[po_number]"], .payment-method._active #po_number');
                 }
 
-                function validatePurchaseOrderField() {
-                    var input = getActivePurchaseOrderInput(),
-                        form;
-
+                // Use Magento's validation plugin, but scope it to the active KO renderer form.
+                function validateNativeMagentoField(input) {
                     if (!input) {
                         return true;
                     }
 
-                    form = input.form || input.closest('form');
+                    var form = input.form || input.closest('form');
                     if (form && typeof $(form).validation === 'function') {
                         $(form).validation();
                         if (typeof $(input).valid === 'function') {
@@ -5122,6 +5120,10 @@ define([
 
                     input.removeAttribute('aria-invalid');
                     return true;
+                }
+
+                function validatePurchaseOrderWithNativeValidation() {
+                    return validateNativeMagentoField(getScopedPurchaseOrderInput());
                 }
 
                 function assignCheckoutAgreementsFallback(paymentData) {
@@ -5473,7 +5475,7 @@ define([
 	                        }
 
 		                        if (!poNumber) {
-		                            var poInput = getActivePurchaseOrderInput();
+		                            var poInput = getScopedPurchaseOrderInput();
 		                            if (poInput) {
 		                                poNumber = poInput.value || '';
 		                            }
@@ -5563,60 +5565,61 @@ define([
                             );
 	                    },
 
-                        syncActiveFormData: function (wire) {
-                            var collected,
-                                paymentData,
-                                additionalData,
-                                extensionAttributes,
-                                methodCode,
-                                poNumber;
+	                        syncActiveFormData: function (wire) {
+	                            var collected,
+	                                paymentData,
+	                                additionalData,
+	                                extensionAttributes,
+	                                methodCode,
+	                                poNumber;
 
-                            if (!wire || typeof wire.set !== 'function') {
-                                return Promise.resolve();
-                            }
+	                            if (!wire || typeof wire.set !== 'function') {
+	                                return Promise.resolve();
+	                            }
 
-                            collected = collectFastcheckoutStructuredFields(getActivePaymentFormRoots(), { mode: 'payment' });
-                            if (
-                                !Object.keys(collected.additionalData || {}).length &&
-                                !Object.keys(collected.extensionAttributes || {}).length &&
-                                !(collected.topLevel && collected.topLevel.po_number)
-                            ) {
-                                return Promise.resolve(true);
-                            }
+	                            methodCode = getSelectedMethodCode();
+	                            collected = collectFastcheckoutStructuredFields(getActivePaymentFormRoots(), { mode: 'payment' });
+	                            if (
+	                                methodCode !== 'purchaseorder' &&
+	                                !Object.keys(collected.additionalData || {}).length &&
+	                                !Object.keys(collected.extensionAttributes || {}).length &&
+	                                !(collected.topLevel && collected.topLevel.po_number)
+	                            ) {
+	                                return Promise.resolve(true);
+	                            }
 
-                            paymentData = {
-                                method: getSelectedMethodCode()
-                            };
-                            if (Object.keys(collected.additionalData || {}).length) {
-                                paymentData.additional_data = collected.additionalData;
-                            }
-                            if (Object.keys(collected.extensionAttributes || {}).length) {
-                                paymentData.extension_attributes = collected.extensionAttributes;
-                            }
+	                            paymentData = {
+	                                method: methodCode
+	                            };
+	                            if (Object.keys(collected.additionalData || {}).length) {
+	                                paymentData.additional_data = collected.additionalData;
+	                            }
+	                            if (Object.keys(collected.extensionAttributes || {}).length) {
+	                                paymentData.extension_attributes = collected.extensionAttributes;
+	                            }
 	                            if (collected.topLevel && collected.topLevel.po_number) {
 	                                paymentData.po_number = collected.topLevel.po_number;
 	                            }
-                            additionalData = this.getPaymentAdditionalData(paymentData);
-                            extensionAttributes = this.getPaymentExtensionAttributes(paymentData);
-                            additionalData = $.extend(
-                                true,
-                                {},
-                                getProperty(wire, 'paymentAdditionalData') || {},
-                                additionalData
-                            );
-                            extensionAttributes = $.extend(
-                                true,
-                                {},
-                                getProperty(wire, 'paymentExtensionAttributes') || {},
-                                extensionAttributes
-                            );
-                            methodCode = paymentData && paymentData.method ? paymentData.method : getSelectedMethodCode();
-                            poNumber = methodCode === 'purchaseorder' ? this.getPurchaseOrderNumber(paymentData) : '';
+	                            additionalData = this.getPaymentAdditionalData(paymentData);
+	                            extensionAttributes = this.getPaymentExtensionAttributes(paymentData);
+	                            additionalData = $.extend(
+	                                true,
+	                                {},
+	                                getProperty(wire, 'paymentAdditionalData') || {},
+	                                additionalData
+	                            );
+	                            extensionAttributes = $.extend(
+	                                true,
+	                                {},
+	                                getProperty(wire, 'paymentExtensionAttributes') || {},
+	                                extensionAttributes
+	                            );
+	                            poNumber = methodCode === 'purchaseorder' ? this.getPurchaseOrderNumber(paymentData) : '';
 
-                            return Promise.resolve(wire.set('paymentAdditionalData', additionalData, true))
-                                .then(function () {
-                                    return wire.set('paymentExtensionAttributes', extensionAttributes, true);
-                                })
+	                            return Promise.resolve(wire.set('paymentAdditionalData', additionalData, true))
+	                                .then(function () {
+	                                    return wire.set('paymentExtensionAttributes', extensionAttributes, true);
+	                                })
 	                                .then(function () {
 	                                    return methodCode === 'purchaseorder' ? wire.set('poNumber', poNumber, true) : true;
 	                                });
@@ -5793,19 +5796,24 @@ define([
                                 methodCode = paymentData && paymentData.method ? paymentData.method : (selectedMethod || getSelectedMethodCode());
 
 		                            if (!component || typeof component.placeOrder !== 'function') {
-                                    if (methodCode === 'purchaseorder' && !validatePurchaseOrderField()) {
-                                        var fallbackPoValidationError = new Error(translateFastcheckoutMessage('Please check the selected payment method and try again.'));
-                                        handlePaymentError(fallbackPoValidationError, getBridgeMessageContainer());
-                                        return Promise.reject(fallbackPoValidationError);
-                                    }
-	                                    if (!this.validate()) {
-	                                        var validationError = new Error(translateFastcheckoutMessage('Please check the selected payment method and try again.'));
-	                                        handlePaymentError(validationError, getBridgeMessageContainer());
-	                                        return Promise.reject(validationError);
+	                                    if (methodCode === 'purchaseorder' && !validatePurchaseOrderWithNativeValidation()) {
+	                                        var fallbackPoValidationError = new Error(translateFastcheckoutMessage('Please check the selected payment method and try again.'));
+	                                        handlePaymentError(fallbackPoValidationError, getBridgeMessageContainer());
+	                                        return Promise.reject(fallbackPoValidationError);
 	                                    }
-	                                return this.syncPaymentData(wire).then(function () {
-	                                    return wire.call('placeOrder', selectedMethod || (paymentData && paymentData.method) || getSelectedMethodCode());
-	                                }).then(function (result) {
+                                        if (methodCode === 'purchaseorder' && !validateAdditionalValidators(false)) {
+                                            var fallbackPoAdditionalValidationError = new Error(translateFastcheckoutMessage('Please check the selected payment method and try again.'));
+                                            handlePaymentError(fallbackPoAdditionalValidationError, getBridgeMessageContainer());
+                                            return Promise.reject(fallbackPoAdditionalValidationError);
+                                        }
+		                                    if (methodCode !== 'purchaseorder' && !this.validate()) {
+		                                        var validationError = new Error(translateFastcheckoutMessage('Please check the selected payment method and try again.'));
+		                                        handlePaymentError(validationError, getBridgeMessageContainer());
+		                                        return Promise.reject(validationError);
+	                                    }
+		                                return this.syncPaymentData(wire).then(function () {
+		                                    return wire.call('placeOrder', selectedMethod || (paymentData && paymentData.method) || getSelectedMethodCode());
+		                                }).then(function (result) {
                                         if (result && typeof result === 'object' && result.success === false) {
                                             throw new Error(result.message || result.error || translateFastcheckoutMessage('The order was not placed.'));
                                         }
@@ -5819,16 +5827,37 @@ define([
 	                                });
 	                            }
 
-                                    if (methodCode === 'purchaseorder' && !validatePurchaseOrderField()) {
-                                        var poValidationError = new Error(translateFastcheckoutMessage('Please check the selected payment method and try again.'));
-                                        handlePaymentError(poValidationError, component.messageContainer || getBridgeMessageContainer());
-                                        return Promise.reject(poValidationError);
+	                                if (methodCode === 'purchaseorder' && !validatePurchaseOrderWithNativeValidation()) {
+	                                    var poValidationError = new Error(translateFastcheckoutMessage('Please check the selected payment method and try again.'));
+	                                    handlePaymentError(poValidationError, component.messageContainer || getBridgeMessageContainer());
+	                                    return Promise.reject(poValidationError);
+	                                }
+	                                    if (methodCode === 'purchaseorder' && !validateAdditionalValidators(false)) {
+	                                        var poAdditionalValidationError = new Error(translateFastcheckoutMessage('Please check the selected payment method and try again.'));
+	                                        handlePaymentError(poAdditionalValidationError, component.messageContainer || getBridgeMessageContainer());
+	                                        return Promise.reject(poAdditionalValidationError);
+	                                    }
+                                    if (methodCode === 'purchaseorder') {
+                                        return this.syncPaymentData(wire).then(function () {
+                                            return wire.call('placeOrder', methodCode);
+                                        }).then(function (result) {
+                                            if (result && typeof result === 'object' && result.success === false) {
+                                                throw new Error(result.message || result.error || translateFastcheckoutMessage('The order was not placed.'));
+                                            }
+                                            window.fastcheckoutLastPlaceOrderResult = result || {};
+                                            runPlaceOrderAfterRequestListeners();
+                                            return result;
+                                        }).catch(function (err) {
+                                            runPlaceOrderAfterRequestListeners();
+                                            handlePaymentError(err, component.messageContainer || getBridgeMessageContainer());
+                                            throw err;
+                                        });
                                     }
-			                            if (!this.validate()) {
+			                            if (methodCode !== 'purchaseorder' && !this.validate()) {
 		                                    var activeValidationError = new Error(translateFastcheckoutMessage('Please check the selected payment method and try again.'));
 		                                    handlePaymentError(activeValidationError, component.messageContainer || getBridgeMessageContainer());
 			                                return Promise.reject(activeValidationError);
-			                            }
+		                            }
 		                            if (
 	                                typeof component.isPlaceOrderActionAllowed === 'function' &&
 	                                !component.isPlaceOrderActionAllowed()
@@ -6034,11 +6063,17 @@ define([
 	                        return false;
 	                    },
 
-                    validate: function () {
-                        var component = getActiveRenderer();
-                        if (component && typeof component.validate === 'function') {
-                            var isValid = component.validate();
-                            if (!isValid) {
+	                    validate: function () {
+	                        var component = getActiveRenderer(),
+                                methodCode = getSelectedMethodCode();
+
+                            if (methodCode === 'purchaseorder') {
+                                return validatePurchaseOrderWithNativeValidation() && validateAdditionalValidators(false);
+                            }
+
+	                        if (component && typeof component.validate === 'function') {
+	                            var isValid = component.validate();
+	                            if (!isValid) {
                                 return false;
                             }
                         }
