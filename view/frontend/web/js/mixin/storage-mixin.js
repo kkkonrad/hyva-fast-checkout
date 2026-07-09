@@ -649,6 +649,72 @@ define([
         });
     }
 
+    function ensureShippingRatesAfterBillingAddress(endpoint, wire) {
+        if (endpoint !== 'billingAddress' || typeof require !== 'function') {
+            return Promise.resolve(true);
+        }
+
+        return new Promise(function (resolve) {
+            require([
+                'Magento_Checkout/js/model/quote',
+                'Magento_Checkout/js/model/shipping-service'
+            ], function (quote, shippingService) {
+                var currentRates = shippingService && typeof shippingService.getShippingRates === 'function'
+                        ? shippingService.getShippingRates()()
+                        : [],
+                    shippingAddress = quote && typeof quote.shippingAddress === 'function' ? quote.shippingAddress() : null;
+
+                if (Array.isArray(currentRates) && currentRates.length) {
+                    resolve(true);
+                    return;
+                }
+
+                if (!wire || typeof wire.call !== 'function') {
+                    resolve(true);
+                    return;
+                }
+
+                Promise.resolve(wire.call('saveShippingAddress', true, true, true))
+                    .then(function () {
+                        return refreshCheckoutState(wire, true);
+                    })
+                    .then(applyCheckoutStateToKnockout)
+                    .then(function () {
+                        currentRates = shippingService && typeof shippingService.getShippingRates === 'function'
+                            ? shippingService.getShippingRates()()
+                            : [];
+
+                        if (Array.isArray(currentRates) && currentRates.length) {
+                            return true;
+                        }
+
+                        if (
+                            shippingAddress &&
+                            window.fastcheckoutHyvaShipping &&
+                            typeof window.fastcheckoutHyvaShipping.onEstimateShippingRatesAction === 'function'
+                        ) {
+                            return window.fastcheckoutHyvaShipping.onEstimateShippingRatesAction(shippingAddress);
+                        }
+
+                        return true;
+                    })
+                    .then(function (rates) {
+                        if (Array.isArray(rates) && rates.length && shippingService && typeof shippingService.setShippingRates === 'function') {
+                            shippingService.setShippingRates(rates);
+                        }
+                    })
+                    .catch(function () {
+                        return true;
+                    })
+                    .then(function () {
+                        resolve(true);
+                    });
+            }, function () {
+                resolve(true);
+            });
+        });
+    }
+
     function syncAddressToWire(wire, address, isBilling) {
         var prefix = isBilling ? 'billing' : '',
             street = getAddressValue(address, 'street'),
@@ -1052,6 +1118,9 @@ define([
             .then(function (response) {
                 return refreshCheckoutState(wire, true)
                     .then(applyCheckoutStateToKnockout)
+                    .then(function () {
+                        return ensureShippingRatesAfterBillingAddress(endpoint, wire);
+                    })
                     .catch(function () {
                         return true;
                     })

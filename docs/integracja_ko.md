@@ -15,9 +15,9 @@ Most opiera się na bibliotece RequireJS. W środowisku Hyvä tradycyjne pliki J
 
 ---
 
-## 2. Inicjalizacja Mostu na Frontendzie (`payment-renderers.phtml`)
+## 2. Inicjalizacja Mostu na Frontendzie (`checkout-bridge.phtml`)
 
-Szablon [payment-renderers.phtml](file:///var/www/html/app/code/Kkkonrad/Fastcheckout/view/frontend/templates/hyva/knockout/payment-renderers.phtml) wstrzykuje izolowany kontener KO i zarządza kolejnością ładowania skryptów:
+Szablon [checkout-bridge.phtml](file:///var/www/html/app/code/Kkkonrad/Fastcheckout/view/frontend/templates/hyva/knockout/checkout-bridge.phtml) wstrzykuje izolowany kontener KO i zarządza kolejnością ładowania skryptów:
 
 ### A. Bezpieczny Getter/Setter dla `window.checkoutConfig`
 Zewnętrzne wtyczki (np. PayPal Braintree) często próbują nadpisać cały obiekt `window.checkoutConfig`. Aby temu zapobiec, w szablonie zaimplementowano mechanizm `Object.defineProperty`:
@@ -64,9 +64,9 @@ Skrypt nasłuchuje zdarzeń `magewire:available` lub `livewire:available`. Dopie
 
 ---
 
-## 3. Emulacja środowiska KO w `payment-renderers.js`
+## 3. Emulacja środowiska KO w `checkout-bridge.js`
 
-Główny plik JS mostu ([payment-renderers.js](file:///var/www/html/app/code/Kkkonrad/Fastcheckout/view/frontend/web/js/hyva/payment-renderers.js)) dostarcza atrapy (mocki) brakujących obiektów i rejestrów Magento:
+Główny plik JS mostu ([checkout-bridge.js](file:///var/www/html/app/code/Kkkonrad/Fastcheckout/view/frontend/web/js/hyva/checkout-bridge.js)) dostarcza atrapy (mocki) brakujących obiektów i rejestrów Magento:
 
 - **Atrapy Adresów koszyka (Quote Addresses)**: 
   Moduły płatności KO wywołują na adresach metodę `.getCacheKey()`. Most podmienia obiekty `quote.billingAddress` oraz `quote.shippingAddress` tak, by zwracały statyczny klucz i implementowały subskrypcje KO:
@@ -162,7 +162,7 @@ Synchronizacja stanu pól formularzy (adresy dostawy, płatności, dane kontakto
 - **Z Alpine.js do KO**:
   W komponencie Alpine (`checkout.phtml`) zdefiniowano pętlę obserwatorów `this.$watch` na 23 polach formularza. Każda zmiana wartości (np. wpisanie kodu pocztowego) uruchamia helper `window.fastcheckoutHyvaPayment.syncFieldToKo`, który pobiera instancję Quote w KO i bezpośrednio modyfikuje powiązane Knockout observables, wywołując metodę `valueHasMutated()`.
 - **Z KO do Magewire/Alpine**:
-  W [payment-renderers.js](file:///var/www/html/app/code/Kkkonrad/Fastcheckout/view/frontend/web/js/hyva/payment-renderers.js) most subskrybuje observables `quote.shippingAddress`, `quote.billingAddress` oraz `quote.paymentMethod`. Jeśli bramka płatności KO zmodyfikuje te obiekty (np. Braintree zaktualizuje adres rozliczeniowy), subskrypcja automatycznie synchronizuje te zmiany z powrotem do pól komponentu Magewire za pomocą `$wire.set()`.
+  W [checkout-bridge.js](file:///var/www/html/app/code/Kkkonrad/Fastcheckout/view/frontend/web/js/hyva/checkout-bridge.js) most subskrybuje observables `quote.shippingAddress`, `quote.billingAddress` oraz `quote.paymentMethod`. Jeśli bramka płatności KO zmodyfikuje te obiekty (np. Braintree zaktualizuje adres rozliczeniowy), subskrypcja automatycznie synchronizuje te zmiany z powrotem do pól komponentu Magewire za pomocą `$wire.set()`.
 
 ---
 

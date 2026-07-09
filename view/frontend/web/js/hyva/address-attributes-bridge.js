@@ -7,6 +7,7 @@ define([
         var quote = options.quote,
             getCheckoutProvider = options.getCheckoutProvider,
             syncTimer = null,
+            wireRetryCount = 0,
             magewireSyncValues = {};
 
         function getRootPath(path) {
@@ -320,6 +321,10 @@ define([
             return null;
         }
 
+        function hasAttributeData(value) {
+            return value && typeof value === 'object' && Object.keys(value).length > 0;
+        }
+
         function setMagewireValue(wire, field, value) {
             var currentValue,
                 cachedValue;
@@ -353,7 +358,7 @@ define([
             magewireSyncValues[field] = typeof value === 'object'
                 ? $.extend(true, {}, value)
                 : value;
-            wire.set(field, value, true);
+            wire.set(field, value, false);
         }
 
         function updateQuoteAddressAttributes(address, customAttributes, extensionAttributes) {
@@ -508,12 +513,28 @@ define([
                 );
             });
 
-            if (wire) {
-                setMagewireValue(wire, 'shippingCustomAttributes', shippingCustomAttributes);
-                setMagewireValue(wire, 'shippingExtensionAttributes', shippingExtensionAttributes);
-                setMagewireValue(wire, 'billingCustomAttributes', billingCustomAttributes);
-                setMagewireValue(wire, 'billingExtensionAttributes', billingExtensionAttributes);
+            if (!wire) {
+                if (
+                    wireRetryCount < 6 &&
+                    (
+                        hasAttributeData(shippingCustomAttributes) ||
+                        hasAttributeData(shippingExtensionAttributes) ||
+                        hasAttributeData(billingCustomAttributes) ||
+                        hasAttributeData(billingExtensionAttributes)
+                    )
+                ) {
+                    wireRetryCount += 1;
+                    window.setTimeout(sync, 150 * wireRetryCount);
+                }
+
+                return;
             }
+
+            wireRetryCount = 0;
+            setMagewireValue(wire, 'shippingCustomAttributes', shippingCustomAttributes);
+            setMagewireValue(wire, 'shippingExtensionAttributes', shippingExtensionAttributes);
+            setMagewireValue(wire, 'billingCustomAttributes', billingCustomAttributes);
+            setMagewireValue(wire, 'billingExtensionAttributes', billingExtensionAttributes);
         }
 
         function schedule(path) {

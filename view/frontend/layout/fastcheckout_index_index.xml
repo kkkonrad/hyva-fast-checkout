@@ -17,9 +17,9 @@
                 </arguments>
             </block>
             <block class="Kkkonrad\Fastcheckout\Block\Hyva\Checkout"
-                   name="kkkonrad.fastcheckout.hyva.checkout.ko_payment_renderers"
-                   as="ko_payment_renderers"
-                   template="Kkkonrad_Fastcheckout::hyva/knockout/payment-renderers.phtml"
+                   name="kkkonrad.fastcheckout.hyva.checkout.ko_checkout_bridge"
+                   as="ko_checkout_bridge"
+                   template="Kkkonrad_Fastcheckout::hyva/knockout/checkout-bridge.phtml"
                    cacheable="false"/>
         </referenceContainer>
     </body>
