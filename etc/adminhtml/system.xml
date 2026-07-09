@@ -81,6 +81,18 @@
                     <frontend_model>Kkkonrad\Fastcheckout\Block\Adminhtml\System\Config\ShippingPaymentMapping</frontend_model>
                     <backend_model>Kkkonrad\Fastcheckout\Model\Config\Backend\Json</backend_model>
                 </field>
+                <field id="required_shipping_fields" translate="label comment" type="text"
+                       sortOrder="21" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Required Shipping Fields</label>
+                    <comment>Provide JSON object keyed by shipping method code or rule, for example: {"customcarrier_pickup":["custom_attributes.pickup_location_code"],"inpost_*":["extension_attributes.locker_id"]}.</comment>
+                    <backend_model>Kkkonrad\Fastcheckout\Model\Config\Backend\Json</backend_model>
+                </field>
+                <field id="required_payment_fields" translate="label comment" type="text"
+                       sortOrder="22" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Required Payment Fields</label>
+                    <comment>Provide JSON object keyed by exact payment method code, for example: {"purchaseorder":["po_number"],"custom_gateway":["additional_data.transaction_id"]}.</comment>
+                    <backend_model>Kkkonrad\Fastcheckout\Model\Config\Backend\Json</backend_model>
+                </field>
             </group>
             <group id="restrict_payment" translate="label" type="text"
                    sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">

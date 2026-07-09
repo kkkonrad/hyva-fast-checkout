@@ -18,6 +18,11 @@ use Magewirephp\Magewire\Component;
 class Checkout extends Component
 {
     private const GENERIC_PAYMENT_METHOD_PREFIX = 'generic-';
+    private const INTERNAL_PAYMENT_PAYLOAD_KEYS = [
+        'fastcheckout_selected_method',
+        'fastcheckoutSelectedMethod',
+    ];
+    private const INPOST_LOCKER_ID_ATTRIBUTE = 'inpost_locker_id';
 
     /**
      * Shipping address fields
@@ -391,6 +396,7 @@ class Checkout extends Component
                 $this->getMergedAddressCustomAttributes(false),
                 $this->getMergedAddressExtensionAttributes(false)
             );
+            $this->applyQuoteInpostLockerId($quote);
             
             $shippingAddress->setShouldIgnoreValidation($ignoreValidation);
             $shippingAddress->setCollectShippingRates($collectRates);
@@ -1328,6 +1334,22 @@ class Checkout extends Component
             return $this->buildPlaceOrderResponse(false);
         }
 
+        $missingShippingFields = $isVirtual ? [] : $this->getMissingRequiredShippingFields($this->shippingMethod);
+        if ($missingShippingFields !== []) {
+            $this->orderError = (string)__('Please complete the required shipping fields.');
+            $this->logger->info('Fastcheckout placeOrder blocked: missing required shipping fields', [
+                'quote_id' => $quote->getId(),
+                'shipping_method' => $this->shippingMethod,
+                'missing_fields' => $missingShippingFields,
+                'diagnostics' => $this->buildRequiredFieldDiagnostics(
+                    $this->getShippingDataForRequiredFieldValidation($this->shippingMethod),
+                    $missingShippingFields,
+                    ['custom_attributes', 'extension_attributes']
+                ),
+            ]);
+            return $this->buildPlaceOrderResponse(false);
+        }
+
         if (empty($this->paymentMethod)) {
             $this->orderError = (string)__('Please select a payment method.');
             $this->logger->info('Fastcheckout placeOrder blocked: missing payment method', ['quote_id' => $quote->getId()]);
@@ -1350,6 +1372,22 @@ class Checkout extends Component
         if ($this->paymentMethod === 'purchaseorder' && empty($this->poNumber)) {
             $this->orderError = (string)__('Purchase Order Number is a required field.');
             $this->logger->info('Fastcheckout placeOrder blocked: missing purchase order number', ['quote_id' => $quote->getId()]);
+            return $this->buildPlaceOrderResponse(false);
+        }
+
+        $missingPaymentFields = $this->getMissingRequiredPaymentFields($this->paymentMethod);
+        if ($missingPaymentFields !== []) {
+            $this->orderError = (string)__('Please complete the required payment fields.');
+            $this->logger->info('Fastcheckout placeOrder blocked: missing required payment fields', [
+                'quote_id' => $quote->getId(),
+                'payment_method' => $this->paymentMethod,
+                'missing_fields' => $missingPaymentFields,
+                'diagnostics' => $this->buildRequiredFieldDiagnostics(
+                    $this->getPaymentDataForRequiredFieldValidation($this->paymentMethod),
+                    $missingPaymentFields,
+                    ['additional_data', 'extension_attributes']
+                ),
+            ]);
             return $this->buildPlaceOrderResponse(false);
         }
 
@@ -1769,10 +1807,13 @@ class Checkout extends Component
             $this->normalizePaymentAdditionalData($rawPaymentData['additional_data'] ?? []),
             $this->normalizePaymentAdditionalData($this->paymentAdditionalData)
         );
+        $additionalData = $this->normalizePaymentAdditionalAliases($additionalData);
+        $additionalData = $this->removeInternalPaymentPayloadKeys($additionalData);
 
         $data = $this->normalizePaymentPayload($rawPaymentData);
         $data['method'] = $methodCode;
         $data['additional_data'] = $additionalData;
+        $data = $this->sanitizePaymentPayloadForImport($data);
 
         $extensionAttributes = $this->mergeGenericData(
             $this->normalizePaymentAdditionalData($rawPaymentData['extension_attributes'] ?? []),
@@ -1819,6 +1860,305 @@ class Checkout extends Component
         return '';
     }
 
+    private function sanitizePaymentPayloadForImport(array $paymentData): array
+    {
+        $paymentData = $this->removeInternalPaymentPayloadKeys($paymentData);
+
+        if (isset($paymentData['additional_data']) && is_array($paymentData['additional_data'])) {
+            $paymentData['additional_data'] = $this->removeInternalPaymentPayloadKeys($paymentData['additional_data']);
+        }
+
+        return $paymentData;
+    }
+
+    private function removeInternalPaymentPayloadKeys(array $data): array
+    {
+        foreach (self::INTERNAL_PAYMENT_PAYLOAD_KEYS as $key) {
+            unset($data[$key]);
+        }
+
+        return $data;
+    }
+
+    private function getMissingRequiredPaymentFields(string $methodCode): array
+    {
+        $fieldPaths = $this->getRequiredPaymentFieldPaths($methodCode);
+        if ($fieldPaths === []) {
+            return [];
+        }
+
+        $paymentData = $this->getPaymentDataForRequiredFieldValidation($methodCode);
+        $missing = [];
+        foreach ($fieldPaths as $fieldPath) {
+            [$exists, $value] = $this->getRequiredFieldValueByPath(
+                $paymentData,
+                $fieldPath,
+                ['additional_data', 'extension_attributes']
+            );
+            if (!$exists || !$this->isRequiredFieldValuePresent($value)) {
+                $missing[] = $fieldPath;
+            }
+        }
+
+        return $missing;
+    }
+
+    private function getRequiredPaymentFieldPaths(string $methodCode): array
+    {
+        $methodCode = trim($methodCode);
+        if ($methodCode === '' || !method_exists($this->helper, 'getRequiredPaymentFields')) {
+            return [];
+        }
+
+        $fieldConfig = $this->helper->getRequiredPaymentFields();
+        if (!is_array($fieldConfig) || !isset($fieldConfig[$methodCode]) || !is_array($fieldConfig[$methodCode])) {
+            return [];
+        }
+
+        $fieldPaths = [];
+        foreach ($fieldConfig[$methodCode] as $fieldPath) {
+            $fieldPath = trim((string)$fieldPath);
+            if ($fieldPath !== '') {
+                $fieldPaths[] = $fieldPath;
+            }
+        }
+
+        return array_values(array_unique($fieldPaths));
+    }
+
+    private function getPaymentDataForRequiredFieldValidation(string $methodCode): array
+    {
+        $availableMethodCode = $this->resolveAvailablePaymentMethodCode($methodCode);
+        $rawPaymentData = $this->getRawPaymentData(
+            $availableMethodCode !== '' ? $availableMethodCode : $methodCode,
+            $methodCode
+        );
+
+        $paymentData = $this->normalizePaymentPayload($rawPaymentData);
+        $paymentData['additional_data'] = $this->mergeGenericData(
+            $paymentData['additional_data'] ?? [],
+            $this->paymentAdditionalData
+        );
+        $paymentData['additional_data'] = $this->normalizePaymentAdditionalAliases($paymentData['additional_data']);
+        $paymentData['extension_attributes'] = $this->mergeGenericData(
+            $paymentData['extension_attributes'] ?? [],
+            $this->paymentExtensionAttributes
+        );
+
+        if ($methodCode === 'purchaseorder') {
+            $poNumber = $this->resolvePurchaseOrderNumber($methodCode);
+            if ($poNumber !== '') {
+                $paymentData['po_number'] = $poNumber;
+            }
+        }
+
+        return $paymentData;
+    }
+
+    private function getMissingRequiredShippingFields(string $methodCode): array
+    {
+        if ($methodCode === '' || !method_exists($this->helper, 'getRequiredShippingFieldsForMethod')) {
+            return [];
+        }
+
+        $fieldPaths = $this->helper->getRequiredShippingFieldsForMethod($methodCode);
+        if (!is_array($fieldPaths) || $fieldPaths === []) {
+            return [];
+        }
+
+        $shippingData = $this->getShippingDataForRequiredFieldValidation($methodCode);
+        $missing = [];
+        foreach ($fieldPaths as $fieldPath) {
+            $fieldPath = trim((string)$fieldPath);
+            if ($fieldPath === '') {
+                continue;
+            }
+
+            [$exists, $value] = $this->getRequiredFieldValueByPath(
+                $shippingData,
+                $fieldPath,
+                ['custom_attributes', 'extension_attributes']
+            );
+            if (!$exists || !$this->isRequiredFieldValuePresent($value)) {
+                $missing[] = $fieldPath;
+            }
+        }
+
+        return array_values(array_unique($missing));
+    }
+
+    private function getShippingDataForRequiredFieldValidation(string $methodCode): array
+    {
+        $rawAddressData = $this->getRawAddressData(false);
+        $rawAddressInformation = $this->getRawAddressInformationData();
+
+        $shippingData = $this->mergeGenericData(
+            $rawAddressInformation,
+            $rawAddressData,
+            [
+                'method' => $methodCode,
+                'shipping_method' => $methodCode,
+                'shippingMethod' => $methodCode,
+            ]
+        );
+        $shippingData['custom_attributes'] = $this->mergeGenericData(
+            $shippingData['custom_attributes'] ?? [],
+            $shippingData['customAttributes'] ?? [],
+            $this->getMergedAddressCustomAttributes(false)
+        );
+        $shippingData['extension_attributes'] = $this->mergeGenericData(
+            $shippingData['extension_attributes'] ?? [],
+            $shippingData['extensionAttributes'] ?? [],
+            $this->getMergedAddressExtensionAttributes(false)
+        );
+        $pickupLocationCode = $this->getShippingPickupLocationCode($shippingData);
+        if (
+            $pickupLocationCode !== ''
+            && empty($shippingData['extension_attributes']['pickup_location_code'])
+        ) {
+            $shippingData['extension_attributes']['pickup_location_code'] = $pickupLocationCode;
+        }
+
+        unset($shippingData['customAttributes'], $shippingData['extensionAttributes']);
+
+        return $shippingData;
+    }
+
+    private function getShippingPickupLocationCode(array $shippingData): string
+    {
+        foreach ([
+            'selectedPickupAddress.extension_attributes.pickup_location_code',
+            'selectedPickupAddress.extensionAttributes.pickup_location_code',
+            'selectedPickupAddress.pickup_location_code',
+            'selectedPickupAddress.pickupLocationCode',
+            'selected_pickup_address.extension_attributes.pickup_location_code',
+            'selected_pickup_address.extensionAttributes.pickup_location_code',
+            'selected_pickup_address.pickup_location_code',
+            'selected_pickup_address.pickupLocationCode',
+        ] as $path) {
+            [$exists, $value] = $this->getArrayValueByPath($shippingData, $path);
+            if ($exists && is_scalar($value) && trim((string)$value) !== '') {
+                return trim((string)$value);
+            }
+        }
+
+        foreach ([
+            $shippingData['pickup_location_code'] ?? null,
+            $shippingData['pickupLocationCode'] ?? null,
+            $shippingData['custom_attributes']['pickup_location_code'] ?? null,
+            $shippingData['customAttributes']['pickup_location_code'] ?? null,
+            $shippingData['extension_attributes']['pickup_location_code'] ?? null,
+            $shippingData['extensionAttributes']['pickup_location_code'] ?? null,
+        ] as $candidate) {
+            if (is_scalar($candidate) && trim((string)$candidate) !== '') {
+                return trim((string)$candidate);
+            }
+        }
+
+        return '';
+    }
+
+    private function getRequiredFieldValueByPath(array $data, string $fieldPath, array $fallbackContainers): array
+    {
+        $fieldPath = trim($fieldPath);
+        if ($fieldPath === '') {
+            return [false, null];
+        }
+
+        $directValue = $this->getArrayValueByPath($data, $fieldPath);
+        if ($directValue[0] || strpos($fieldPath, '.') !== false) {
+            return $directValue;
+        }
+
+        foreach ($fallbackContainers as $containerKey) {
+            $containerValue = $data[$containerKey] ?? [];
+            if (!is_array($containerValue)) {
+                continue;
+            }
+
+            $nestedValue = $this->getArrayValueByPath($containerValue, $fieldPath);
+            if ($nestedValue[0]) {
+                return $nestedValue;
+            }
+        }
+
+        return [false, null];
+    }
+
+    private function getArrayValueByPath(array $data, string $fieldPath): array
+    {
+        $value = $data;
+        foreach (explode('.', $fieldPath) as $segment) {
+            if (!is_array($value) || !array_key_exists($segment, $value)) {
+                return [false, null];
+            }
+            $value = $value[$segment];
+        }
+
+        return [true, $value];
+    }
+
+    private function buildRequiredFieldDiagnostics(array $data, array $missingFields, array $containerKeys): array
+    {
+        $diagnostics = [
+            'missing_fields' => array_values($missingFields),
+            'available_top_level_keys' => $this->getDiagnosticKeyPaths($data, 1),
+            'available_container_keys' => [],
+        ];
+
+        foreach ($containerKeys as $containerKey) {
+            $containerData = $data[$containerKey] ?? [];
+            $diagnostics['available_container_keys'][$containerKey] = is_array($containerData)
+                ? $this->getDiagnosticKeyPaths($containerData, 3)
+                : [];
+        }
+
+        return $diagnostics;
+    }
+
+    private function getDiagnosticKeyPaths(array $data, int $maxDepth, string $prefix = ''): array
+    {
+        $paths = [];
+        foreach ($data as $key => $value) {
+            if (!is_string($key) && !is_int($key)) {
+                continue;
+            }
+
+            $path = $prefix === '' ? (string)$key : $prefix . '.' . (string)$key;
+            $paths[] = $path;
+
+            if ($maxDepth > 1 && is_array($value)) {
+                $paths = array_merge(
+                    $paths,
+                    $this->getDiagnosticKeyPaths($value, $maxDepth - 1, $path)
+                );
+            }
+
+            if (count($paths) >= 50) {
+                break;
+            }
+        }
+
+        return array_values(array_unique($paths));
+    }
+
+    private function isRequiredFieldValuePresent($value): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_scalar($value)) {
+            return trim((string)$value) !== '';
+        }
+
+        if (is_array($value)) {
+            return $value !== [];
+        }
+
+        return $value !== null;
+    }
+
     private function getRawPaymentData(string $methodCode, string $selectedMethodCode = ''): array
     {
         if (!is_array($this->placeOrderRequestData)) {
@@ -1832,15 +2172,34 @@ class Checkout extends Component
 
         $paymentData = $this->normalizePaymentPayload($paymentData);
         $payloadMethod = isset($paymentData['method']) ? (string)$paymentData['method'] : '';
+        $payloadSelectedMethod = $this->getPaymentPayloadSelectedMethod($paymentData);
         if (
             $payloadMethod !== ''
             && $payloadMethod !== $methodCode
             && $payloadMethod !== $selectedMethodCode
+            && $payloadSelectedMethod !== $methodCode
+            && $payloadSelectedMethod !== $selectedMethodCode
         ) {
             return [];
         }
 
         return $paymentData;
+    }
+
+    private function getPaymentPayloadSelectedMethod(array $paymentData): string
+    {
+        foreach ([
+            $paymentData['fastcheckout_selected_method'] ?? null,
+            $paymentData['fastcheckoutSelectedMethod'] ?? null,
+            $paymentData['additional_data']['fastcheckout_selected_method'] ?? null,
+            $paymentData['additionalData']['fastcheckout_selected_method'] ?? null,
+        ] as $candidate) {
+            if (is_scalar($candidate) && trim((string)$candidate) !== '') {
+                return trim((string)$candidate);
+            }
+        }
+
+        return '';
     }
 
     private function getRawPaymentPayloadData(): array
@@ -1876,7 +2235,7 @@ class Checkout extends Component
 
     private function payloadLooksLikePaymentData(array $payload): bool
     {
-        foreach (['method', 'additional_data', 'additionalData', 'extension_attributes', 'extensionAttributes', 'po_number', 'poNumber'] as $key) {
+        foreach (['method', 'fastcheckout_selected_method', 'fastcheckoutSelectedMethod', 'additional_data', 'additionalData', 'extension_attributes', 'extensionAttributes', 'po_number', 'poNumber'] as $key) {
             if (array_key_exists($key, $payload)) {
                 return true;
             }
@@ -1915,6 +2274,54 @@ class Checkout extends Component
     private function normalizePaymentAdditionalData($data): array
     {
         return $this->normalizeGenericData($data);
+    }
+
+    private function normalizePaymentAdditionalAliases(array $additionalData): array
+    {
+        $aliasGroups = [
+            ['group', 'groupId', 'group_id'],
+            ['channel', 'channelId', 'channel_id'],
+            ['blik_code', 'blikCode'],
+            ['blik_alias', 'blikAlias', 'saveAlias'],
+            ['regulation_accept', 'regulationAccept'],
+            ['method', 'methodId', 'method_id'],
+            ['accept_tos', 'acceptTos'],
+            ['terms_accept', 'termsAccept'],
+            ['card_data', 'cardData'],
+            ['card_save', 'cardSave'],
+            ['card_id', 'cardId', 'savedId'],
+            ['card_vendor', 'cardVendor'],
+            ['short_code', 'shortCode', 'card_short_code', 'cardShortCode'],
+            ['sessionId', 'session_id'],
+            ['refId', 'ref_id'],
+            ['cardType', 'card_type'],
+            ['cardDate', 'card_date'],
+            ['cardMask', 'card_mask'],
+        ];
+
+        foreach ($aliasGroups as $aliases) {
+            $value = null;
+            $hasValue = false;
+            foreach ($aliases as $alias) {
+                if (array_key_exists($alias, $additionalData) && $additionalData[$alias] !== null && $additionalData[$alias] !== '') {
+                    $value = $additionalData[$alias];
+                    $hasValue = true;
+                    break;
+                }
+            }
+
+            if (!$hasValue) {
+                continue;
+            }
+
+            foreach ($aliases as $alias) {
+                if (!array_key_exists($alias, $additionalData) || $additionalData[$alias] === null || $additionalData[$alias] === '') {
+                    $additionalData[$alias] = $value;
+                }
+            }
+        }
+
+        return $additionalData;
     }
 
     private function getMergedAddressCustomAttributes(bool $isBilling): array
@@ -2131,6 +2538,183 @@ class Checkout extends Component
                 if ($shippingMethod !== '') {
                     return $shippingMethod;
                 }
+            }
+        }
+
+        return '';
+    }
+
+    private function applyQuoteInpostLockerId($quote): void
+    {
+        $lockerId = $this->resolveInpostLockerId();
+        if ($lockerId === '') {
+            return;
+        }
+
+        if (method_exists($quote, 'setData')) {
+            $quote->setData(self::INPOST_LOCKER_ID_ATTRIBUTE, $lockerId);
+        }
+        if (method_exists($quote, 'setInpostLockerId')) {
+            $quote->setInpostLockerId($lockerId);
+        }
+
+        if (!method_exists($quote, 'getExtensionAttributes') || !method_exists($quote, 'setExtensionAttributes')) {
+            return;
+        }
+
+        try {
+            $extensionAttributes = $quote->getExtensionAttributes();
+            if ($extensionAttributes === null) {
+                $extensionAttributes = \Magento\Framework\App\ObjectManager::getInstance()
+                    ->get(\Magento\Quote\Api\Data\CartExtensionFactory::class)
+                    ->create();
+            }
+
+            if (method_exists($extensionAttributes, 'setInpostLockerId')) {
+                $extensionAttributes->setInpostLockerId($lockerId);
+                $quote->setExtensionAttributes($extensionAttributes);
+            }
+        } catch (\Throwable $e) {
+            try {
+                $this->logger->warning('Fastcheckout InPost locker quote attribute sync failed', ['exception' => $e]);
+            } catch (\Exception $ignored) {
+                // ignore
+            }
+        }
+    }
+
+    private function resolveInpostLockerId(): string
+    {
+        $shippingMethod = $this->shippingMethod !== '' ? $this->shippingMethod : $this->getRawShippingMethodCode();
+        if (!$this->isInpostPickupShippingMethod($shippingMethod)) {
+            return '';
+        }
+
+        foreach ([
+            $this->getMergedAddressExtensionAttributes(false),
+            $this->getMergedAddressCustomAttributes(false),
+            $this->getRawAddressData(false),
+            $this->getRawAddressInformationData(),
+            $this->placeOrderRequestData,
+        ] as $source) {
+            $lockerId = $this->extractInpostLockerId($source);
+            if ($lockerId !== '') {
+                return $lockerId;
+            }
+        }
+
+        return '';
+    }
+
+    private function isInpostPickupShippingMethod(string $shippingMethod): bool
+    {
+        $shippingMethod = strtolower($shippingMethod);
+        if ($shippingMethod === '') {
+            return false;
+        }
+
+        return strpos($shippingMethod, 'inpostlocker') !== false
+            || strpos($shippingMethod, 'paczkomat') !== false
+            || (
+                strpos($shippingMethod, 'inpost') !== false
+                && (
+                    strpos($shippingMethod, 'locker') !== false
+                    || strpos($shippingMethod, 'box') !== false
+                    || strpos($shippingMethod, 'point') !== false
+                )
+            );
+    }
+
+    private function extractInpostLockerId($source, int $depth = 0): string
+    {
+        if ($depth > 4) {
+            return '';
+        }
+
+        $source = $this->normalizeGenericData($source);
+        if ($source === []) {
+            return '';
+        }
+
+        foreach ([
+            self::INPOST_LOCKER_ID_ATTRIBUTE,
+            'inpostLockerId',
+            'target_locker',
+            'targetLocker',
+            'locker_id',
+            'lockerId',
+        ] as $key) {
+            if (array_key_exists($key, $source)) {
+                $lockerId = $this->extractIdentifierString($source[$key]);
+                if ($lockerId !== '') {
+                    return $lockerId;
+                }
+            }
+        }
+
+        foreach ([
+            'shippingInPostPointData',
+            'shippingInPostPoint',
+            'inpostPoint',
+            'inpost_point',
+            'pickupPoint',
+            'pickup_point',
+            'parcelLocker',
+            'parcel_locker',
+            'locker',
+            'point',
+        ] as $key) {
+            if (!array_key_exists($key, $source)) {
+                continue;
+            }
+
+            $lockerId = $this->extractIdentifierString($source[$key]);
+            if ($lockerId !== '') {
+                return $lockerId;
+            }
+
+            $lockerId = $this->extractInpostLockerId($source[$key], $depth + 1);
+            if ($lockerId !== '') {
+                return $lockerId;
+            }
+        }
+
+        return '';
+    }
+
+    private function extractIdentifierString($value): string
+    {
+        if (is_scalar($value)) {
+            return trim((string)$value);
+        }
+
+        $value = $this->normalizeGenericValue($value);
+        if (is_scalar($value)) {
+            return trim((string)$value);
+        }
+        if (!is_array($value)) {
+            return '';
+        }
+
+        foreach ([
+            'name',
+            'id',
+            'code',
+            'value',
+            self::INPOST_LOCKER_ID_ATTRIBUTE,
+            'inpostLockerId',
+            'target_locker',
+            'targetLocker',
+            'locker_id',
+            'lockerId',
+        ] as $key) {
+            if (!array_key_exists($key, $value)) {
+                continue;
+            }
+
+            $identifier = $this->extractIdentifierString($value[$key]);
+            if ($identifier !== '') {
+                return $identifier;
             }
         }
 

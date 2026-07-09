@@ -135,6 +135,68 @@ class DataTest extends TestCase
         $this->assertSame(['checkmo', 'payu_blik'], $helper->getRestrictPaymentMethods());
     }
 
+    public function testGetRequiredPaymentFieldsReturnsEmptyArrayWhenJsonIsInvalid(): void
+    {
+        $logger = $this->createMock(LoggerInterface::class);
+        $jsonHelper = $this->createMock(JsonHelper::class);
+        $jsonHelper->method('jsonDecode')->willThrowException(new \InvalidArgumentException('invalid json'));
+
+        $helper = $this->createHelper('{invalid json', $jsonHelper, $logger);
+
+        $this->assertSame([], $helper->getRequiredPaymentFields());
+    }
+
+    public function testGetRequiredPaymentFieldsReturnsDecodedArray(): void
+    {
+        $fields = [
+            'purchaseorder' => ['po_number'],
+            'custom_gateway' => ['additional_data.transaction_id'],
+        ];
+
+        $jsonHelper = $this->createMock(JsonHelper::class);
+        $jsonHelper->method('jsonDecode')->willReturn($fields);
+
+        $helper = $this->createHelper('encoded fields', $jsonHelper);
+
+        $this->assertSame($fields, $helper->getRequiredPaymentFields());
+    }
+
+    public function testGetRequiredShippingFieldsForMethodMatchesExactCarrierAndWildcards(): void
+    {
+        $fields = [
+            'customcarrier_pickup' => ['custom_attributes.pickup_location_code'],
+            'customcarrier' => ['extension_attributes.carrier_account'],
+            'customcarrier_*' => ['extension_attributes.locker_id'],
+            '*' => ['custom_attributes.delivery_note'],
+        ];
+
+        $jsonHelper = $this->createMock(JsonHelper::class);
+        $jsonHelper->method('jsonDecode')->willReturn($fields);
+
+        $helper = $this->createHelper('encoded fields', $jsonHelper);
+
+        $this->assertSame(
+            [
+                'custom_attributes.pickup_location_code',
+                'extension_attributes.carrier_account',
+                'extension_attributes.locker_id',
+                'custom_attributes.delivery_note',
+            ],
+            $helper->getRequiredShippingFieldsForMethod('customcarrier_pickup')
+        );
+    }
+
+    public function testGetRequiredShippingFieldsForMethodReturnsEmptyArrayWhenJsonIsInvalid(): void
+    {
+        $logger = $this->createMock(LoggerInterface::class);
+        $jsonHelper = $this->createMock(JsonHelper::class);
+        $jsonHelper->method('jsonDecode')->willThrowException(new \InvalidArgumentException('invalid json'));
+
+        $helper = $this->createHelper('{invalid json', $jsonHelper, $logger);
+
+        $this->assertSame([], $helper->getRequiredShippingFieldsForMethod('customcarrier_pickup'));
+    }
+
     private function createHelper(
         string $configValue,
         JsonHelper $jsonHelper,

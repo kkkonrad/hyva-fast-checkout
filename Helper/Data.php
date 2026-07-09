@@ -37,6 +37,8 @@ class Data extends AbstractHelper
     const XML_PATH_PAYMENT_TITLE_TYPE = 'fastcheckout/extended/payment_title_type';
     const XML_PATH_DISPLAY_ALL_METHODS = 'fastcheckout/extended/show_all_ship_methods';
     const XML_PATH_SHIPPING_PAYMENT_MAPPING = 'fastcheckout/extended/shipping_payment_mapping';
+    const XML_PATH_REQUIRED_SHIPPING_FIELDS = 'fastcheckout/extended/required_shipping_fields';
+    const XML_PATH_REQUIRED_PAYMENT_FIELDS = 'fastcheckout/extended/required_payment_fields';
 
     const XML_PATH_RESTRICT_PAYMENT_ENABLE = 'fastcheckout/restrict_payment/enable';
     const XML_PATH_RESTRICT_PAYMENT_METHODS = 'fastcheckout/restrict_payment/methods';
@@ -227,6 +229,67 @@ class Data extends AbstractHelper
             $this->_logger->warning('Invalid fastcheckout restricted payment methods', ['exception' => $e]);
             return [];
         }
+    }
+
+    public function getRequiredPaymentFields(): array
+    {
+        $fields = $this->scopeConfig->getValue(self::XML_PATH_REQUIRED_PAYMENT_FIELDS, ScopeInterface::SCOPE_STORE);
+        if (empty($fields)) {
+            return [];
+        }
+
+        try {
+            $decoded = $this->jsonHelper->jsonDecode($fields);
+            return is_array($decoded) ? $decoded : [];
+        } catch (\Exception $e) {
+            $this->_logger->warning('Invalid fastcheckout required payment fields', ['exception' => $e]);
+            return [];
+        }
+    }
+
+    public function getRequiredShippingFields(): array
+    {
+        $fields = $this->scopeConfig->getValue(self::XML_PATH_REQUIRED_SHIPPING_FIELDS, ScopeInterface::SCOPE_STORE);
+        if (empty($fields)) {
+            return [];
+        }
+
+        try {
+            $decoded = $this->jsonHelper->jsonDecode($fields);
+            return is_array($decoded) ? $decoded : [];
+        } catch (\Exception $e) {
+            $this->_logger->warning('Invalid fastcheckout required shipping fields', ['exception' => $e]);
+            return [];
+        }
+    }
+
+    public function getRequiredShippingFieldsForMethod($shippingMethod): array
+    {
+        $shippingMethod = (string)$shippingMethod;
+        if ($shippingMethod === '') {
+            return [];
+        }
+
+        $fieldRules = $this->getRequiredShippingFields();
+        if ($fieldRules === []) {
+            return [];
+        }
+
+        $fieldPaths = [];
+        foreach ($fieldRules as $shippingMethodRule => $paths) {
+            if (!is_array($paths) || !$this->shippingMappingRuleMatches((string)$shippingMethodRule, $shippingMethod)) {
+                continue;
+            }
+
+            foreach ($paths as $path) {
+                $path = trim((string)$path);
+                if ($path !== '') {
+                    $fieldPaths[] = $path;
+                }
+            }
+        }
+
+        return array_values(array_unique($fieldPaths));
     }
 
     public function isRestrictPaymentEnable()

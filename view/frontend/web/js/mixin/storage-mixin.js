@@ -747,6 +747,41 @@ define([
             });
     }
 
+    function syncBridgeFormDataToWire(wire, endpoint) {
+        var sequence = Promise.resolve();
+
+        if (!wire) {
+            return sequence;
+        }
+
+        if (
+            (endpoint === 'shippingInformation' || endpoint === 'estimateShippingMethods' || endpoint === 'placeOrder') &&
+            window.fastcheckoutHyvaShipping &&
+            typeof window.fastcheckoutHyvaShipping.syncDomAttributes === 'function'
+        ) {
+            sequence = sequence.then(function () {
+                return window.fastcheckoutHyvaShipping.syncDomAttributes(wire);
+            });
+        }
+
+        if (
+            (endpoint === 'setPaymentInformation' || endpoint === 'placeOrder') &&
+            window.fastcheckoutHyvaPayment &&
+            typeof window.fastcheckoutHyvaPayment.syncActiveFormData === 'function'
+        ) {
+            sequence = sequence.then(function () {
+                return window.fastcheckoutHyvaPayment.syncActiveFormData(wire);
+            });
+        }
+
+        return sequence.catch(function (error) {
+            if (window.console && typeof window.console.warn === 'function') {
+                window.console.warn('Kkkonrad Fastcheckout: form data bridge sync failed.', error);
+            }
+            return true;
+        });
+    }
+
     function syncPayloadToWire(wire, endpoint, data, headers) {
         var payload = parsePayload(data),
             sequence = Promise.resolve(),
@@ -921,6 +956,10 @@ define([
                     return syncPaymentToWire(wire, getPayloadPaymentMethod(payload));
                 });
         }
+
+        sequence = sequence.then(function () {
+            return syncBridgeFormDataToWire(wire, endpoint);
+        });
 
         if (headers || Object.keys(payload).length) {
             sequence = sequence

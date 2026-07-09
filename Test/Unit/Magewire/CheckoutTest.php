@@ -662,6 +662,55 @@ class CheckoutTest extends TestCase
         $this->checkoutComponent->selectPaymentMethod('checkmo');
     }
 
+    public function testSelectPaymentMethodAcceptsRendererPayloadWhenSelectedMethodHintMatches(): void
+    {
+        $this->quoteMock->expects($this->any())
+            ->method('getId')
+            ->willReturn(42);
+
+        $this->paymentMethodManagementMock->expects($this->once())
+            ->method('getList')
+            ->with(42)
+            ->willReturn([$this->createPaymentMethodMock('checkmo')]);
+
+        $paymentMock = $this->getMockBuilder(\Magento\Quote\Model\Quote\Payment::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['importData'])
+            ->getMock();
+
+        $this->quoteMock->expects($this->once())
+            ->method('getPayment')
+            ->willReturn($paymentMock);
+
+        $this->checkoutComponent->placeOrderRequestData = [
+            'paymentMethod' => [
+                'method' => 'external_renderer_backend_code',
+                'fastcheckout_selected_method' => 'checkmo',
+                'additional_data' => [
+                    'fastcheckout_selected_method' => 'checkmo',
+                    'selected_variant' => 'wallet',
+                ],
+            ],
+        ];
+
+        $paymentMock->expects($this->once())
+            ->method('importData')
+            ->with($this->callback(static function (array $data): bool {
+                return $data['method'] === 'checkmo'
+                    && $data['additional_data']['selected_variant'] === 'wallet'
+                    && !array_key_exists('fastcheckout_selected_method', $data)
+                    && !array_key_exists('fastcheckoutSelectedMethod', $data)
+                    && !array_key_exists('fastcheckout_selected_method', $data['additional_data']);
+            }));
+
+        $this->quoteMock->expects($this->once())->method('collectTotals');
+        $this->cartRepositoryMock->expects($this->once())
+            ->method('save')
+            ->with($this->quoteMock);
+
+        $this->checkoutComponent->selectPaymentMethod('checkmo');
+    }
+
     public function testSelectPaymentMethodRejectsVariantWhenOnlyBaseMethodIsAvailable(): void
     {
         $this->checkoutComponent->shippingMethod = 'customcarrier_pickup';
@@ -1395,6 +1444,254 @@ class CheckoutTest extends TestCase
         $this->assertSame('purchaseorder', $response['payment_method']);
     }
 
+    public function testPlaceOrderStopsWhenConfiguredRequiredPaymentFieldIsMissing(): void
+    {
+        $this->helperMock->method('getRequiredPaymentFields')
+            ->willReturn(['custom_gateway' => ['additional_data.transaction_id']]);
+
+        $this->checkoutComponent->email = 'guest@example.com';
+        $this->checkoutComponent->paymentMethod = 'custom_gateway';
+        $this->checkoutComponent->shippingMethod = 'flatrate_flatrate';
+        $this->checkoutComponent->placeOrderRequestData = [
+            'paymentMethod' => [
+                'method' => 'custom_gateway',
+                'additional_data' => [],
+            ],
+        ];
+
+        $this->quoteMock->expects($this->once())
+            ->method('hasItems')
+            ->willReturn(true);
+        $this->checkoutComponent->billingSameAsShipping = false;
+
+        $this->quoteMock->expects($this->once())
+            ->method('getCustomerId')
+            ->willReturn(null);
+
+        $this->quoteMock->expects($this->once())
+            ->method('setCustomerEmail')
+            ->with('guest@example.com');
+
+        $this->quoteMock->expects($this->once())
+            ->method('setCheckoutMethod')
+            ->with(\Magento\Checkout\Model\Type\Onepage::METHOD_GUEST);
+
+        $shippingAddressMock = $this->createAddressMock();
+        $billingAddressMock = $this->createAddressMock();
+
+        $this->quoteMock->expects($this->any())
+            ->method('getShippingAddress')
+            ->willReturn($shippingAddressMock);
+
+        $this->quoteMock->expects($this->any())
+            ->method('getBillingAddress')
+            ->willReturn($billingAddressMock);
+
+        $shippingAddressMock->expects($this->once())->method('setShouldIgnoreValidation')->with(false);
+        $billingAddressMock->expects($this->once())->method('setShouldIgnoreValidation')->with(false);
+
+        $this->quoteMock->expects($this->once())
+            ->method('isVirtual')
+            ->willReturn(false);
+
+        $this->quoteMock->expects($this->any())
+            ->method('getId')
+            ->willReturn(42);
+
+        $this->paymentMethodManagementMock->expects($this->once())
+            ->method('getList')
+            ->with(42)
+            ->willReturn([$this->createPaymentMethodMock('custom_gateway')]);
+
+        $this->cartManagementMock->expects($this->never())
+            ->method('placeOrder');
+
+        $response = $this->checkoutComponent->placeOrder();
+
+        $this->assertFalse($response['success']);
+        $this->assertSame('Please complete the required payment fields.', $this->checkoutComponent->orderError);
+    }
+
+    public function testRequiredPaymentFieldValidationReadsAdditionalDataPath(): void
+    {
+        $this->helperMock->method('getRequiredPaymentFields')
+            ->willReturn(['custom_gateway' => ['additional_data.transaction_id']]);
+
+        $this->checkoutComponent->paymentMethod = 'custom_gateway';
+        $this->checkoutComponent->placeOrderRequestData = [
+            'paymentMethod' => [
+                'method' => 'custom_gateway',
+                'additionalData' => [
+                    'transaction_id' => 'TX-123',
+                ],
+            ],
+        ];
+
+        $this->quoteMock->expects($this->any())
+            ->method('getId')
+            ->willReturn(42);
+
+        $this->paymentMethodManagementMock->expects($this->once())
+            ->method('getList')
+            ->with(42)
+            ->willReturn([$this->createPaymentMethodMock('custom_gateway')]);
+
+        $method = new \ReflectionMethod($this->checkoutComponent, 'getMissingRequiredPaymentFields');
+        $method->setAccessible(true);
+
+        $this->assertSame([], $method->invoke($this->checkoutComponent, 'custom_gateway'));
+    }
+
+    public function testPlaceOrderStopsWhenConfiguredRequiredShippingFieldIsMissing(): void
+    {
+        $this->helperMock->method('getRequiredShippingFieldsForMethod')
+            ->with('customcarrier_pickup')
+            ->willReturn(['custom_attributes.pickup_location_code']);
+
+        $this->checkoutComponent->email = 'guest@example.com';
+        $this->checkoutComponent->paymentMethod = 'checkmo';
+        $this->checkoutComponent->shippingMethod = 'customcarrier_pickup';
+
+        $this->quoteMock->expects($this->once())
+            ->method('hasItems')
+            ->willReturn(true);
+        $this->checkoutComponent->billingSameAsShipping = false;
+
+        $this->quoteMock->expects($this->once())
+            ->method('getCustomerId')
+            ->willReturn(null);
+
+        $this->quoteMock->expects($this->once())
+            ->method('setCustomerEmail')
+            ->with('guest@example.com');
+
+        $this->quoteMock->expects($this->once())
+            ->method('setCheckoutMethod')
+            ->with(\Magento\Checkout\Model\Type\Onepage::METHOD_GUEST);
+
+        $shippingAddressMock = $this->createAddressMock();
+        $billingAddressMock = $this->createAddressMock();
+
+        $this->quoteMock->expects($this->any())
+            ->method('getShippingAddress')
+            ->willReturn($shippingAddressMock);
+
+        $this->quoteMock->expects($this->any())
+            ->method('getBillingAddress')
+            ->willReturn($billingAddressMock);
+
+        $shippingAddressMock->expects($this->once())->method('setShouldIgnoreValidation')->with(false);
+        $billingAddressMock->expects($this->once())->method('setShouldIgnoreValidation')->with(false);
+
+        $this->quoteMock->expects($this->once())
+            ->method('isVirtual')
+            ->willReturn(false);
+
+        $this->quoteMock->expects($this->any())
+            ->method('getId')
+            ->willReturn(42);
+
+        $this->paymentMethodManagementMock->expects($this->never())
+            ->method('getList');
+
+        $this->cartManagementMock->expects($this->never())
+            ->method('placeOrder');
+
+        $response = $this->checkoutComponent->placeOrder();
+
+        $this->assertFalse($response['success']);
+        $this->assertSame('Please complete the required shipping fields.', $this->checkoutComponent->orderError);
+    }
+
+    public function testRequiredShippingFieldValidationReadsCustomAndExtensionAttributePaths(): void
+    {
+        $this->helperMock->method('getRequiredShippingFieldsForMethod')
+            ->with('customcarrier_pickup')
+            ->willReturn([
+                'custom_attributes.pickup_location_code',
+                'extension_attributes.locker_id',
+            ]);
+
+        $this->checkoutComponent->shippingMethod = 'customcarrier_pickup';
+        $this->checkoutComponent->placeOrderRequestData = [
+            'addressInformation' => [
+                'shippingAddress' => [
+                    'customAttributes' => [
+                        [
+                            'attribute_code' => 'pickup_location_code',
+                            'value' => 'POP-42',
+                        ],
+                    ],
+                    'extensionAttributes' => [
+                        'locker_id' => 'LOCKER-42',
+                    ],
+                ],
+            ],
+        ];
+
+        $method = new \ReflectionMethod($this->checkoutComponent, 'getMissingRequiredShippingFields');
+        $method->setAccessible(true);
+
+        $this->assertSame([], $method->invoke($this->checkoutComponent, 'customcarrier_pickup'));
+    }
+
+    public function testRequiredShippingFieldValidationMapsInStorePickupLocationCodeAlias(): void
+    {
+        $this->helperMock->method('getRequiredShippingFieldsForMethod')
+            ->with('instore_pickup')
+            ->willReturn(['extension_attributes.pickup_location_code']);
+
+        $this->checkoutComponent->shippingMethod = 'instore_pickup';
+        $this->checkoutComponent->placeOrderRequestData = [
+            'addressInformation' => [
+                'shippingAddress' => [
+                    'selectedPickupAddress' => [
+                        'extension_attributes' => [
+                            'pickup_location_code' => 'eu-1',
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $method = new \ReflectionMethod($this->checkoutComponent, 'getMissingRequiredShippingFields');
+        $method->setAccessible(true);
+
+        $this->assertSame([], $method->invoke($this->checkoutComponent, 'instore_pickup'));
+    }
+
+    public function testRequiredFieldDiagnosticsExposeKeysWithoutValues(): void
+    {
+        $method = new \ReflectionMethod($this->checkoutComponent, 'buildRequiredFieldDiagnostics');
+        $method->setAccessible(true);
+
+        $diagnostics = $method->invoke(
+            $this->checkoutComponent,
+            [
+                'method' => 'custom_gateway',
+                'additional_data' => [
+                    'transaction_id' => 'secret-transaction-value',
+                    'nested' => [
+                        'token' => 'secret-token-value',
+                    ],
+                ],
+                'extension_attributes' => [
+                    'agreement_ids' => ['1'],
+                ],
+            ],
+            ['additional_data.customer_id'],
+            ['additional_data', 'extension_attributes']
+        );
+
+        $encodedDiagnostics = json_encode($diagnostics);
+
+        $this->assertContains('transaction_id', $diagnostics['available_container_keys']['additional_data']);
+        $this->assertContains('nested.token', $diagnostics['available_container_keys']['additional_data']);
+        $this->assertContains('agreement_ids', $diagnostics['available_container_keys']['extension_attributes']);
+        $this->assertStringNotContainsString('secret-transaction-value', $encodedDiagnostics);
+        $this->assertStringNotContainsString('secret-token-value', $encodedDiagnostics);
+    }
+
     public function testPlaceOrderStopsWhenCheckoutAgreementsAreInvalid(): void
     {
         $loggerMock = $this->createMock(\Psr\Log\LoggerInterface::class);
@@ -1913,6 +2210,53 @@ class CheckoutTest extends TestCase
         $this->assertArrayNotHasKey('extensionAttributes', $result);
     }
 
+    public function testNormalizePaymentAdditionalAliasesKeepsCommonGatewayKeyVariants(): void
+    {
+        $method = new \ReflectionMethod($this->checkoutComponent, 'normalizePaymentAdditionalAliases');
+        $method->setAccessible(true);
+
+        $result = $method->invoke($this->checkoutComponent, [
+            'blikCode' => '123456',
+            'regulationAccept' => true,
+            'methodId' => '154',
+            'channel_id' => '64',
+            'saveAlias' => true,
+            'savedId' => 'card-42',
+            'card_short_code' => '1111',
+            'cardData' => 'encrypted-card-payload',
+            'cardSave' => true,
+            'cardVendor' => 'VI',
+            'session_id' => 'SESSION-1',
+            'ref_id' => 'REF-1',
+            'card_type' => 'visa',
+            'card_date' => '12/30',
+            'card_mask' => '411111******1111',
+        ]);
+
+        $this->assertSame('123456', $result['blikCode']);
+        $this->assertSame('123456', $result['blik_code']);
+        $this->assertTrue($result['regulationAccept']);
+        $this->assertTrue($result['regulation_accept']);
+        $this->assertSame('154', $result['method']);
+        $this->assertSame('154', $result['methodId']);
+        $this->assertSame('64', $result['channel']);
+        $this->assertSame('64', $result['channelId']);
+        $this->assertTrue($result['blik_alias']);
+        $this->assertTrue($result['saveAlias']);
+        $this->assertSame('card-42', $result['card_id']);
+        $this->assertSame('card-42', $result['savedId']);
+        $this->assertSame('1111', $result['short_code']);
+        $this->assertSame('1111', $result['card_short_code']);
+        $this->assertSame('encrypted-card-payload', $result['card_data']);
+        $this->assertTrue($result['card_save']);
+        $this->assertSame('VI', $result['card_vendor']);
+        $this->assertSame('SESSION-1', $result['sessionId']);
+        $this->assertSame('REF-1', $result['refId']);
+        $this->assertSame('visa', $result['cardType']);
+        $this->assertSame('12/30', $result['cardDate']);
+        $this->assertSame('411111******1111', $result['cardMask']);
+    }
+
     public function testApplyAddressAttributesPersistsCustomAndExtensionData(): void
     {
         $address = new class {
@@ -2018,6 +2362,79 @@ class CheckoutTest extends TestCase
         $this->assertSame('leave at reception', $address->data['delivery_comment']);
         $this->assertSame('KRA01A', $address->extensionAttributes->lockerId);
         $this->assertSame('leave at reception', $address->extensionAttributes->deliveryComment);
+    }
+
+    public function testApplyQuoteInpostLockerIdPersistsSmartmageCartAttribute(): void
+    {
+        $quote = new class {
+            public $data = [];
+            public $extensionAttributes;
+
+            public function __construct()
+            {
+                $this->extensionAttributes = new class {
+                    public $inpostLockerId = null;
+
+                    public function setInpostLockerId($value): void
+                    {
+                        $this->inpostLockerId = $value;
+                    }
+                };
+            }
+
+            public function setData($code, $value): void
+            {
+                $this->data[$code] = $value;
+            }
+
+            public function getExtensionAttributes()
+            {
+                return $this->extensionAttributes;
+            }
+
+            public function setExtensionAttributes($extensionAttributes): void
+            {
+                $this->extensionAttributes = $extensionAttributes;
+            }
+        };
+
+        $this->checkoutComponent->shippingMethod = 'inpostlocker_standard';
+        $this->checkoutComponent->shippingExtensionAttributes = [
+            'point' => [
+                'name' => 'KRA01A',
+                'type' => 'parcel_locker',
+            ],
+        ];
+
+        $method = new \ReflectionMethod($this->checkoutComponent, 'applyQuoteInpostLockerId');
+        $method->setAccessible(true);
+        $method->invoke($this->checkoutComponent, $quote);
+
+        $this->assertSame('KRA01A', $quote->data['inpost_locker_id']);
+        $this->assertSame('KRA01A', $quote->extensionAttributes->inpostLockerId);
+    }
+
+    public function testApplyQuoteInpostLockerIdIgnoresNonInpostShippingMethod(): void
+    {
+        $quote = new class {
+            public $data = [];
+
+            public function setData($code, $value): void
+            {
+                $this->data[$code] = $value;
+            }
+        };
+
+        $this->checkoutComponent->shippingMethod = 'flatrate_flatrate';
+        $this->checkoutComponent->shippingExtensionAttributes = [
+            'inpost_locker_id' => 'KRA01A',
+        ];
+
+        $method = new \ReflectionMethod($this->checkoutComponent, 'applyQuoteInpostLockerId');
+        $method->setAccessible(true);
+        $method->invoke($this->checkoutComponent, $quote);
+
+        $this->assertArrayNotHasKey('inpost_locker_id', $quote->data);
     }
 
     public function testRawPlaceOrderAddressAttributesAreMergedWithMagewireAddressAttributes(): void

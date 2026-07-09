@@ -112,6 +112,98 @@ class JsonTest extends TestCase
         $backend->beforeSave();
     }
 
+    public function testBeforeSaveAcceptsRequiredPaymentFields(): void
+    {
+        $backend = $this->createBackend(
+            ConfigPaths::XML_PATH_REQUIRED_PAYMENT_FIELDS,
+            '{"purchaseorder":["po_number"],"custom_gateway":["additional_data.transaction_id"]}'
+        );
+
+        $this->assertSame($backend, $backend->beforeSave());
+        $this->assertSame(
+            '{"purchaseorder":["po_number"],"custom_gateway":["additional_data.transaction_id"]}',
+            $backend->getValue()
+        );
+    }
+
+    public function testBeforeSaveNormalizesRequiredPaymentFieldKeysAndPaths(): void
+    {
+        $backend = $this->createBackend(
+            ConfigPaths::XML_PATH_REQUIRED_PAYMENT_FIELDS,
+            '{" custom_gateway ":[" additional_data.transaction_id "]}'
+        );
+
+        $backend->beforeSave();
+
+        $this->assertSame('{"custom_gateway":["additional_data.transaction_id"]}', $backend->getValue());
+    }
+
+    public function testBeforeSaveRejectsWildcardRequiredPaymentMethod(): void
+    {
+        $backend = $this->createBackend(
+            ConfigPaths::XML_PATH_REQUIRED_PAYMENT_FIELDS,
+            '{"payu_*":["additional_data.transaction_id"]}'
+        );
+
+        $this->expectException(LocalizedException::class);
+        $this->expectExceptionMessage('Payment methods must use exact method codes.');
+
+        $backend->beforeSave();
+    }
+
+    public function testBeforeSaveRejectsInvalidRequiredPaymentFieldPath(): void
+    {
+        $backend = $this->createBackend(
+            ConfigPaths::XML_PATH_REQUIRED_PAYMENT_FIELDS,
+            '{"custom_gateway":["additional_data.*"]}'
+        );
+
+        $this->expectException(LocalizedException::class);
+        $this->expectExceptionMessage('Required field paths must be exact field paths.');
+
+        $backend->beforeSave();
+    }
+
+    public function testBeforeSaveAcceptsRequiredShippingFieldsWithShippingWildcard(): void
+    {
+        $backend = $this->createBackend(
+            ConfigPaths::XML_PATH_REQUIRED_SHIPPING_FIELDS,
+            '{"customcarrier_*":["custom_attributes.pickup_location_code"],"*":["extension_attributes.delivery_note"]}'
+        );
+
+        $this->assertSame($backend, $backend->beforeSave());
+        $this->assertSame(
+            '{"customcarrier_*":["custom_attributes.pickup_location_code"],"*":["extension_attributes.delivery_note"]}',
+            $backend->getValue()
+        );
+    }
+
+    public function testBeforeSaveRejectsInvalidRequiredShippingWildcardPlacement(): void
+    {
+        $backend = $this->createBackend(
+            ConfigPaths::XML_PATH_REQUIRED_SHIPPING_FIELDS,
+            '{"custom*carrier":["custom_attributes.pickup_location_code"]}'
+        );
+
+        $this->expectException(LocalizedException::class);
+        $this->expectExceptionMessage('Shipping method wildcards are supported only at the end of a rule.');
+
+        $backend->beforeSave();
+    }
+
+    public function testBeforeSaveRejectsInvalidRequiredShippingFieldPath(): void
+    {
+        $backend = $this->createBackend(
+            ConfigPaths::XML_PATH_REQUIRED_SHIPPING_FIELDS,
+            '{"customcarrier_*":["custom_attributes.*"]}'
+        );
+
+        $this->expectException(LocalizedException::class);
+        $this->expectExceptionMessage('Required field paths must be exact field paths.');
+
+        $backend->beforeSave();
+    }
+
     public function testBeforeSaveRejectsInvalidJson(): void
     {
         $backend = $this->createBackend(
