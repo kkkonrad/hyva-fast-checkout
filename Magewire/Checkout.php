@@ -1833,11 +1833,6 @@ class Checkout extends Component
 
     private function resolvePurchaseOrderNumber(string $methodCode): string
     {
-        $poNumber = trim((string)$this->poNumber);
-        if ($poNumber !== '') {
-            return $poNumber;
-        }
-
         $availableMethodCode = $this->resolveAvailablePaymentMethodCode($methodCode);
         $rawPaymentData = $this->getRawPaymentData(
             $availableMethodCode !== '' ? $availableMethodCode : $methodCode,
@@ -1845,19 +1840,22 @@ class Checkout extends Component
         );
 
         foreach ([
-            $rawPaymentData['po_number'] ?? null,
-            $rawPaymentData['poNumber'] ?? null,
-            $rawPaymentData['additional_data']['po_number'] ?? null,
-            $rawPaymentData['additionalData']['po_number'] ?? null,
-            $this->paymentAdditionalData['po_number'] ?? null,
-            $this->paymentAdditionalData['poNumber'] ?? null,
+            [$rawPaymentData, 'po_number'],
+            [$rawPaymentData, 'poNumber'],
+            [is_array($rawPaymentData['additional_data'] ?? null) ? $rawPaymentData['additional_data'] : [], 'po_number'],
+            [is_array($rawPaymentData['additional_data'] ?? null) ? $rawPaymentData['additional_data'] : [], 'poNumber'],
+            [is_array($rawPaymentData['additionalData'] ?? null) ? $rawPaymentData['additionalData'] : [], 'po_number'],
+            [is_array($rawPaymentData['additionalData'] ?? null) ? $rawPaymentData['additionalData'] : [], 'poNumber'],
+            [$this->paymentAdditionalData, 'po_number'],
+            [$this->paymentAdditionalData, 'poNumber'],
         ] as $candidate) {
-            if (is_scalar($candidate) && trim((string)$candidate) !== '') {
-                return trim((string)$candidate);
+            [$source, $key] = $candidate;
+            if (is_array($source) && array_key_exists($key, $source)) {
+                return is_scalar($source[$key]) ? trim((string)$source[$key]) : '';
             }
         }
 
-        return '';
+        return trim((string)$this->poNumber);
     }
 
     private function sanitizePaymentPayloadForImport(array $paymentData): array

@@ -1444,6 +1444,79 @@ class CheckoutTest extends TestCase
         $this->assertSame('purchaseorder', $response['payment_method']);
     }
 
+    public function testPlaceOrderWithPurchaseOrderTreatsExplicitEmptyPoNumberAsMissing(): void
+    {
+        $this->checkoutComponent->email = 'guest@example.com';
+        $this->checkoutComponent->paymentMethod = 'purchaseorder';
+        $this->checkoutComponent->shippingMethod = 'flatrate_flatrate';
+        $this->checkoutComponent->poNumber = 'OLD-PO';
+        $this->checkoutComponent->placeOrderRequestData = [
+            'paymentMethod' => [
+                'method' => 'purchaseorder',
+                'po_number' => '',
+                'additional_data' => [
+                    'po_number' => '',
+                ],
+            ],
+        ];
+
+        $this->quoteMock->expects($this->once())
+            ->method('hasItems')
+            ->willReturn(true);
+        $this->checkoutComponent->billingSameAsShipping = false;
+
+        $this->quoteMock->expects($this->once())
+            ->method('getCustomerId')
+            ->willReturn(null);
+
+        $this->quoteMock->expects($this->once())
+            ->method('setCustomerEmail')
+            ->with('guest@example.com');
+
+        $this->quoteMock->expects($this->once())
+            ->method('setCheckoutMethod')
+            ->with(\Magento\Checkout\Model\Type\Onepage::METHOD_GUEST);
+
+        $shippingAddressMock = $this->createAddressMock();
+        $billingAddressMock = $this->createAddressMock();
+
+        $this->quoteMock->expects($this->any())
+            ->method('getShippingAddress')
+            ->willReturn($shippingAddressMock);
+
+        $this->quoteMock->expects($this->any())
+            ->method('getBillingAddress')
+            ->willReturn($billingAddressMock);
+
+        $this->checkoutComponent->regionId = '';
+        $this->checkoutComponent->billingRegionId = '';
+
+        $shippingAddressMock->expects($this->once())->method('setShouldIgnoreValidation')->with(false);
+        $billingAddressMock->expects($this->once())->method('setShouldIgnoreValidation')->with(false);
+
+        $this->quoteMock->expects($this->once())
+            ->method('isVirtual')
+            ->willReturn(false);
+
+        $this->quoteMock->expects($this->any())
+            ->method('getId')
+            ->willReturn(42);
+
+        $this->paymentMethodManagementMock->expects($this->once())
+            ->method('getList')
+            ->with(42)
+            ->willReturn([$this->createPaymentMethodMock('purchaseorder')]);
+
+        $this->cartManagementMock->expects($this->never())
+            ->method('placeOrder');
+
+        $response = $this->checkoutComponent->placeOrder();
+
+        $this->assertFalse($response['success']);
+        $this->assertSame('', $this->checkoutComponent->poNumber);
+        $this->assertSame('Purchase Order Number is a required field.', $this->checkoutComponent->orderError);
+    }
+
     public function testPlaceOrderStopsWhenConfiguredRequiredPaymentFieldIsMissing(): void
     {
         $this->helperMock->method('getRequiredPaymentFields')
