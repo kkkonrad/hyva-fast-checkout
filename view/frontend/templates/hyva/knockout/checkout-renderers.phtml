@@ -1,0 +1,11 @@
+<?php
+/**
+ * Checkout renderer bootstrap template for the Knockout checkout bridge.
+ *
+ * @var \Kkkonrad\Fastcheckout\Block\Hyva\Checkout $block
+ */
+
+$checkoutBridgeTemplate = $block->getTemplateFile('Kkkonrad_Fastcheckout::hyva/knockout/checkout-bridge.phtml');
+if ($checkoutBridgeTemplate) {
+    include $checkoutBridgeTemplate;
+}

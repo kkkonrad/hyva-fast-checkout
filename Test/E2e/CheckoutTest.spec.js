@@ -1716,6 +1716,253 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
         expect(pageErrors, JSON.stringify(pageErrors, null, 2)).toEqual([]);
     });
 
+    test('should expose renderer map entries for installed payment integrations', async ({ page }) => {
+        const checkout = new CheckoutPage(page);
+        await checkout.goto();
+
+        await expect.poll(async () => page.evaluate(() => Boolean(
+            window.fastcheckoutHyvaPayment &&
+            typeof window.fastcheckoutHyvaPayment.getRendererMap === 'function'
+        )), {
+            timeout: 10000
+        }).toBe(true);
+
+        const result = await page.evaluate(() => {
+            const map = window.fastcheckoutHyvaPayment.getRendererMap();
+            const byMethod = {};
+
+            map.forEach((entry) => {
+                if (entry && entry.method) {
+                    byMethod[entry.method] = entry.component;
+                }
+            });
+
+            return {
+                count: map.length,
+                braintree: byMethod.braintree,
+                braintreePaypal: byMethod.braintree_paypal,
+                payu: byMethod.payu_gateway || null,
+                tpay: byMethod.Tpay_Magento2,
+                tpayGeneric: byMethod.generic,
+                przelewy24: byMethod.przelewy24 || null,
+                mollieCreditcard: byMethod.mollie_methods_creditcard
+            };
+        });
+
+        expect(result.count, JSON.stringify(result, null, 2)).toBeGreaterThan(0);
+        expect(result.braintree, JSON.stringify(result, null, 2)).toBe('PayPal_Braintree/js/view/payment/braintree');
+        expect(result.braintreePaypal, JSON.stringify(result, null, 2)).toBe('PayPal_Braintree/js/view/payment/braintree');
+        expect(result.tpay, JSON.stringify(result, null, 2)).toBe('Tpay_Magento2/js/view/payment/tpay-payments');
+        expect(result.tpayGeneric, JSON.stringify(result, null, 2)).toBe('Tpay_Magento2/js/view/payment/tpay-payments');
+        expect(result.mollieCreditcard, JSON.stringify(result, null, 2)).toBe('Mollie_Payment/js/view/payment/method-renderer');
+    });
+
+    test('should hide only standard native place-order actions', async ({ page }) => {
+        const checkout = new CheckoutPage(page);
+        await checkout.goto();
+
+        await expect.poll(async () => page.evaluate(() => Boolean(
+            window.fastcheckoutHyvaPayment &&
+            typeof window.fastcheckoutHyvaPayment.refreshNativePaymentActions === 'function'
+        )), {
+            timeout: 10000
+        }).toBe(true);
+
+        const result = await page.evaluate(() => {
+            const fixture = document.createElement('div');
+
+            fixture.id = 'fastcheckout-native-actions-fixture';
+            fixture.className = 'payment-method _active';
+            fixture.innerHTML = `
+                <div class="payment-method-content">
+                    <div class="actions-toolbar" data-role="standard-toolbar">
+                        <button class="action primary checkout" data-bind="click: placeOrder">Place Order</button>
+                    </div>
+                    <div class="actions-toolbar" data-role="custom-toolbar">
+                        <button class="action primary checkout" data-bind="click: payWithCard">Pay with card</button>
+                    </div>
+                    <div class="actions-toolbar" data-role="utility-toolbar">
+                        <button class="action primary" data-bind="click: showWidget">Use new card</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(fixture);
+
+            window.fastcheckoutHyvaPayment.refreshNativePaymentActions();
+
+            const standardToolbar = fixture.querySelector('[data-role="standard-toolbar"]');
+            const customToolbar = fixture.querySelector('[data-role="custom-toolbar"]');
+            const utilityToolbar = fixture.querySelector('[data-role="utility-toolbar"]');
+            const standardButton = standardToolbar.querySelector('button');
+            const customButton = customToolbar.querySelector('button');
+            const utilityButton = utilityToolbar.querySelector('button');
+
+            const state = {
+                standardButtonHidden: standardButton.classList.contains('fastcheckout-native-place-order-hidden'),
+                standardToolbarHidden: standardToolbar.classList.contains('fastcheckout-actions-toolbar-hidden'),
+                customButtonHidden: customButton.classList.contains('fastcheckout-native-place-order-hidden'),
+                customToolbarHidden: customToolbar.classList.contains('fastcheckout-actions-toolbar-hidden'),
+                utilityButtonHidden: utilityButton.classList.contains('fastcheckout-native-place-order-hidden'),
+                utilityToolbarHidden: utilityToolbar.classList.contains('fastcheckout-actions-toolbar-hidden')
+            };
+
+            fixture.remove();
+
+            return state;
+        });
+
+        expect(result, JSON.stringify(result, null, 2)).toMatchObject({
+            standardButtonHidden: true,
+            standardToolbarHidden: true,
+            customButtonHidden: false,
+            customToolbarHidden: false,
+            utilityButtonHidden: false,
+            utilityToolbarHidden: false
+        });
+    });
+
+    test('should delegate global submit to custom native renderer actions', async ({ page }) => {
+        const checkout = new CheckoutPage(page);
+        await checkout.goto();
+
+        await expect.poll(async () => page.evaluate(() => Boolean(
+            window.fastcheckoutHyvaPayment &&
+            typeof window.fastcheckoutHyvaPayment.placeOrder === 'function' &&
+            typeof window.require === 'function'
+        )), {
+            timeout: 10000
+        }).toBe(true);
+
+        const result = await page.evaluate(() => new Promise((resolve) => {
+            window.require(['uiRegistry'], (registry) => {
+                const method = 'fastcheckout_test_custom_action';
+                const calls = [];
+                const fixture = document.createElement('div');
+                const originalValidate = window.fastcheckoutHyvaPayment.validate;
+                const wire = {
+                    data: {
+                        paymentMethod: method,
+                        shippingMethod: 'flatrate_flatrate'
+                    },
+                    get(name) {
+                        return this.data[name] || '';
+                    },
+                    set(name, value) {
+                        calls.push({ type: 'wire.set', name, value });
+                        this.data[name] = value;
+                        return Promise.resolve(true);
+                    },
+                    call(name, value) {
+                        calls.push({ type: 'wire.call', name, value });
+                        return Promise.resolve({ success: true });
+                    }
+                };
+                const component = {
+                    item: { method, title: 'Custom Action' },
+                    messageContainer: {
+                        addErrorMessage(message) {
+                            calls.push({ type: 'message', message });
+                        }
+                    },
+                    getCode() {
+                        return method;
+                    },
+                    getData() {
+                        calls.push({ type: 'getData' });
+                        return {
+                            method,
+                            additional_data: {
+                                marker: 'native'
+                            }
+                        };
+                    },
+                    validate() {
+                        calls.push({ type: 'validate' });
+                        return true;
+                    },
+                    isPlaceOrderActionAllowed() {
+                        return true;
+                    },
+                    customSubmitAction() {
+                        calls.push({ type: 'customSubmitAction' });
+                        return this.placeOrder();
+                    },
+                    placeOrder() {
+                        calls.push({ type: 'component.placeOrder' });
+                        return window.fastcheckoutHyvaPayment.onPlaceOrderAction(
+                            this.getData(),
+                            this.messageContainer,
+                            (paymentData) => {
+                                calls.push({ type: 'originalPlaceOrderAction', paymentData });
+                                return Promise.resolve({ success: true });
+                            }
+                        );
+                    }
+                };
+
+                fixture.id = 'fastcheckout-custom-native-action-fixture';
+                fixture.innerHTML = `
+                    <div class="payment-method _active" data-fastcheckout-active="true">
+                        <div class="payment-method-title">
+                            <input type="radio" name="payment_method" value="${method}" checked>
+                        </div>
+                        <div class="payment-method-content">
+                            <div class="actions-toolbar">
+                                <button class="action primary checkout" data-bind="click: customSubmitAction">Pay</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                document.querySelectorAll('input[name="payment_method"]:checked').forEach((input) => {
+                    input.checked = false;
+                });
+                document.body.appendChild(fixture);
+                registry.set('fastcheckout.test.customActionRenderer', component);
+                window.fastcheckoutHyvaPayment.validate = () => true;
+                window.fastcheckoutHyvaPayment.refreshNativePaymentActions();
+                const initialNativeSubmitActionName = window.fastcheckoutHyvaPayment.getActiveNativeSubmitActionName();
+
+                window.fastcheckoutHyvaPayment.placeOrder(wire, method)
+                    .then(() => {
+                        const nativeSubmitActionName = window.fastcheckoutHyvaPayment.getActiveNativeSubmitActionName();
+                        window.fastcheckoutHyvaPayment.validate = originalValidate;
+                        fixture.remove();
+                        resolve({
+                            calls,
+                            customIndex: calls.findIndex((call) => call.type === 'customSubmitAction'),
+                            placeOrderIndex: calls.findIndex((call) => call.type === 'component.placeOrder'),
+                            originalActionIndex: calls.findIndex((call) => call.type === 'originalPlaceOrderAction'),
+                            initialNativeSubmitActionName,
+                            nativeSubmitActionName,
+                            syncedAdditionalData: wire.data.paymentAdditionalData
+                        });
+                    })
+                    .catch((error) => {
+                        window.fastcheckoutHyvaPayment.validate = originalValidate;
+                        fixture.remove();
+                        resolve({
+                            error: error && (error.message || String(error)),
+                            calls
+                        });
+                    });
+            }, (error) => {
+                resolve({
+                    requireError: error && (error.requireModules || error.message || String(error))
+                });
+            });
+        }));
+
+        expect(result.requireError, JSON.stringify(result, null, 2)).toBeFalsy();
+        expect(result.error, JSON.stringify(result, null, 2)).toBeFalsy();
+        expect(result.initialNativeSubmitActionName, JSON.stringify(result, null, 2)).toBe('customSubmitAction');
+        expect(result.customIndex, JSON.stringify(result, null, 2)).toBeGreaterThanOrEqual(0);
+        expect(result.placeOrderIndex, JSON.stringify(result, null, 2)).toBeGreaterThan(result.customIndex);
+        expect(result.originalActionIndex, JSON.stringify(result, null, 2)).toBeGreaterThan(result.placeOrderIndex);
+        expect(result.syncedAdditionalData, JSON.stringify(result, null, 2)).toMatchObject({
+            marker: 'native'
+        });
+    });
+
     test('should expose standard payment before-place-order region children', async ({ page }) => {
         const pageErrors = [];
 
@@ -1725,6 +1972,18 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
 
         const checkout = new CheckoutPage(page);
         await checkout.goto();
+
+        await expect.poll(async () => page.evaluate(() => new Promise((resolve) => {
+            window.require(['uiRegistry'], (registry) => {
+                try {
+                    resolve(Boolean(registry.get('checkout.steps.store-pickup')));
+                } catch (error) {
+                    resolve(false);
+                }
+            }, () => resolve(false));
+        })), {
+            timeout: 10000
+        }).toBe(true);
 
         const result = await page.evaluate(() => new Promise((resolve) => {
             window.require(['uiRegistry'], (registry) => {
@@ -1923,6 +2182,56 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
         expect(result.beforeFormLength, JSON.stringify(result, null, 2)).toBeGreaterThan(0);
         expect(result.beforeFieldsLength, JSON.stringify(result, null, 2)).toBeGreaterThan(0);
         expect(result.additionalAddressesLength, JSON.stringify(result, null, 2)).toBeGreaterThan(0);
+        expect(pageErrors, JSON.stringify(pageErrors, null, 2)).toEqual([]);
+    });
+
+    test('should initialize native checkout step children such as store pickup', async ({ page }) => {
+        const pageErrors = [];
+
+        page.on('pageerror', (error) => {
+            pageErrors.push(error.message);
+        });
+
+        const checkout = new CheckoutPage(page);
+        await checkout.goto();
+
+        const result = await page.evaluate(() => new Promise((resolve) => {
+            window.require(['uiRegistry'], (registry) => {
+                const getRegistryItem = (name) => {
+                    try {
+                        return registry.get(name);
+                    } catch (error) {
+                        return null;
+                    }
+                };
+
+                const storePickup = getRegistryItem('checkout.steps.store-pickup');
+                const storeSelector = getRegistryItem('checkout.steps.store-pickup.store-selector');
+
+                resolve({
+                    storePickup: Boolean(storePickup),
+                    storePickupName: storePickup && storePickup.name,
+                    storeSelector: Boolean(storeSelector),
+                    storeSelectorName: storeSelector && storeSelector.name,
+                    hasSelectStorePickup: Boolean(storePickup && typeof storePickup.selectStorePickup === 'function'),
+                    hasSelectShipping: Boolean(storePickup && typeof storePickup.selectShipping === 'function')
+                });
+            }, (error) => {
+                resolve({
+                    requireError: error && (error.requireModules || error.message || String(error))
+                });
+            });
+        }));
+
+        expect(result.requireError).toBeFalsy();
+        expect(result, JSON.stringify(result, null, 2)).toMatchObject({
+            storePickup: true,
+            storePickupName: 'checkout.steps.store-pickup',
+            storeSelector: true,
+            storeSelectorName: 'checkout.steps.store-pickup.store-selector',
+            hasSelectStorePickup: true,
+            hasSelectShipping: true
+        });
         expect(pageErrors, JSON.stringify(pageErrors, null, 2)).toEqual([]);
     });
 
@@ -2246,6 +2555,31 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
             'afterPlaceOrder'
         ]);
         expect(result.url).toContain('/fast-checkout/');
+    });
+
+    test('should honor native redirect-on-success redirectUrl set by payment renderer', async ({ page }) => {
+        const checkout = new CheckoutPage(page);
+        await checkout.goto();
+
+        await expect.poll(async () => page.evaluate(() => Boolean(
+            window.fastcheckoutHyvaPayment &&
+            typeof window.require === 'function'
+        )), {
+            timeout: 10000
+        }).toBe(true);
+
+        await page.evaluate(() => new Promise((resolve) => {
+            window.require([
+                'Magento_Checkout/js/action/redirect-on-success'
+            ], (redirectOnSuccessAction) => {
+                redirectOnSuccessAction.redirectUrl = 'fastcheckout/e2e-payment-redirect-sentinel';
+                window.fastcheckoutKoSuccessRedirectInProgress = true;
+                window.fastcheckoutHyvaPayment.afterPlaceOrder();
+                resolve(true);
+            });
+        }));
+
+        await expect(page).toHaveURL(/fastcheckout\/e2e-payment-redirect-sentinel/);
     });
 
     test('should route standard Magento KO place-order action through Fastcheckout bridge', async ({ page }) => {

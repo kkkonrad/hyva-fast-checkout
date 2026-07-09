@@ -19,6 +19,7 @@ $paymentListChildren = $block->getPaymentListChildren();
 $paymentRegionChildren = $block->getPaymentRegionChildren();
 $shippingListChildren = $block->getShippingListChildren();
 $shippingAddressChildren = $block->getShippingAddressChildren();
+$checkoutStepChildren = $block->getCheckoutStepChildren();
 $layoutScripts = $block->getCheckoutLayoutScripts();
 
 if (
@@ -30,6 +31,7 @@ if (
     empty($paymentRegionChildren) &&
     empty($shippingListChildren) &&
     empty($shippingAddressChildren) &&
+    empty($checkoutStepChildren) &&
     empty($layoutScripts['modules']) &&
     empty($layoutScripts['external'])
 ) {
@@ -47,6 +49,7 @@ $mageInitConfig = [
     'paymentRegionChildren' => $paymentRegionChildren,
     'shippingListChildren' => $shippingListChildren,
     'shippingAddressChildren' => $shippingAddressChildren,
+    'checkoutStepChildren' => $checkoutStepChildren,
     'layoutScripts' => $layoutScripts['modules'] ?? [],
     'scope' => 'fastcheckoutHyvaPaymentRenderers'
 ];
@@ -54,11 +57,11 @@ $block->ensureRequireJsAssets();
 ?>
 <style>
     .fastcheckout-ko-payment-root .payment-method-title,
-    .fastcheckout-ko-payment-root .actions-toolbar,
     .fastcheckout-ko-payment-root .payment-method-billing-address,
     .fastcheckout-payment-method-ko-container .payment-method-title,
-    .fastcheckout-payment-method-ko-container .actions-toolbar,
-    .fastcheckout-payment-method-ko-container .payment-method-billing-address {
+    .fastcheckout-payment-method-ko-container .payment-method-billing-address,
+    .fastcheckout-native-place-order-hidden,
+    .fastcheckout-actions-toolbar-hidden {
         display: none !important;
     }
     .required-captcha.checkbox {
@@ -341,6 +344,7 @@ foreach ($layoutScripts['external'] as $externalScript) {
     function initCheckoutBridge() {
         if (
             started ||
+            window.fastcheckoutKoCheckoutRenderersStarted ||
             window.fastcheckoutKoCheckoutBridgeStarted ||
             window.fastcheckoutKoPaymentRenderersStarted ||
             typeof window.require !== 'function'
@@ -351,13 +355,14 @@ foreach ($layoutScripts['external'] as $externalScript) {
         setupDomOverrides();
 
         started = true;
+        window.fastcheckoutKoCheckoutRenderersStarted = true;
         window.fastcheckoutKoCheckoutBridgeStarted = true;
         window.fastcheckoutKoPaymentRenderersStarted = true;
         window.require.config({
             baseUrl: staticBaseUrl
         });
 
-        window.require(['Kkkonrad_Fastcheckout/js/hyva/checkout-bridge'], function (init) {
+        window.require(['Kkkonrad_Fastcheckout/js/hyva/checkout-renderers'], function (init) {
             init(config);
         });
     }

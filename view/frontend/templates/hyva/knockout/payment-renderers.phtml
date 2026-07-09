@@ -1,11 +1,11 @@
 <?php
 /**
- * Backward-compatible template alias for the Knockout checkout bridge.
+ * Backward-compatible template alias for the checkout renderers.
  *
  * @var \Kkkonrad\Fastcheckout\Block\Hyva\Checkout $block
  */
 
-$checkoutBridgeTemplate = $block->getTemplateFile('Kkkonrad_Fastcheckout::hyva/knockout/checkout-bridge.phtml');
-if ($checkoutBridgeTemplate) {
-    include $checkoutBridgeTemplate;
+$checkoutRenderersTemplate = $block->getTemplateFile('Kkkonrad_Fastcheckout::hyva/knockout/checkout-renderers.phtml');
+if ($checkoutRenderersTemplate) {
+    include $checkoutRenderersTemplate;
 }

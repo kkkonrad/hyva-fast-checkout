@@ -53,6 +53,10 @@ define([
         }
 
         return {
+            getRendererMap: function () {
+                return rendererComponentMap.slice(0);
+            },
+
             getRendererComponentForMethod: getRendererComponentForMethod,
 
             isLoaded: function (component) {

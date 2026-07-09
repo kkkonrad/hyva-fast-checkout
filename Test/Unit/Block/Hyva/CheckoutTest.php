@@ -730,4 +730,100 @@ XML
             @rmdir($moduleDir);
         }
     }
+
+    public function testGetCheckoutStepChildrenKeepsAdditionalNativeSteps(): void
+    {
+        $moduleDir = sys_get_temp_dir() . '/fastcheckout-checkout-steps-' . uniqid('', true);
+        $layoutDir = $moduleDir . '/view/frontend/layout';
+        mkdir($layoutDir, 0777, true);
+        file_put_contents($layoutDir . '/checkout_index_index.xml', <<<'XML'
+<?xml version="1.0"?>
+<page>
+    <body>
+        <referenceBlock name="checkout.root">
+            <arguments>
+                <argument name="jsLayout" xsi:type="array" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                    <item name="components" xsi:type="array">
+                        <item name="checkout" xsi:type="array">
+                            <item name="children" xsi:type="array">
+                                <item name="steps" xsi:type="array">
+                                    <item name="children" xsi:type="array">
+                                        <item name="shipping-step" xsi:type="array">
+                                            <item name="component" xsi:type="string">uiComponent</item>
+                                        </item>
+                                        <item name="billing-step" xsi:type="array">
+                                            <item name="component" xsi:type="string">uiComponent</item>
+                                        </item>
+                                        <item name="store-pickup" xsi:type="array">
+                                            <item name="component" xsi:type="string">Magento_InventoryInStorePickupFrontend/js/view/store-pickup</item>
+                                            <item name="sortOrder" xsi:type="string">0</item>
+                                            <item name="deps" xsi:type="array">
+                                                <item name="0" xsi:type="string">checkout.steps.shipping-step.shippingAddress</item>
+                                            </item>
+                                            <item name="children" xsi:type="array">
+                                                <item name="store-selector" xsi:type="array">
+                                                    <item name="component" xsi:type="string">Magento_InventoryInStorePickupFrontend/js/view/store-selector</item>
+                                                    <item name="displayArea" xsi:type="string">store-selector</item>
+                                                </item>
+                                            </item>
+                                        </item>
+                                    </item>
+                                </item>
+                            </item>
+                        </item>
+                    </item>
+                </argument>
+            </arguments>
+        </referenceBlock>
+    </body>
+</page>
+XML
+        );
+
+        $contextMock = $this->createMock(Context::class);
+        $moduleListMock = $this->createMock(ModuleListInterface::class);
+        $moduleListMock->method('getNames')->willReturn(['Vendor_Module']);
+
+        $componentRegistrarMock = $this->createMock(ComponentRegistrarInterface::class);
+        $componentRegistrarMock->method('getPath')->willReturn($moduleDir);
+
+        $block = new Checkout(
+            $contextMock,
+            $this->checkoutSessionMock,
+            $this->pricingHelperMock,
+            $this->imageHelperMock,
+            $this->productConfigurationMock,
+            $this->viewModelRegistryMock,
+            $this->helperMock,
+            null,
+            $moduleListMock,
+            $componentRegistrarMock,
+            null,
+            []
+        );
+
+        try {
+            $this->assertSame([
+                'store-pickup' => [
+                    'component' => 'Magento_InventoryInStorePickupFrontend/js/view/store-pickup',
+                    'sortOrder' => '0',
+                    'deps' => [
+                        '0' => 'checkout.steps.shipping-step.shippingAddress'
+                    ],
+                    'children' => [
+                        'store-selector' => [
+                            'component' => 'Magento_InventoryInStorePickupFrontend/js/view/store-selector',
+                            'displayArea' => 'store-selector'
+                        ]
+                    ]
+                ]
+            ], $block->getCheckoutStepChildren());
+        } finally {
+            @unlink($layoutDir . '/checkout_index_index.xml');
+            @rmdir($layoutDir);
+            @rmdir($moduleDir . '/view/frontend');
+            @rmdir($moduleDir . '/view');
+            @rmdir($moduleDir);
+        }
+    }
 }

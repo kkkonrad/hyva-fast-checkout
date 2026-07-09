@@ -23,8 +23,9 @@ define([
     'Kkkonrad_Fastcheckout/js/hyva/customer-email-sync',
     'Kkkonrad_Fastcheckout/js/hyva/checkout-agreements-fallback',
     'Kkkonrad_Fastcheckout/js/hyva/shipping-method-sync',
-    'Kkkonrad_Fastcheckout/js/hyva/shipping-error-bridge'
-], function ($, createRendererManager, initShadowSelectorBridge, createCheckoutProviderBridge, createAddressAttributesBridge, formDataCollector, createPaymentMessageBridge, createPaymentValidationRegistry, createShippingCompatibilityBridge, checkoutCompatibility, createCheckoutDataPersistence, createCheckoutTotalsSync, createCheckoutLayoutBridge, createAddressDataBuilder, createCheckoutStateBridge, createPaymentDomBridge, createPlaceOrderHooksBridge, createShippingAttributesSync, createCheckoutComponentFallbacks, magewireUtils, createPaymentMethodSync, createCustomerEmailSync, checkoutAgreementsFallback, createShippingMethodSync, createShippingErrorBridge) {
+    'Kkkonrad_Fastcheckout/js/hyva/shipping-error-bridge',
+    'Kkkonrad_Fastcheckout/js/hyva/step-navigator-bridge'
+], function ($, createRendererManager, initShadowSelectorBridge, createCheckoutProviderBridge, createAddressAttributesBridge, formDataCollector, createPaymentMessageBridge, createPaymentValidationRegistry, createShippingCompatibilityBridge, checkoutCompatibility, createCheckoutDataPersistence, createCheckoutTotalsSync, createCheckoutLayoutBridge, createAddressDataBuilder, createCheckoutStateBridge, createPaymentDomBridge, createPlaceOrderHooksBridge, createShippingAttributesSync, createCheckoutComponentFallbacks, magewireUtils, createPaymentMethodSync, createCustomerEmailSync, checkoutAgreementsFallback, createShippingMethodSync, createShippingErrorBridge, createStepNavigatorBridge) {
     'use strict';
 
     return function (config) {
@@ -101,6 +102,7 @@ define([
             'Magento_Checkout/js/model/error-processor',
             'Magento_Checkout/js/model/full-screen-loader',
             'Magento_Checkout/js/model/payment/place-order-hooks',
+            'Magento_Checkout/js/model/step-navigator',
             'mage/translate',
             'mage/validation'
         ], function (
@@ -128,6 +130,7 @@ define([
             errorProcessor,
             fullScreenLoader,
             placeOrderHooks,
+            stepNavigator,
             $t
         ) {
             checkoutCompatibility.ensureQuoteAddressCacheKeys(quote);
@@ -152,6 +155,11 @@ define([
                 getCheckoutProvider: getCheckoutProvider,
                 translate: $t
             });
+
+            createStepNavigatorBridge({
+                ko: ko,
+                stepNavigator: stepNavigator
+            }).init();
 
             function getCountryDictionaryOptions() {
                 return checkoutProviderBridge.getCountryDictionaryOptions();
@@ -503,7 +511,7 @@ define([
                             children: {
                                 steps: {
                                     component: 'uiComponent',
-                                    children: {
+                                    children: $.extend(true, {}, checkoutLayoutBridge.checkoutStepChildren, {
                                         'shipping-step': {
                                             component: 'uiComponent',
                                             children: {
@@ -513,7 +521,7 @@ define([
                                                 }
                                             }
                                         }
-                                    }
+                                    })
                                 }
                             }
                         }
@@ -1551,14 +1559,107 @@ define([
                     return matches;
                 }
 
+                function getKoClickHandlerName(element) {
+                    var binding = element && element.getAttribute ? (element.getAttribute('data-bind') || element.getAttribute('ko')) : '',
+                        match;
+
+                    if (!binding) {
+                        return '';
+                    }
+
+                    match = binding.match(/(?:^|[,{\s])click\s*:\s*(?:\$parent\.|\$data\.|this\.)?([A-Za-z_$][\w$]*)/);
+                    return match ? match[1] : '';
+                }
+
+                function getNativeCheckoutActionButtons(root) {
+                    if (!root || typeof root.querySelectorAll !== 'function') {
+                        return [];
+                    }
+
+                    return Array.prototype.slice.call(root.querySelectorAll(
+                        '.actions-toolbar button.action.primary.checkout, ' +
+                        '.actions-toolbar .action.primary.checkout, ' +
+                        'button.action.primary.checkout, ' +
+                        '.apple-pay-button.action.primary.checkout'
+                    ));
+                }
+
+                function annotateNativePaymentActions(root) {
+                    if (!root || typeof root.querySelectorAll !== 'function') {
+                        return;
+                    }
+
+                    Array.prototype.slice.call(root.querySelectorAll('.fastcheckout-native-place-order-hidden')).forEach(function (button) {
+                        button.classList.remove('fastcheckout-native-place-order-hidden');
+                    });
+                    Array.prototype.slice.call(root.querySelectorAll('.fastcheckout-actions-toolbar-hidden')).forEach(function (toolbar) {
+                        toolbar.classList.remove('fastcheckout-actions-toolbar-hidden');
+                    });
+
+                    Array.prototype.slice.call(root.querySelectorAll('.actions-toolbar')).forEach(function (toolbar) {
+                        var actionButtons = getNativeCheckoutActionButtons(toolbar),
+                            visibleActionButtons;
+
+                        actionButtons.forEach(function (button) {
+                            var handlerName = getKoClickHandlerName(button);
+
+                            if (!handlerName || handlerName === 'placeOrder') {
+                                button.classList.add('fastcheckout-native-place-order-hidden');
+                            }
+                        });
+
+                        visibleActionButtons = actionButtons.filter(function (button) {
+                            return !button.classList.contains('fastcheckout-native-place-order-hidden');
+                        });
+
+                        if (actionButtons.length && !visibleActionButtons.length) {
+                            toolbar.classList.add('fastcheckout-actions-toolbar-hidden');
+                        }
+                    });
+                }
+
+                function getRendererNativeSubmitAction(component) {
+                    var roots = getActivePaymentFormRoots(),
+                        action = null;
+
+                    if (!component) {
+                        return null;
+                    }
+
+                    roots.some(function (root) {
+                        return getNativeCheckoutActionButtons(root).some(function (button) {
+                            var handlerName = getKoClickHandlerName(button);
+
+                            if (
+                                handlerName &&
+                                handlerName !== 'placeOrder' &&
+                                typeof component[handlerName] === 'function'
+                            ) {
+                                action = {
+                                    name: handlerName,
+                                    button: button,
+                                    run: component[handlerName].bind(component)
+                                };
+                                return true;
+                            }
+
+                            return false;
+                        });
+                    });
+
+                    return action;
+                }
+
                 function hasVisibleContent(element) {
                     var content = element.querySelector('.payment-method-content');
                     if (!content) {
                         return false;
                     }
 
-                    // 1. Check if there are any input, select, or textarea elements
-                    if (content.querySelector('input:not([type="hidden"]), select, textarea')) {
+                    annotateNativePaymentActions(content);
+
+                    // 1. Check if there are any input, select, textarea, or native custom action elements
+                    if (content.querySelector('input:not([type="hidden"]), select, textarea, .actions-toolbar:not(.fastcheckout-actions-toolbar-hidden) button:not(.fastcheckout-native-place-order-hidden)')) {
                         return true;
                     }
 
@@ -1568,7 +1669,7 @@ define([
                     // Remove components we explicitly hide or handle globally
                     var selectorsToRemove = [
                         '.payment-method-title',
-                        '.actions-toolbar',
+                        '.fastcheckout-actions-toolbar-hidden',
                         '.payment-method-billing-address'
                     ];
                     selectorsToRemove.forEach(function (selector) {
@@ -1637,6 +1738,7 @@ define([
                         
                         activeElement.classList.add('_active');
                         activeElement.setAttribute('data-fastcheckout-active', 'true');
+                        annotateNativePaymentActions(activeElement);
 
                         var target = document.querySelector('[data-fastcheckout-payment-method-ko-target="' + methodCode + '"]');
                         if (target) {
@@ -1659,11 +1761,11 @@ define([
                                         padding: 0 !important;
                                     }
                                     .payment-method-title,
-                                    .actions-toolbar,
                                     .payment-method-billing-address,
                                     .fastcheckout-payment-method-ko-container .payment-method-title,
-                                    .fastcheckout-payment-method-ko-container .actions-toolbar,
-                                    .fastcheckout-payment-method-ko-container .payment-method-billing-address {
+                                    .fastcheckout-payment-method-ko-container .payment-method-billing-address,
+                                    .fastcheckout-native-place-order-hidden,
+                                    .fastcheckout-actions-toolbar-hidden {
                                         display: none !important;
                                     }
                                     .required-captcha.checkbox {
@@ -1909,6 +2011,19 @@ define([
                     });
 
                     return roots;
+                }
+
+                function refreshNativePaymentActions() {
+                    annotateNativePaymentActions(document);
+                    getActivePaymentFormRoots().forEach(function (root) {
+                        annotateNativePaymentActions(root);
+                    });
+                }
+
+                function getActiveNativeSubmitActionName() {
+                    var action = getRendererNativeSubmitAction(getActiveRenderer());
+
+                    return action ? action.name : '';
                 }
 
                 function mergeActivePaymentFormData(paymentData) {
@@ -2434,6 +2549,7 @@ define([
 		                        var component,
 		                            paymentData,
                                     methodCode,
+                                    nativeSubmitAction,
 		                            result,
 		                            self = this;
 
@@ -2453,10 +2569,14 @@ define([
                                 return prepareCheckoutState(wire);
                             }).then(function () {
 		                            component = getActiveRenderer();
+                                if (component) {
+                                    refreshNativePaymentActions();
+                                }
 		                            paymentData = component && typeof component.getData === 'function'
 		                                ? applyPaymentDataAssigners(component.getData())
 		                                : this.getActivePaymentData();
                                 methodCode = paymentData && paymentData.method ? paymentData.method : (selectedMethod || getSelectedMethodCode());
+                                nativeSubmitAction = getRendererNativeSubmitAction(component);
 
 		                            if (!component || typeof component.placeOrder !== 'function') {
 	                                    if (methodCode === 'purchaseorder' && !validatePurchaseOrderWithNativeValidation()) {
@@ -2529,6 +2649,19 @@ define([
                                     handlePaymentError(notReadyError, component.messageContainer || getBridgeMessageContainer());
 	                                return Promise.reject(notReadyError);
 	                            }
+                                if (
+                                    nativeSubmitAction &&
+                                    nativeSubmitAction.button &&
+                                    (
+                                        nativeSubmitAction.button.disabled ||
+                                        nativeSubmitAction.button.classList.contains('disabled') ||
+                                        nativeSubmitAction.button.getAttribute('aria-disabled') === 'true'
+                                    )
+                                ) {
+                                    var nativeActionNotReadyError = new Error(translateFastcheckoutMessage('The selected payment method is not ready. Please try again.'));
+                                    handlePaymentError(nativeActionNotReadyError, component.messageContainer || getBridgeMessageContainer());
+                                    return Promise.reject(nativeActionNotReadyError);
+                                }
 
                                 return this.syncWirePaymentData(
                                     wire,
@@ -2560,7 +2693,9 @@ define([
 	                                }, 30000);
 
 	                                try {
-		                                    if (component.getCode && component.getCode() === 'braintree') {
+                                            if (nativeSubmitAction) {
+                                                result = nativeSubmitAction.run(component, new Event('submit'));
+                                            } else if (component.getCode && component.getCode() === 'braintree') {
 		                                        result = component.placeOrder();
 		                                    } else {
 		                                        result = component.placeOrder(paymentData, new Event('submit'));
@@ -2744,7 +2879,8 @@ define([
                     },
 
                     afterPlaceOrder: function () {
-                        var component = getActiveRenderer();
+                        var component = getActiveRenderer(),
+                            shouldRunRendererAfterPlaceOrder = !window.fastcheckoutKoSuccessRedirectInProgress;
                         
 
                         if (component) {
@@ -2764,28 +2900,48 @@ define([
                                 return;
                             }
 
-                            // If the component overrides standard afterPlaceOrder (like Tpay)
-                            if (typeof component.afterPlaceOrder === 'function' && component.redirectAfterPlaceOrder === false) {
+                            // If the component overrides standard afterPlaceOrder (like Tpay/Mollie).
+                            // When Magento's redirect-on-success action calls this bridge, the renderer
+                            // has already run its native afterPlaceOrder in payment/default.js.
+                            if (shouldRunRendererAfterPlaceOrder && typeof component.afterPlaceOrder === 'function') {
                                 try {
                                     component.afterPlaceOrder();
-                                    return;
                                 } catch (e) {
                                     if (window.console && typeof window.console.error === 'function') {
                                         window.console.error('Kkkonrad Fastcheckout: error executing afterPlaceOrder:', e);
                                     }
                                 }
+
+                                if (component.redirectAfterPlaceOrder === false) {
+                                    return;
+                                }
                             }
                         }
 
-                        // Default success redirect
-                        require(['mage/url'], function (url) {
-                            window.location.replace(url.build('checkout/onepage/success'));
+                        // Default success redirect, honoring modules that set redirectOnSuccessAction.redirectUrl
+                        // in their native afterPlaceOrder implementation (for example Przelewy24).
+                        require([
+                            'mage/url',
+                            'Magento_Checkout/js/action/redirect-on-success'
+                        ], function (url, redirectOnSuccessAction) {
+                            var redirectUrl = redirectOnSuccessAction && redirectOnSuccessAction.redirectUrl
+                                ? redirectOnSuccessAction.redirectUrl
+                                : (window.checkoutConfig && window.checkoutConfig.defaultSuccessPageUrl) || 'checkout/onepage/success';
+
+                            window.location.replace(url.build(redirectUrl));
                         });
                     },
 
                     selectPaymentMethod: setSelectedMethod,
                     ensureRendererForMethod: ensureRendererForMethod,
+                    getRendererMap: function () {
+                        return typeof rendererManager.getRendererMap === 'function'
+                            ? rendererManager.getRendererMap()
+                            : [];
+                    },
                     getActiveRenderer: getActiveRenderer,
+                    refreshNativePaymentActions: refreshNativePaymentActions,
+                    getActiveNativeSubmitActionName: getActiveNativeSubmitActionName,
                     getMessageContainer: getBridgeMessageContainer,
                     clearMessages: clearPaymentMessages
                 });

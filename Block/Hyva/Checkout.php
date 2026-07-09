@@ -145,6 +145,11 @@ class Checkout extends Template
     /**
      * @var array|null
      */
+    private $checkoutStepChildrenCache;
+
+    /**
+     * @var array|null
+     */
     private $checkoutLayoutAssetsCache;
 
     /**
@@ -624,6 +629,52 @@ class Checkout extends Template
         $this->shippingAddressChildrenCache = $children;
 
         return $this->shippingAddressChildrenCache;
+    }
+
+    /**
+     * Return additional direct children declared under the standard Magento checkout steps component.
+     *
+     * The shipping-step and billing-step are handled by dedicated Fastcheckout bridges because their
+     * core regions are mapped into the custom Hyva/Magewire UI. Other step children, such as MSI
+     * Store Pickup, are kept as native KO components so their registry entries and side effects stay
+     * compatible with standard checkout modules.
+     *
+     * @return array
+     */
+    public function getCheckoutStepChildren()
+    {
+        if ($this->checkoutStepChildrenCache !== null) {
+            return $this->checkoutStepChildrenCache;
+        }
+
+        $moduleList = $this->getModuleList();
+        $componentRegistrar = $this->getComponentRegistrar();
+        if ($moduleList === null || $componentRegistrar === null) {
+            $this->checkoutStepChildrenCache = [];
+            return $this->checkoutStepChildrenCache;
+        }
+
+        $children = [];
+        foreach ($moduleList->getNames() as $moduleName) {
+            $modulePath = $componentRegistrar->getPath(ComponentRegistrar::MODULE, $moduleName);
+            if (!$modulePath) {
+                continue;
+            }
+
+            $layoutFile = $modulePath . '/view/frontend/layout/checkout_index_index.xml';
+            if (!is_file($layoutFile)) {
+                continue;
+            }
+
+            $children = $this->mergeJsLayoutArrays(
+                $children,
+                $this->getCheckoutStepChildrenFromLayout($layoutFile)
+            );
+        }
+
+        $this->checkoutStepChildrenCache = $children;
+
+        return $this->checkoutStepChildrenCache;
     }
 
     /**
@@ -1139,6 +1190,49 @@ class Checkout extends Template
     }
 
     /**
+     * @param string $layoutFile
+     * @return array
+     */
+    private function getCheckoutStepChildrenFromLayout($layoutFile)
+    {
+        $dom = new \DOMDocument();
+        $previous = libxml_use_internal_errors(true);
+
+        try {
+            if (!$dom->load($layoutFile)) {
+                return [];
+            }
+
+            $xpath = new \DOMXPath($dom);
+            $nodes = $xpath->query(
+                '//*[local-name()="item"][@name="steps"]' .
+                '/*[local-name()="item"][@name="children"]' .
+                '/*[local-name()="item"]'
+            );
+
+            $children = [];
+            foreach ($nodes as $node) {
+                $name = $node->getAttribute('name');
+                if (!$name || $name === 'shipping-step' || $name === 'billing-step') {
+                    continue;
+                }
+
+                $children[$name] = $this->mergeJsLayoutArrays(
+                    $children[$name] ?? [],
+                    $this->parseJsLayoutItem($node)
+                );
+            }
+
+            return $children;
+        } catch (\Exception $e) {
+            return [];
+        } finally {
+            libxml_clear_errors();
+            libxml_use_internal_errors($previous);
+        }
+    }
+
+    /**
      * @param mixed $fieldset
      * @return array
      */
@@ -1213,7 +1307,7 @@ class Checkout extends Template
                 }
 
                 $name = $child->getAttribute('name');
-                if (!$name) {
+                if ($name === '') {
                     continue;
                 }
 

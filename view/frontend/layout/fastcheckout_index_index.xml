@@ -19,7 +19,7 @@
             <block class="Kkkonrad\Fastcheckout\Block\Hyva\Checkout"
                    name="kkkonrad.fastcheckout.hyva.checkout.ko_checkout_bridge"
                    as="ko_checkout_bridge"
-                   template="Kkkonrad_Fastcheckout::hyva/knockout/checkout-bridge.phtml"
+                   template="Kkkonrad_Fastcheckout::hyva/knockout/checkout-renderers.phtml"
                    cacheable="false"/>
         </referenceContainer>
     </body>
