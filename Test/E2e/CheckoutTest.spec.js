@@ -1802,6 +1802,7 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
                 braintree: byMethod.braintree,
                 braintreePaypal: byMethod.braintree_paypal,
                 payu: byMethod.payu_gateway || null,
+                payuCard: byMethod.payu_gateway_card || null,
                 tpay: byMethod.Tpay_Magento2,
                 tpayGeneric: byMethod.generic,
                 przelewy24: byMethod.przelewy24 || null,
@@ -1812,6 +1813,8 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
         expect(result.count, JSON.stringify(result, null, 2)).toBeGreaterThan(0);
         expect(result.braintree, JSON.stringify(result, null, 2)).toBe('PayPal_Braintree/js/view/payment/braintree');
         expect(result.braintreePaypal, JSON.stringify(result, null, 2)).toBe('PayPal_Braintree/js/view/payment/braintree');
+        expect(result.payu, JSON.stringify(result, null, 2)).toBe('PayU_PaymentGateway/js/view/payment/payu_gateway');
+        expect(result.payuCard, JSON.stringify(result, null, 2)).toBe('PayU_PaymentGateway/js/view/payment/payu_gateway');
         expect(result.tpay, JSON.stringify(result, null, 2)).toBe('Tpay_Magento2/js/view/payment/tpay-payments');
         expect(result.tpayGeneric, JSON.stringify(result, null, 2)).toBe('Tpay_Magento2/js/view/payment/tpay-payments');
         expect(result.mollieCreditcard, JSON.stringify(result, null, 2)).toBe('Mollie_Payment/js/view/payment/method-renderer');
@@ -2020,6 +2023,122 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
         expect(result.originalActionIndex, JSON.stringify(result, null, 2)).toBeGreaterThan(result.placeOrderIndex);
         expect(result.syncedAdditionalData, JSON.stringify(result, null, 2)).toMatchObject({
             marker: 'native'
+        });
+    });
+
+    test('should wait for PayU card tokenization before handling a false renderer result', async ({ page }) => {
+        const checkout = new CheckoutPage(page);
+        await checkout.goto();
+
+        const result = await page.evaluate(() => new Promise((resolve) => {
+            window.require(['uiRegistry', 'ko'], (registry, ko) => {
+                const method = 'payu_gateway_card';
+                const calls = [];
+                const fixture = document.createElement('div');
+                const originalValidate = window.fastcheckoutHyvaPayment.validate;
+                const wire = {
+                    data: {
+                        paymentMethod: method,
+                        shippingMethod: 'flatrate_flatrate'
+                    },
+                    get(name) {
+                        return this.data[name] || '';
+                    },
+                    set(name, value) {
+                        this.data[name] = value;
+                        return Promise.resolve(true);
+                    },
+                    call(name, value) {
+                        calls.push({ type: 'wire.call', name, value });
+                        return Promise.resolve({ success: true });
+                    }
+                };
+                const component = {
+                    item: { method, title: 'PayU Card' },
+                    secureFormError: ko.observable(''),
+                    cardToken() {
+                        return null;
+                    },
+                    placeOrderDefer() {},
+                    messageContainer: {
+                        addErrorMessage(message) {
+                            calls.push({ type: 'message', message });
+                        }
+                    },
+                    getCode() {
+                        return method;
+                    },
+                    getData() {
+                        return {
+                            method,
+                            additional_data: {
+                                payu_method: 'token-after-async-flow',
+                                payu_method_type: 'PBL'
+                            }
+                        };
+                    },
+                    validate() {
+                        return true;
+                    },
+                    isPlaceOrderActionAllowed() {
+                        return true;
+                    },
+                    placeOrder() {
+                        calls.push({ type: 'component.placeOrder' });
+                        window.setTimeout(() => {
+                            window.fastcheckoutHyvaPayment.onPlaceOrderAction(
+                                this.getData(),
+                                this.messageContainer,
+                                (paymentData) => {
+                                    calls.push({ type: 'originalPlaceOrderAction', paymentData });
+                                    return Promise.resolve({ success: true });
+                                }
+                            );
+                        }, 0);
+
+                        return false;
+                    }
+                };
+
+                fixture.innerHTML = `
+                    <div class="payment-method _active" data-fastcheckout-active="true">
+                        <div class="payment-method-title">
+                            <input type="radio" name="payment_method" value="${method}" checked>
+                        </div>
+                    </div>
+                `;
+                document.querySelectorAll('input[name="payment_method"]:checked').forEach((input) => {
+                    input.checked = false;
+                });
+                document.body.appendChild(fixture);
+                registry.set('fastcheckout.test.payuCardRenderer', component);
+                window.fastcheckoutHyvaPayment.validate = () => true;
+
+                window.fastcheckoutHyvaPayment.placeOrder(wire, method)
+                    .then(() => {
+                        window.fastcheckoutHyvaPayment.validate = originalValidate;
+                        fixture.remove();
+                        resolve({ calls, paymentAdditionalData: wire.data.paymentAdditionalData });
+                    })
+                    .catch((error) => {
+                        window.fastcheckoutHyvaPayment.validate = originalValidate;
+                        fixture.remove();
+                        resolve({ error: error && (error.message || String(error)), calls });
+                    });
+            }, (error) => {
+                resolve({ requireError: error && (error.requireModules || error.message || String(error)) });
+            });
+        }));
+
+        expect(result.requireError, JSON.stringify(result, null, 2)).toBeFalsy();
+        expect(result.error, JSON.stringify(result, null, 2)).toBeFalsy();
+        expect(result.calls.findIndex((call) => call.type === 'component.placeOrder')).toBeGreaterThanOrEqual(0);
+        expect(result.calls.findIndex((call) => call.type === 'originalPlaceOrderAction')).toBeGreaterThan(
+            result.calls.findIndex((call) => call.type === 'component.placeOrder')
+        );
+        expect(result.paymentAdditionalData, JSON.stringify(result, null, 2)).toMatchObject({
+            payu_method: 'token-after-async-flow',
+            payu_method_type: 'PBL'
         });
     });
 

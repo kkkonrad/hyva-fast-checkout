@@ -2309,6 +2309,43 @@ define([
                     return placeOrderHooksBridge.syncHookData(wire, hookData, deferUpdate);
                 }
 
+                function isPayUCardTokenizationInProgress(component, methodCode, result) {
+                    return result === false &&
+                        methodCode === 'payu_gateway_card' &&
+                        component &&
+                        typeof component.placeOrderDefer === 'function' &&
+                        typeof component.cardToken === 'function';
+                }
+
+                function watchPayUCardTokenizationError(component, reject) {
+                    var errorObserver = component && component.secureFormError,
+                        subscription,
+                        handleError;
+
+                    if (!errorObserver || typeof errorObserver.subscribe !== 'function') {
+                        return;
+                    }
+
+                    handleError = function (message) {
+                        var errorMessage;
+
+                        if (!message || !window.fastcheckoutHyvaPayment || !window.fastcheckoutHyvaPayment.koOrderActive) {
+                            return;
+                        }
+
+                        errorMessage = String(message).replace(/<[^>]*>/g, ' ').trim() ||
+                            translateFastcheckoutMessage('The selected payment method could not complete order placement. Please try again.');
+                        window.fastcheckoutHyvaPayment.cleanupKoOrderState();
+                        handlePaymentError(new Error(errorMessage), component.messageContainer || getBridgeMessageContainer());
+                        reject(new Error(errorMessage));
+                    };
+
+                    subscription = errorObserver.subscribe(handleError);
+
+                    window.fastcheckoutHyvaPayment.koOrderNativeErrorSubscription = subscription;
+                    handleError(errorObserver());
+                }
+
                 function watchRendererPlaceOrderResult(result, component, reject) {
                     var handleReject;
 
@@ -2373,7 +2410,14 @@ define([
 	                        if (this.koOrderTimeout) {
 	                            window.clearTimeout(this.koOrderTimeout);
 	                        }
+	                        if (
+	                            this.koOrderNativeErrorSubscription &&
+	                            typeof this.koOrderNativeErrorSubscription.dispose === 'function'
+	                        ) {
+	                            this.koOrderNativeErrorSubscription.dispose();
+	                        }
 	                        this.koOrderTimeout = null;
+	                        this.koOrderNativeErrorSubscription = null;
 	                        this.koOrderDeferred = null;
 	                        this.koOrderActive = false;
 	                        this.syncWire = null;
@@ -2846,11 +2890,13 @@ define([
 		                                        result = component.placeOrder();
 		                                    } else {
 		                                        result = component.placeOrder(paymentData, new Event('submit'));
-		                                    }
+                                            }
                                             watchRendererPlaceOrderResult(result, component, reject);
 
-		                                    if (result === false) {
-		                                        self.cleanupKoOrderState();
+			                                    if (isPayUCardTokenizationInProgress(component, methodCode, result)) {
+			                                        watchPayUCardTokenizationError(component, reject);
+			                                    } else if (result === false) {
+			                                        self.cleanupKoOrderState();
 	                                            var resultError = new Error(translateFastcheckoutMessage('Please check the selected payment method and try again.'));
                                             handlePaymentError(resultError, component.messageContainer || getBridgeMessageContainer());
 	                                        reject(resultError);
