@@ -1684,7 +1684,7 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
         expect(pageErrors, JSON.stringify(pageErrors, null, 2)).toEqual([]);
     });
 
-    test('should resolve dynamically suffixed payment renderer methods', async ({ page }) => {
+    test('should expose exact payment renderer map entries', async ({ page }) => {
         const pageErrors = [];
 
         page.on('pageerror', (error) => {
@@ -1701,48 +1701,18 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
             timeout: 10000
         }).toBe(true);
 
-        const result = await page.evaluate(() => new Promise((resolve) => {
+        const result = await page.evaluate(() => {
             const map = window.fastcheckoutKoPaymentRendererComponentMap || [];
-            const entry = map.find((item) => (
-                item &&
-                item.method === 'generic' &&
-                item.matchPrefix &&
-                /Tpay_Magento2/.test(item.component)
-            ));
 
-            if (!entry) {
-                resolve({
-                    ok: true,
-                    skipped: true,
-                    reason: 'No generic dynamic payment renderer entry available'
-                });
-                return;
-            }
-
-            window.fastcheckoutHyvaPayment.ensureRendererForMethod(`${entry.method}-fastcheckout-regression`)
-                .then(() => {
-                    window.setTimeout(() => {
-                        resolve({
-                            ok: true,
-                            component: entry.component,
-                            loadedComponents: window.fastcheckoutKoLoadedPaymentRendererComponents || []
-                        });
-                    }, 250);
-                })
-                .catch((error) => {
-                    resolve({
-                        ok: false,
-                        message: error && (error.message || String(error))
-                    });
-                });
-        }));
+            return {
+                ok: map.every((item) => item && !item.matchPrefix && !item.matchContains),
+                fuzzyEntries: map.filter((item) => item && (item.matchPrefix || item.matchContains))
+            };
+        });
 
         expect(result, JSON.stringify(result, null, 2)).toMatchObject({
             ok: true
         });
-        if (!result.skipped) {
-            expect(result.loadedComponents, JSON.stringify(result, null, 2)).toContain(result.component);
-        }
         expect(pageErrors, JSON.stringify(pageErrors, null, 2)).toEqual([]);
     });
 

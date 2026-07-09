@@ -257,20 +257,15 @@ XML
             $this->assertSame([
                 [
                     'method' => 'gateway-group',
-                    'component' => 'Vendor_Module/js/view/payment/gateway',
-                    'matchPrefix' => true,
-                    'matchContains' => true
+                    'component' => 'Vendor_Module/js/view/payment/gateway'
                 ],
                 [
                     'method' => 'gateway_one',
-                    'component' => 'Vendor_Module/js/view/payment/gateway',
-                    'matchPrefix' => true
+                    'component' => 'Vendor_Module/js/view/payment/gateway'
                 ],
                 [
                     'method' => 'standalone',
-                    'component' => 'Vendor_Module/js/view/payment/standalone',
-                    'matchPrefix' => true,
-                    'matchContains' => true
+                    'component' => 'Vendor_Module/js/view/payment/standalone'
                 ]
             ], $block->getPaymentRendererComponentMap());
         } finally {

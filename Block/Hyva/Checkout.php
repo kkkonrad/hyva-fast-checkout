@@ -376,12 +376,6 @@ class Checkout extends Template
                 'method' => $entry['method'],
                 'component' => $entry['component']
             ];
-            if (!empty($entry['matchPrefix'])) {
-                $unique[$entry['method'] . '::' . $entry['component']]['matchPrefix'] = true;
-            }
-            if (!empty($entry['matchContains'])) {
-                $unique[$entry['method'] . '::' . $entry['component']]['matchContains'] = true;
-            }
         }
 
         $this->paymentRendererComponentMapCache = array_values($unique);
@@ -854,9 +848,7 @@ class Checkout extends Template
                 if ($rendererCode) {
                     $map[] = [
                         'method' => $rendererCode,
-                        'component' => $component,
-                        'matchPrefix' => true,
-                        'matchContains' => true
+                        'component' => $component
                     ];
                 }
 
@@ -870,8 +862,7 @@ class Checkout extends Template
                     if ($methodCode && $this->_scopeConfig->getValue('payment/' . $methodCode . '/active') !== '0') {
                         $map[] = [
                             'method' => $methodCode,
-                            'component' => $component,
-                            'matchPrefix' => true
+                            'component' => $component
                         ];
                     }
                 }

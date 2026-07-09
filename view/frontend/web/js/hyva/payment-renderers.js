@@ -1,6 +1,9 @@
 define([
-    'jquery'
-], function ($) {
+    'jquery',
+    'Kkkonrad_Fastcheckout/js/hyva/renderer-manager',
+    'Kkkonrad_Fastcheckout/js/hyva/shadow-selector-bridge',
+    'Kkkonrad_Fastcheckout/js/hyva/checkout-provider-bridge'
+], function ($, createRendererManager, initShadowSelectorBridge, createCheckoutProviderBridge) {
     'use strict';
 
     return function (config) {
@@ -10,62 +13,11 @@ define([
 
         window.fastcheckoutKoPaymentBridgeInitialized = true;
         
-        // Apply global jQuery selector override for Shadow DOM elements
-        if ($ && $.fn && typeof $.fn.init === 'function' && !$.fn.init.fastcheckoutPatched) {
-            var originalInit = $.fn.init;
-            $.fn.init = function(selector, context, root) {
-                if (window.fastcheckoutInsideSelectorOverride) {
-                    return originalInit.apply(this, arguments);
-                }
-                var result = originalInit.apply(this, arguments);
-                if (typeof selector === 'string' && result.length === 0 && selector.indexOf('<') !== 0) {
-                    window.fastcheckoutInsideSelectorOverride = true;
-                    try {
-                        var elements = [];
-                        var placeholders = document.querySelectorAll('[data-fastcheckout-payment-method-ko-target]');
-                        placeholders.forEach(function(placeholder) {
-                            if (placeholder.shadowRoot) {
-                                // Use jQuery find to resolve custom/pseudo selectors (like :visible) safely
-                                var shadowElements = $(placeholder.shadowRoot).find(selector);
-                                shadowElements.each(function() {
-                                    elements.push(this);
-                                });
-                            }
-                        });
-                        if (elements.length > 0) {
-                            return originalInit.call(this, elements);
-                        }
-                    } finally {
-                        window.fastcheckoutInsideSelectorOverride = false;
-                    }
-                }
-                return result;
-            };
-            $.fn.init.prototype = $.fn;
-            $.fn.init.fastcheckoutPatched = true;
-        }
+        initShadowSelectorBridge();
         window.fastcheckoutKoPaymentBridgeInitCount = (window.fastcheckoutKoPaymentBridgeInitCount || 0) + 1;
         
         var scope = config.scope || 'fastcheckoutHyvaPaymentRenderers',
-            rendererComponents = config.rendererComponents || [],
-            rendererComponentMap = config.rendererComponentMap || [],
-            rendererComponentsByMethod = {},
-            rendererComponentEntries = [],
-            loadedRendererComponents = {},
-            loadingRendererComponents = {},
-            patchRenderersHandler = null,
-            syncPaymentRenderersHandler = null;
-
-        rendererComponentMap.forEach(function (entry) {
-            if (entry && entry.method && entry.component) {
-                rendererComponentEntries.push(entry);
-                rendererComponentsByMethod[entry.method] = entry.component;
-            }
-        });
-
-        window.fastcheckoutKoPaymentRendererComponentMap = rendererComponentMap.slice(0);
-
-        window.fastcheckoutKoLoadedPaymentRendererComponents = window.fastcheckoutKoLoadedPaymentRendererComponents || [];
+            rendererManager = createRendererManager(config);
 
         window.checkoutConfig = config.checkoutConfig || {};
 
@@ -242,223 +194,26 @@ define([
                 }
             }
 
-            function createCheckoutProviderFallback() {
-                var data = {
-                        params: {
-                            invalid: false
-                        },
-                        shippingAddress: {},
-                        billingAddress: {},
-                        billingAddressshared: {},
-                        dictionaries: {
-                            country_id: getCountryDictionaryOptions()
-                        }
-                    },
-                    listeners = {};
-
-                function splitPath(path) {
-                    return typeof path === 'string' && path.length ? path.split('.') : [];
+            var checkoutProviderBridge = createCheckoutProviderBridge({
+                registry: registry,
+                getPaymentMethods: function () {
+                    return typeof getDomPaymentMethods === 'function' ? getDomPaymentMethods() : [];
                 }
-
-                function ensurePath(path) {
-                    var parts = splitPath(path),
-                        current = data;
-
-                    parts.forEach(function (part) {
-                        if (typeof current[part] === 'undefined' || current[part] === null) {
-                            current[part] = {};
-                        }
-                        current = current[part];
-                    });
-
-                    return current;
-                }
-
-                function getPath(path) {
-                    var parts = splitPath(path),
-                        current = data;
-
-                    if (typeof path === 'string' && path.indexOf('billingAddress') === 0 && typeof data[path] === 'undefined') {
-                        data[path] = {};
-                    }
-
-                    if (!parts.length) {
-                        return data;
-                    }
-
-                    parts.some(function (part) {
-                        if (typeof current === 'undefined' || current === null || typeof current[part] === 'undefined') {
-                            current = undefined;
-                            return true;
-                        }
-                        current = current[part];
-                        return false;
-                    });
-
-                    return current;
-                }
-
-                function setPath(path, value) {
-                    var parts = splitPath(path),
-                        last = parts.pop(),
-                        parent = data;
-
-                    if (!last) {
-                        return;
-                    }
-
-                    parts.forEach(function (part) {
-                        if (typeof parent[part] === 'undefined' || parent[part] === null) {
-                            parent[part] = {};
-                        }
-                        parent = parent[part];
-                    });
-
-                    parent[last] = value;
-                    data[path] = value;
-                }
-
-                function notify(path, value, changes) {
-                    if (!listeners[path]) {
-                        return;
-                    }
-
-                    listeners[path].slice().forEach(function (callback) {
-                        callback(value, changes || []);
-                    });
-                }
-
-                return {
-                    data: data,
-                    params: data.params,
-                    shippingAddress: data.shippingAddress,
-                    billingAddress: data.billingAddress,
-                    dictionaries: data.dictionaries,
-                    get: function (path) {
-                        return getPath(path);
-                    },
-                    set: function (path, value) {
-                        var oldValue = getPath(path);
-
-                        setPath(path, value);
-                        if (path === 'shippingAddress') {
-                            this.shippingAddress = value;
-                        } else if (path === 'billingAddress') {
-                            this.billingAddress = value;
-                        } else if (path === 'dictionaries') {
-                            this.dictionaries = value;
-                        }
-                        notify(path, value, [{
-                            path: path,
-                            value: value,
-                            oldValue: oldValue
-                        }]);
-
-                        return this;
-                    },
-                    on: function (path, callback) {
-                        listeners[path] = listeners[path] || [];
-                        listeners[path].push(callback);
-
-                        return this;
-                    },
-                    off: function (path) {
-                        if (path) {
-                            delete listeners[path];
-                        }
-
-                        return this;
-                    },
-                    trigger: function (path, changes) {
-                        notify(path, getPath(path), changes || []);
-
-                        return this;
-                    },
-                    setInitial: function (path, value) {
-                        if (typeof getPath(path) === 'undefined') {
-                            this.set(path, value);
-                        }
-
-                        return this;
-                    },
-                    ensurePath: ensurePath
-                };
-            }
-
-            function getCountryDictionaryOptions() {
-                var options = [];
-
-                document.querySelectorAll('#co-shipping-country-id option, select[name="country_id"] option').forEach(function (option) {
-                    var value = option.value;
-
-                    if (!value && value !== '') {
-                        return;
-                    }
-
-                    if (options.some(function (item) { return item.value === value; })) {
-                        return;
-                    }
-
-                    options.push({
-                        value: value,
-                        label: option.textContent ? option.textContent.trim() : value
-                    });
-                });
-
-                if (!options.length && window.checkoutConfig && window.checkoutConfig.defaultCountryId) {
-                    options.push({
-                        value: window.checkoutConfig.defaultCountryId,
-                        label: window.checkoutConfig.defaultCountryId
-                    });
-                }
-
-                return options;
-            }
-
-            function getCountryOptionsByValue() {
-                var indexedOptions = {};
-
-                getCountryDictionaryOptions().forEach(function (option) {
-                    if (!option || !option.value) {
-                        return;
-                    }
-
-                    indexedOptions[option.value] = $.extend({
-                        is_region_required: false
-                    }, option);
-                });
-
-                return indexedOptions;
-            }
+            });
 
             var checkoutProviderAddressAttributeSyncTimer = null,
                 checkoutProviderMagewireAddressSyncValues = {};
 
+            function getCountryDictionaryOptions() {
+                return checkoutProviderBridge.getCountryDictionaryOptions();
+            }
+
+            function getCountryOptionsByValue() {
+                return checkoutProviderBridge.getCountryOptionsByValue();
+            }
+
             function getCheckoutProvider() {
-                var provider;
-
-                try {
-                    provider = registry.get('checkoutProvider');
-                } catch (e) {
-                    provider = null;
-                }
-
-                if (!provider) {
-                    provider = createCheckoutProviderFallback();
-                    try {
-                        registry.set('checkoutProvider', provider);
-                    } catch (e) {
-                        if (window.console && typeof window.console.warn === 'function') {
-                            window.console.warn('Kkkonrad Fastcheckout: could not register fallback checkoutProvider.', e);
-                        }
-                    }
-                } else if (provider && !provider.dictionaries) {
-                    provider.dictionaries = provider.get && provider.get('dictionaries') ? provider.get('dictionaries') : {
-                        country_id: getCountryDictionaryOptions()
-                    };
-                }
-
-                return provider;
+                return checkoutProviderBridge.getCheckoutProvider();
             }
 
             function getCheckoutProviderRootPath(path) {
@@ -1222,136 +977,28 @@ define([
 
             window.fastcheckoutHyvaPayment = window.fastcheckoutHyvaPayment || {};
 
-            function rememberLoadedRendererComponent(component) {
-                if (!component) {
-                    return;
-                }
-
-                loadedRendererComponents[component] = true;
-                if (window.fastcheckoutKoLoadedPaymentRendererComponents.indexOf(component) === -1) {
-                    window.fastcheckoutKoLoadedPaymentRendererComponents.push(component);
-                }
-            }
-
             function getRendererComponentForMethod(methodCode) {
-                var normalizedMethod,
-                    matchedComponent = '';
-
-                if (!methodCode) {
-                    return '';
-                }
-
-                normalizedMethod = String(methodCode);
-                if (rendererComponentsByMethod[normalizedMethod]) {
-                    return rendererComponentsByMethod[normalizedMethod];
-                }
-
-                rendererComponentEntries.some(function (entry) {
-                    var base = entry && entry.method ? String(entry.method) : '';
-
-                    if (!base || !entry.component || !entry.matchPrefix) {
-                        return false;
-                    }
-
-                    if (
-                        normalizedMethod.indexOf(base + '_') === 0 ||
-                        normalizedMethod.indexOf(base + '-') === 0
-                    ) {
-                        matchedComponent = entry.component;
-                        return true;
-                    }
-
-                    return false;
-                });
-
-                if (matchedComponent) {
-                    return matchedComponent;
-                }
-
-                rendererComponentEntries.some(function (entry) {
-                    var token = entry && entry.method ? String(entry.method) : '';
-
-                    if (!token || !entry.component || !entry.matchContains) {
-                        return false;
-                    }
-
-                    if (
-                        normalizedMethod.indexOf('_' + token) !== -1 ||
-                        normalizedMethod.indexOf('-' + token) !== -1 ||
-                        normalizedMethod.indexOf(token + '_') === 0 ||
-                        normalizedMethod.indexOf(token + '-') === 0
-                    ) {
-                        matchedComponent = entry.component;
-                        return true;
-                    }
-
-                    return false;
-                });
-
-                return matchedComponent;
+                return rendererManager.getRendererComponentForMethod(methodCode);
             }
 
             function loadRendererForMethod(methodCode) {
-                var component = getRendererComponentForMethod(methodCode),
-                    deferred;
-
-                if (!component) {
-                    return $.Deferred().resolve(false).promise();
-                }
-
-                if (loadedRendererComponents[component]) {
-                    return $.Deferred().resolve(true).promise();
-                }
-
-                if (loadingRendererComponents[component]) {
-                    return loadingRendererComponents[component];
-                }
-
-                deferred = $.Deferred();
-                loadingRendererComponents[component] = deferred.promise();
-
-                require([component], function () {
-                    rememberLoadedRendererComponent(component);
-                    delete loadingRendererComponents[component];
-                    runPatchRenderers();
-                    runSyncPaymentRenderers();
-                    deferred.resolve(true);
-                }, function (error) {
-                    delete loadingRendererComponents[component];
-                    if (window.console && typeof window.console.warn === 'function') {
-                        window.console.warn('Kkkonrad Fastcheckout: payment renderer could not be loaded', component, error);
-                    }
-                    deferred.resolve(false);
-                });
-
-                return deferred.promise();
+                return rendererManager.loadRendererForMethod(methodCode);
             }
 
             function ensureRendererForMethod(methodCode) {
-                return loadRendererForMethod(methodCode).then(function () {
-                    return true;
-                });
+                return rendererManager.ensureRendererForMethod(methodCode);
             }
 
             function runPatchRenderers() {
-                if (typeof patchRenderersHandler === 'function') {
-                    patchRenderersHandler();
-                }
+                rendererManager.runPatchRenderers();
             }
 
             function runSyncPaymentRenderers() {
-                if (typeof syncPaymentRenderersHandler === 'function') {
-                    syncPaymentRenderersHandler();
-                }
+                rendererManager.runSyncPaymentRenderers();
             }
 
             function loadRendererComponents(done) {
-                rendererComponents.forEach(function (component) {
-                    if (!rendererComponentMap.length && component) {
-                        rememberLoadedRendererComponent(component);
-                    }
-                });
-                done();
+                rendererManager.loadRendererComponents(done);
             }
 
             loadRendererComponents(function () {
@@ -2826,57 +2473,8 @@ define([
                     });
                 }
 
-                function refreshCheckoutProviderDictionaries(provider) {
-                    var countryOptions = getCountryDictionaryOptions(),
-                        dictionaries;
-
-                    if (!provider || !countryOptions.length) {
-                        return;
-                    }
-
-                    dictionaries = provider.get && provider.get('dictionaries') ? provider.get('dictionaries') : {};
-                    dictionaries.country_id = dictionaries.country_id && dictionaries.country_id.length
-                        ? dictionaries.country_id
-                        : countryOptions;
-
-                    if (typeof provider.set === 'function') {
-                        provider.set('dictionaries', dictionaries);
-                        provider.set('dictionaries.country_id', dictionaries.country_id);
-                    } else {
-                        provider.dictionaries = dictionaries;
-                    }
-                }
-
                 function syncAddressDataToCheckoutProvider(addressData, type) {
-                    var provider = getCheckoutProvider(),
-                        paymentMethods = getDomPaymentMethods(),
-                        dataToSet;
-
-                    if (!provider || !addressData) {
-                        return;
-                    }
-
-                    refreshCheckoutProviderDictionaries(provider);
-                    dataToSet = $.extend(true, {}, addressData);
-
-                    if (type === 'billing') {
-                        if (typeof provider.set === 'function') {
-                            provider.set('billingAddress', dataToSet);
-                            provider.set('billingAddressshared', dataToSet);
-                            paymentMethods.forEach(function (method) {
-                                if (method.method) {
-                                    provider.set('billingAddress' + method.method, dataToSet);
-                                }
-                            });
-                        }
-                        return;
-                    }
-
-                    if (typeof provider.set === 'function') {
-                        provider.set('shippingAddress', dataToSet);
-                    } else {
-                        provider.shippingAddress = dataToSet;
-                    }
+                    checkoutProviderBridge.syncAddressData(addressData, type);
                 }
 
                 function getMagewireComponent() {
@@ -4669,8 +4267,8 @@ define([
                     });
                 }
 
-                patchRenderersHandler = patchRenderers;
-                syncPaymentRenderersHandler = syncKoPaymentRenderers;
+                rendererManager.setPatchRenderersHandler(patchRenderers);
+                rendererManager.setSyncPaymentRenderersHandler(syncKoPaymentRenderers);
 
                 function elementMatchesMethod(element, methodCode, activeCode) {
                     var inputs = element.querySelectorAll('input'),
@@ -4884,7 +4482,7 @@ define([
                     }
 
                     component = getRendererComponentForMethod(methodCode);
-                    if (component && !loadedRendererComponents[component]) {
+                    if (component && !rendererManager.isLoaded(component)) {
                         loadRendererForMethod(methodCode).done(function () {
                             if (getSelectedMethodCode() === methodCode || pendingSelectedMethodCode === methodCode) {
                                 retryPendingSelectedMethod();
