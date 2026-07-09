@@ -40,6 +40,14 @@ define([
         return null;
     }
 
+    function isEmptyObjectLike(value) {
+        if (!value || typeof value !== 'object') {
+            return false;
+        }
+
+        return Object.keys(value).length === 0;
+    }
+
     function setValue(wire, field, value, deferUpdate) {
         var currentValue;
 
@@ -48,6 +56,9 @@ define([
         }
 
         currentValue = getProperty(wire, field);
+        if (isEmptyObjectLike(currentValue) && isEmptyObjectLike(value)) {
+            return null;
+        }
         if (
             (typeof currentValue === 'object' || typeof value === 'object') &&
             JSON.stringify(currentValue || {}) === JSON.stringify(value || {})

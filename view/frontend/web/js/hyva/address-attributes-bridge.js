@@ -325,6 +325,14 @@ define([
             return value && typeof value === 'object' && Object.keys(value).length > 0;
         }
 
+        function isGuestAddressSnapshotRestorePending() {
+            return window.fastcheckoutGuestAddressSnapshotRestorePending === true;
+        }
+
+        function isEmptyAttributeData(value) {
+            return !value || (typeof value === 'object' && Object.keys(value).length === 0);
+        }
+
         function setMagewireValue(wire, field, value) {
             var currentValue,
                 cachedValue;
@@ -339,6 +347,11 @@ define([
             }
 
             currentValue = getWireProperty(wire, field);
+            if (isEmptyAttributeData(currentValue) && isEmptyAttributeData(value)) {
+                magewireSyncValues[field] = {};
+                return;
+            }
+
             if (
                 (typeof currentValue === 'object' || typeof value === 'object') &&
                 JSON.stringify(currentValue || {}) === JSON.stringify(value || {})
@@ -385,6 +398,11 @@ define([
 
             syncTimer = null;
             if (!provider) {
+                return;
+            }
+
+            if (isGuestAddressSnapshotRestorePending()) {
+                syncTimer = window.setTimeout(sync, 250);
                 return;
             }
 

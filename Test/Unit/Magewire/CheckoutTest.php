@@ -11,8 +11,12 @@ use Magento\Quote\Api\ShippingMethodManagementInterface;
 use Magento\Quote\Api\PaymentMethodManagementInterface;
 use Magento\Quote\Api\CartManagementInterface;
 use Magento\Quote\Api\Data\PaymentMethodInterface;
+use Magento\Customer\Api\AddressRepositoryInterface;
+use Magento\Customer\Api\Data\AddressInterface;
+use Magento\Customer\Model\Session as CustomerSession;
 use Magento\Directory\Model\ResourceModel\Country\CollectionFactory as CountryCollectionFactory;
 use Magento\Directory\Model\ResourceModel\Region\CollectionFactory as RegionCollectionFactory;
+use Magento\Framework\Api\SearchCriteriaBuilder;
 use Magento\Newsletter\Model\SubscriberFactory;
 use Magento\Quote\Model\Quote;
 use Magento\Quote\Model\Quote\Address as ShippingAddress;
@@ -325,6 +329,297 @@ class CheckoutTest extends TestCase
         $this->checkoutComponent->mount();
 
         $this->assertSame('10', $this->checkoutComponent->regionId);
+    }
+
+    public function testMountAutofillsEmptyQuoteShippingAddressFromCustomerDefaultShippingAddress(): void
+    {
+        $shippingAddressMock = $this->createAddressMock();
+        $billingAddressMock = $this->createAddressMock();
+        $customerSessionMock = $this->getMockBuilder(CustomerSession::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['isLoggedIn', 'getCustomerId', 'getCustomer'])
+            ->getMock();
+        $addressRepositoryMock = $this->createMock(AddressRepositoryInterface::class);
+        $searchCriteriaBuilderMock = $this->createMock(SearchCriteriaBuilder::class);
+        $customerAddressMock = $this->createMock(AddressInterface::class);
+        $customerMock = new \Magento\Framework\DataObject(['default_shipping' => 77]);
+
+        $this->quoteMock->method('getCustomerEmail')->willReturn('customer@example.com');
+        $this->quoteMock->method('getCouponCode')->willReturn('');
+        $this->quoteMock->method('getShippingAddress')->willReturn($shippingAddressMock);
+        $this->quoteMock->method('getBillingAddress')->willReturn($billingAddressMock);
+        $this->quoteMock->method('getPayment')->willReturn(null);
+
+        $shippingAddressMock->method('getFirstname')->willReturn('');
+        $shippingAddressMock->method('getLastname')->willReturn('');
+        $shippingAddressMock->method('getCompany')->willReturn('');
+        $shippingAddressMock->method('getStreet')->willReturn([]);
+        $shippingAddressMock->method('getCity')->willReturn('');
+        $shippingAddressMock->method('getPostcode')->willReturn('');
+        $shippingAddressMock->method('getCountryId')->willReturn('PL');
+        $shippingAddressMock->method('getRegionId')->willReturn(null);
+        $shippingAddressMock->method('getRegion')->willReturn('');
+        $shippingAddressMock->method('getTelephone')->willReturn('');
+        $shippingAddressMock->method('getShippingMethod')->willReturn('');
+
+        $billingAddressMock->method('getStreet')->willReturn([]);
+        $billingAddressMock->method('getCountryId')->willReturn('PL');
+        $billingAddressMock->method('getRegionId')->willReturn(null);
+        $billingAddressMock->method('getRegion')->willReturn('');
+
+        $customerSessionMock->method('isLoggedIn')->willReturn(true);
+        $customerSessionMock->method('getCustomerId')->willReturn(42);
+        $customerSessionMock->method('getCustomer')->willReturn($customerMock);
+        $addressRepositoryMock->expects($this->once())
+            ->method('getById')
+            ->with(77)
+            ->willReturn($customerAddressMock);
+
+        $customerAddressMock->method('getCustomerId')->willReturn(42);
+        $customerAddressMock->method('getFirstname')->willReturn('Auto');
+        $customerAddressMock->method('getLastname')->willReturn('Customer');
+        $customerAddressMock->method('getCompany')->willReturn('Auto Company');
+        $customerAddressMock->method('getPrefix')->willReturn('');
+        $customerAddressMock->method('getMiddlename')->willReturn('');
+        $customerAddressMock->method('getSuffix')->willReturn('');
+        $customerAddressMock->method('getFax')->willReturn('');
+        $customerAddressMock->method('getVatId')->willReturn('');
+        $customerAddressMock->method('getStreet')->willReturn(['Default Street 1', 'Suite 2']);
+        $customerAddressMock->method('getCity')->willReturn('Warsaw');
+        $customerAddressMock->method('getPostcode')->willReturn('00-001');
+        $customerAddressMock->method('getCountryId')->willReturn('PL');
+        $customerAddressMock->method('getTelephone')->willReturn('123456789');
+        $customerAddressMock->method('getRegion')->willReturn('Mazowieckie');
+        $customerAddressMock->method('getRegionId')->willReturn(10);
+
+        $regionCollectionMock = $this->getMockBuilder(\Magento\Directory\Model\ResourceModel\Region\Collection::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['addFieldToFilter', 'getFirstItem'])
+            ->getMock();
+        $regionMock = $this->getMockBuilder(\Magento\Directory\Model\Region::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['getId', 'getName'])
+            ->getMock();
+        $this->regionCollectionFactoryMock->expects($this->once())
+            ->method('create')
+            ->willReturn($regionCollectionMock);
+        $regionCollectionMock->expects($this->once())
+            ->method('addFieldToFilter')
+            ->with('main_table.region_id', 10)
+            ->willReturnSelf();
+        $regionCollectionMock->expects($this->once())
+            ->method('getFirstItem')
+            ->willReturn($regionMock);
+        $regionMock->method('getId')->willReturn(10);
+        $regionMock->method('getName')->willReturn('Mazowieckie');
+
+        $shippingAddressMock->expects($this->once())->method('setFirstname')->with('Auto');
+        $shippingAddressMock->expects($this->once())->method('setLastname')->with('Customer');
+        $shippingAddressMock->expects($this->once())->method('setStreet')->with(['Default Street 1', 'Suite 2']);
+        $shippingAddressMock->expects($this->once())->method('setCity')->with('Warsaw');
+        $shippingAddressMock->expects($this->once())->method('setPostcode')->with('00-001');
+        $shippingAddressMock->expects($this->once())->method('setCountryId')->with('PL');
+        $shippingAddressMock->expects($this->once())->method('setRegionId')->with(10);
+        $shippingAddressMock->expects($this->once())->method('setRegion')->with('Mazowieckie');
+        $shippingAddressMock->expects($this->once())->method('setTelephone')->with('123456789');
+        $shippingAddressMock->expects($this->once())->method('setCompany')->with('Auto Company');
+        $shippingAddressMock->expects($this->once())->method('setEmail')->with('customer@example.com');
+        $shippingAddressMock->expects($this->once())->method('setShouldIgnoreValidation')->with(true);
+        $shippingAddressMock->expects($this->once())->method('setCollectShippingRates')->with(true);
+        $this->cartRepositoryMock->expects($this->once())
+            ->method('save')
+            ->with($this->quoteMock);
+
+        $component = new Checkout(
+            $this->checkoutSessionMock,
+            $this->cartRepositoryMock,
+            $this->shippingMethodManagementMock,
+            $this->paymentMethodManagementMock,
+            $this->cartManagementMock,
+            $this->countryCollectionFactoryMock,
+            $this->regionCollectionFactoryMock,
+            $this->subscriberFactoryMock,
+            $this->helperMock,
+            $this->createMock(\Psr\Log\LoggerInterface::class),
+            null,
+            null,
+            null,
+            $customerSessionMock,
+            $addressRepositoryMock,
+            $searchCriteriaBuilderMock
+        );
+
+        $component->mount();
+
+        $this->assertSame('Auto', $component->firstname);
+        $this->assertSame('Customer', $component->lastname);
+        $this->assertSame('Default Street 1', $component->street1);
+        $this->assertSame('Suite 2', $component->street2);
+        $this->assertSame('Warsaw', $component->city);
+        $this->assertSame('00-001', $component->postcode);
+        $this->assertSame('PL', $component->countryId);
+        $this->assertSame('Mazowieckie', $component->region);
+        $this->assertSame('10', $component->regionId);
+        $this->assertSame('123456789', $component->telephone);
+    }
+
+    public function testMountDoesNotOverwriteExistingQuoteShippingAddressWithCustomerDefaultShippingAddress(): void
+    {
+        $shippingAddressMock = $this->createAddressMock();
+        $billingAddressMock = $this->createAddressMock();
+        $customerSessionMock = $this->getMockBuilder(CustomerSession::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['isLoggedIn', 'getCustomerId', 'getCustomer'])
+            ->getMock();
+        $addressRepositoryMock = $this->createMock(AddressRepositoryInterface::class);
+
+        $this->quoteMock->method('getCustomerEmail')->willReturn('customer@example.com');
+        $this->quoteMock->method('getCouponCode')->willReturn('');
+        $this->quoteMock->method('getShippingAddress')->willReturn($shippingAddressMock);
+        $this->quoteMock->method('getBillingAddress')->willReturn($billingAddressMock);
+        $this->quoteMock->method('getPayment')->willReturn(null);
+
+        $shippingAddressMock->method('getFirstname')->willReturn('Quote');
+        $shippingAddressMock->method('getLastname')->willReturn('Customer');
+        $shippingAddressMock->method('getCompany')->willReturn('');
+        $shippingAddressMock->method('getStreet')->willReturn(['Quote Street 1']);
+        $shippingAddressMock->method('getCity')->willReturn('Krakow');
+        $shippingAddressMock->method('getPostcode')->willReturn('30-001');
+        $shippingAddressMock->method('getCountryId')->willReturn('PL');
+        $shippingAddressMock->method('getRegionId')->willReturn(10);
+        $shippingAddressMock->method('getRegion')->willReturn('Malopolskie');
+        $shippingAddressMock->method('getTelephone')->willReturn('987654321');
+        $shippingAddressMock->method('getShippingMethod')->willReturn('flatrate_flatrate');
+
+        $billingAddressMock->method('getStreet')->willReturn([]);
+        $billingAddressMock->method('getCountryId')->willReturn('PL');
+        $billingAddressMock->method('getRegionId')->willReturn(null);
+        $billingAddressMock->method('getRegion')->willReturn('');
+
+        $customerSessionMock->expects($this->never())->method('isLoggedIn');
+        $addressRepositoryMock->expects($this->never())->method('getById');
+        $this->cartRepositoryMock->expects($this->never())->method('save');
+
+        $component = new Checkout(
+            $this->checkoutSessionMock,
+            $this->cartRepositoryMock,
+            $this->shippingMethodManagementMock,
+            $this->paymentMethodManagementMock,
+            $this->cartManagementMock,
+            $this->countryCollectionFactoryMock,
+            $this->regionCollectionFactoryMock,
+            $this->subscriberFactoryMock,
+            $this->helperMock,
+            $this->createMock(\Psr\Log\LoggerInterface::class),
+            null,
+            null,
+            null,
+            $customerSessionMock,
+            $addressRepositoryMock
+        );
+
+        $component->mount();
+
+        $this->assertSame('Quote', $component->firstname);
+        $this->assertSame('Customer', $component->lastname);
+        $this->assertSame('Quote Street 1', $component->street1);
+        $this->assertSame('Krakow', $component->city);
+        $this->assertSame('30-001', $component->postcode);
+        $this->assertSame('10', $component->regionId);
+        $this->assertSame('987654321', $component->telephone);
+    }
+
+    public function testRestoreGuestAddressSnapshotPersistsEmptyGuestQuoteAddress(): void
+    {
+        $shippingAddressMock = $this->createAddressMock();
+        $loggerMock = $this->createMock(\Psr\Log\LoggerInterface::class);
+        $loggerMock->method('warning')
+            ->willReturnCallback(static function ($message, array $context = []): void {
+                $exception = $context['exception'] ?? null;
+                throw new \RuntimeException(
+                    (string)$message . ($exception ? ': ' . get_class($exception) . ': ' . $exception->getMessage() : '')
+                );
+            });
+        $loggerProperty = new \ReflectionProperty($this->checkoutComponent, 'logger');
+        $loggerProperty->setAccessible(true);
+        $loggerProperty->setValue($this->checkoutComponent, $loggerMock);
+
+        $this->checkoutComponent->billingSameAsShipping = false;
+        $this->checkoutComponent->firstname = 'DeferredFrontendValue';
+        $this->checkoutComponent->street1 = 'Deferred Frontend Street';
+        $this->quoteMock->setDataChanges(true);
+        $shippingAddressMock->setDataChanges(true);
+        $this->quoteMock->method('getShippingAddress')->willReturn($shippingAddressMock);
+        $this->quoteMock->expects($this->once())
+            ->method('setCustomerEmail')
+            ->with('recent-guest@example.com');
+
+        $shippingAddressMock->method('getFirstname')->willReturn('');
+        $shippingAddressMock->method('getLastname')->willReturn('');
+        $shippingAddressMock->method('getStreet')->willReturn([]);
+        $shippingAddressMock->method('getCity')->willReturn('');
+        $shippingAddressMock->method('getPostcode')->willReturn('');
+        $shippingAddressMock->method('getTelephone')->willReturn('');
+
+        $regionCollectionMock = $this->getMockBuilder(\Magento\Directory\Model\ResourceModel\Region\Collection::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['addFieldToFilter', 'getFirstItem'])
+            ->getMock();
+        $regionMock = $this->getMockBuilder(\Magento\Directory\Model\Region::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['getId', 'getName'])
+            ->getMock();
+        $this->regionCollectionFactoryMock->expects($this->once())
+            ->method('create')
+            ->willReturn($regionCollectionMock);
+        $regionCollectionMock->expects($this->once())
+            ->method('addFieldToFilter')
+            ->with('main_table.region_id', 10)
+            ->willReturnSelf();
+        $regionCollectionMock->expects($this->once())
+            ->method('getFirstItem')
+            ->willReturn($regionMock);
+        $regionMock->method('getId')->willReturn(10);
+        $regionMock->method('getName')->willReturn('Mazowieckie');
+
+        $shippingAddressMock->expects($this->once())->method('setFirstname')->with('RecentGuest');
+        $shippingAddressMock->expects($this->once())->method('setLastname')->with('Checkout');
+        $shippingAddressMock->expects($this->once())->method('setStreet')->with(['Recent Street 10', '']);
+        $shippingAddressMock->expects($this->once())->method('setCity')->with('Warsaw');
+        $shippingAddressMock->expects($this->once())->method('setPostcode')->with('00-002');
+        $shippingAddressMock->expects($this->once())->method('setCountryId')->with('PL');
+        $shippingAddressMock->expects($this->once())->method('setRegionId')->with(10);
+        $shippingAddressMock->expects($this->once())->method('setRegion')->with('Mazowieckie');
+        $shippingAddressMock->expects($this->once())->method('setTelephone')->with('500600700');
+        $shippingAddressMock->expects($this->once())->method('setEmail')->with('recent-guest@example.com');
+        $shippingAddressMock->expects($this->once())->method('setShouldIgnoreValidation')->with(true);
+        $shippingAddressMock->expects($this->once())->method('setCollectShippingRates')->with(true);
+        $this->cartRepositoryMock->expects($this->once())
+            ->method('save')
+            ->with($this->quoteMock);
+
+        $this->checkoutComponent->restoreGuestAddressSnapshot([
+            'email' => 'recent-guest@example.com',
+            'firstname' => 'RecentGuest',
+            'lastname' => 'Checkout',
+            'street1' => 'Recent Street 10',
+            'city' => 'Warsaw',
+            'postcode' => '00-002',
+            'countryId' => 'PL',
+            'regionId' => '10',
+            'region' => 'Mazowieckie',
+            'telephone' => '500600700',
+        ]);
+
+        $this->assertSame('recent-guest@example.com', $this->checkoutComponent->email);
+        $this->assertSame('RecentGuest', $this->checkoutComponent->firstname);
+        $this->assertSame('Checkout', $this->checkoutComponent->lastname);
+        $this->assertSame('Recent Street 10', $this->checkoutComponent->street1);
+        $this->assertSame('Warsaw', $this->checkoutComponent->city);
+        $this->assertSame('00-002', $this->checkoutComponent->postcode);
+        $this->assertSame('PL', $this->checkoutComponent->countryId);
+        $this->assertSame('10', $this->checkoutComponent->regionId);
+        $this->assertSame('500600700', $this->checkoutComponent->telephone);
     }
 
     public function testSaveShippingAddress(): void

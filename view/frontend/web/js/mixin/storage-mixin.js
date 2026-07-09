@@ -211,6 +211,77 @@ define([
         return result;
     }
 
+    function hasObjectData(value) {
+        return value && typeof value === 'object' && Object.keys(value).length > 0;
+    }
+
+    function isEmptyObjectLike(value) {
+        return value && typeof value === 'object' && Object.keys(value).length === 0;
+    }
+
+    function hasMeaningfulAddressData(address) {
+        var street,
+            fields = ['firstname', 'lastname', 'city', 'postcode', 'region', 'telephone', 'company'];
+
+        if (!address || typeof address !== 'object') {
+            return false;
+        }
+
+        street = getAddressValue(address, 'street');
+        if (Array.isArray(street) && street.some(function (line) {
+            return String(line || '').trim() !== '';
+        })) {
+            return true;
+        }
+        if (typeof street === 'string' && street.trim() !== '') {
+            return true;
+        }
+
+        if (fields.some(function (field) {
+            return String(getAddressValue(address, field) || '').trim() !== '';
+        })) {
+            return true;
+        }
+
+        if (parseInt(getAddressValue(address, 'regionId', 'region_id') || 0, 10) > 0) {
+            return true;
+        }
+
+        return hasObjectData(getAddressObjectValue(address, 'customAttributes', 'custom_attributes')) ||
+            hasObjectData(getAddressObjectValue(address, 'extensionAttributes', 'extension_attributes'));
+    }
+
+    function hasMeaningfulRequestPayload(payload) {
+        var addressInformation,
+            address,
+            shippingAddress,
+            billingAddress,
+            paymentMethod;
+
+        payload = payload || {};
+        addressInformation = mergeObjectValues(payload.address_information, payload.addressInformation);
+        address = mergeObjectValues(payload.address);
+        shippingAddress = mergeObjectValues(
+            getPayloadShippingAddress(payload),
+            addressInformation.shipping_address,
+            addressInformation.shippingAddress
+        );
+        billingAddress = mergeObjectValues(
+            getPayloadBillingAddress(payload),
+            addressInformation.billing_address,
+            addressInformation.billingAddress
+        );
+        paymentMethod = getPayloadPaymentMethod(payload);
+
+        return hasMeaningfulAddressData(address) ||
+            hasMeaningfulAddressData(shippingAddress) ||
+            hasMeaningfulAddressData(billingAddress) ||
+            Boolean(paymentMethod && paymentMethod.method) ||
+            Boolean(getShippingMethodCode(payload)) ||
+            Boolean(getShippingMethodCode(addressInformation)) ||
+            Boolean(getPayloadEmail(payload));
+    }
+
     function getAddressObjectValue(address, camelKey, snakeKey) {
         if (!address) {
             return {};
@@ -506,7 +577,14 @@ define([
     }
 
     function setWireValue(wire, key, value) {
+        var currentValue;
+
         if (!wire || typeof wire.set !== 'function' || typeof value === 'undefined') {
+            return Promise.resolve();
+        }
+
+        currentValue = getWireValue(wire, key);
+        if (isEmptyObjectLike(currentValue) && isEmptyObjectLike(value)) {
             return Promise.resolve();
         }
 
@@ -722,7 +800,7 @@ define([
             extensionAttributes = getAddressObjectValue(address, 'extensionAttributes', 'extension_attributes'),
             sequence = Promise.resolve();
 
-        if (!address) {
+        if (!hasMeaningfulAddressData(address)) {
             return sequence;
         }
 
@@ -932,6 +1010,10 @@ define([
             sequence = sequence.then(function () {
                 var estimateAddress = mergeObjectValues(payload.address, payload.shipping_address, payload.shippingAddress);
 
+                if (!hasMeaningfulAddressData(estimateAddress) && !hasMeaningfulAddressData(payload)) {
+                    return false;
+                }
+
                 return syncAddressToWire(
                     wire,
                     mergeAddressPayloadAttributes(
@@ -940,8 +1022,8 @@ define([
                     ),
                     false
                 );
-            }).then(function () {
-                if (typeof wire.call === 'function') {
+            }).then(function (addressSynced) {
+                if (addressSynced !== false && typeof wire.call === 'function') {
                     return wire.call('saveShippingAddress', true, true, true);
                 }
 
@@ -1027,7 +1109,7 @@ define([
             return syncBridgeFormDataToWire(wire, endpoint);
         });
 
-        if (headers || Object.keys(payload).length) {
+        if ((headers && hasObjectData(headers)) || hasMeaningfulRequestPayload(payload)) {
             sequence = sequence
                 .then(function () {
                     return setWireValue(wire, 'placeOrderRequestHeaders', headers || {});
@@ -1043,10 +1125,16 @@ define([
     function handleIntercept(url, data, type, headers) {
         var deferred = $.Deferred();
         var wire = getWire(),
-            endpoint = getEndpoint(url);
+            endpoint = getEndpoint(url),
+            payload = parsePayload(data);
 
         if (!wire) {
             deferred.reject(new Error('Magewire not available'));
+            return deferred.promise();
+        }
+
+        if (endpoint === 'estimateShippingMethods' && !hasMeaningfulRequestPayload(payload)) {
+            deferred.resolve([]);
             return deferred.promise();
         }
 

@@ -20,6 +20,10 @@ define([
     }
 
     function safeSet(method, value) {
+        if (window.fastcheckoutOrderPlaced) {
+            return;
+        }
+
         if (checkoutData && typeof checkoutData[method] === 'function' && value) {
             checkoutData[method](value);
         }
@@ -35,7 +39,7 @@ define([
             shippingAddressData,
             billingAddressData;
 
-        if (!isFastcheckoutActive() || !quote) {
+        if (!isFastcheckoutActive() || window.fastcheckoutOrderPlaced || !quote) {
             return;
         }
 

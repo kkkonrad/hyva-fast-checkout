@@ -2060,28 +2060,175 @@ define([
                     return input || document.querySelector('.payment-method._active input[name="payment[po_number]"], .payment-method._active #po_number');
                 }
 
+                function getFieldValidationErrorElement(input) {
+                    var root,
+                        describedBy,
+                        errorElement;
+
+                    if (!input) {
+                        return null;
+                    }
+
+                    root = typeof input.getRootNode === 'function' ? input.getRootNode() : document;
+                    describedBy = input.getAttribute('aria-describedby');
+
+                    if (describedBy && root && typeof root.getElementById === 'function') {
+                        errorElement = root.getElementById(describedBy);
+                        if (errorElement) {
+                            return errorElement;
+                        }
+                    }
+
+                    if (input.id && root && typeof root.getElementById === 'function') {
+                        errorElement = root.getElementById(input.id + '-error');
+                        if (errorElement) {
+                            return errorElement;
+                        }
+                    }
+
+                    if (input.nextElementSibling && input.nextElementSibling.classList && input.nextElementSibling.classList.contains('mage-error')) {
+                        return input.nextElementSibling;
+                    }
+
+                    return null;
+                }
+
+                function fieldErrorElementHasVisibleText(element) {
+                    var style,
+                        rect;
+
+                    if (!element || !String(element.textContent || '').trim()) {
+                        return false;
+                    }
+
+                    style = window.getComputedStyle ? window.getComputedStyle(element) : null;
+                    rect = typeof element.getBoundingClientRect === 'function' ? element.getBoundingClientRect() : null;
+
+                    return !style || (
+                        style.display !== 'none' &&
+                        style.visibility !== 'hidden' &&
+                        style.opacity !== '0' &&
+                        (!rect || rect.height > 0)
+                    );
+                }
+
+                function getRequiredFieldMessage(input) {
+                    return input && input.getAttribute('data-msg-required')
+                        ? input.getAttribute('data-msg-required')
+                        : translateFastcheckoutMessage('This is a required field.');
+                }
+
+                function isNativeRequiredField(input) {
+                    var dataValidate = input && input.getAttribute('data-validate');
+
+                    return !!(
+                        input &&
+                        (
+                            input.required ||
+                            input.getAttribute('aria-required') === 'true' ||
+                            (dataValidate && /required\s*:\s*true/.test(dataValidate))
+                        )
+                    );
+                }
+
+                function isNativeFieldEmpty(input) {
+                    return !input || !String(input.value || '').trim();
+                }
+
+                function scheduleNativeFieldErrorMessage(input, message) {
+                    window.setTimeout(function () {
+                        if (isNativeRequiredField(input) && isNativeFieldEmpty(input)) {
+                            ensureNativeFieldErrorMessage(input, message);
+                        }
+                    }, 0);
+                    window.setTimeout(function () {
+                        if (isNativeRequiredField(input) && isNativeFieldEmpty(input)) {
+                            ensureNativeFieldErrorMessage(input, message);
+                        }
+                    }, 75);
+                }
+
+                function ensureNativeFieldErrorMessage(input, message) {
+                    var errorElement;
+
+                    if (!input) {
+                        return;
+                    }
+
+                    errorElement = getFieldValidationErrorElement(input);
+                    if (fieldErrorElementHasVisibleText(errorElement)) {
+                        return;
+                    }
+
+                    if (!errorElement) {
+                        errorElement = document.createElement('div');
+                        errorElement.id = input.id ? input.id + '-error' : 'fastcheckout-payment-field-error';
+                        errorElement.className = 'mage-error fastcheckout-validation-error';
+                        errorElement.setAttribute('data-fastcheckout-validation-fallback', 'true');
+
+                        if (input.parentNode) {
+                            input.parentNode.insertBefore(errorElement, input.nextSibling);
+                        }
+                    }
+
+                    errorElement.textContent = message || getRequiredFieldMessage(input);
+                    errorElement.style.display = 'block';
+                    errorElement.classList.add('mage-error');
+
+                    input.classList.add('mage-error');
+                    input.setAttribute('aria-invalid', 'true');
+                    if (errorElement.id) {
+                        input.setAttribute('aria-describedby', errorElement.id);
+                    }
+                }
+
+                function clearNativeFieldErrorFallback(input) {
+                    var errorElement = getFieldValidationErrorElement(input);
+
+                    if (errorElement && errorElement.getAttribute('data-fastcheckout-validation-fallback') === 'true') {
+                        errorElement.remove();
+                    }
+                }
+
                 // Use Magento's validation plugin, but scope it to the active KO renderer form.
                 function validateNativeMagentoField(input) {
+                    var form,
+                        isValid;
+
                     if (!input) {
                         return true;
                     }
 
-                    var form = input.form || input.closest('form');
+                    form = input.form || input.closest('form');
                     if (form && typeof $(form).validation === 'function') {
                         $(form).validation();
                         if (typeof $(input).valid === 'function') {
-                            return $(input).valid();
+                            isValid = $(input).valid();
+                        } else {
+                            isValid = $(form).validation('isValid');
                         }
 
-                        return $(form).validation('isValid');
+                        if (isValid && isNativeRequiredField(input) && isNativeFieldEmpty(input)) {
+                            isValid = false;
+                        }
+
+                        if (!isValid) {
+                            ensureNativeFieldErrorMessage(input, getRequiredFieldMessage(input));
+                            scheduleNativeFieldErrorMessage(input, getRequiredFieldMessage(input));
+                        } else {
+                            clearNativeFieldErrorFallback(input);
+                        }
+
+                        return isValid;
                     }
 
                     if (!String(input.value || '').trim()) {
-                        input.setAttribute('aria-invalid', 'true');
+                        ensureNativeFieldErrorMessage(input, getRequiredFieldMessage(input));
                         return false;
                     }
 
                     input.removeAttribute('aria-invalid');
+                    clearNativeFieldErrorFallback(input);
                     return true;
                 }
 

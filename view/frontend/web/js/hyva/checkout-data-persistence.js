@@ -53,6 +53,10 @@ define([], function () {
         }
 
         function safeSet(methodName, value, fallback) {
+            if (window.fastcheckoutOrderPlaced) {
+                return;
+            }
+
             if (checkoutData && typeof checkoutData[methodName] === 'function') {
                 try {
                     window.fastcheckoutSuppressCheckoutDataBridge = true;

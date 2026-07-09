@@ -49,6 +49,10 @@ define([
         var saveSetterFallback = function (method, value) {
             var data = getData();
 
+            if (window.fastcheckoutOrderPlaced) {
+                return;
+            }
+
             switch (method) {
                 case 'setSelectedShippingAddress':
                     data.selectedShippingAddress = value;
@@ -91,6 +95,7 @@ define([
         var dispatchCheckoutDataUpdate = function (method, value) {
             if (
                 !isFastcheckoutActive() ||
+                window.fastcheckoutOrderPlaced ||
                 window.fastcheckoutSuppressCheckoutDataBridge ||
                 !window.fastcheckoutCheckoutDataBufferReady
             ) {
@@ -115,6 +120,10 @@ define([
             originalMethod = checkoutData[method];
             checkoutData[method] = function (value) {
                 var result;
+
+                if (window.fastcheckoutOrderPlaced) {
+                    return;
+                }
 
                 var isStorageReady = customerData &&
                                      typeof customerData.getInitCustomerData === 'function' &&

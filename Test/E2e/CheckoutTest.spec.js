@@ -1963,6 +1963,90 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
         });
     });
 
+    test('should render purchase order field validation message under empty PO number', async ({ page }) => {
+        const checkout = new CheckoutPage(page);
+        await checkout.goto();
+
+        await expect.poll(async () => page.evaluate(() => Boolean(
+            window.fastcheckoutHyvaPayment &&
+            typeof window.fastcheckoutHyvaPayment.selectPaymentMethod === 'function' &&
+            typeof window.fastcheckoutHyvaPayment.validate === 'function'
+        )), {
+            timeout: 10000
+        }).toBe(true);
+
+        const result = await page.evaluate(() => new Promise((resolve) => {
+            const radio = document.querySelector('input[name="payment_method"][value="purchaseorder"]');
+
+            if (!radio) {
+                resolve({
+                    missingPurchaseOrder: true,
+                    methods: Array.from(document.querySelectorAll('input[name="payment_method"]')).map((input) => input.value)
+                });
+                return;
+            }
+
+            radio.click();
+            window.fastcheckoutHyvaPayment.selectPaymentMethod('purchaseorder');
+
+            window.setTimeout(() => {
+                const isValid = window.fastcheckoutHyvaPayment.validate();
+                let shadow = null;
+
+                document.querySelectorAll('[data-fastcheckout-payment-method-ko-target="purchaseorder"]').forEach((target) => {
+                    if (target.shadowRoot) {
+                        shadow = target.shadowRoot;
+                    }
+                });
+
+                const input = shadow ? shadow.querySelector('#po_number') : null;
+                const error = shadow ? shadow.querySelector('#po_number-error') : null;
+                const errorStyle = error ? window.getComputedStyle(error) : null;
+                const errorRect = error ? error.getBoundingClientRect() : null;
+
+                window.setTimeout(() => {
+                    const secondIsValid = window.fastcheckoutHyvaPayment.validate();
+                    window.setTimeout(() => {
+                        const secondError = shadow ? shadow.querySelector('#po_number-error') : null;
+                        const secondErrorStyle = secondError ? window.getComputedStyle(secondError) : null;
+                        const secondErrorRect = secondError ? secondError.getBoundingClientRect() : null;
+
+                        resolve({
+                            isValid,
+                            secondIsValid,
+                            inputClass: input ? input.className : '',
+                            ariaInvalid: input ? input.getAttribute('aria-invalid') : '',
+                            ariaDescribedBy: input ? input.getAttribute('aria-describedby') : '',
+                            errorText: error ? error.textContent.trim() : '',
+                            errorDisplay: errorStyle ? errorStyle.display : '',
+                            errorVisibility: errorStyle ? errorStyle.visibility : '',
+                            errorHeight: errorRect ? errorRect.height : 0,
+                            secondErrorText: secondError ? secondError.textContent.trim() : '',
+                            secondErrorDisplay: secondErrorStyle ? secondErrorStyle.display : '',
+                            secondErrorVisibility: secondErrorStyle ? secondErrorStyle.visibility : '',
+                            secondErrorHeight: secondErrorRect ? secondErrorRect.height : 0
+                        });
+                    }, 150);
+                }, 150);
+            }, 1500);
+        }));
+
+        expect(result.missingPurchaseOrder, JSON.stringify(result, null, 2)).toBeFalsy();
+        expect(result.isValid, JSON.stringify(result, null, 2)).toBe(false);
+        expect(result.secondIsValid, JSON.stringify(result, null, 2)).toBe(false);
+        expect(result.inputClass, JSON.stringify(result, null, 2)).toContain('mage-error');
+        expect(result.ariaInvalid, JSON.stringify(result, null, 2)).toBe('true');
+        expect(result.ariaDescribedBy, JSON.stringify(result, null, 2)).toBe('po_number-error');
+        expect(result.errorText, JSON.stringify(result, null, 2)).toBeTruthy();
+        expect(result.errorDisplay, JSON.stringify(result, null, 2)).not.toBe('none');
+        expect(result.errorVisibility, JSON.stringify(result, null, 2)).not.toBe('hidden');
+        expect(result.errorHeight, JSON.stringify(result, null, 2)).toBeGreaterThan(0);
+        expect(result.secondErrorText, JSON.stringify(result, null, 2)).toBeTruthy();
+        expect(result.secondErrorDisplay, JSON.stringify(result, null, 2)).not.toBe('none');
+        expect(result.secondErrorVisibility, JSON.stringify(result, null, 2)).not.toBe('hidden');
+        expect(result.secondErrorHeight, JSON.stringify(result, null, 2)).toBeGreaterThan(0);
+    });
+
     test('should expose standard payment before-place-order region children', async ({ page }) => {
         const pageErrors = [];
 
@@ -2916,6 +3000,246 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
         // Check if value restored from sessionStorage (give brief delay for restore timeout)
         await page.waitForTimeout(1000);
         await expect(page.locator(selectors.firstname)).toHaveValue('SessionStorageTest');
+    });
+
+    test('should clear checkout persistence and ignore stale address writes after order placed', async ({ page }) => {
+        const checkout = new CheckoutPage(page);
+        await checkout.goto();
+
+        const result = await page.evaluate(() => new Promise((resolve) => {
+            window.require(['Magento_Checkout/js/checkout-data'], (checkoutData) => {
+                const cache = JSON.parse(window.localStorage.getItem('mage-cache-storage') || '{}');
+
+                window.fastcheckoutOrderPlaced = false;
+                window.sessionStorage.setItem('fastcheckout_firstname', 'OldOrderFirstname');
+                cache['checkout-data'] = Object.assign({}, cache['checkout-data'] || {}, {
+                    shippingAddressFromData: {
+                        default: {
+                            firstname: 'OldOrderFirstname'
+                        }
+                    },
+                    newCustomerShippingAddress: {
+                        default: {
+                            firstname: 'OldOrderFirstname'
+                        }
+                    },
+                    billingAddressFromData: {
+                        firstname: 'OldBillingFirstname'
+                    },
+                    validatedEmailValue: 'old-order@example.com',
+                    inputFieldEmailValue: 'old-order@example.com'
+                });
+                window.localStorage.setItem('mage-cache-storage', JSON.stringify(cache));
+
+                window.fastcheckoutHyvaPayment = window.fastcheckoutHyvaPayment || {};
+                window.fastcheckoutHyvaPayment.handleOrderPlaced = () => true;
+                window.dispatchEvent(new CustomEvent('magewire:order-placed', {
+                    detail: {
+                        orderId: 123456
+                    }
+                }));
+
+                window.setTimeout(() => {
+                    const input = document.querySelector('input[data-wire-field="firstname"]');
+                    if (input) {
+                        input.value = 'StaleAfterOrder';
+                        input.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+
+                    if (checkoutData && typeof checkoutData.setShippingAddressFromData === 'function') {
+                        checkoutData.setShippingAddressFromData({
+                            firstname: 'StaleCheckoutDataAfterOrder'
+                        });
+                    }
+
+                    window.setTimeout(() => {
+                        const afterCache = JSON.parse(window.localStorage.getItem('mage-cache-storage') || '{}');
+                        const afterCheckoutData = afterCache['checkout-data'] || {};
+
+                        resolve({
+                            orderPlaced: window.fastcheckoutOrderPlaced === true,
+                            sessionFirstname: window.sessionStorage.getItem('fastcheckout_firstname'),
+                            lastGuestAddress: JSON.parse(window.sessionStorage.getItem('fastcheckout_last_guest_address') || 'null'),
+                            checkoutData: afterCheckoutData
+                        });
+                    }, 150);
+                }, 150);
+            }, (error) => {
+                resolve({
+                    requireError: error && (error.requireModules || error.message || String(error))
+                });
+            });
+        }));
+
+        expect(result.requireError, JSON.stringify(result, null, 2)).toBeFalsy();
+        expect(result.orderPlaced, JSON.stringify(result, null, 2)).toBe(true);
+        expect(result.sessionFirstname, JSON.stringify(result, null, 2)).toBeNull();
+        expect(result.lastGuestAddress?.values?.firstname, JSON.stringify(result, null, 2)).toBe('OldOrderFirstname');
+        expect(result.checkoutData.shippingAddressFromData, JSON.stringify(result, null, 2)).toBeUndefined();
+        expect(result.checkoutData.newCustomerShippingAddress, JSON.stringify(result, null, 2)).toBeUndefined();
+        expect(result.checkoutData.billingAddressFromData, JSON.stringify(result, null, 2)).toBeUndefined();
+        expect(result.checkoutData.validatedEmailValue, JSON.stringify(result, null, 2)).toBeUndefined();
+        expect(result.checkoutData.inputFieldEmailValue, JSON.stringify(result, null, 2)).toBeUndefined();
+    });
+
+    test('should restore recent guest address snapshot on the next empty checkout', async ({ page }) => {
+        const checkout = new CheckoutPage(page);
+        await checkout.goto();
+
+        await page.evaluate(async () => {
+            const fields = [
+                'email', 'firstname', 'lastname', 'company',
+                'prefix', 'middlename', 'suffix', 'fax', 'vatId',
+                'street1', 'street2', 'street3', 'street4', 'city', 'postcode',
+                'countryId', 'regionId', 'region', 'telephone',
+                'billingFirstname', 'billingLastname', 'billingCompany',
+                'billingPrefix', 'billingMiddlename', 'billingSuffix', 'billingFax', 'billingVatId',
+                'billingStreet1', 'billingStreet2', 'billingStreet3', 'billingStreet4', 'billingCity',
+                'billingPostcode', 'billingCountryId', 'billingRegionId', 'billingRegion', 'billingTelephone'
+            ];
+            const wireEl = document.querySelector('[wire\\:id]');
+            const wire = wireEl && window.Livewire ? window.Livewire.find(wireEl.getAttribute('wire:id')) : null;
+            const fieldsToClear = ['email', 'firstname', 'lastname', 'street1', 'street2', 'street3', 'street4', 'city', 'postcode', 'telephone', 'region', 'regionId'];
+
+            fields.forEach((field) => window.sessionStorage.removeItem(`fastcheckout_${field}`));
+            window.sessionStorage.removeItem('fastcheckout_order_placed_cleanup');
+
+            if (wire && typeof wire.set === 'function') {
+                for (const field of fieldsToClear) {
+                    await wire.set(field, '');
+                }
+            }
+
+            window.sessionStorage.setItem('fastcheckout_last_guest_address', JSON.stringify({
+                createdAt: Date.now(),
+                values: {
+                    email: 'recent-guest@example.com',
+                    firstname: 'RecentGuest',
+                    lastname: 'Checkout',
+                    street1: 'Recent Street 10',
+                    city: 'Warsaw',
+                    postcode: '00-002',
+                    countryId: 'PL',
+                    regionId: '10',
+                    region: 'Mazowieckie',
+                    telephone: '500600700'
+                }
+            }));
+        });
+
+        await page.reload();
+        await page.waitForLoadState('domcontentloaded');
+        await page.waitForTimeout(1500);
+
+        await expect(page.locator(selectors.email)).toHaveValue('recent-guest@example.com');
+        await expect(page.locator(selectors.firstname)).toHaveValue('RecentGuest');
+        await expect(page.locator(selectors.lastname)).toHaveValue('Checkout');
+        await expect(page.locator(selectors.street1)).toHaveValue('Recent Street 10');
+        await expect(page.locator(selectors.city)).toHaveValue('Warsaw');
+        await expect(page.locator(selectors.postcode)).toHaveValue('00-002');
+        await expect(page.locator(selectors.telephone)).toHaveValue(/500\s?600\s?700/);
+
+        const readRestoredWireState = () => page.evaluate(() => {
+            const wireEl = document.querySelector('[wire\\:id]');
+            const wire = wireEl && window.Livewire ? window.Livewire.find(wireEl.getAttribute('wire:id')) : null;
+
+            return wire && typeof wire.get === 'function'
+                ? {
+                    firstname: wire.get('firstname'),
+                    street1: wire.get('street1'),
+                    city: wire.get('city'),
+                    postcode: wire.get('postcode'),
+                    telephone: wire.get('telephone')
+                }
+                : {};
+        });
+
+        await expect.poll(readRestoredWireState, {
+            timeout: 10000
+        }).toMatchObject({
+            firstname: 'RecentGuest',
+            street1: 'Recent Street 10',
+            city: 'Warsaw',
+            postcode: '00-002'
+        });
+        const restoredWireState = await readRestoredWireState();
+
+        expect(restoredWireState.firstname, JSON.stringify(restoredWireState, null, 2)).toBe('RecentGuest');
+        expect(restoredWireState.street1, JSON.stringify(restoredWireState, null, 2)).toBe('Recent Street 10');
+        expect(restoredWireState.city, JSON.stringify(restoredWireState, null, 2)).toBe('Warsaw');
+        expect(restoredWireState.postcode, JSON.stringify(restoredWireState, null, 2)).toBe('00-002');
+
+        await page.waitForTimeout(2000);
+        await page.evaluate(() => {
+            ['firstname', 'street1', 'city', 'telephone'].forEach((field) => {
+                const input = document.querySelector(`[data-wire-field="${field}"]`);
+                if (input) {
+                    input.value = '';
+                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+            });
+        });
+        await page.waitForTimeout(1500);
+        await expect(page.locator(selectors.firstname)).toHaveValue('RecentGuest');
+        await expect(page.locator(selectors.street1)).toHaveValue('Recent Street 10');
+        await expect(page.locator(selectors.city)).toHaveValue('Warsaw');
+        await expect(page.locator(selectors.telephone)).toHaveValue(/500\s?600\s?700/);
+
+        await page.waitForTimeout(4000);
+        await expect(page.locator(selectors.firstname)).toHaveValue('RecentGuest');
+        await expect(page.locator(selectors.street1)).toHaveValue('Recent Street 10');
+        await expect(page.locator(selectors.city)).toHaveValue('Warsaw');
+        await expect(page.locator(selectors.telephone)).toHaveValue(/500\s?600\s?700/);
+    });
+
+    test('should re-enable checkout persistence when active checkout page is shown again', async ({ page }) => {
+        const checkout = new CheckoutPage(page);
+        await checkout.goto();
+
+        const result = await page.evaluate(() => new Promise((resolve) => {
+            window.require(['Magento_Checkout/js/checkout-data'], (checkoutData) => {
+                window.fastcheckoutOrderPlaced = true;
+                window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
+
+                window.setTimeout(() => {
+                    const input = document.querySelector('input[data-wire-field="firstname"]');
+                    if (input) {
+                        input.value = 'FreshCheckoutFirstname';
+                        input.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+
+                    if (checkoutData && typeof checkoutData.setShippingAddressFromData === 'function') {
+                        checkoutData.setShippingAddressFromData({
+                            firstname: 'FreshCheckoutFirstname'
+                        });
+                    }
+
+                    window.setTimeout(() => {
+                        const cache = JSON.parse(window.localStorage.getItem('mage-cache-storage') || '{}');
+                        const checkoutDataCache = cache['checkout-data'] || {};
+                        const shippingAddressByStore = checkoutDataCache.shippingAddressFromData || {};
+                        const firstShippingAddress = Object.keys(shippingAddressByStore).length
+                            ? shippingAddressByStore[Object.keys(shippingAddressByStore)[0]]
+                            : null;
+
+                        resolve({
+                            orderPlaced: window.fastcheckoutOrderPlaced === true,
+                            sessionFirstname: window.sessionStorage.getItem('fastcheckout_firstname'),
+                            shippingFirstname: firstShippingAddress && firstShippingAddress.firstname
+                        });
+                    }, 150);
+                }, 150);
+            }, (error) => {
+                resolve({
+                    requireError: error && (error.requireModules || error.message || String(error))
+                });
+            });
+        }));
+
+        expect(result.requireError, JSON.stringify(result, null, 2)).toBeFalsy();
+        expect(result.orderPlaced, JSON.stringify(result, null, 2)).toBe(false);
+        expect(result.sessionFirstname, JSON.stringify(result, null, 2)).toBe('FreshCheckoutFirstname');
+        expect(result.shippingFirstname, JSON.stringify(result, null, 2)).toBe('FreshCheckoutFirstname');
     });
 
     test('should support address autofill for logged-in customers', async ({ page }) => {

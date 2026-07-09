@@ -452,6 +452,9 @@ window.addEventListener('alpine:init', () => Alpine.data('initCheckout', initChe
 /* ── sessionStorage backup (Livewire 2 / Magewire compatible) ──────────────── */
 (function () {
     const PREFIX = 'fastcheckout_';
+    const ORDER_PLACED_MARKER = PREFIX + 'order_placed_cleanup';
+    const LAST_GUEST_ADDRESS_KEY = PREFIX + 'last_guest_address';
+    const LAST_GUEST_ADDRESS_TTL = 30 * 60 * 1000;
     const FIELDS = [
         'email', 'firstname', 'lastname', 'company',
         'prefix', 'middlename', 'suffix', 'fax', 'vatId',
@@ -462,24 +465,322 @@ window.addEventListener('alpine:init', () => Alpine.data('initCheckout', initChe
         'billingStreet1', 'billingStreet2', 'billingStreet3', 'billingStreet4', 'billingCity',
         'billingPostcode', 'billingCountryId', 'billingRegionId', 'billingRegion', 'billingTelephone'
     ];
+    const MEANINGFUL_SHIPPING_FIELDS = [
+        'firstname', 'lastname', 'street1', 'street2', 'street3', 'street4', 'city', 'postcode', 'telephone'
+    ];
+    let lastGuestRestoreValues = null;
+    let lastGuestRestoreAttempts = 0;
+    let lastGuestRestoreUntil = 0;
+    let lastGuestRestoreInterval = null;
+    let lastGuestRestoreServerSynced = false;
+    let lastGuestRestoreServerSyncing = false;
+
+    function isCheckoutSuccessPage() {
+        return window.location.href.includes('/checkout/onepage/success');
+    }
+
+    function resetOrderPlacedStateForActiveCheckout() {
+        if (isCheckoutSuccessPage()) {
+            return;
+        }
+
+        window.fastcheckoutOrderPlaced = false;
+        try { sessionStorage.removeItem(ORDER_PLACED_MARKER); } catch (e) {}
+    }
 
     function save(field, value) {
         try {
-            if (value !== undefined && value !== null) {
+            if (!window.fastcheckoutOrderPlaced && value !== undefined && value !== null) {
                 sessionStorage.setItem(PREFIX + field, value);
             }
         } catch (e) {}
     }
 
-    function restore(wire) {
-        FIELDS.forEach(function (field) {
-            try {
-                const val = sessionStorage.getItem(PREFIX + field);
-                if (val && !wire.get(field)) {
-                    wire.set(field, val);
-                }
-            } catch (e) {}
+    function getWireValue(wire, field) {
+        try {
+            if (wire && typeof wire.get === 'function') {
+                return wire.get(field);
+            }
+        } catch (e) {}
+
+        return undefined;
+    }
+
+    function getFieldElement(field) {
+        return document.querySelector('[data-wire-field="' + field + '"]');
+    }
+
+    function setDomFieldValue(field, value) {
+        const input = getFieldElement(field);
+
+        if (!input || String(input.value || '') === String(value || '')) {
+            return;
+        }
+
+        input.value = value;
+        try { input.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) {}
+        try { input.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) {}
+    }
+
+    function setDomFieldValueQuietly(field, value) {
+        const input = getFieldElement(field);
+
+        if (!input || String(input.value || '') === String(value || '')) {
+            return;
+        }
+
+        input.value = value;
+    }
+
+    function setWireValue(wire, field, value, deferUpdate) {
+        try {
+            if (wire && typeof wire.set === 'function') {
+                wire.set(field, value, deferUpdate === true);
+            }
+            if (wire && wire.data && typeof wire.data === 'object') {
+                wire.data[field] = value;
+            }
+        } catch (e) {}
+    }
+
+    function hasMeaningfulShippingData(wire) {
+        return MEANINGFUL_SHIPPING_FIELDS.some(function (field) {
+            const value = getWireValue(wire, field);
+            return value !== undefined && value !== null && String(value).trim() !== '';
         });
+    }
+
+    function hasMeaningfulDomShippingData() {
+        return MEANINGFUL_SHIPPING_FIELDS.some(function (field) {
+            const value = readCurrentFieldValue(field);
+            return value !== undefined && value !== null && String(value).trim() !== '';
+        });
+    }
+
+    function readSessionField(field) {
+        try {
+            return sessionStorage.getItem(PREFIX + field);
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function readCurrentFieldValue(field) {
+        const input = getFieldElement(field);
+        return input ? input.value : null;
+    }
+
+    function buildPersistedFieldsSnapshot() {
+        const values = {};
+
+        FIELDS.forEach(function (field) {
+            const sessionValue = readSessionField(field);
+            const inputValue = readCurrentFieldValue(field);
+            const value = inputValue !== null && inputValue !== '' ? inputValue : sessionValue;
+
+            if (value !== undefined && value !== null && value !== '') {
+                values[field] = value;
+            }
+        });
+
+        return values;
+    }
+
+    function hasMeaningfulSnapshotAddress(values) {
+        return MEANINGFUL_SHIPPING_FIELDS.some(function (field) {
+            return values[field] !== undefined && values[field] !== null && String(values[field]).trim() !== '';
+        });
+    }
+
+    function persistLastGuestAddress() {
+        try {
+            const values = buildPersistedFieldsSnapshot();
+            if (!hasMeaningfulSnapshotAddress(values)) {
+                return;
+            }
+
+            sessionStorage.setItem(LAST_GUEST_ADDRESS_KEY, JSON.stringify({
+                createdAt: Date.now(),
+                values: values
+            }));
+        } catch (e) {}
+    }
+
+    function getLastGuestAddressValues() {
+        try {
+            const raw = sessionStorage.getItem(LAST_GUEST_ADDRESS_KEY);
+            const payload = raw ? JSON.parse(raw) : null;
+            if (!payload || !payload.createdAt || !payload.values) {
+                return null;
+            }
+            if (Date.now() - payload.createdAt > LAST_GUEST_ADDRESS_TTL) {
+                sessionStorage.removeItem(LAST_GUEST_ADDRESS_KEY);
+                return null;
+            }
+
+            return payload.values;
+        } catch (e) {
+            try { sessionStorage.removeItem(LAST_GUEST_ADDRESS_KEY); } catch (removeError) {}
+            return null;
+        }
+    }
+
+    function restoreFields(wire, values, deferUpdates) {
+        if (!values) {
+            return;
+        }
+
+        FIELDS.forEach(function (field) {
+            const val = values[field],
+                domValue = readCurrentFieldValue(field),
+                wireValue = getWireValue(wire, field);
+
+            if (
+                val &&
+                (
+                    domValue === null ||
+                    String(domValue || '').trim() === '' ||
+                    String(wireValue || '').trim() === ''
+                )
+            ) {
+                setDomFieldValue(field, val);
+                setWireValue(wire, field, val, deferUpdates === true);
+            }
+        });
+    }
+
+    function restoreDomFieldsOnly(values) {
+        if (!values) {
+            return;
+        }
+
+        FIELDS.forEach(function (field) {
+            const val = values[field],
+                domValue = readCurrentFieldValue(field);
+
+            if (val && (domValue === null || String(domValue || '').trim() === '')) {
+                setDomFieldValueQuietly(field, val);
+            }
+        });
+    }
+
+    function syncRecentGuestAddressToServer(wire, values) {
+        if (
+            !wire ||
+            !values ||
+            lastGuestRestoreServerSynced ||
+            lastGuestRestoreServerSyncing ||
+            typeof wire.call !== 'function'
+        ) {
+            return Promise.resolve(lastGuestRestoreServerSynced);
+        }
+
+        lastGuestRestoreServerSyncing = true;
+        window.fastcheckoutGuestAddressSnapshotRestorePending = true;
+        try {
+            return Promise.resolve(wire.call('restoreGuestAddressSnapshot', values))
+                .then(function (result) {
+                    lastGuestRestoreServerSyncing = false;
+                    lastGuestRestoreServerSynced = result !== false;
+                    window.fastcheckoutGuestAddressSnapshotRestorePending = !lastGuestRestoreServerSynced;
+                    return lastGuestRestoreServerSynced;
+                })
+                .catch(function () {
+                    lastGuestRestoreServerSyncing = false;
+                    lastGuestRestoreServerSynced = false;
+                    window.fastcheckoutGuestAddressSnapshotRestorePending = false;
+                    return false;
+                });
+        } catch (e) {
+            lastGuestRestoreServerSyncing = false;
+            lastGuestRestoreServerSynced = false;
+            window.fastcheckoutGuestAddressSnapshotRestorePending = false;
+            return Promise.resolve(false);
+        }
+    }
+
+    function restoreRecentGuestAddress(wire, snapshotValues) {
+        const values = snapshotValues || getLastGuestAddressValues();
+
+        if (!values || hasMeaningfulDomShippingData() || hasMeaningfulShippingData(wire)) {
+            return false;
+        }
+
+        lastGuestRestoreValues = values;
+        lastGuestRestoreAttempts = 0;
+        lastGuestRestoreUntil = Date.now() + 15000;
+        lastGuestRestoreServerSynced = false;
+        lastGuestRestoreServerSyncing = false;
+        window.fastcheckoutGuestAddressSnapshotRestorePending = true;
+        syncRecentGuestAddressToServer(wire, values).then(function (synced) {
+            if (synced) {
+                restoreDomFieldsOnly(values);
+            }
+        });
+        scheduleRecentGuestAddressReapply();
+        return true;
+    }
+
+    function reapplyRecentGuestAddressIfNeeded(wire) {
+        if (!lastGuestRestoreValues || window.fastcheckoutOrderPlaced) {
+            return;
+        }
+        if (Date.now() > lastGuestRestoreUntil || lastGuestRestoreAttempts >= 20) {
+            lastGuestRestoreValues = null;
+            window.fastcheckoutGuestAddressSnapshotRestorePending = false;
+            if (lastGuestRestoreInterval) {
+                window.clearInterval(lastGuestRestoreInterval);
+                lastGuestRestoreInterval = null;
+            }
+            return;
+        }
+
+        lastGuestRestoreAttempts += 1;
+        if (!lastGuestRestoreServerSynced) {
+            syncRecentGuestAddressToServer(wire, lastGuestRestoreValues).then(function (synced) {
+                if (synced) {
+                    restoreDomFieldsOnly(lastGuestRestoreValues);
+                }
+            });
+            return;
+        }
+
+        restoreDomFieldsOnly(lastGuestRestoreValues);
+    }
+
+    function scheduleRecentGuestAddressReapply() {
+        if (!lastGuestRestoreInterval) {
+            lastGuestRestoreInterval = window.setInterval(function () {
+                reapplyRecentGuestAddressIfNeeded(getWire());
+            }, 500);
+        }
+
+        [50, 250, 750, 1500, 3000].forEach(function (delay) {
+            window.setTimeout(function () {
+                reapplyRecentGuestAddressIfNeeded(getWire());
+            }, delay);
+        });
+    }
+
+    function restore(wire) {
+        if (window.fastcheckoutOrderPlaced) {
+            return;
+        }
+
+        const guestValues = getLastGuestAddressValues();
+        if (guestValues && !hasMeaningfulDomShippingData() && !hasMeaningfulShippingData(wire)) {
+            restoreRecentGuestAddress(wire, guestValues);
+            return;
+        }
+
+        const sessionValues = {};
+        FIELDS.forEach(function (field) {
+            const val = readSessionField(field);
+            if (val) {
+                sessionValues[field] = val;
+            }
+        });
+        restoreFields(wire, sessionValues, false);
     }
 
     function clearStorage() {
@@ -488,17 +789,61 @@ window.addEventListener('alpine:init', () => Alpine.data('initCheckout', initChe
         });
     }
 
+    function clearCheckoutDataStorage() {
+        try {
+            if (!window.localStorage) {
+                return;
+            }
+
+            const cache = JSON.parse(window.localStorage.getItem('mage-cache-storage') || '{}');
+            const checkoutData = cache['checkout-data'] || {};
+            [
+                'selectedShippingAddress',
+                'shippingAddressFromData',
+                'newCustomerShippingAddress',
+                'selectedShippingRate',
+                'selectedPaymentMethod',
+                'selectedBillingAddress',
+                'billingAddressFromData',
+                'newCustomerBillingAddress',
+                'validatedEmailValue',
+                'inputFieldEmailValue',
+                'checkedEmailValue'
+            ].forEach(function (key) {
+                delete checkoutData[key];
+            });
+            cache['checkout-data'] = checkoutData;
+            window.localStorage.setItem('mage-cache-storage', JSON.stringify(cache));
+        } catch (e) {}
+    }
+
+    function clearPersistedCheckoutState() {
+        persistLastGuestAddress();
+        window.fastcheckoutOrderPlaced = true;
+        try { sessionStorage.setItem(ORDER_PLACED_MARKER, '1'); } catch (e) {}
+        clearStorage();
+        clearCheckoutDataStorage();
+    }
+
     function getWire() {
         const el = document.querySelector('[wire\\:id]');
         return el ? (window.Livewire && window.Livewire.find(el.getAttribute('wire:id'))) : null;
     }
 
+    resetOrderPlacedStateForActiveCheckout();
+
+    window.addEventListener('pageshow', function () {
+        resetOrderPlacedStateForActiveCheckout();
+    });
+
     if (window.Livewire) {
         window.Livewire.hook('message.processed', function (message, component) {
+            if (window.fastcheckoutOrderPlaced) return;
             if (!component || !component.data) return;
             FIELDS.forEach(function (field) {
                 try { save(field, component.data[field]); } catch (e) {}
             });
+            scheduleRecentGuestAddressReapply();
         });
     }
 
@@ -506,6 +851,7 @@ window.addEventListener('alpine:init', () => Alpine.data('initCheckout', initChe
     document.addEventListener('input', function (event) {
         var target = event.target;
         if (!target) return;
+        if (window.fastcheckoutOrderPlaced) return;
         var field = target.dataset.wireField;
         if (field && FIELDS.includes(field)) {
             save(field, target.value);
@@ -517,8 +863,7 @@ window.addEventListener('alpine:init', () => Alpine.data('initCheckout', initChe
             const wire = getWire();
             if (wire) restore(wire);
             window.addEventListener('magewire:order-placed', function (event) {
-                window.fastcheckoutOrderPlaced = true;
-                clearStorage();
+                clearPersistedCheckoutState();
                 if (
                     window.fastcheckoutHyvaPayment &&
                     typeof window.fastcheckoutHyvaPayment.handleOrderPlaced === 'function' &&
@@ -538,8 +883,8 @@ window.addEventListener('alpine:init', () => Alpine.data('initCheckout', initChe
                     });
                 }
             });
-            if (window.location.href.includes('/checkout/onepage/success')) {
-                clearStorage();
+            if (isCheckoutSuccessPage()) {
+                clearPersistedCheckoutState();
             }
         }, 400);
     });

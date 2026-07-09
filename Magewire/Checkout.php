@@ -288,6 +288,14 @@ class Checkout extends Component
                     $this->selectShippingMethod($defaultShipping);
                 }
             }
+
+            if (!$this->hasMeaningfulShippingAddressData()) {
+                $defaultCustomerAddress = $this->getDefaultCustomerShippingAddress();
+                if ($defaultCustomerAddress) {
+                    $this->applyCustomerAddressToShippingFields($defaultCustomerAddress);
+                    $this->saveShippingAddress(true, true, true);
+                }
+            }
         }
 
         $billingAddress = $quote->getBillingAddress();
@@ -422,6 +430,40 @@ class Checkout extends Component
                     throw $e;
                 }
             }
+        }
+    }
+
+    public function restoreGuestAddressSnapshot(array $values): bool
+    {
+        try {
+            $quote = $this->checkoutSession->getQuote();
+            $shippingAddress = $quote->getShippingAddress();
+
+            if ($this->hasMeaningfulQuoteShippingAddressData($shippingAddress)) {
+                return true;
+            }
+
+            $this->applyGuestAddressSnapshotToFields($values);
+            if (!$this->hasMeaningfulShippingAddressData()) {
+                return false;
+            }
+
+            if ($this->email !== '') {
+                $quote->setCustomerEmail($this->email);
+            }
+            if (method_exists($quote, 'setDataChanges')) {
+                $quote->setDataChanges(true);
+            }
+            if ($shippingAddress && method_exists($shippingAddress, 'setDataChanges')) {
+                $shippingAddress->setDataChanges(true);
+            }
+
+            $this->saveShippingAddress(true, false, true);
+            $this->cartRepository->save($quote);
+            return true;
+        } catch (\Exception $e) {
+            $this->logger->warning('Fastcheckout guest address snapshot restore failed', ['exception' => $e]);
+            return false;
         }
     }
 
@@ -1750,35 +1792,170 @@ class Checkout extends Component
                 return;
             }
 
-            $street = (array) $address->getStreet();
-
-            $this->firstname  = (string) $address->getFirstname();
-            $this->lastname   = (string) $address->getLastname();
-            $this->company    = (string) $address->getCompany();
-            $this->prefix     = (string) $address->getPrefix();
-            $this->middlename = (string) $address->getMiddlename();
-            $this->suffix     = (string) $address->getSuffix();
-            $this->fax        = (string) $address->getFax();
-            $this->vatId      = (string) $address->getVatId();
-            $this->street1    = $street[0] ?? '';
-            $this->street2    = $street[1] ?? '';
-            $this->street3    = $street[2] ?? '';
-            $this->street4    = $street[3] ?? '';
-            $this->city       = (string) $address->getCity();
-            $this->postcode   = (string) $address->getPostcode();
-            $this->countryId  = (string) $address->getCountryId();
-            $this->telephone  = (string) $address->getTelephone();
-
-            $region = $address->getRegion();
-            if ($region) {
-                $this->region = $this->resolveAddressRegionName($address);
-                $this->regionId = $this->resolveAddressRegionId($address, $this->countryId, $this->region);
-            }
-
+            $this->applyCustomerAddressToShippingFields($address);
             $this->saveShippingAddress(true, true, true);
         } catch (\Exception $e) {
             $this->logger->error('Kkkonrad Fastcheckout fillFromSavedAddress Error: ' . $e->getMessage(), ['exception' => $e]);
         }
+    }
+
+    private function hasMeaningfulShippingAddressData(): bool
+    {
+        return trim((string)$this->firstname) !== ''
+            || trim((string)$this->lastname) !== ''
+            || trim((string)$this->street1 . (string)$this->street2 . (string)$this->street3 . (string)$this->street4) !== ''
+            || trim((string)$this->city) !== ''
+            || trim((string)$this->postcode) !== ''
+            || trim((string)$this->telephone) !== '';
+    }
+
+    private function hasMeaningfulQuoteShippingAddressData($address): bool
+    {
+        if (!$address) {
+            return false;
+        }
+
+        try {
+            $street = is_callable([$address, 'getStreet']) ? (array)$address->getStreet() : [];
+
+            return trim((string)(is_callable([$address, 'getFirstname']) ? $address->getFirstname() : '')) !== ''
+                || trim((string)(is_callable([$address, 'getLastname']) ? $address->getLastname() : '')) !== ''
+                || trim(implode('', array_map('strval', $street))) !== ''
+                || trim((string)(is_callable([$address, 'getCity']) ? $address->getCity() : '')) !== ''
+                || trim((string)(is_callable([$address, 'getPostcode']) ? $address->getPostcode() : '')) !== ''
+                || trim((string)(is_callable([$address, 'getTelephone']) ? $address->getTelephone() : '')) !== '';
+        } catch (\Throwable $e) {
+            $this->logger->warning('Fastcheckout quote shipping address data check failed', ['exception' => $e]);
+            return false;
+        }
+    }
+
+    private function applyGuestAddressSnapshotToFields(array $values): void
+    {
+        $this->email = $this->getSnapshotString($values, 'email', 255) ?: $this->email;
+        $this->firstname = $this->getSnapshotString($values, 'firstname');
+        $this->lastname = $this->getSnapshotString($values, 'lastname');
+        $this->company = $this->getSnapshotString($values, 'company');
+        $this->prefix = $this->getSnapshotString($values, 'prefix');
+        $this->middlename = $this->getSnapshotString($values, 'middlename');
+        $this->suffix = $this->getSnapshotString($values, 'suffix');
+        $this->fax = $this->getSnapshotString($values, 'fax');
+        $this->vatId = $this->getSnapshotString($values, 'vatId');
+        $this->street1 = $this->getSnapshotString($values, 'street1');
+        $this->street2 = $this->getSnapshotString($values, 'street2');
+        $this->street3 = $this->getSnapshotString($values, 'street3');
+        $this->street4 = $this->getSnapshotString($values, 'street4');
+        $this->city = $this->getSnapshotString($values, 'city');
+        $this->postcode = $this->getSnapshotString($values, 'postcode');
+        $this->countryId = $this->getSnapshotString($values, 'countryId', 2) ?: $this->getDefaultCountry();
+        $this->regionId = $this->getSnapshotString($values, 'regionId', 32);
+        $this->region = $this->getSnapshotString($values, 'region');
+        $this->telephone = $this->getSnapshotString($values, 'telephone', 64);
+
+        $this->billingFirstname = $this->getSnapshotString($values, 'billingFirstname') ?: $this->firstname;
+        $this->billingLastname = $this->getSnapshotString($values, 'billingLastname') ?: $this->lastname;
+        $this->billingCompany = $this->getSnapshotString($values, 'billingCompany') ?: $this->company;
+        $this->billingPrefix = $this->getSnapshotString($values, 'billingPrefix') ?: $this->prefix;
+        $this->billingMiddlename = $this->getSnapshotString($values, 'billingMiddlename') ?: $this->middlename;
+        $this->billingSuffix = $this->getSnapshotString($values, 'billingSuffix') ?: $this->suffix;
+        $this->billingFax = $this->getSnapshotString($values, 'billingFax') ?: $this->fax;
+        $this->billingVatId = $this->getSnapshotString($values, 'billingVatId') ?: $this->vatId;
+        $this->billingStreet1 = $this->getSnapshotString($values, 'billingStreet1') ?: $this->street1;
+        $this->billingStreet2 = $this->getSnapshotString($values, 'billingStreet2') ?: $this->street2;
+        $this->billingStreet3 = $this->getSnapshotString($values, 'billingStreet3') ?: $this->street3;
+        $this->billingStreet4 = $this->getSnapshotString($values, 'billingStreet4') ?: $this->street4;
+        $this->billingCity = $this->getSnapshotString($values, 'billingCity') ?: $this->city;
+        $this->billingPostcode = $this->getSnapshotString($values, 'billingPostcode') ?: $this->postcode;
+        $this->billingCountryId = $this->getSnapshotString($values, 'billingCountryId', 2) ?: $this->countryId;
+        $this->billingRegionId = $this->getSnapshotString($values, 'billingRegionId', 32) ?: $this->regionId;
+        $this->billingRegion = $this->getSnapshotString($values, 'billingRegion') ?: $this->region;
+        $this->billingTelephone = $this->getSnapshotString($values, 'billingTelephone', 64) ?: $this->telephone;
+    }
+
+    private function getSnapshotString(array $values, string $key, int $maxLength = 255): string
+    {
+        if (!array_key_exists($key, $values) || is_array($values[$key]) || is_object($values[$key])) {
+            return '';
+        }
+
+        $value = trim((string)$values[$key]);
+        if ($value === '') {
+            return '';
+        }
+
+        return substr($value, 0, $maxLength);
+    }
+
+    private function getDefaultCustomerShippingAddress()
+    {
+        if ($this->customerSession === null || $this->addressRepository === null) {
+            return null;
+        }
+
+        try {
+            if (!$this->customerSession->isLoggedIn()) {
+                return null;
+            }
+
+            $customerId = (int)$this->customerSession->getCustomerId();
+            if ($customerId <= 0) {
+                return null;
+            }
+
+            $customer = is_callable([$this->customerSession, 'getCustomer'])
+                ? $this->customerSession->getCustomer()
+                : null;
+            $defaultShippingId = $customer && is_callable([$customer, 'getDefaultShipping'])
+                ? (int)$customer->getDefaultShipping()
+                : 0;
+
+            if ($defaultShippingId > 0) {
+                $address = $this->addressRepository->getById($defaultShippingId);
+                if ((int)$address->getCustomerId() === $customerId) {
+                    return $address;
+                }
+            }
+
+            if ($this->searchCriteriaBuilder !== null) {
+                $searchCriteria = $this->searchCriteriaBuilder
+                    ->addFilter('parent_id', $customerId)
+                    ->create();
+                $addresses = $this->addressRepository->getList($searchCriteria)->getItems();
+                foreach ($addresses as $address) {
+                    if ((int)$address->getCustomerId() === $customerId) {
+                        return $address;
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            $this->logger->warning('Fastcheckout default customer shipping address load failed', ['exception' => $e]);
+        }
+
+        return null;
+    }
+
+    private function applyCustomerAddressToShippingFields($address): void
+    {
+        $street = (array)$address->getStreet();
+
+        $this->firstname  = (string)$address->getFirstname();
+        $this->lastname   = (string)$address->getLastname();
+        $this->company    = (string)$address->getCompany();
+        $this->prefix     = (string)$address->getPrefix();
+        $this->middlename = (string)$address->getMiddlename();
+        $this->suffix     = (string)$address->getSuffix();
+        $this->fax        = (string)$address->getFax();
+        $this->vatId      = (string)$address->getVatId();
+        $this->street1    = (string)($street[0] ?? '');
+        $this->street2    = (string)($street[1] ?? '');
+        $this->street3    = (string)($street[2] ?? '');
+        $this->street4    = (string)($street[3] ?? '');
+        $this->city       = (string)$address->getCity();
+        $this->postcode   = (string)$address->getPostcode();
+        $this->countryId  = (string)$address->getCountryId();
+        $this->telephone  = (string)$address->getTelephone();
+        $this->region     = $this->resolveAddressRegionName($address);
+        $this->regionId   = $this->resolveAddressRegionId($address, $this->countryId, $this->region);
     }
 
     /**
