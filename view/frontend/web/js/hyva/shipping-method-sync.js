@@ -8,7 +8,6 @@ define([], function () {
             shippingService = deps.shippingService,
             selectShippingMethodAction = deps.selectShippingMethodAction,
             getMagewireComponent = typeof deps.getMagewireComponent === 'function' ? deps.getMagewireComponent : function () { return null; },
-            getProperty = typeof deps.getProperty === 'function' ? deps.getProperty : function () { return ''; },
             persistShippingMethod = typeof deps.persistShippingMethod === 'function' ? deps.persistShippingMethod : function () {},
             lastMagewireShippingMethodCode = '',
             syncTimer = null;
@@ -74,8 +73,7 @@ define([], function () {
         }
 
         function syncToMagewireNow(methodCode) {
-            var wire,
-                currentMethod;
+            var wire;
 
             persistShippingMethod(methodCode);
 
@@ -93,12 +91,7 @@ define([], function () {
                 return Promise.resolve(false);
             }
 
-            currentMethod = getProperty(wire, 'shippingMethod');
             lastMagewireShippingMethodCode = methodCode;
-
-            if (currentMethod === methodCode) {
-                return Promise.resolve(true);
-            }
 
             return Promise.resolve(wire.call('selectShippingMethod', methodCode));
         }
@@ -120,8 +113,7 @@ define([], function () {
             }
 
             syncTimer = window.setTimeout(function () {
-                var wire = getMagewireComponent(),
-                    currentMethod;
+                var wire = getMagewireComponent();
 
                 syncTimer = null;
 
@@ -129,10 +121,7 @@ define([], function () {
                     return;
                 }
 
-                currentMethod = getProperty(wire, 'shippingMethod');
-                if (currentMethod !== methodCode) {
-                    wire.call('selectShippingMethod', methodCode);
-                }
+                wire.call('selectShippingMethod', methodCode);
             }, 0);
         }
 

@@ -130,6 +130,21 @@ class Data extends AbstractHelper
         }
     }
 
+    public function hasShippingPaymentMapping(): bool
+    {
+        foreach ($this->getShippingPaymentMapping() as $rule) {
+            if (
+                is_array($rule)
+                && trim((string)($rule['shipping_method'] ?? '')) !== ''
+                && trim((string)($rule['payment_method'] ?? '')) !== ''
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public function getMappedPaymentMethodsForShipping($shippingMethod): array
     {
         $shippingMethod = (string)$shippingMethod;

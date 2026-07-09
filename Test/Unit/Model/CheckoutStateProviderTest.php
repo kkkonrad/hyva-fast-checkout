@@ -18,6 +18,79 @@ use Psr\Log\LoggerInterface;
 
 class CheckoutStateProviderTest extends TestCase
 {
+    public function testStateReturnsNoPaymentMethodsForUnmappedShippingMethod(): void
+    {
+        $checkoutSession = $this->createMock(CheckoutSession::class);
+        $cartRepository = $this->createMock(CartRepositoryInterface::class);
+        $paymentMethodManagement = $this->createMock(PaymentMethodManagementInterface::class);
+        $helper = $this->createMock(Helper::class);
+        $logger = $this->createMock(LoggerInterface::class);
+
+        $quote = $this->getMockBuilder(Quote::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods([
+                'getAllVisibleItems',
+                'getId',
+                'getPayment',
+                'getShippingAddress',
+                'getTotals',
+                'hasItems',
+            ])
+            ->addMethods([
+                'getCouponCode',
+                'getGrandTotal',
+                'getSubtotal',
+                'getSubtotalWithDiscount',
+            ])
+            ->getMock();
+        $shippingAddress = $this->getMockBuilder(QuoteAddress::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['getCountryId', 'getShippingMethod'])
+            ->getMock();
+        $paymentMethod = new class extends DataObject implements PaymentMethodInterface {
+            public function getCode()
+            {
+                return 'cashondelivery';
+            }
+
+            public function getTitle()
+            {
+                return 'Cash on Delivery';
+            }
+        };
+
+        $checkoutSession->method('getQuote')->willReturn($quote);
+        $quote->method('getId')->willReturn(42);
+        $quote->method('hasItems')->willReturn(false);
+        $quote->method('getPayment')->willReturn(null);
+        $quote->method('getShippingAddress')->willReturn($shippingAddress);
+        $quote->method('getTotals')->willReturn(null);
+        $quote->method('getAllVisibleItems')->willReturn([]);
+        $quote->method('getCouponCode')->willReturn('');
+        $quote->method('getGrandTotal')->willReturn(0.0);
+        $quote->method('getSubtotal')->willReturn(0.0);
+        $quote->method('getSubtotalWithDiscount')->willReturn(0.0);
+        $shippingAddress->method('getCountryId')->willReturn('PL');
+        $shippingAddress->method('getShippingMethod')->willReturn('tablerate_bestway');
+
+        $paymentMethodManagement->expects($this->once())->method('getList')->with(42)->willReturn([$paymentMethod]);
+        $helper->method('hasShippingPaymentMapping')->willReturn(true);
+        $helper->expects($this->once())
+            ->method('getMappedPaymentMethodsForShipping')
+            ->with('tablerate_bestway')
+            ->willReturn([]);
+
+        $provider = new CheckoutStateProvider(
+            $checkoutSession,
+            $cartRepository,
+            $paymentMethodManagement,
+            $helper,
+            $logger
+        );
+
+        $this->assertSame([], $provider->getState()['payment_methods']);
+    }
+
     public function testStateIncludesShippingRateExtensionAttributes(): void
     {
         $checkoutSession = $this->createMock(CheckoutSession::class);

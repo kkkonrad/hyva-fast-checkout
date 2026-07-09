@@ -89,6 +89,31 @@ class DataTest extends TestCase
         $this->assertSame(['payu_blik'], $helper->getMappedPaymentMethodsForShipping('customcarrier_pickup'));
     }
 
+    public function testHasShippingPaymentMappingRequiresAtLeastOneValidRule(): void
+    {
+        $jsonHelper = $this->createMock(JsonHelper::class);
+        $jsonHelper->method('jsonDecode')->willReturn([
+            '_empty' => '',
+            '_invalid' => ['shipping_method' => 'flatrate_flatrate'],
+        ]);
+
+        $helper = $this->createHelper('encoded mapping', $jsonHelper);
+
+        $this->assertFalse($helper->hasShippingPaymentMapping());
+
+        $jsonHelper = $this->createMock(JsonHelper::class);
+        $jsonHelper->method('jsonDecode')->willReturn([
+            '_valid' => [
+                'shipping_method' => 'flatrate_flatrate',
+                'payment_method' => 'cashondelivery',
+            ],
+        ]);
+
+        $helper = $this->createHelper('encoded mapping', $jsonHelper);
+
+        $this->assertTrue($helper->hasShippingPaymentMapping());
+    }
+
     public function testIsPaymentMethodCodeAllowedByRulesMatchesExactCodesOnly(): void
     {
         $helper = $this->createHelper('', $this->createMock(JsonHelper::class));

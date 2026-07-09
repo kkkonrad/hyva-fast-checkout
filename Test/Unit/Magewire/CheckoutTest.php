@@ -787,6 +787,52 @@ class CheckoutTest extends TestCase
         $this->assertEquals('customcarrier_pickup_point_cod', $this->checkoutComponent->shippingMethod);
     }
 
+    public function testUpdatedHookPersistsDirectMagewirePropertyUpdates(): void
+    {
+        $shippingAddressMock = $this->createAddressMock();
+
+        $this->quoteMock->method('getShippingAddress')->willReturn($shippingAddressMock);
+        $shippingAddressMock->method('getCountryId')->willReturn('PL');
+        $shippingAddressMock->expects($this->once())
+            ->method('setShippingMethod')
+            ->with('inpostlocker_standard');
+        $this->cartRepositoryMock->expects($this->once())
+            ->method('save')
+            ->with($this->quoteMock);
+
+        $this->checkoutComponent->updated('inpostlocker_standard', 'shippingMethod');
+
+        $this->assertSame('inpostlocker_standard', $this->checkoutComponent->shippingMethod);
+    }
+
+    public function testSelectShippingMethodClearsQuotePaymentThatIsNotAllowedForNewMethod(): void
+    {
+        $shippingAddressMock = $this->createAddressMock();
+        $paymentMock = $this->getMockBuilder(\Magento\Quote\Model\Quote\Payment::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['getMethod', 'setMethod'])
+            ->getMock();
+
+        $this->quoteMock->method('getShippingAddress')->willReturn($shippingAddressMock);
+        $this->quoteMock->method('getPayment')->willReturn($paymentMock);
+        $shippingAddressMock->method('getCountryId')->willReturn('PL');
+        $shippingAddressMock->method('getShippingMethod')->willReturn('');
+        $paymentMock->method('getMethod')->willReturn('cashondelivery');
+        $paymentMock->expects($this->once())->method('setMethod')->with('');
+
+        $this->helperMock->method('hasShippingPaymentMapping')->willReturn(true);
+        $this->helperMock->method('getMappedPaymentMethodsForShipping')
+            ->with('tablerate_bestway')
+            ->willReturn([]);
+        $this->paymentMethodManagementMock->expects($this->atLeastOnce())
+            ->method('getList')
+            ->willReturn([]);
+
+        $this->checkoutComponent->selectShippingMethod('tablerate_bestway');
+
+        $this->assertSame('', $this->checkoutComponent->paymentMethod);
+    }
+
     public function testSelectPaymentMethod(): void
     {
         $this->checkoutComponent->shippingMethod = 'flatrate_flatrate';
@@ -1396,6 +1442,66 @@ class CheckoutTest extends TestCase
         $this->assertSame(['cashondelivery'], array_map(static function (PaymentMethodInterface $method): string {
             return $method->getCode();
         }, $methods));
+    }
+
+    public function testGetAllowedPaymentMethodsUsesCurrentMagewireShippingMethodBeforeStaleQuoteValue(): void
+    {
+        $this->checkoutComponent->shippingMethod = 'tablerate_bestway';
+        $this->quoteMock->method('getId')->willReturn(42);
+
+        $shippingAddressMock = $this->createAddressMock();
+        $shippingAddressMock->method('getShippingMethod')->willReturn('inpostlocker_standard');
+        $this->quoteMock->method('getShippingAddress')->willReturn($shippingAddressMock);
+
+        $this->paymentMethodManagementMock->expects($this->once())
+            ->method('getList')
+            ->with(42)
+            ->willReturn([
+                $this->createPaymentMethodMock('cashondelivery'),
+                $this->createPaymentMethodMock('braintree'),
+            ]);
+        $this->helperMock->expects($this->once())
+            ->method('getMappedPaymentMethodsForShipping')
+            ->with('tablerate_bestway')
+            ->willReturn(['braintree']);
+
+        $methods = $this->checkoutComponent->getAllowedPaymentMethods();
+
+        $this->assertSame(['braintree'], array_map(static function (PaymentMethodInterface $method): string {
+            return $method->getCode();
+        }, $methods));
+    }
+
+    public function testGetAllowedPaymentMethodsReturnsNoMethodsForUnmappedShippingMethod(): void
+    {
+        $this->quoteMock->expects($this->any())
+            ->method('getId')
+            ->willReturn(42);
+
+        $shippingAddressMock = $this->createAddressMock();
+        $shippingAddressMock->expects($this->any())
+            ->method('getShippingMethod')
+            ->willReturn('tablerate_bestway');
+
+        $this->quoteMock->expects($this->any())
+            ->method('getShippingAddress')
+            ->willReturn($shippingAddressMock);
+
+        $this->paymentMethodManagementMock->expects($this->once())
+            ->method('getList')
+            ->with(42)
+            ->willReturn([
+                $this->createPaymentMethodMock('cashondelivery'),
+                $this->createPaymentMethodMock('braintree'),
+            ]);
+
+        $this->helperMock->expects($this->once())
+            ->method('getMappedPaymentMethodsForShipping')
+            ->with('tablerate_bestway')
+            ->willReturn([]);
+        $this->helperMock->method('hasShippingPaymentMapping')->willReturn(true);
+
+        $this->assertSame([], $this->checkoutComponent->getAllowedPaymentMethods());
     }
 
     public function testGetAllowedPaymentMethodsAppliesGlobalPaymentRestrictions(): void

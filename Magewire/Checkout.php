@@ -656,32 +656,47 @@ class Checkout extends Component
     public function selectShippingMethod(string $methodCode): array
     {
         try {
-            $this->saveShippingAddress(true, false, false);
-            $quote = $this->checkoutSession->getQuote();
-            $shippingAddress = $quote->getShippingAddress();
-            if ($shippingAddress) {
-                if (!$shippingAddress->getCountryId()) {
-                    $shippingAddress->setCountryId($this->countryId ?: $this->getDefaultCountry());
-                }
-                $shippingAddress->setShippingMethod($methodCode);
-                $shippingAddress->setCollectShippingRates(true);
-                $quote->collectTotals();
-                $this->saveQuote($quote);
-                $this->shippingMethod = $methodCode;
-
-                // Check if the currently selected payment method is still valid under new shipping method
-                if ($this->paymentMethod !== '') {
-                    if (!$this->isSelectedPaymentMethodStillAllowed($this->paymentMethod)) {
-                        $this->selectFirstAllowedPaymentMethodOrClear($quote);
-                    }
-                }
-            }
+            $this->applyShippingMethodToQuote($methodCode);
         } catch (\Exception $e) {
             $this->logger->error('Kkkonrad Fastcheckout selectShippingMethod Error: ' . $e->getMessage(), ['exception' => $e]);
         }
 
         $this->paymentMethodsCache = null;
         return $this->refreshCheckoutState();
+    }
+
+    private function applyShippingMethodToQuote(string $methodCode): void
+    {
+        $quote = $this->checkoutSession->getQuote();
+        $shippingAddress = $quote->getShippingAddress();
+        if (!$shippingAddress) {
+            return;
+        }
+
+        if (!$shippingAddress->getCountryId()) {
+            $shippingAddress->setCountryId($this->countryId ?: $this->getDefaultCountry());
+        }
+
+        $shippingAddress->setShippingMethod($methodCode);
+        $shippingAddress->setCollectShippingRates(true);
+        $quote->collectTotals();
+        $this->cartRepository->save($quote);
+        $this->shippingMethod = $methodCode;
+        $this->paymentMethodsCache = null;
+
+        // Knockout can set the quote payment before it updates the Magewire property.
+        $selectedPaymentMethod = (string)$this->paymentMethod;
+        if ($selectedPaymentMethod === '') {
+            $payment = $quote->getPayment();
+            $selectedPaymentMethod = $payment ? (string)$payment->getMethod() : '';
+        }
+
+        if ($selectedPaymentMethod !== '') {
+            $this->paymentMethod = $selectedPaymentMethod;
+            if (!$this->isSelectedPaymentMethodStillAllowed($selectedPaymentMethod)) {
+                $this->selectFirstAllowedPaymentMethodOrClear($quote);
+            }
+        }
     }
 
     public function getPaymentMethods(): array
@@ -705,9 +720,14 @@ class Checkout extends Component
     {
         $methods = $this->getPaymentMethods();
         $allowedCodes = $this->getAllowedPaymentMethodCodes();
+        $hasShippingPaymentMapping = $this->helper->hasShippingPaymentMapping();
 
-        return array_values(array_filter($methods, function ($method) use ($allowedCodes) {
-            return $this->isPaymentMethodAllowedByRules((string)$method->getCode(), $allowedCodes);
+        return array_values(array_filter($methods, function ($method) use ($allowedCodes, $hasShippingPaymentMapping) {
+            return $this->isPaymentMethodAllowedByRules(
+                (string)$method->getCode(),
+                $allowedCodes,
+                $hasShippingPaymentMapping
+            );
         }));
     }
 
@@ -715,7 +735,8 @@ class Checkout extends Component
     {
         return $this->isPaymentMethodAllowedByRules(
             $paymentMethodCode,
-            $shippingAllowedCodes === null ? $this->getAllowedPaymentMethodCodes() : $shippingAllowedCodes
+            $shippingAllowedCodes === null ? $this->getAllowedPaymentMethodCodes() : $shippingAllowedCodes,
+            $this->helper->hasShippingPaymentMapping()
         );
     }
 
@@ -749,9 +770,16 @@ class Checkout extends Component
         }
     }
 
-    private function isPaymentMethodAllowedByRules(string $paymentMethodCode, array $shippingAllowedCodes = []): bool
+    private function isPaymentMethodAllowedByRules(
+        string $paymentMethodCode,
+        array $shippingAllowedCodes = [],
+        bool $hasShippingPaymentMapping = false
+    ): bool
     {
-        if ($shippingAllowedCodes !== [] && !$this->helper->isPaymentMethodCodeAllowedByRules($paymentMethodCode, $shippingAllowedCodes)) {
+        if (
+            ($hasShippingPaymentMapping || $shippingAllowedCodes !== [])
+            && !$this->helper->isPaymentMethodCodeAllowedByRules($paymentMethodCode, $shippingAllowedCodes)
+        ) {
             return false;
         }
 
@@ -788,9 +816,9 @@ class Checkout extends Component
     {
         $quote = $this->checkoutSession->getQuote();
         $shippingAddress = $quote->getShippingAddress();
-        $shippingMethod = $shippingAddress ? $shippingAddress->getShippingMethod() : null;
+        $shippingMethod = $this->shippingMethod;
         if (!$shippingMethod) {
-            $shippingMethod = $this->shippingMethod;
+            $shippingMethod = $shippingAddress ? $shippingAddress->getShippingMethod() : null;
         }
 
         if (!$shippingMethod) {
@@ -1637,6 +1665,21 @@ class Checkout extends Component
      */
     public function updated($value, string $name)
     {
+        if ($name === 'shippingMethod') {
+            $methodCode = trim((string)$value);
+            if ($methodCode === '') {
+                return;
+            }
+
+            try {
+                $this->applyShippingMethodToQuote($methodCode);
+            } catch (\Exception $e) {
+                $this->logger->error('Kkkonrad Fastcheckout updated shipping method Error: ' . $e->getMessage(), ['exception' => $e]);
+            }
+
+            return;
+        }
+
         if ((int)$this->regionId <= 0) {
             $this->regionId = '';
         }

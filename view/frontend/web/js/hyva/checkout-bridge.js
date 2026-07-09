@@ -943,15 +943,6 @@ define([
                             operations.push(setMagewireValue(wire, 'email', pending.email, false));
                         }
 
-                        if (pending.selectedPaymentMethod) {
-                            setQuotePaymentMethodFromBridge({ method: pending.selectedPaymentMethod });
-                            operations.push(setMagewireValue(wire, 'paymentMethod', pending.selectedPaymentMethod, false));
-                        }
-
-                        if (pending.selectedShippingRate) {
-                            operations.push(setMagewireValue(wire, 'shippingMethod', pending.selectedShippingRate, false));
-                        }
-
                         if (pending.shippingAddress) {
                             shippingAddress = addressConverter.formAddressDataToQuoteAddress(pending.shippingAddress);
                             syncAddressDataToCheckoutProvider(normalizeKoAddressData(shippingAddress), 'shipping');
@@ -965,6 +956,27 @@ define([
                         }
 
                         return Promise.all(operations.filter(Boolean)).then(function () {
+                            if (!pending.selectedShippingRate) {
+                                return true;
+                            }
+
+                            if (typeof wire.call === 'function') {
+                                return wire.call('selectShippingMethod', pending.selectedShippingRate);
+                            }
+
+                            return setMagewireValue(wire, 'shippingMethod', pending.selectedShippingRate, false);
+                        }).then(function () {
+                            if (!pending.selectedPaymentMethod) {
+                                return true;
+                            }
+
+                            if (typeof wire.call === 'function') {
+                                return wire.call('selectPaymentMethod', pending.selectedPaymentMethod);
+                            }
+
+                            setQuotePaymentMethodFromBridge({ method: pending.selectedPaymentMethod });
+                            return setMagewireValue(wire, 'paymentMethod', pending.selectedPaymentMethod, false);
+                        }).then(function () {
                             pending.shippingAddress = null;
                             pending.billingAddress = null;
                             pending.selectedShippingRate = null;
@@ -1262,6 +1274,7 @@ define([
                     syncAddress: syncAddressToKnockout,
                     syncShippingMethod: syncSelectedShippingMethodToKnockout,
                     syncShippingMethodToMagewire: syncShippingMethodToMagewire,
+                    syncShippingMethodToMagewireNow: syncShippingMethodToMagewireNow,
                     getShippingInformationComponent: function () {
                         return shippingCompatibilityBridge.getShippingInformationComponent();
                     },
@@ -3205,11 +3218,13 @@ define([
                     window.Livewire.hook('element.updating', function (fromEl, toEl) {
                         if (fromEl.getAttribute('wire:key') === 'checkout-payment-methods-card') {
                             var fromCodes = Array.from(fromEl.querySelectorAll('[data-fastcheckout-payment-option]')).map(function (el) {
-                                return el.getAttribute('data-fastcheckout-payment-option');
+                                return el.getAttribute('data-fastcheckout-payment-option') + ':' +
+                                    el.getAttribute('data-fastcheckout-payment-allowed');
                             }).sort().join(',');
 
                             var toCodes = Array.from(toEl.querySelectorAll('[data-fastcheckout-payment-option]')).map(function (el) {
-                                return el.getAttribute('data-fastcheckout-payment-option');
+                                return el.getAttribute('data-fastcheckout-payment-option') + ':' +
+                                    el.getAttribute('data-fastcheckout-payment-allowed');
                             }).sort().join(',');
 
                             if (fromCodes === toCodes) {

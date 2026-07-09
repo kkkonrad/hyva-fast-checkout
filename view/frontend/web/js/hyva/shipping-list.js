@@ -76,6 +76,14 @@ define([
 
                     if (
                         window.fastcheckoutHyvaShipping &&
+                        typeof window.fastcheckoutHyvaShipping.syncShippingMethodToMagewireNow === 'function'
+                    ) {
+                        window.fastcheckoutHyvaShipping.syncShippingMethodToMagewireNow(value);
+                        return;
+                    }
+
+                    if (
+                        window.fastcheckoutHyvaShipping &&
                         typeof window.fastcheckoutHyvaShipping.syncShippingMethodToMagewire === 'function'
                     ) {
                         window.fastcheckoutHyvaShipping.syncShippingMethodToMagewire(value);

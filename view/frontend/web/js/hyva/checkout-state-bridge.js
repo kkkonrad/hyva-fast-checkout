@@ -315,7 +315,9 @@ define([
 
             call('syncQuoteCustomerData');
             domMethods = call('getDomPaymentMethods') || [];
-            methods = domMethods.map(function (method) {
+            methods = domMethods.filter(function (method) {
+                return !method.disabled;
+            }).map(function (method) {
                 return {
                     method: method.method,
                     title: method.title
@@ -336,7 +338,7 @@ define([
             }
             lastMethodsJson = currentMethodsJson;
 
-            if (methods.length > 0) {
+            if (methods.length > 0 || domMethods.length > 0) {
                 paymentService.setPaymentMethods(methods);
             } else {
                 fallbackMethods = methodConverter(config.paymentMethods || window.checkoutConfig.paymentMethods || []);

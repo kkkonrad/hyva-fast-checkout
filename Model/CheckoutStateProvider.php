@@ -220,15 +220,27 @@ class CheckoutStateProvider
         }
 
         $allowedCodes = $this->getAllowedPaymentMethodCodes($quote);
+        $hasShippingPaymentMapping = $this->helper->hasShippingPaymentMapping();
 
-        return array_values(array_filter($methods, function ($method) use ($allowedCodes): bool {
-            return $this->isPaymentMethodAllowedByRules((string)$method->getCode(), $allowedCodes);
+        return array_values(array_filter($methods, function ($method) use ($allowedCodes, $hasShippingPaymentMapping): bool {
+            return $this->isPaymentMethodAllowedByRules(
+                (string)$method->getCode(),
+                $allowedCodes,
+                $hasShippingPaymentMapping
+            );
         }));
     }
 
-    private function isPaymentMethodAllowedByRules(string $paymentMethodCode, array $shippingAllowedCodes = []): bool
+    private function isPaymentMethodAllowedByRules(
+        string $paymentMethodCode,
+        array $shippingAllowedCodes = [],
+        bool $hasShippingPaymentMapping = false
+    ): bool
     {
-        if ($shippingAllowedCodes !== [] && !$this->helper->isPaymentMethodCodeAllowedByRules($paymentMethodCode, $shippingAllowedCodes)) {
+        if (
+            ($hasShippingPaymentMapping || $shippingAllowedCodes !== [])
+            && !$this->helper->isPaymentMethodCodeAllowedByRules($paymentMethodCode, $shippingAllowedCodes)
+        ) {
             return false;
         }
 
