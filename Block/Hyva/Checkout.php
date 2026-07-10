@@ -244,7 +244,7 @@ class Checkout extends Template
     public function ensureRequireJsAssets()
     {
         try {
-            return $this->getObjectManager()->get(RequireJsAssets::class)->ensure($this->getQuote()->getStoreId());
+            return $this->getObjectManager()->get(RequireJsAssets::class)->ensure();
         } catch (\Throwable $exception) {
             return false;
         }

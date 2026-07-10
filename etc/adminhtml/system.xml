@@ -82,16 +82,6 @@
                     <backend_model>Kkkonrad\Fastcheckout\Model\Config\Backend\Json</backend_model>
                 </field>
             </group>
-            <group id="hyva" translate="label" type="text"
-                   sortOrder="40" showInDefault="1" showInWebsite="1" showInStore="1">
-                <label>Hyva Compatibility</label>
-                <field id="auto_generate_requirejs_assets" translate="label comment" type="select"
-                       sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
-                    <label>Generate RequireJS static files on checkout</label>
-                    <comment>Creates missing requirejs/require.js and requirejs-config.js for the current Hyva theme and locale when the checkout page is opened.</comment>
-                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
-                </field>
-            </group>
         </section>
     </system>
 </config>

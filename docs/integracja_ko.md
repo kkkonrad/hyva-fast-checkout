@@ -11,7 +11,7 @@ Most opiera się na bibliotece RequireJS. W środowisku Hyvä tradycyjne pliki J
   Metoda `ensure($storeId)` sprawdza w katalogu plików statycznych (`pub/static`) obecność dwóch kluczowych plików:
   1. `requirejs/require.js` – plik silnika RequireJS.
   2. `requirejs-config.js` – scalona konfiguracja mapowania modułów RequireJS.
-  Jeśli plików brakuje, są one kompilowane i publikowane w locie za pomocą publishera zasobów. Działanie to można włączyć/wyłączyć w konfiguracji sklepu pod ścieżką `fastcheckout/hyva/auto_generate_requirejs_assets`.
+  Jeśli plików brakuje, są one kompilowane i publikowane w locie za pomocą publishera zasobów.
 
 ---
 

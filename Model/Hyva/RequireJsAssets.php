@@ -4,20 +4,16 @@ declare(strict_types=1);
 
 namespace Kkkonrad\Fastcheckout\Model\Hyva;
 
-use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\Filesystem\DirectoryList;
 use Magento\Framework\App\View\Asset\Publisher;
 use Magento\Framework\Filesystem;
 use Magento\Framework\RequireJs\Config as RequireJsConfig;
 use Magento\Framework\View\Asset\Repository as AssetRepository;
 use Magento\RequireJs\Model\FileManager;
-use Magento\Store\Model\ScopeInterface;
 use Psr\Log\LoggerInterface;
 
 class RequireJsAssets
 {
-    public const XML_PATH_AUTO_GENERATE = 'fastcheckout/hyva/auto_generate_requirejs_assets';
-
     private const REQUIRED_CONFIG_MARKERS = [
         'Kkkonrad_Fastcheckout/js/mixin/storage-mixin',
         'Kkkonrad_Fastcheckout/js/mixin/select-shipping-address-mixin',
@@ -27,11 +23,6 @@ class RequireJsAssets
         'Kkkonrad_Fastcheckout/js/mixin/set-billing-address-mixin',
         'Kkkonrad_Fastcheckout/js/mixin/place-order-mixin',
     ];
-
-    /**
-     * @var ScopeConfigInterface
-     */
-    private $scopeConfig;
 
     /**
      * @var FileManager
@@ -69,7 +60,6 @@ class RequireJsAssets
     private $wasChecked = false;
 
     public function __construct(
-        ScopeConfigInterface $scopeConfig,
         FileManager $fileManager,
         Publisher $assetPublisher,
         AssetRepository $assetRepository,
@@ -77,7 +67,6 @@ class RequireJsAssets
         RequireJsConfig $requireJsConfig,
         LoggerInterface $logger
     ) {
-        $this->scopeConfig = $scopeConfig;
         $this->fileManager = $fileManager;
         $this->assetPublisher = $assetPublisher;
         $this->assetRepository = $assetRepository;
@@ -90,12 +79,11 @@ class RequireJsAssets
      * Ensure the two RequireJS files needed by the Hyva checkout bridge exist
      * for the current frontend theme and locale.
      *
-     * @param int|string|null $storeId
      * @return bool
      */
-    public function ensure($storeId = null): bool
+    public function ensure(): bool
     {
-        if ($this->wasChecked || !$this->isEnabled($storeId)) {
+        if ($this->wasChecked) {
             return false;
         }
 
@@ -147,16 +135,4 @@ class RequireJsAssets
         return true;
     }
 
-    /**
-     * @param int|string|null $storeId
-     * @return bool
-     */
-    private function isEnabled($storeId = null): bool
-    {
-        return $this->scopeConfig->isSetFlag(
-            self::XML_PATH_AUTO_GENERATE,
-            ScopeInterface::SCOPE_STORE,
-            $storeId
-        );
-    }
 }

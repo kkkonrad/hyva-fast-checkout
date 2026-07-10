@@ -3075,6 +3075,34 @@ define([
                                 return validatePurchaseOrderWithNativeValidation() && validateAdditionalValidators(false);
                             }
 
+                            // Hosted card renderers can expose field validation separately from validate().
+                            if (
+                                component &&
+                                (
+                                    typeof component.validateCardType === 'function' ||
+                                    typeof component.validateExpirationDate === 'function' ||
+                                    typeof component.validateCvvNumber === 'function'
+                                )
+                            ) {
+                                var isCardNumberValid = typeof component.validateCardType === 'function'
+                                        ? component.validateCardType()
+                                        : true,
+                                    isExpirationDateValid = typeof component.validateExpirationDate === 'function'
+                                        ? component.validateExpirationDate()
+                                        : true,
+                                    isCvvValid = typeof component.validateCvvNumber === 'function'
+                                        ? component.validateCvvNumber()
+                                        : true;
+
+                                if (
+                                    !isCardNumberValid ||
+                                    !isExpirationDateValid ||
+                                    !isCvvValid
+                                ) {
+                                    return false;
+                                }
+                            }
+
 	                        if (component && typeof component.validate === 'function') {
 	                            var isValid = component.validate();
 	                            if (!isValid) {
