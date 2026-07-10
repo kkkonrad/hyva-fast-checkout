@@ -52,6 +52,41 @@ define([
             }
         }
 
+        function loadRendererComponent(component) {
+            var deferred;
+
+            if (!component) {
+                return $.Deferred().resolve(false).promise();
+            }
+
+            if (loadedRendererComponents[component]) {
+                return $.Deferred().resolve(true).promise();
+            }
+
+            if (loadingRendererComponents[component]) {
+                return loadingRendererComponents[component];
+            }
+
+            deferred = $.Deferred();
+            loadingRendererComponents[component] = deferred.promise();
+
+            window.require([component], function () {
+                rememberLoadedRendererComponent(component);
+                delete loadingRendererComponents[component];
+                runPatchRenderers();
+                runSyncPaymentRenderers();
+                deferred.resolve(true);
+            }, function (error) {
+                delete loadingRendererComponents[component];
+                if (window.console && typeof window.console.warn === 'function') {
+                    window.console.warn('Kkkonrad Fastcheckout: payment renderer could not be loaded', component, error);
+                }
+                deferred.resolve(false);
+            });
+
+            return deferred.promise();
+        }
+
         return {
             getRendererMap: function () {
                 return rendererComponentMap.slice(0);
@@ -64,39 +99,7 @@ define([
             },
 
             loadRendererForMethod: function (methodCode) {
-                var component = getRendererComponentForMethod(methodCode),
-                    deferred;
-
-                if (!component) {
-                    return $.Deferred().resolve(false).promise();
-                }
-
-                if (loadedRendererComponents[component]) {
-                    return $.Deferred().resolve(true).promise();
-                }
-
-                if (loadingRendererComponents[component]) {
-                    return loadingRendererComponents[component];
-                }
-
-                deferred = $.Deferred();
-                loadingRendererComponents[component] = deferred.promise();
-
-                window.require([component], function () {
-                    rememberLoadedRendererComponent(component);
-                    delete loadingRendererComponents[component];
-                    runPatchRenderers();
-                    runSyncPaymentRenderers();
-                    deferred.resolve(true);
-                }, function (error) {
-                    delete loadingRendererComponents[component];
-                    if (window.console && typeof window.console.warn === 'function') {
-                        window.console.warn('Kkkonrad Fastcheckout: payment renderer could not be loaded', component, error);
-                    }
-                    deferred.resolve(false);
-                });
-
-                return deferred.promise();
+                return loadRendererComponent(getRendererComponentForMethod(methodCode));
             },
 
             ensureRendererForMethod: function (methodCode) {
@@ -110,12 +113,14 @@ define([
             runSyncPaymentRenderers: runSyncPaymentRenderers,
 
             loadRendererComponents: function (done) {
-                rendererComponents.forEach(function (component) {
-                    if (!rendererComponentMap.length && component) {
-                        rememberLoadedRendererComponent(component);
-                    }
-                });
-                done();
+                var loads = rendererComponents.map(loadRendererComponent);
+
+                if (!loads.length) {
+                    done();
+                    return;
+                }
+
+                $.when.apply($, loads).always(done);
             },
 
             setPatchRenderersHandler: function (handler) {

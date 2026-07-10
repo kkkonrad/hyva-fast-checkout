@@ -2322,15 +2322,16 @@ define([
                     return placeOrderHooksBridge.syncHookData(wire, hookData, deferUpdate);
                 }
 
-                function isPayUCardTokenizationInProgress(component, methodCode, result) {
+                function isAsyncTokenizationInProgress(component, result) {
                     return result === false &&
-                        methodCode === 'payu_gateway_card' &&
                         component &&
                         typeof component.placeOrderDefer === 'function' &&
-                        typeof component.cardToken === 'function';
+                        typeof component.cardToken === 'function' &&
+                        component.secureFormError &&
+                        typeof component.secureFormError.subscribe === 'function';
                 }
 
-                function watchPayUCardTokenizationError(component, reject) {
+                function watchAsyncTokenizationError(component, reject) {
                     var errorObserver = component && component.secureFormError,
                         subscription,
                         handleError;
@@ -2906,8 +2907,8 @@ define([
                                             }
                                             watchRendererPlaceOrderResult(result, component, reject);
 
-			                                    if (isPayUCardTokenizationInProgress(component, methodCode, result)) {
-			                                        watchPayUCardTokenizationError(component, reject);
+			                                    if (isAsyncTokenizationInProgress(component, result)) {
+			                                        watchAsyncTokenizationError(component, reject);
 			                                    } else if (result === false) {
 			                                        self.cleanupKoOrderState();
 	                                            var resultError = new Error(translateFastcheckoutMessage('Please check the selected payment method and try again.'));
