@@ -2331,6 +2331,21 @@ define([
                         typeof component.secureFormError.subscribe === 'function';
                 }
 
+                function formatAsyncTokenizationErrorMessage(message) {
+                    var lines = String(message || '')
+                        .replace(/<\s*\/?\s*(?:div|p|li|br)\b[^>]*>/gi, '\n')
+                        .replace(/<[^>]*>/g, ' ')
+                        .split(/\r?\n/)
+                        .map(function (line) {
+                            return line.replace(/\s+/g, ' ').trim().replace(/[.?!]+$/, '');
+                        })
+                        .filter(function (line) {
+                            return line !== '';
+                        });
+
+                    return lines.length ? lines.join('. ') + '.' : '';
+                }
+
                 function watchAsyncTokenizationError(component, reject) {
                     var errorObserver = component && component.secureFormError,
                         subscription,
@@ -2347,8 +2362,14 @@ define([
                             return;
                         }
 
-                        errorMessage = String(message).replace(/<[^>]*>/g, ' ').trim() ||
+                        errorMessage = formatAsyncTokenizationErrorMessage(message) ||
                             translateFastcheckoutMessage('The selected payment method could not complete order placement. Please try again.');
+
+                        if (String(message).trim() !== errorMessage) {
+                            errorObserver(errorMessage);
+                            return;
+                        }
+
                         window.fastcheckoutHyvaPayment.cleanupKoOrderState();
                         handlePaymentError(new Error(errorMessage), component.messageContainer || getBridgeMessageContainer());
                         reject(new Error(errorMessage));
