@@ -1748,88 +1748,23 @@ define([
                     });
 
                     if (activeElement) {
-                        
+                        if (!hasVisibleContent(activeElement)) {
+                            return false;
+                        }
+
                         activeElement.classList.add('_active');
                         activeElement.setAttribute('data-fastcheckout-active', 'true');
                         annotateNativePaymentActions(activeElement);
 
                         var target = document.querySelector('[data-fastcheckout-payment-method-ko-target="' + methodCode + '"]');
                         if (target) {
-                            var shadow = target.shadowRoot;
-                            if (!shadow) {
-                                shadow = target.attachShadow({ mode: 'open' });
-                                
-                                // Clone ALL page stylesheets (including main Tailwind stylesheet)
-                                document.querySelectorAll('link[rel="stylesheet"]').forEach(function (link) {
-                                    shadow.appendChild(link.cloneNode(true));
-                                });
-
-                                var style = document.createElement('style');
-                                style.textContent = `
-                                    .payment-method {
-                                        display: block !important;
-                                        border: none !important;
-                                        background: transparent !important;
-                                        margin-top: 0 !important;
-                                        padding: 0 !important;
-                                    }
-                                    .payment-method-title,
-                                    .payment-method-billing-address,
-                                    .fastcheckout-payment-method-ko-container .payment-method-title,
-                                    .fastcheckout-payment-method-ko-container .payment-method-billing-address,
-                                    .fastcheckout-native-place-order-hidden,
-                                    .fastcheckout-actions-toolbar-hidden {
-                                        display: none !important;
-                                    }
-                                    .required-captcha.checkbox {
-                                        position: absolute !important;
-                                        display: block !important;
-                                        visibility: visible !important;
-                                        overflow: hidden !important;
-                                        opacity: 0 !important;
-                                        width: 1px !important;
-                                        height: 1px !important;
-                                        padding: 0 !important;
-                                        border: none !important;
-                                    }
-                                    .recaptcha-checkout-place-order .field {
-                                        margin: 0 !important;
-                                        padding: 0 !important;
-                                        height: 0 !important;
-                                        overflow: hidden !important;
-                                    }
-                                    .tpay-groups-wrapper .tpay-group-logo-holder img {
-                                        max-width: 100% !important;
-                                    }
-                                `;
-                                shadow.appendChild(style);
+                            if (activeElement.parentNode !== target) {
+                                target.appendChild(activeElement);
                             }
 
-                            var existingWrapper = shadow.querySelector('.fastcheckout-payment-method-ko-container');
-                            if (existingWrapper && activeElement.parentNode === existingWrapper) {
-                                existingWrapper.classList.remove('hidden');
-                                existingWrapper.style.display = '';
-                                target.classList.remove('hidden');
-                                target.style.display = 'block';
-                                movedToTarget = true;
-                            } else {
-                                shadow.querySelectorAll('.fastcheckout-payment-method-ko-container').forEach(function (w) {
-                                    w.remove();
-                                });
-
-                                // Wrap activeElement in a container with class fastcheckout-payment-method-ko-container
-                                // to ensure that CSS selectors starting with .fastcheckout-payment-method-ko-container will match perfectly!
-                                var wrapper = document.createElement('div');
-                                wrapper.className = 'fastcheckout-payment-method-ko-container';
-                                wrapper.appendChild(activeElement);
-
-                                shadow.appendChild(wrapper);
-                                target.classList.remove('hidden');
-                                target.style.display = 'block';
-                                movedToTarget = true;
-                            }
-                        } else {
-                            
+                            target.classList.remove('hidden');
+                            target.style.display = 'block';
+                            movedToTarget = true;
                         }
                     } else {
                         
@@ -1937,10 +1872,11 @@ define([
                     }
 
                     if (paymentMethodSync.isSynced(methodCode)) {
-                        pendingSelectedMethodCode = '';
                         runPatchRenderers();
-                        updateActiveRendererClass(methodCode, methodCode);
-                        return;
+                        if (updateActiveRendererClass(methodCode, methodCode)) {
+                            pendingSelectedMethodCode = '';
+                            return;
+                        }
                     }
 
                     if (!domHasPaymentMethod(methodCode)) {
@@ -2007,19 +1943,14 @@ define([
                     activeElements.forEach(addRoot);
 
                     Array.prototype.slice.call(document.querySelectorAll('[data-fastcheckout-payment-method-ko-target]')).forEach(function (target) {
-                        var shadow = target.shadowRoot,
-                            targetMethod = target.getAttribute('data-fastcheckout-payment-method-ko-target');
+                        var targetMethod = target.getAttribute('data-fastcheckout-payment-method-ko-target');
 
-                        if (!shadow) {
-                            return;
-                        }
-
-                        Array.prototype.slice.call(shadow.querySelectorAll(
+                        Array.prototype.slice.call(target.querySelectorAll(
                             '.payment-method._active, [data-fastcheckout-active="true"], .fastcheckout-payment-method-ko-container:not(.hidden)'
                         )).forEach(addRoot);
 
                         if (selectedMethod && targetMethod === selectedMethod) {
-                            addRoot(shadow);
+                            addRoot(target);
                         }
                     });
 
@@ -3253,14 +3184,6 @@ define([
                             }
                         });
 
-                        // Clear empty wrappers from shadow roots
-                        document.querySelectorAll('[data-fastcheckout-payment-method-ko-target]').forEach(function (placeholder) {
-                            if (placeholder.shadowRoot) {
-                                placeholder.shadowRoot.querySelectorAll('.fastcheckout-payment-method-ko-container').forEach(function (wrapper) {
-                                    wrapper.remove();
-                                });
-                            }
-                        });
                     }
                 }
 

@@ -2170,23 +2170,18 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
 
             window.setTimeout(() => {
                 const isValid = window.fastcheckoutHyvaPayment.validate();
-                let shadow = null;
-
-                document.querySelectorAll('[data-fastcheckout-payment-method-ko-target="purchaseorder"]').forEach((target) => {
-                    if (target.shadowRoot) {
-                        shadow = target.shadowRoot;
-                    }
-                });
-
-                const input = shadow ? shadow.querySelector('#po_number') : null;
-                const error = shadow ? shadow.querySelector('#po_number-error') : null;
+                const target = document.querySelector(
+                    '[data-fastcheckout-payment-method-ko-target="purchaseorder"]'
+                );
+                const input = target ? target.querySelector('#po_number') : null;
+                const error = target ? target.querySelector('#po_number-error') : null;
                 const errorStyle = error ? window.getComputedStyle(error) : null;
                 const errorRect = error ? error.getBoundingClientRect() : null;
 
                 window.setTimeout(() => {
                     const secondIsValid = window.fastcheckoutHyvaPayment.validate();
                     window.setTimeout(() => {
-                        const secondError = shadow ? shadow.querySelector('#po_number-error') : null;
+                        const secondError = target ? target.querySelector('#po_number-error') : null;
                         const secondErrorStyle = secondError ? window.getComputedStyle(secondError) : null;
                         const secondErrorRect = secondError ? secondError.getBoundingClientRect() : null;
 
