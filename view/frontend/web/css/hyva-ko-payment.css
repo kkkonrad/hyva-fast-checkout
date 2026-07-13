@@ -144,6 +144,12 @@
     text-decoration: underline;
 }
 
+@media (max-width: 767px) {
+    footer.page-footer {
+        display: none;
+    }
+}
+
 /* Active payment option highlight — pure CSS, no delay or transition lag */
 [data-fastcheckout-payment-option] {
     border: 2px solid #e5e7eb !important; /* border-gray-200, 2px */
@@ -773,5 +779,4 @@ body.checkout-submitting .btn-primary {
     color: #374151 !important;
     border: 1px solid #d1d5db !important;
 }
-
 
