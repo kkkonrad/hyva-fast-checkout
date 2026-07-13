@@ -256,7 +256,7 @@ function initCheckout() {
                         .catch((err) => {
                             this.isProcessing = false;
                             document.body.classList.remove('checkout-submitting');
-                            if (!this.clientOrderError && err && err.message) {
+                            if (!this.clientOrderError && err && err.message && !err.fastcheckoutNativePaymentError) {
                                 this.clientOrderError = err.message;
                             }
 

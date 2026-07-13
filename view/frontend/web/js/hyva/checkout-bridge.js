@@ -2287,7 +2287,8 @@ define([
                     }
 
                     handleError = function (message) {
-                        var errorMessage;
+                        var errorMessage,
+                            nativeError;
 
                         if (!message || !window.fastcheckoutHyvaPayment || !window.fastcheckoutHyvaPayment.koOrderActive) {
                             return;
@@ -2301,9 +2302,10 @@ define([
                             return;
                         }
 
+                        nativeError = new Error(errorMessage);
+                        nativeError.fastcheckoutNativePaymentError = true;
                         window.fastcheckoutHyvaPayment.cleanupKoOrderState();
-                        handlePaymentError(new Error(errorMessage), component.messageContainer || getBridgeMessageContainer());
-                        reject(new Error(errorMessage));
+                        reject(nativeError);
                     };
 
                     subscription = errorObserver.subscribe(handleError);
@@ -2877,7 +2879,9 @@ define([
 		                                }
 		                            });
                                 }).catch(function (error) {
-                                    handlePaymentError(error, component.messageContainer || getBridgeMessageContainer());
+                                    if (!error || !error.fastcheckoutNativePaymentError) {
+                                        handlePaymentError(error, component.messageContainer || getBridgeMessageContainer());
+                                    }
                                     throw error;
                                 });
 		                        }.bind(this));
