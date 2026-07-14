@@ -115,6 +115,18 @@ export class CheckoutPage {
 
 test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
 
+    test('should initialize InPost pickup selector before the shipping address is filled', async ({ page }) => {
+        const checkout = new CheckoutPage(page);
+
+        await checkout.goto();
+
+        const inPostMethod = page.locator('#label_method_standard_inpostlocker');
+        test.skip(await inPostMethod.count() === 0, 'The test store has no active InPost locker rate.');
+
+        await expect(page.locator(selectors.postcode)).toHaveValue('');
+        await expect(inPostMethod.locator('[data-inpost-select-point]')).toBeVisible({ timeout: 15_000 });
+    });
+
     test('should expose Magento KO checkout compatibility surface', async ({ page }) => {
         const checkout = new CheckoutPage(page);
         await checkout.goto();

@@ -8,6 +8,30 @@ define([
 ], function (ko, Component, shippingService, selectShippingMethodAction, quote, priceUtils) {
     'use strict';
 
+    function renderInPostWidget() {
+        require([
+            'inPostPaczkomaty',
+            'Magento_Checkout/js/model/full-screen-loader'
+        ], function (inPostPaczkomaty, fullScreenLoader) {
+            if (!inPostPaczkomaty || typeof inPostPaczkomaty.renderInPostData !== 'function') {
+                return;
+            }
+
+            setTimeout(function () {
+                inPostPaczkomaty.renderInPostData()
+                    .then(function () {
+                        return inPostPaczkomaty.insertLogoInPost();
+                    })
+                    .then(function () {
+                        fullScreenLoader.stopLoader();
+                    })
+                    .catch(function () {
+                        fullScreenLoader.stopLoader();
+                    });
+            }, 100);
+        });
+    }
+
     return Component.extend({
         defaults: {
             template: 'Kkkonrad_Fastcheckout/hyva/shipping-list'
@@ -110,30 +134,18 @@ define([
             this._super();
             window.fastcheckoutHyvaShippingListInstance = this;
 
+            // Initial rates are populated before this component subscribes to
+            // shippingService, so initialize carrier widgets explicitly once.
+            renderInPostWidget();
+
             // Re-render InPost widget when shipping rates change (e.g. on payment method switch)
             shippingService.getShippingRates().subscribe(function () {
-                require(['inPostPaczkomaty'], function (inPostPaczkomaty) {
-                    if (inPostPaczkomaty && typeof inPostPaczkomaty.renderInPostData === 'function') {
-                        setTimeout(function () {
-                            inPostPaczkomaty.renderInPostData().then(function() {
-                                inPostPaczkomaty.insertLogoInPost();
-                            });
-                        }, 100);
-                    }
-                });
+                renderInPostWidget();
             });
 
             // Re-render InPost widget when shipping method changes
             quote.shippingMethod.subscribe(function () {
-                require(['inPostPaczkomaty'], function (inPostPaczkomaty) {
-                    if (inPostPaczkomaty && typeof inPostPaczkomaty.renderInPostData === 'function') {
-                        setTimeout(function () {
-                            inPostPaczkomaty.renderInPostData().then(function() {
-                                inPostPaczkomaty.insertLogoInPost();
-                            });
-                        }, 100);
-                    }
-                });
+                renderInPostWidget();
             });
             
             return this;
