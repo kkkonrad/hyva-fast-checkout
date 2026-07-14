@@ -895,40 +895,11 @@ window.addEventListener('alpine:init', () => Alpine.data('initCheckout', initChe
 <?php $hyvaCsp->registerInlineScript() ?>
 <div wire:ignore>
 <style>
-@media (min-width: 1024px) and (max-width: 1279px) {
-    /* Tablet layout uses 2 flex columns */
+@media (min-width: 1024px) {
+    /* Desktop layout keeps the address and checkout details in 2 columns. */
     .fc-grid {
         display: grid !important;
         grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    }
-}
-@media (min-width: 1280px) {
-    /* Desktop layout uses 3-column CSS Grid with direct child positioning */
-    .fc-grid {
-        display: grid !important;
-        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-    }
-    .fc-left-wrapper,
-    .fc-right-wrapper {
-        display: contents !important;
-    }
-    .fc-container-1 {
-        grid-column-start: 1 !important;
-        grid-row-start: 1 !important;
-        grid-row-end: span 2 !important;
-    }
-    .fc-container-2 {
-        grid-column-start: 2 !important;
-        grid-row-start: 1 !important;
-    }
-    .fc-container-3 {
-        grid-column-start: 2 !important;
-        grid-row-start: 2 !important;
-    }
-    .fc-container-4 {
-        grid-column-start: 3 !important;
-        grid-row-start: 1 !important;
-        grid-row-end: span 2 !important;
     }
 }
 </style>
