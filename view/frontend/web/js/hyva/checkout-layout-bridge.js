@@ -8,11 +8,27 @@ define([
 
         var config = deps.config || {},
             registry = deps.registry,
+            layout = deps.layout,
+            scope = deps.scope || 'fastcheckoutHyvaPaymentRenderers',
             paymentListChildren = $.extend(true, {}, config.paymentListChildren || {}),
+            deferredPaymentListChildren = {},
             paymentRegionChildren = $.extend(true, {}, config.paymentRegionChildren || {}),
             shippingListChildren = $.extend(true, {}, config.shippingListChildren || {}),
             shippingAddressChildren = $.extend(true, {}, config.shippingAddressChildren || {}),
             checkoutStepChildren = $.extend(true, {}, config.checkoutStepChildren || {});
+
+        function containsDeferredPaymentComponent(name, node) {
+            var serialized = name + ' ' + JSON.stringify(node || {});
+
+            return /paypal|braintree|mollie|payu|tpay|przelewy|stripe/i.test(serialized);
+        }
+
+        Object.keys(paymentListChildren).forEach(function (name) {
+            if (containsDeferredPaymentComponent(name, paymentListChildren[name])) {
+                deferredPaymentListChildren[name] = paymentListChildren[name];
+                delete paymentListChildren[name];
+            }
+        });
 
         paymentRegionChildren.paymentList = {
             component: 'Kkkonrad_Fastcheckout/js/hyva/payment-list',
@@ -80,12 +96,32 @@ define([
             aliasAdditionalCheckoutStepRegistryPaths();
         }
 
+        function activateDeferredPaymentListChildren(methodCode, rendererComponent) {
+            var component = String(rendererComponent || ''),
+                isThirdParty = (component !== '' && !/^(Magento_|Kkkonrad_)/.test(component)) ||
+                    /paypal|braintree|mollie|payu|tpay|przelewy|stripe/i.test(String(methodCode || '')),
+                parent;
+
+            if (!isThirdParty || !Object.keys(deferredPaymentListChildren).length || typeof layout !== 'function') {
+                return;
+            }
+
+            parent = getRegistryItem(scope + '.paymentList');
+            if (!parent) {
+                return;
+            }
+
+            layout(deferredPaymentListChildren, parent);
+            deferredPaymentListChildren = {};
+        }
+
         return {
             paymentListChildren: paymentListChildren,
             paymentRegionChildren: paymentRegionChildren,
             shippingListChildren: shippingListChildren,
             shippingAddressChildren: shippingAddressChildren,
             checkoutStepChildren: checkoutStepChildren,
+            activateDeferredPaymentListChildren: activateDeferredPaymentListChildren,
             aliasAdditionalCheckoutStepRegistryPaths: aliasAdditionalCheckoutStepRegistryPaths,
             aliasStandardShippingRegistryPaths: aliasStandardShippingRegistryPaths
         };

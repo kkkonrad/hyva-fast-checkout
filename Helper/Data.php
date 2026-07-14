@@ -354,11 +354,6 @@ class Data extends AbstractHelper
         return (bool)$this->scopeConfig->getValue(self::XML_PATH_SUBSCRIBE_BY_DEFAULT, ScopeInterface::SCOPE_STORE);
     }
 
-    public function isAssignOrderToCustomer()
-    {
-        return true;
-    }
-
     public function isReloadShippingOnDiscount()
     {
         return (bool)$this->scopeConfig->getValue(self::XML_PATH_RELOAD_SHIPPING_ON_DISCOUNT, ScopeInterface::SCOPE_STORE);

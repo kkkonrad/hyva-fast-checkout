@@ -9,6 +9,8 @@ use Magento\Quote\Api\CartRepositoryInterface;
 use Magento\Quote\Api\ShippingMethodManagementInterface;
 use Magento\Quote\Api\PaymentMethodManagementInterface;
 use Magento\Quote\Api\CartManagementInterface;
+use Magento\Quote\Api\Data\AddressExtensionFactory;
+use Magento\Quote\Api\Data\CartExtensionFactory;
 use Magento\Checkout\Api\AgreementsValidatorInterface;
 use Magento\Customer\Model\Session as CustomerSession;
 use Magento\Customer\Api\AddressRepositoryInterface;
@@ -135,6 +137,8 @@ class Checkout extends Component
     private $giftMessageRepository;
     private $giftMessageFactory;
     private $agreementsValidator;
+    private $cartExtensionFactory;
+    private $addressExtensionFactory;
     private $paymentMethodsCache = null;
     /**
      * @param CheckoutSession $checkoutSession
@@ -174,7 +178,9 @@ class Checkout extends Component
         SearchCriteriaBuilder $searchCriteriaBuilder = null,
         \Magento\GiftMessage\Api\CartRepositoryInterface $giftMessageRepository = null,
         \Magento\GiftMessage\Api\Data\MessageInterfaceFactory $giftMessageFactory = null,
-        AgreementsValidatorInterface $agreementsValidator = null
+        AgreementsValidatorInterface $agreementsValidator = null,
+        CartExtensionFactory $cartExtensionFactory = null,
+        AddressExtensionFactory $addressExtensionFactory = null
     ) {
         $this->checkoutSession = $checkoutSession;
         $this->cartRepository = $cartRepository;
@@ -185,56 +191,18 @@ class Checkout extends Component
         $this->regionCollectionFactory = $regionCollectionFactory;
         $this->subscriberFactory = $subscriberFactory;
         $this->helper = $helper;
-        try {
-            $this->logger = $logger ?? \Magento\Framework\App\ObjectManager::getInstance()->get(\Psr\Log\LoggerInterface::class);
-        } catch (\Exception $e) {
-            $this->logger = new \Psr\Log\NullLogger();
-        }
-        try {
-            $this->directoryHelper = $directoryHelper ?? \Magento\Framework\App\ObjectManager::getInstance()->get(\Magento\Directory\Helper\Data::class);
-        } catch (\Exception $e) {
-            $this->directoryHelper = null;
-        }
-        try {
-            $this->paymentHelper = $paymentHelper ?? \Magento\Framework\App\ObjectManager::getInstance()->get(\Magento\Payment\Helper\Data::class);
-        } catch (\Exception $e) {
-            $this->paymentHelper = null;
-        }
-        try {
-            $this->orderFactory = $orderFactory ?? \Magento\Framework\App\ObjectManager::getInstance()->get(\Magento\Sales\Model\OrderFactory::class);
-        } catch (\Exception $e) {
-            $this->orderFactory = null;
-        }
-        try {
-            $this->customerSession = $customerSession ?? \Magento\Framework\App\ObjectManager::getInstance()->get(CustomerSession::class);
-        } catch (\Exception $e) {
-            $this->customerSession = null;
-        }
-        try {
-            $this->addressRepository = $addressRepository ?? \Magento\Framework\App\ObjectManager::getInstance()->get(AddressRepositoryInterface::class);
-        } catch (\Exception $e) {
-            $this->addressRepository = null;
-        }
-        try {
-            $this->searchCriteriaBuilder = $searchCriteriaBuilder ?? \Magento\Framework\App\ObjectManager::getInstance()->get(SearchCriteriaBuilder::class);
-        } catch (\Exception $e) {
-            $this->searchCriteriaBuilder = null;
-        }
-        try {
-            $this->giftMessageRepository = $giftMessageRepository ?? \Magento\Framework\App\ObjectManager::getInstance()->get(\Magento\GiftMessage\Api\CartRepositoryInterface::class);
-        } catch (\Exception $e) {
-            $this->giftMessageRepository = null;
-        }
-        try {
-            $this->giftMessageFactory = $giftMessageFactory ?? \Magento\Framework\App\ObjectManager::getInstance()->get(\Magento\GiftMessage\Api\Data\MessageInterfaceFactory::class);
-        } catch (\Exception $e) {
-            $this->giftMessageFactory = null;
-        }
-        try {
-            $this->agreementsValidator = $agreementsValidator ?? \Magento\Framework\App\ObjectManager::getInstance()->get(AgreementsValidatorInterface::class);
-        } catch (\Exception $e) {
-            $this->agreementsValidator = null;
-        }
+        $this->logger = $logger ?? new \Psr\Log\NullLogger();
+        $this->directoryHelper = $directoryHelper;
+        $this->paymentHelper = $paymentHelper;
+        $this->orderFactory = $orderFactory;
+        $this->customerSession = $customerSession;
+        $this->addressRepository = $addressRepository;
+        $this->searchCriteriaBuilder = $searchCriteriaBuilder;
+        $this->giftMessageRepository = $giftMessageRepository;
+        $this->giftMessageFactory = $giftMessageFactory;
+        $this->agreementsValidator = $agreementsValidator;
+        $this->cartExtensionFactory = $cartExtensionFactory;
+        $this->addressExtensionFactory = $addressExtensionFactory;
     }
 
     /**
@@ -2913,13 +2881,11 @@ class Checkout extends Component
 
         try {
             $extensionAttributes = $quote->getExtensionAttributes();
-            if ($extensionAttributes === null) {
-                $extensionAttributes = \Magento\Framework\App\ObjectManager::getInstance()
-                    ->get(\Magento\Quote\Api\Data\CartExtensionFactory::class)
-                    ->create();
+            if ($extensionAttributes === null && $this->cartExtensionFactory !== null) {
+                $extensionAttributes = $this->cartExtensionFactory->create();
             }
 
-            if (method_exists($extensionAttributes, 'setInpostLockerId')) {
+            if ($extensionAttributes !== null && method_exists($extensionAttributes, 'setInpostLockerId')) {
                 $extensionAttributes->setInpostLockerId($lockerId);
                 $quote->setExtensionAttributes($extensionAttributes);
             }
@@ -3116,10 +3082,12 @@ class Checkout extends Component
 
         try {
             $extension = $address->getExtensionAttributes();
+            if ($extension === null && $this->addressExtensionFactory !== null) {
+                $extension = $this->addressExtensionFactory->create();
+            }
+
             if ($extension === null) {
-                $extension = \Magento\Framework\App\ObjectManager::getInstance()
-                    ->get(\Magento\Quote\Api\Data\AddressExtensionFactory::class)
-                    ->create();
+                return;
             }
 
             foreach ($normalizedExtensionAttributes as $code => $value) {

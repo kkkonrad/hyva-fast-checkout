@@ -7,5 +7,6 @@
 
 $checkoutRenderersTemplate = $block->getTemplateFile('Kkkonrad_Fastcheckout::hyva/knockout/checkout-renderers.phtml');
 if ($checkoutRenderersTemplate) {
+    // phpcs:ignore Magento2.Security.IncludeFile.FoundIncludeFile -- trusted module template.
     include $checkoutRenderersTemplate;
 }

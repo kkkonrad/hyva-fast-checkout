@@ -4,10 +4,10 @@
   "description": "",
   "main": "CheckoutTest.spec.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "playwright test"
   },
   "keywords": [],
-  "author": "",
+  "author": "Administrator <admin@hosting-magento.pl>",
   "license": "ISC",
   "dependencies": {
     "@playwright/test": "^1.61.1"

@@ -62,12 +62,16 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
         <div class="fc-grid grid gap-6 grid-cols-1 items-start w-full">
             
             <div class="fc-left-wrapper flex flex-col gap-6">
+                <?php // phpcs:ignore Magento2.Security.IncludeFile.FoundIncludeFile -- trusted module template. ?>
                 <?php include $block->getTemplateFile('Kkkonrad_Fastcheckout::hyva/checkout/shipping-address.phtml'); ?>
+                <?php // phpcs:ignore Magento2.Security.IncludeFile.FoundIncludeFile -- trusted module template. ?>
                 <?php include $block->getTemplateFile('Kkkonrad_Fastcheckout::hyva/checkout/shipping-methods.phtml'); ?>
             </div>
 
             <div class="fc-right-wrapper flex flex-col gap-6">
+                <?php // phpcs:ignore Magento2.Security.IncludeFile.FoundIncludeFile -- trusted module template. ?>
                 <?php include $block->getTemplateFile('Kkkonrad_Fastcheckout::hyva/checkout/payment-methods.phtml'); ?>
+                <?php // phpcs:ignore Magento2.Security.IncludeFile.FoundIncludeFile -- trusted module template. ?>
                 <?php include $block->getTemplateFile('Kkkonrad_Fastcheckout::hyva/checkout/summary.phtml'); ?>
             </div>
 
@@ -106,5 +110,6 @@ $hasPaymentMethodFilter = !empty($allowedPaymentMethodCodes);
     </form>
     <?php endif; ?>
 
+    <?php // phpcs:ignore Magento2.Security.IncludeFile.FoundIncludeFile -- trusted module template. ?>
     <?php include $block->getTemplateFile('Kkkonrad_Fastcheckout::hyva/checkout/script.phtml'); ?>
 </section>

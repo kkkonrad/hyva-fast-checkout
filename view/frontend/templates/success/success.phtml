@@ -17,7 +17,7 @@
         <p class="text-sm text-gray-500 leading-relaxed">
             <?php if ($block->getOrderId()): ?>
                 <?php if ($block->getCanViewOrder()): ?>
-                    <?= sprintf(
+                    <?= /* @noEscape -- link URL and label are escaped below. */ sprintf(
                         __('Your order %s has been placed. You will receive an email with more details of your purchase.'),
                         sprintf(
                             '<a class="font-semibold text-blue-600 hover:text-blue-700 underline" href="%s">#%s</a>',
@@ -26,13 +26,13 @@
                         )
                     ) ?>
                 <?php else: ?>
-                    <?= sprintf(
+                    <?= /* @noEscape -- order identifier is escaped below. */ sprintf(
                         __('Your order %s has been placed. You will receive an email with more details of your purchase.'),
                         '<span class="font-semibold text-gray-800">#' . $block->escapeHtml($block->getOrderId()) . '</span>'
                     ) ?>
                 <?php endif; ?>
             <?php endif; ?>
-            <?= $block->getAdditionalInfoHtml() ?>
+            <?= /* @noEscape -- HTML is provided by Magento success-page blocks. */ $block->getAdditionalInfoHtml() ?>
         </p>
     </div>
 

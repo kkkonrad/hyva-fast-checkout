@@ -2,17 +2,6 @@
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
 
-    <preference for="Magento\Downloadable\Observer\IsAllowedGuestCheckoutObserver" type="Kkkonrad\Fastcheckout\Observer\Downloadable\IsAllowedGuestCheckoutObserver"/>
-    <preference for="Magento\Checkout\Helper\Data" type="Kkkonrad\Fastcheckout\Helper\Checkout\Data"/>
-
-
-
-    <type name="Magento\Customer\Model\Address\AbstractAddress">
-        <plugin name="fastcheckout_customer_address" type="Kkkonrad\Fastcheckout\Plugin\Customer\Model\Address\AbstractAddress"/>
-    </type>
-    <type name="Magento\Payment\Model\InfoInterface">
-        <plugin name="fastcheckout_unset_extension_attributes" type="Kkkonrad\Fastcheckout\Plugin\Payments\Info"/>
-    </type>
     <type name="Magento\Quote\Api\CartRepositoryInterface">
         <plugin name="fastcheckout_preserve_inpost_locker" type="Kkkonrad\Fastcheckout\Plugin\Quote\PreserveInpostLocker"/>
     </type>

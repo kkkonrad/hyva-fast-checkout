@@ -81,6 +81,38 @@
                     <frontend_model>Kkkonrad\Fastcheckout\Block\Adminhtml\System\Config\ShippingPaymentMapping</frontend_model>
                     <backend_model>Kkkonrad\Fastcheckout\Model\Config\Backend\Json</backend_model>
                 </field>
+                <field id="required_shipping_fields" translate="label comment" type="text"
+                       sortOrder="30" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Required Shipping Fields</label>
+                    <comment>Select fields required by each shipping method. Enter comma-separated exact paths only for fields not available in the list.</comment>
+                    <frontend_model>Kkkonrad\Fastcheckout\Block\Adminhtml\System\Config\RequiredShippingFields</frontend_model>
+                    <backend_model>Kkkonrad\Fastcheckout\Model\Config\Backend\Json</backend_model>
+                </field>
+                <field id="required_payment_fields" translate="label comment" type="text"
+                       sortOrder="31" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Required Payment Fields</label>
+                    <comment>Select fields required by each payment method. Enter comma-separated exact paths only for fields not available in the list.</comment>
+                    <frontend_model>Kkkonrad\Fastcheckout\Block\Adminhtml\System\Config\RequiredPaymentFields</frontend_model>
+                    <backend_model>Kkkonrad\Fastcheckout\Model\Config\Backend\Json</backend_model>
+                </field>
+            </group>
+            <group id="restrict_payment" translate="label" type="text"
+                   sortOrder="3" showInDefault="1" showInWebsite="1" showInStore="1">
+                <label>Restricted Payment Methods</label>
+                <field id="enable" translate="label" type="select"
+                       sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Enable Restrictions?</label>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="methods" translate="label comment" type="textarea"
+                       sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Allowed Payment Methods</label>
+                    <comment>JSON array of exact method codes, for example ["checkmo","banktransfer"]. Wildcards are not supported.</comment>
+                    <backend_model>Kkkonrad\Fastcheckout\Model\Config\Backend\Json</backend_model>
+                    <depends>
+                        <field id="enable">1</field>
+                    </depends>
+                </field>
             </group>
         </section>
     </system>

@@ -80,6 +80,7 @@ define([
         require([
             'knockout',
             'Magento_Ui/js/core/app',
+            'Magento_Ui/js/core/renderer/layout',
             'Magento_Checkout/js/model/payment-service',
             'Magento_Checkout/js/model/payment/method-converter',
             'Magento_Checkout/js/model/payment/method-list',
@@ -108,6 +109,7 @@ define([
         ], function (
             ko,
             app,
+            uiLayout,
             paymentService,
             methodConverter,
             methodList,
@@ -219,11 +221,13 @@ define([
                 rendererManager.runSyncPaymentRenderers();
             }
 
-            function loadRendererComponents(done) {
-                rendererManager.loadRendererComponents(done);
+            function initializeCheckoutBridge(done) {
+                // Loading a renderer registration module can initialize a remote
+                // payment SDK. Individual renderers are loaded by method code.
+                done();
             }
 
-            loadRendererComponents(function () {
+            initializeCheckoutBridge(function () {
                 // Initialize customerData dynamically if available
                 require(['Magento_Customer/js/customer-data'], function (customerData) {
                     if (customerData) {
@@ -280,7 +284,9 @@ define([
                 });
                 var checkoutLayoutBridge = createCheckoutLayoutBridge({
                     config: config,
-                    registry: registry
+                    registry: registry,
+                    layout: uiLayout,
+                    scope: scope
                 });
                 var addressDataBuilder = createAddressDataBuilder({
                     quote: quote,
@@ -1864,6 +1870,11 @@ define([
                     lastSetSelectedMethodAt = Date.now();
                     syncPaymentMethods();
 
+                    checkoutLayoutBridge.activateDeferredPaymentListChildren(
+                        methodCode,
+                        getRendererComponentForMethod(methodCode)
+                    );
+
                     if (!methodCode) {
                         pendingSelectedMethodCode = '';
                         persistPaymentMethodToCheckoutData(null);
@@ -2849,7 +2860,7 @@ define([
                                         var timeoutError = new Error(translateFastcheckoutMessage('The selected payment method did not start order placement. Please try again.'));
                                         handlePaymentError(timeoutError, component.messageContainer || getBridgeMessageContainer());
 	                                    reject(timeoutError);
-	                                }, 30000);
+                                }, 15000);
 
 	                                try {
                                             if (nativeSubmitAction) {
@@ -2972,7 +2983,7 @@ define([
                                         fallbackDeferred.reject(timeoutError);
                                     }
                                     this.cleanupKoOrderState();
-                                }.bind(this), 30000);
+                                }.bind(this), 15000);
 
                                 this.syncWirePaymentData(
                                     wire,
@@ -3242,6 +3253,11 @@ define([
                 var layoutScripts = config.layoutScripts || [];
                 if (layoutScripts.length > 0) {
                     layoutScripts.forEach(function (scriptModule) {
+                        var namespace = String(scriptModule).split('/')[0];
+
+                        if (!/^(Magento_|Kkkonrad_)/.test(namespace)) {
+                            return;
+                        }
                         require([scriptModule], function () {
                             
                         }, function (err) {

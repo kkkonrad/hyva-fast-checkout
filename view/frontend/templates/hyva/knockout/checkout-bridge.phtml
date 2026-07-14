@@ -51,6 +51,7 @@ $mageInitConfig = [
     'shippingAddressChildren' => $shippingAddressChildren,
     'checkoutStepChildren' => $checkoutStepChildren,
     'layoutScripts' => $layoutScripts['modules'] ?? [],
+    'layoutExternalScripts' => $layoutScripts['external'] ?? [],
     'scope' => 'fastcheckoutHyvaPaymentRenderers'
 ];
 $block->ensureRequireJsAssets();
@@ -122,9 +123,6 @@ foreach ($layoutAssets['css'] as $cssAsset) {
     $url = ($cssAsset['src_type'] === 'url') ? $cssAsset['src'] : $block->getViewFileUrl($cssAsset['src']);
     echo '<link rel="stylesheet" type="text/css" href="' . $escaper->escapeUrl($url) . '" />';
 }
-foreach ($layoutScripts['external'] as $externalScript) {
-    echo '<script src="' . $escaper->escapeUrl($externalScript) . '"></script>';
-}
 ?>
 
 <div id="fastcheckout-ko-payment-root"
@@ -150,8 +148,13 @@ foreach ($layoutScripts['external'] as $externalScript) {
 (function () {
     // Safely define checkoutConfig and payment config inline before RequireJS is loaded/executed
     // We use a getter/setter to prevent subsequent scripts (e.g. from PayPal_Braintree) from overwriting it completely and removing key structures
-    var existingConfig = window.checkoutConfig || <?= /* @noEscape */ \Laminas\Json\Json::encode($checkoutConfig) ?>;
-    var actualConfig = {};
+    var serverConfig = <?= /* @noEscape */ \Laminas\Json\Json::encode($checkoutConfig) ?>;
+    var existingConfig = window.checkoutConfig && typeof window.checkoutConfig === 'object'
+        ? window.checkoutConfig
+        : {};
+    // Hyva or a payment module may define an empty checkoutConfig first. Keep
+    // those additions, but always start with Magento's complete server config.
+    var actualConfig = Object.assign({}, serverConfig, existingConfig);
     
     var initPaymentProxy = function(paymentObj) {
         paymentObj = paymentObj || {};
@@ -192,7 +195,7 @@ foreach ($layoutScripts['external'] as $externalScript) {
         configurable: true,
         enumerable: true
     });
-    window.checkoutConfig = existingConfig;
+    window.checkoutConfig = actualConfig;
 
     var config = <?= /* @noEscape */ \Laminas\Json\Json::encode($mageInitConfig) ?>;
     var requireJsUrl = '<?= $escaper->escapeJs($block->getViewFileUrl('requirejs/require.js')) ?>';

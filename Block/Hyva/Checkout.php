@@ -12,7 +12,6 @@ use Magento\Framework\Component\ComponentRegistrar;
 use Magento\Framework\Component\ComponentRegistrarInterface;
 use Magento\Framework\Locale\ResolverInterface;
 use Magento\Framework\Module\ModuleListInterface;
-use Magento\Framework\ObjectManagerInterface;
 use Magento\Framework\Pricing\Helper\Data as PricingHelper;
 use Magento\Framework\View\Element\Template;
 use Magento\Framework\View\Element\Template\Context;
@@ -20,6 +19,8 @@ use Magento\Quote\Model\Quote;
 use Magento\Quote\Model\Quote\Item;
 use Kkkonrad\Fastcheckout\Helper\Data as Helper;
 use Kkkonrad\Fastcheckout\Model\Hyva\RequireJsAssets;
+use Magento\Customer\Helper\Address as AddressHelper;
+use Magento\Tax\Helper\Data as TaxHelper;
 
 
 class Checkout extends Template
@@ -93,11 +94,6 @@ class Checkout extends Template
     private $localeResolver;
 
     /**
-     * @var ObjectManagerInterface|null
-     */
-    private $objectManager;
-
-    /**
      * @var array|null
      */
     private $checkoutConfigCache;
@@ -167,6 +163,15 @@ class Checkout extends Template
      */
     private $helper;
 
+    /** @var RequireJsAssets|null */
+    private $requireJsAssets;
+
+    /** @var AddressHelper|null */
+    private $addressHelper;
+
+    /** @var TaxHelper|null */
+    private $taxHelper;
+
 
     /**
      * @param Context $context
@@ -175,7 +180,7 @@ class Checkout extends Template
      * @param ImageHelper $imageHelper
      * @param ProductConfiguration $productConfiguration
      * @param ViewModelRegistry $viewModelRegistry
-     * @param CompositeConfigProvider|array|null $configProvider
+     * @param CompositeConfigProvider|null $configProvider
      * @param ModuleListInterface|null $moduleList
      * @param ComponentRegistrarInterface|null $componentRegistrar
      * @param ResolverInterface|null $localeResolver
@@ -189,27 +194,28 @@ class Checkout extends Template
         ProductConfiguration $productConfiguration,
         ViewModelRegistry $viewModelRegistry,
         Helper $helper,
-        $configProvider = null,
+        ?CompositeConfigProvider $configProvider = null,
         ModuleListInterface $moduleList = null,
         ComponentRegistrarInterface $componentRegistrar = null,
         ResolverInterface $localeResolver = null,
-        array $data = []
+        array $data = [],
+        RequireJsAssets $requireJsAssets = null,
+        AddressHelper $addressHelper = null,
+        TaxHelper $taxHelper = null
     ) {
-        if (is_array($configProvider)) {
-            $data = $configProvider;
-            $configProvider = null;
-        }
-
         $this->checkoutSession = $checkoutSession;
         $this->pricingHelper = $pricingHelper;
         $this->imageHelper = $imageHelper;
         $this->productConfiguration = $productConfiguration;
         $this->viewModelRegistry = $viewModelRegistry;
         $this->helper = $helper;
-        $this->configProvider = $configProvider instanceof CompositeConfigProvider ? $configProvider : null;
+        $this->configProvider = $configProvider;
         $this->moduleList = $moduleList;
         $this->componentRegistrar = $componentRegistrar;
         $this->localeResolver = $localeResolver;
+        $this->requireJsAssets = $requireJsAssets;
+        $this->addressHelper = $addressHelper;
+        $this->taxHelper = $taxHelper;
 
         parent::__construct($context, $data);
     }
@@ -243,8 +249,12 @@ class Checkout extends Template
      */
     public function ensureRequireJsAssets()
     {
+        if ($this->requireJsAssets === null) {
+            return false;
+        }
+
         try {
-            return $this->getObjectManager()->get(RequireJsAssets::class)->ensure();
+            return $this->requireJsAssets->ensure();
         } catch (\Throwable $exception) {
             return false;
         }
@@ -1358,17 +1368,6 @@ class Checkout extends Template
      */
     private function getConfigProvider()
     {
-        if ($this->configProvider instanceof CompositeConfigProvider) {
-            return $this->configProvider;
-        }
-
-        try {
-            $configProvider = $this->getObjectManager()->get(CompositeConfigProvider::class);
-            $this->configProvider = $configProvider instanceof CompositeConfigProvider ? $configProvider : null;
-        } catch (\Throwable $exception) {
-            $this->configProvider = null;
-        }
-
         return $this->configProvider;
     }
 
@@ -1377,17 +1376,6 @@ class Checkout extends Template
      */
     private function getModuleList()
     {
-        if ($this->moduleList instanceof ModuleListInterface) {
-            return $this->moduleList;
-        }
-
-        try {
-            $moduleList = $this->getObjectManager()->get(ModuleListInterface::class);
-            $this->moduleList = $moduleList instanceof ModuleListInterface ? $moduleList : null;
-        } catch (\Throwable $exception) {
-            $this->moduleList = null;
-        }
-
         return $this->moduleList;
     }
 
@@ -1396,19 +1384,6 @@ class Checkout extends Template
      */
     private function getComponentRegistrar()
     {
-        if ($this->componentRegistrar instanceof ComponentRegistrarInterface) {
-            return $this->componentRegistrar;
-        }
-
-        try {
-            $componentRegistrar = $this->getObjectManager()->get(ComponentRegistrarInterface::class);
-            $this->componentRegistrar = $componentRegistrar instanceof ComponentRegistrarInterface
-                ? $componentRegistrar
-                : null;
-        } catch (\Throwable $exception) {
-            $this->componentRegistrar = null;
-        }
-
         return $this->componentRegistrar;
     }
 
@@ -1417,30 +1392,7 @@ class Checkout extends Template
      */
     private function getLocaleResolver()
     {
-        if ($this->localeResolver instanceof ResolverInterface) {
-            return $this->localeResolver;
-        }
-
-        try {
-            $localeResolver = $this->getObjectManager()->get(ResolverInterface::class);
-            $this->localeResolver = $localeResolver instanceof ResolverInterface ? $localeResolver : null;
-        } catch (\Throwable $exception) {
-            $this->localeResolver = null;
-        }
-
         return $this->localeResolver;
-    }
-
-    /**
-     * @return ObjectManagerInterface
-     */
-    private function getObjectManager()
-    {
-        if ($this->objectManager === null) {
-            $this->objectManager = \Magento\Framework\App\ObjectManager::getInstance();
-        }
-
-        return $this->objectManager;
     }
 
     /**
@@ -1577,18 +1529,10 @@ class Checkout extends Template
     }
 
     /**
-     * @var \Magento\Customer\Helper\Address|null
-     */
-    private $addressHelper;
-
-    /**
      * @return \Magento\Customer\Helper\Address
      */
     public function getAddressHelper()
     {
-        if ($this->addressHelper === null) {
-            $this->addressHelper = $this->getObjectManager()->get(\Magento\Customer\Helper\Address::class);
-        }
         return $this->addressHelper;
     }
 
@@ -1665,18 +1609,10 @@ class Checkout extends Template
     }
 
     /**
-     * @var \Magento\Tax\Helper\Data|null
-     */
-    private $taxHelper;
-
-    /**
      * @return \Magento\Tax\Helper\Data
      */
     public function getTaxHelper()
     {
-        if ($this->taxHelper === null) {
-            $this->taxHelper = $this->getObjectManager()->get(\Magento\Tax\Helper\Data::class);
-        }
         return $this->taxHelper;
     }
 

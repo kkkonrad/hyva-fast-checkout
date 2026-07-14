@@ -16,11 +16,26 @@
             <argument name="moduleList" xsi:type="object">Magento\Framework\Module\ModuleListInterface</argument>
             <argument name="componentRegistrar" xsi:type="object">Magento\Framework\Component\ComponentRegistrarInterface</argument>
             <argument name="localeResolver" xsi:type="object">Magento\Framework\Locale\ResolverInterface</argument>
+            <argument name="requireJsAssets" xsi:type="object">Kkkonrad\Fastcheckout\Model\Hyva\RequireJsAssets</argument>
+            <argument name="addressHelper" xsi:type="object">Magento\Customer\Helper\Address</argument>
+            <argument name="taxHelper" xsi:type="object">Magento\Tax\Helper\Data</argument>
         </arguments>
     </type>
-    <type name="Magento\Directory\Model\ResourceModel\Country\Collection">
-        <plugin name="fastcheckout_country_collection"
-                type="Kkkonrad\Fastcheckout\Plugin\Country\Collection"/>
+    <type name="Kkkonrad\Fastcheckout\Magewire\Checkout">
+        <arguments>
+            <argument name="logger" xsi:type="object">Psr\Log\LoggerInterface</argument>
+            <argument name="directoryHelper" xsi:type="object">Magento\Directory\Helper\Data</argument>
+            <argument name="paymentHelper" xsi:type="object">Magento\Payment\Helper\Data</argument>
+            <argument name="orderFactory" xsi:type="object">Magento\Sales\Model\OrderFactory</argument>
+            <argument name="customerSession" xsi:type="object">Magento\Customer\Model\Session</argument>
+            <argument name="addressRepository" xsi:type="object">Magento\Customer\Api\AddressRepositoryInterface</argument>
+            <argument name="searchCriteriaBuilder" xsi:type="object">Magento\Framework\Api\SearchCriteriaBuilder</argument>
+            <argument name="giftMessageRepository" xsi:type="object">Magento\GiftMessage\Api\CartRepositoryInterface</argument>
+            <argument name="giftMessageFactory" xsi:type="object">Magento\GiftMessage\Api\Data\MessageInterfaceFactory</argument>
+            <argument name="agreementsValidator" xsi:type="object">Magento\Checkout\Api\AgreementsValidatorInterface</argument>
+            <argument name="cartExtensionFactory" xsi:type="object">Magento\Quote\Api\Data\CartExtensionFactory</argument>
+            <argument name="addressExtensionFactory" xsi:type="object">Magento\Quote\Api\Data\AddressExtensionFactory</argument>
+        </arguments>
     </type>
     <type name="Magento\Checkout\Controller\Index\Index">
         <plugin name="fastcheckout_checkout_controller"
@@ -54,18 +69,6 @@
         <plugin name="fastcheckout_get_checkout_url_cart"
                 type="Kkkonrad\Fastcheckout\Plugin\Checkout\Block\Cart"/>
     </type>
-
-    <preference for="PayPal\Braintree\Block\Paypal\Button" type="Kkkonrad\Fastcheckout\Block\Rewrite\Paypal\Button" />
-
-    <type name="Kkkonrad\Fastcheckout\Block\Rewrite\Paypal\Button">
-        <arguments>
-            <argument name="data" xsi:type="array">
-                <item name="template" xsi:type="string">Kkkonrad_Fastcheckout::paypal/button.phtml</item>
-            </argument>
-        </arguments>
-    </type>
-
-    <preference for="Magento\Directory\Model\ResourceModel\Region\Collection" type="Kkkonrad\Fastcheckout\Model\ResourceModel\Region\Collection" />
 
     <type name="Magento\Framework\View\Model\Layout\Merge">
         <plugin name="fastcheckout_hyva_layout_merge_fix"

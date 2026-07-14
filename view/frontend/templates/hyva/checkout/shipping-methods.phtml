@@ -65,7 +65,7 @@ foreach ($shippingMethods as $carrierCode => $rates) {
                                         ? 'border-2 border-blue-500 bg-blue-50/10 shadow-sm' 
                                         : 'border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50/50';
                                 ?>
-                                <div class="rounded p-4 transition-all duration-200 <?= $cssClass ?>">
+                                <div class="rounded p-4 transition-all duration-200 <?= $escaper->escapeHtmlAttr($cssClass) ?>">
                                     <label class="flex items-center justify-between cursor-pointer mb-0 w-full">
                                         <div class="flex items-center min-w-0">
                                             <input type="radio" 

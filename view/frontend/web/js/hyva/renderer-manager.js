@@ -4,11 +4,13 @@ define([
     'use strict';
 
     return function (config) {
-        var rendererComponents = config.rendererComponents || [],
-            rendererComponentMap = config.rendererComponentMap || [],
+        var rendererComponentMap = config.rendererComponentMap || [],
             rendererComponentsByMethod = {},
             loadedRendererComponents = {},
             loadingRendererComponents = {},
+            layoutScripts = config.layoutScripts || [],
+            externalScripts = config.layoutExternalScripts || [],
+            loadedLayoutScripts = {},
             patchRenderersHandler = null,
             syncPaymentRenderersHandler = null;
 
@@ -53,7 +55,10 @@ define([
         }
 
         function loadRendererComponent(component) {
-            var deferred;
+            var deferred,
+                namespace,
+                componentLayoutScripts,
+                prerequisite;
 
             if (!component) {
                 return $.Deferred().resolve(false).promise();
@@ -70,18 +75,79 @@ define([
             deferred = $.Deferred();
             loadingRendererComponents[component] = deferred.promise();
 
-            window.require([component], function () {
-                rememberLoadedRendererComponent(component);
-                delete loadingRendererComponents[component];
-                runPatchRenderers();
-                runSyncPaymentRenderers();
-                deferred.resolve(true);
-            }, function (error) {
-                delete loadingRendererComponents[component];
-                if (window.console && typeof window.console.warn === 'function') {
-                    window.console.warn('Kkkonrad Fastcheckout: payment renderer could not be loaded', component, error);
+            namespace = String(component).split('/')[0];
+            componentLayoutScripts = layoutScripts.filter(function (scriptModule) {
+                return String(scriptModule).split('/')[0] === namespace && !loadedLayoutScripts[scriptModule];
+            });
+            prerequisite = loadRendererPrerequisites(component, componentLayoutScripts);
+
+            prerequisite.always(function () {
+                window.require([component], function () {
+                    rememberLoadedRendererComponent(component);
+                    delete loadingRendererComponents[component];
+                    runPatchRenderers();
+                    runSyncPaymentRenderers();
+                    deferred.resolve(true);
+                }, function (error) {
+                    delete loadingRendererComponents[component];
+                    if (window.console && typeof window.console.warn === 'function') {
+                        window.console.warn('Kkkonrad Fastcheckout: payment renderer could not be loaded', component, error);
+                    }
+                    deferred.resolve(false);
+                });
+            });
+
+            return deferred.promise();
+        }
+
+        function loadRendererPrerequisites(component, componentLayoutScripts) {
+            var deferred = $.Deferred(),
+                isThirdParty = !/^(Magento_|Kkkonrad_)/.test(String(component)),
+                pending = isThirdParty ? externalScripts.length : 0;
+
+            function finishExternalScript() {
+                pending -= 1;
+                if (pending <= 0) {
+                    loadComponentLayoutScripts();
                 }
-                deferred.resolve(false);
+            }
+
+            function loadComponentLayoutScripts() {
+                if (!componentLayoutScripts.length) {
+                    deferred.resolve();
+                    return;
+                }
+
+                window.require(componentLayoutScripts, function () {
+                    componentLayoutScripts.forEach(function (moduleName) {
+                        loadedLayoutScripts[moduleName] = true;
+                    });
+                    deferred.resolve();
+                }, function () {
+                    deferred.resolve();
+                });
+            }
+
+            if (!pending) {
+                loadComponentLayoutScripts();
+                return deferred.promise();
+            }
+
+            externalScripts.forEach(function (src) {
+                var existing = document.querySelector('script[src="' + src.replace(/"/g, '\\"') + '"]'),
+                    script;
+
+                if (existing) {
+                    finishExternalScript();
+                    return;
+                }
+
+                script = document.createElement('script');
+                script.src = src;
+                script.async = true;
+                script.onload = finishExternalScript;
+                script.onerror = finishExternalScript;
+                document.head.appendChild(script);
             });
 
             return deferred.promise();
@@ -111,17 +177,6 @@ define([
             runPatchRenderers: runPatchRenderers,
 
             runSyncPaymentRenderers: runSyncPaymentRenderers,
-
-            loadRendererComponents: function (done) {
-                var loads = rendererComponents.map(loadRendererComponent);
-
-                if (!loads.length) {
-                    done();
-                    return;
-                }
-
-                $.when.apply($, loads).always(done);
-            },
 
             setPatchRenderersHandler: function (handler) {
                 patchRenderersHandler = handler;

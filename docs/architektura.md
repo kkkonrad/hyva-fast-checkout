@@ -97,13 +97,9 @@ Moduł zawiera szereg wtyczek (plugins) eliminujących znane błędy w rdzeniu M
 
 1. **[CustomerManagementPlugin.php](file:///var/www/html/app/code/Kkkonrad/Fastcheckout/Plugin/Quote/CustomerManagementPlugin.php)**:
    - Rozwiązuje krytyczny błąd w Magento 2 core, polegający na tym, że podczas rejestracji klienta w locie podczas zakupu jako gość, wymagane niestandardowe atrybuty adresu (np. fax, prefix, suffix, firma) nie były kopiowane, powodując błędy walidacji. Plugin kopiuje te dane bezpośrednio przed walidacją zapisu adresu.
-2. **[AbstractAddress.php](file:///var/www/html/app/code/Kkkonrad/Fastcheckout/Plugin/Customer/Model/Address/AbstractAddress.php)**:
-   - Naprawia walidację adresu w przypadku krajów, dla których pole Region/Województwo nie jest wymagane. Zapobiega to błędom, gdy w bazie danych Magento istnieją stare lub niepasujące identyfikatory regionów.
-3. **[PreserveInpostLocker.php](file:///var/www/html/app/code/Kkkonrad/Fastcheckout/Plugin/Quote/PreserveInpostLocker.php)**:
+2. **[PreserveInpostLocker.php](file:///var/www/html/app/code/Kkkonrad/Fastcheckout/Plugin/Quote/PreserveInpostLocker.php)**:
    - Zapewnia integralność danych Paczkomatów InPost. Podczas asynchronicznych modyfikacji koszyka przez Magewire (np. dodanie kuponu rabatowego), Magento potrafi wyczyścić Extension Attributes. Plugin przed zapisem Quote sprawdza, czy wybrany Paczkomat znajduje się w bazie danych i w razie potrzeby przywraca jego ID (`inpost_locker_id`) do obiektu Quote.
-4. **[Info.php](file:///var/www/html/app/code/Kkkonrad/Fastcheckout/Plugin/Payments/Info.php)**:
-   - Filtruje dodatkowe informacje o płatnościach. Niektóre wtyczki płatności próbują zapisać w `additional_information` obiekty nieserializowalne. Plugin odrzuca wartości niebędące typami skalarnymi lub obiektami implementującymi `Stringable`, chroniąc koszyk przed wywaleniem błędu bazy danych.
-5. **[MergePlugin.php](file:///var/www/html/app/code/Kkkonrad/Fastcheckout/Plugin/Layout/MergePlugin.php)**:
+3. **[MergePlugin.php](file:///var/www/html/app/code/Kkkonrad/Fastcheckout/Plugin/Layout/MergePlugin.php)**:
    - Rozwiązuje problem niekompatybilności layoutów XML z szablonem Hyvä. W standardowym Magento kontenery `head.additional` oraz `before.body.end` są zadeklarowane jako kontenery (`referenceContainer`), natomiast Hyvä deklaruje je jako bloki (`referenceBlock`). Plugin w locie modyfikuje drzewo XML, zamieniając tagi `referenceContainer` na `referenceBlock`, dzięki czemu zewnętrzne moduły nie psują renderowania strony.
 
 ---
@@ -113,9 +109,7 @@ Moduł zawiera szereg wtyczek (plugins) eliminujących znane błędy w rdzeniu M
 1. **[QuoteSubmitSuccess.php](file:///var/www/html/app/code/Kkkonrad/Fastcheckout/Observer/QuoteSubmitSuccess.php)**:
    - Uruchamia się po pomyślnym złożeniu zamówienia.
    - Odczytuje komentarz z sesji (`fastcheckout_comment`) i zapisuje go jako widoczny dla klienta rekord w tabeli historii statusów zamówienia (`sales_order_status_history`).
-   - Automatycznie przypisuje zamówienie złożone jako gość do konta klienta, jeśli adres e-mail pokrywa się z istniejącym kontem.
-   - Przypisuje zakupione linki produktów cyfrowych (Downloadable) bezpośrednio do konta klienta.
+   - Nie zmienia właściciela zamówienia gościa. Powiązanie wyłącznie na podstawie adresu e-mail byłoby podatne na przejęcie danych zamówienia.
+   - Obsługę linków produktów cyfrowych pozostawia obserwatorom Magento Downloadable.
 2. **[HyvaConfigGenerateBefore.php](file:///var/www/html/app/code/Kkkonrad/Fastcheckout/Observer/HyvaConfigGenerateBefore.php)**:
    - Rejestruje katalog modułu Fastcheckout w procesie kompilacji stylów Tailwind CSS w szablonie Hyvä. Gwarantuje to, że wszelkie klasy CSS użyte w plikach `.phtml` koszyka zostaną prawidłowo wygenerowane w finalnym pliku stylów motywu.
-3. **[IsAllowedGuestCheckoutObserver.php](file:///var/www/html/app/code/Kkkonrad/Fastcheckout/Observer/Downloadable/IsAllowedGuestCheckoutObserver.php)**:
-   - Dostosowuje uprawnienia zakupów gościnnych dla produktów do pobrania (Downloadable), respektując konfigurację sklepu w tym zakresie.
