@@ -52,23 +52,19 @@ define([
             return found;
         },
 
+        /**
+         * Keep stateful third-party renderers alive when a shipping/payment
+         * rule temporarily removes their method. Hosted fields (for example
+         * PayU Secure Forms) cannot be safely destroyed and initialized again
+         * against the same checkout DOM.
+         *
+         * @returns {Object}
+         */
+        removeRenderer: function () {
+            return this;
+        },
+
         syncRenderers: function () {
-            var availableMethods = _.pluck(paymentMethods(), 'method'),
-                self = this;
-
-            _.each(this.paymentGroupsList(), function (group) {
-                _.each(this.getRegion(group.displayArea)(), function (value) {
-                    var isAvailable = value.item && availableMethods.some(function (methodCode) {
-                        return self.methodCodesEqual(value.item.method, methodCode);
-                    });
-
-                    if (value.item && !isAvailable) {
-                        value.disposeSubscriptions();
-                        value.destroy();
-                    }
-                });
-            }, this);
-
             _.each(paymentMethods(), function (paymentMethodData) {
                 if (!this.hasRenderer(paymentMethodData.method) && !this.pendingRendererCodes[paymentMethodData.method]) {
                     this.createRenderer(paymentMethodData);
