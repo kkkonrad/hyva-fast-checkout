@@ -6,9 +6,17 @@
  * @var \Magento\Framework\Escaper $escaper
  * @var \Kkkonrad\Fastcheckout\Magewire\Checkout $magewire
  * @var array $paymentMethods
- * @var bool $hasPaymentMethodFilter
  * @var array $allowedPaymentMethodCodes
  */
+$paymentMethodAvailability = [];
+$hasAvailablePaymentMethods = false;
+
+foreach ($paymentMethods as $paymentMethod) {
+    $paymentMethodCode = (string)$paymentMethod->getCode();
+    $isAvailable = $magewire->isPaymentMethodAvailable($paymentMethodCode, $allowedPaymentMethodCodes);
+    $paymentMethodAvailability[$paymentMethodCode] = $isAvailable;
+    $hasAvailablePaymentMethods = $hasAvailablePaymentMethods || $isAvailable;
+}
 ?>
 <!-- Container 3: Payment Method -->
 <div class="fc-container-3 space-y-6 min-w-0 w-full">
@@ -20,12 +28,17 @@
         </h2>
     </div>
 
-    <?php if (empty($paymentMethods)): ?>
-        <p class="text-sm text-gray-500">
+    <?php if (!$hasAvailablePaymentMethods): ?>
+        <div class="rounded-md border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700"
+             role="status"
+             data-fastcheckout-no-payment-methods>
             <?= $escaper->escapeHtml(__('No payment methods available.')) ?>
-        </p>
-    <?php else: ?>
-        <div class="grid gap-3 relative min-h-[50px]" wire:key="checkout-payment-methods-grid">
+        </div>
+    <?php endif; ?>
+
+    <?php if (!empty($paymentMethods)): ?>
+        <div class="grid gap-3 relative min-h-[50px]<?= $hasAvailablePaymentMethods ? '' : ' hidden' ?>"
+             wire:key="checkout-payment-methods-grid">
             <div wire:loading.flex
                  wire:target="countryId,regionId,region,postcode,city,street1,street2,fillFromSavedAddress,selectShippingMethod"
                  class="absolute inset-0 bg-white/80 backdrop-blur-[1px] z-20 rounded items-center justify-center transition-all duration-200"
@@ -38,7 +51,7 @@
             <?php foreach ($paymentMethods as $method): ?>
                 <?php
                 $methodCode = $method->getCode();
-                $isPaymentMethodAllowed = $magewire->isPaymentMethodAvailable((string)$methodCode, $allowedPaymentMethodCodes);
+                $isPaymentMethodAllowed = $paymentMethodAvailability[(string)$methodCode] ?? false;
                 $isSelectedPayment = $isPaymentMethodAllowed && $magewire->isPaymentMethodSelected((string)$methodCode);
                 ?>
                 <div class="border rounded transition-all duration-200 border-gray-200 hover:border-gray-300"
