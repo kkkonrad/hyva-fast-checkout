@@ -1,7 +1,9 @@
 var config = {
-    map: {
-        '*': {
-            collapsable: 'Kkkonrad_Fastcheckout/js/collapsable-safe'
+    config: {
+        mixins: {
+            'jquery/bootstrap/collapse': {
+                'Kkkonrad_Fastcheckout/js/collapse-jquery-bridge-mixin': true
+            }
         }
     }
 };
