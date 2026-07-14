@@ -84,11 +84,6 @@ class Json extends Value
     {
         $path = (string)$this->getPath();
 
-        if ($path === ConfigPaths::XML_PATH_RESTRICT_PAYMENT_METHODS) {
-            $this->validateRestrictedPaymentMethods($decoded);
-            return;
-        }
-
         if ($path === ConfigPaths::XML_PATH_SHIPPING_PAYMENT_MAPPING) {
             $this->validateShippingPaymentMapping($decoded);
             return;
@@ -149,10 +144,6 @@ class Json extends Value
             return $decoded;
         }
 
-        if ($this->containsRequiredMethodFieldRows($decoded)) {
-            return $this->normalizeRequiredMethodFieldRows($decoded);
-        }
-
         $mapping = [];
         foreach ($decoded as $methodCode => $fieldPaths) {
             if (!is_array($fieldPaths)) {
@@ -168,71 +159,6 @@ class Json extends Value
         }
 
         return $mapping;
-    }
-
-    private function containsRequiredMethodFieldRows(array $value): bool
-    {
-        foreach ($value as $row) {
-            if (is_array($row) && array_key_exists('method_code', $row)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Convert rows submitted by the admin field-array UI to the public
-     * method-code => field-paths configuration format.
-     */
-    private function normalizeRequiredMethodFieldRows(array $rows): array
-    {
-        $mapping = [];
-
-        foreach ($rows as $row) {
-            if (!is_array($row)) {
-                continue;
-            }
-
-            $methodCode = trim((string)($row['method_code'] ?? ''));
-            if ($methodCode === '') {
-                continue;
-            }
-
-            $fieldPaths = $row['field_paths'] ?? [];
-            if (!is_array($fieldPaths)) {
-                $fieldPaths = [$fieldPaths];
-            }
-
-            $customPaths = preg_split('/[\r\n,]+/', (string)($row['custom_field_paths'] ?? '')) ?: [];
-            foreach (array_merge($fieldPaths, $customPaths) as $fieldPath) {
-                $fieldPath = trim((string)$fieldPath);
-                if ($fieldPath !== '') {
-                    $mapping[$methodCode][] = $fieldPath;
-                }
-            }
-        }
-
-        foreach ($mapping as $methodCode => $fieldPaths) {
-            $mapping[$methodCode] = array_values(array_unique($fieldPaths));
-        }
-
-        return $mapping;
-    }
-
-    /**
-     * @param mixed $decoded
-     * @throws LocalizedException
-     */
-    private function validateRestrictedPaymentMethods($decoded): void
-    {
-        if (!is_array($decoded) || !array_is_list($decoded)) {
-            throw new LocalizedException(__('Restricted payment methods must be a JSON array of exact payment method codes.'));
-        }
-
-        foreach ($decoded as $paymentMethodCode) {
-            $this->validateExactPaymentMethodCode($paymentMethodCode);
-        }
     }
 
     /**

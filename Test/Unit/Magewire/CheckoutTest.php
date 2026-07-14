@@ -137,10 +137,6 @@ class CheckoutTest extends TestCase
             ->willReturnCallback(static function ($methodCode): bool {
                 return in_array($methodCode, ['free', 'checkmo', 'banktransfer', 'cashondelivery', 'purchaseorder'], true);
             });
-        $this->helperMock->method('isRestrictPaymentEnable')
-            ->willReturn(false);
-        $this->helperMock->method('getRestrictPaymentMethods')
-            ->willReturn([]);
         $this->helperMock->method('isPaymentMethodCodeAllowedByRules')
             ->willReturnCallback(static function ($methodCode, array $allowedRules): bool {
                 $methodCode = (string)$methodCode;
@@ -1502,71 +1498,6 @@ class CheckoutTest extends TestCase
         $this->helperMock->method('hasShippingPaymentMapping')->willReturn(true);
 
         $this->assertSame([], $this->checkoutComponent->getAllowedPaymentMethods());
-    }
-
-    public function testGetAllowedPaymentMethodsAppliesGlobalPaymentRestrictions(): void
-    {
-        $this->quoteMock->expects($this->any())
-            ->method('getId')
-            ->willReturn(42);
-
-        $shippingAddressMock = $this->createAddressMock();
-        $shippingAddressMock->expects($this->any())
-            ->method('getShippingMethod')
-            ->willReturn('customcarrier_pickup');
-
-        $this->quoteMock->expects($this->any())
-            ->method('getShippingAddress')
-            ->willReturn($shippingAddressMock);
-
-        $this->paymentMethodManagementMock->expects($this->once())
-            ->method('getList')
-            ->with(42)
-            ->willReturn([
-                $this->createPaymentMethodMock('checkmo'),
-                $this->createPaymentMethodMock('payu_blik'),
-                $this->createPaymentMethodMock('payu_card'),
-                $this->createPaymentMethodMock('stripe_payments'),
-            ]);
-
-        $helperMock = $this->createMock(\Kkkonrad\Fastcheckout\Helper\Data::class);
-        $helperMock->method('getMappedPaymentMethodsForShipping')
-            ->with('customcarrier_pickup')
-            ->willReturn(['checkmo', 'payu_blik', 'payu_card', 'stripe_payments']);
-        $helperMock->method('isRestrictPaymentEnable')
-            ->willReturn(true);
-        $helperMock->method('getRestrictPaymentMethods')
-            ->willReturn(['payu_blik', 'checkmo']);
-        $helperMock->method('isPaymentMethodCodeAllowedByRules')
-            ->willReturnCallback(static function ($methodCode, array $allowedRules): bool {
-                $methodCode = (string)$methodCode;
-                foreach ($allowedRules as $rule) {
-                    $rule = trim((string)$rule);
-                    if ($rule === $methodCode) {
-                        return true;
-                    }
-                }
-                return false;
-            });
-
-        $component = new Checkout(
-            $this->checkoutSessionMock,
-            $this->cartRepositoryMock,
-            $this->shippingMethodManagementMock,
-            $this->paymentMethodManagementMock,
-            $this->cartManagementMock,
-            $this->countryCollectionFactoryMock,
-            $this->regionCollectionFactoryMock,
-            $this->subscriberFactoryMock,
-            $helperMock,
-            $this->createMock(\Psr\Log\LoggerInterface::class)
-        );
-
-        $methods = $component->getAllowedPaymentMethods();
-
-        $this->assertSame(['checkmo', 'payu_blik'], array_map(static function (PaymentMethodInterface $method): string {
-            return $method->getCode();
-        }, $methods));
     }
 
     public function testIsPaymentMethodAvailableUsesExactRules(): void

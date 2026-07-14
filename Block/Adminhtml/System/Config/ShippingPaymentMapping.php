@@ -7,6 +7,9 @@ use Magento\Framework\DataObject;
 
 class ShippingPaymentMapping extends AbstractFieldArray
 {
+    /** @var string */
+    protected $_template = 'Kkkonrad_Fastcheckout::system/config/form/field/array.phtml';
+
     /**
      * @var Form\Field\ShippingMethods
      */

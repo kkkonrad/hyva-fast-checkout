@@ -751,16 +751,7 @@ class Checkout extends Component
             return false;
         }
 
-        if (!$this->helper->isRestrictPaymentEnable()) {
-            return true;
-        }
-
-        $restrictedPaymentMethods = $this->helper->getRestrictPaymentMethods();
-        if ($restrictedPaymentMethods === []) {
-            return true;
-        }
-
-        return $this->helper->isPaymentMethodCodeAllowedByRules($paymentMethodCode, $restrictedPaymentMethods);
+        return true;
     }
 
     private function resolveAvailablePaymentMethodCode(string $paymentMethodCode): string

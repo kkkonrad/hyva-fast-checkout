@@ -1,0 +1,168 @@
+<?php
+/**
+ * Fastcheckout system-config field array without the global Prototype `$` dependency.
+ *
+ * @var \Magento\Config\Block\System\Config\Form\Field\FieldArray\AbstractFieldArray $block
+ * @var \Magento\Framework\View\Helper\SecureHtmlRenderer $secureRenderer
+ */
+
+$_htmlId = $block->getHtmlId() ?: '_' . uniqid();
+$_colspan = $block->isAddAfter() ? 2 : 1;
+?>
+
+<div class="design_theme_ua_regexp" id="grid<?= $block->escapeHtmlAttr($_htmlId) ?>">
+    <div class="admin__control-table-wrapper">
+        <table class="admin__control-table" id="<?= $block->escapeHtmlAttr($block->getElement()->getId()) ?>">
+            <thead>
+            <tr>
+                <?php foreach ($block->getColumns() as $column): ?>
+                    <th><?= $block->escapeHtml($column['label']) ?></th>
+                <?php endforeach; ?>
+                <th class="col-actions" colspan="<?= (int)$_colspan ?>">
+                    <?= $block->escapeHtml(__('Action')) ?>
+                </th>
+            </tr>
+            </thead>
+            <tfoot>
+            <tr>
+                <td colspan="<?= count($block->getColumns()) + $_colspan ?>" class="col-actions-add">
+                    <button id="addToEndBtn<?= $block->escapeHtmlAttr($_htmlId) ?>"
+                            class="action-add"
+                            title="<?= $block->escapeHtmlAttr(__('Add')) ?>"
+                            type="button">
+                        <span><?= $block->escapeHtml($block->getAddButtonLabel()) ?></span>
+                    </button>
+                </td>
+            </tr>
+            </tfoot>
+            <tbody id="addRow<?= $block->escapeHtmlAttr($_htmlId) ?>"></tbody>
+        </table>
+    </div>
+    <input type="hidden"
+           name="<?= $block->escapeHtmlAttr($block->getElement()->getName()) ?>[__empty]"
+           value="">
+
+    <?php
+    $scriptString = <<<JS
+require(['mage/template'], function (mageTemplate) {
+    'use strict';
+
+    var rowManager = {
+        template: mageTemplate('<tr id="<%- _id %>">'
+JS;
+
+    foreach ($block->getColumns() as $columnName => $column) {
+        $scriptString .= "        + '<td>'\n"
+            . "        + '" . $block->escapeJs($block->renderCellTemplate($columnName)) . "'\n"
+            . "        + '<\\/td>'\n";
+    }
+
+    if ($block->isAddAfter()) {
+        $scriptString .= "        + '<td><button class=\"action-add-after action-add\" type=\"button\">'\n"
+            . "        + '<span>" . $block->escapeJs(__('Add after')) . "<\\/span><\\/button><\\/td>'\n";
+    }
+
+    $scriptString .= "        + '<td class=\"col-actions\"><button class=\"action-delete\" type=\"button\">'\n"
+        . "        + '<span>" . $block->escapeJs(__('Delete')) . "<\\/span><\\/button><\\/td>'\n"
+        . "        + '<\\/tr>'),\n"
+        . <<<'JS'
+
+        setElementValue: function (element, value) {
+            var selectedValues;
+
+            if (!element) {
+                return;
+            }
+
+            if (element.multiple && Array.isArray(value)) {
+                selectedValues = value.map(String);
+                Array.prototype.forEach.call(element.options, function (option) {
+                    option.selected = selectedValues.indexOf(option.value) !== -1;
+                });
+                return;
+            }
+
+            element.value = value == null ? '' : value;
+        },
+
+        bindRowActions: function (row, rowId) {
+            var addAfter = row.querySelector('.action-add-after'),
+                deleteButton = row.querySelector('.action-delete');
+
+            if (addAfter) {
+                addAfter.addEventListener('click', this.add.bind(this, null, rowId));
+            }
+            if (deleteButton) {
+                deleteButton.addEventListener('click', this.del.bind(this, rowId));
+            }
+        },
+
+        add: function (rowData, insertAfterId) {
+            var templateValues = rowData,
+                target,
+                row,
+                names;
+
+            if (!templateValues) {
+                templateValues = {
+JS;
+
+    foreach ($block->getColumns() as $columnName => $column) {
+        $scriptString .= "                    " . $block->escapeJs($columnName) . ": '',\n"
+            . "                    option_extra_attrs: {},\n";
+    }
+
+    $scriptString .= <<<'JS'
+                    _id: 'row_' + Date.now() + '_' + Math.floor(Math.random() * 1000000)
+                };
+            }
+
+            target = insertAfterId
+                ? document.getElementById(insertAfterId)
+                : document.getElementById('addRow__HTML_ID__');
+
+            if (!target) {
+                return;
+            }
+
+            target.insertAdjacentHTML(insertAfterId ? 'afterend' : 'beforeend', this.template(templateValues));
+            row = document.getElementById(templateValues._id);
+            if (!row) {
+                return;
+            }
+
+            this.bindRowActions(row, templateValues._id);
+
+            if (rowData && rowData.column_values) {
+                names = Object.keys(rowData.column_values);
+                names.forEach(function (name) {
+                    rowManager.setElementValue(document.getElementById(name), rowData.column_values[name]);
+                });
+            }
+        },
+
+        del: function (rowId) {
+            var row = document.getElementById(rowId);
+
+            if (row) {
+                row.remove();
+            }
+        }
+    };
+
+    document.getElementById('addToEndBtn__HTML_ID__').addEventListener('click', function () {
+        rowManager.add(null, null);
+    });
+
+JS;
+
+    $scriptString = str_replace('__HTML_ID__', $block->escapeJs($_htmlId), $scriptString);
+
+    foreach ($block->getArrayRows() as $_row) {
+        $scriptString .= '    rowManager.add(' . /** @noEscape */ $_row->toJson() . ", null);\n";
+    }
+
+    $scriptString .= "});\n";
+    ?>
+    <?= /* @noEscape */ $secureRenderer->renderTag('script', [], $scriptString, false) ?>
+</div>

@@ -40,9 +40,6 @@ class Data extends AbstractHelper
     const XML_PATH_REQUIRED_SHIPPING_FIELDS = 'fastcheckout/extended/required_shipping_fields';
     const XML_PATH_REQUIRED_PAYMENT_FIELDS = 'fastcheckout/extended/required_payment_fields';
 
-    const XML_PATH_RESTRICT_PAYMENT_ENABLE = 'fastcheckout/restrict_payment/enable';
-    const XML_PATH_RESTRICT_PAYMENT_METHODS = 'fastcheckout/restrict_payment/methods';
-
     public $storeManager;
     public $session;
     public $customerSession;
@@ -230,22 +227,6 @@ class Data extends AbstractHelper
         return (string)($parts[0] ?? '');
     }
 
-    public function getRestrictPaymentMethods()
-    {
-        $methods = $this->scopeConfig->getValue(self::XML_PATH_RESTRICT_PAYMENT_METHODS, ScopeInterface::SCOPE_STORE);
-        if (empty($methods)) {
-            return [];
-        }
-
-        try {
-            $decoded = $this->jsonHelper->jsonDecode($methods);
-            return is_array($decoded) ? $decoded : [];
-        } catch (\Exception $e) {
-            $this->_logger->warning('Invalid fastcheckout restricted payment methods', ['exception' => $e]);
-            return [];
-        }
-    }
-
     public function getRequiredPaymentFields(): array
     {
         $fields = $this->scopeConfig->getValue(self::XML_PATH_REQUIRED_PAYMENT_FIELDS, ScopeInterface::SCOPE_STORE);
@@ -305,11 +286,6 @@ class Data extends AbstractHelper
         }
 
         return array_values(array_unique($fieldPaths));
-    }
-
-    public function isRestrictPaymentEnable()
-    {
-        return (bool)$this->scopeConfig->getValue(self::XML_PATH_RESTRICT_PAYMENT_ENABLE, ScopeInterface::SCOPE_STORE);
     }
 
     public function isShowComment()

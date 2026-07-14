@@ -18,9 +18,6 @@
                 <required_shipping_fields>{"instore_pickup":["extension_attributes.pickup_location_code"]}</required_shipping_fields>
                 <required_payment_fields>{"purchaseorder":["po_number"]}</required_payment_fields>
             </extended>
-            <restrict_payment>
-                <enable>0</enable>
-            </restrict_payment>
         </fastcheckout>
     </default>
 </config>

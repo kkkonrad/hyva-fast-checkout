@@ -20,30 +20,6 @@ use Psr\Log\LoggerInterface;
 
 class JsonTest extends TestCase
 {
-    public function testBeforeSaveAcceptsExactRestrictedPaymentMethods(): void
-    {
-        $backend = $this->createBackend(
-            ConfigPaths::XML_PATH_RESTRICT_PAYMENT_METHODS,
-            '["checkmo","payu_blik"]'
-        );
-
-        $this->assertSame($backend, $backend->beforeSave());
-        $this->assertSame('["checkmo","payu_blik"]', $backend->getValue());
-    }
-
-    public function testBeforeSaveRejectsRestrictedPaymentWildcard(): void
-    {
-        $backend = $this->createBackend(
-            ConfigPaths::XML_PATH_RESTRICT_PAYMENT_METHODS,
-            '["checkmo","payu_*"]'
-        );
-
-        $this->expectException(LocalizedException::class);
-        $this->expectExceptionMessage('Payment methods must use exact method codes.');
-
-        $backend->beforeSave();
-    }
-
     public function testBeforeSaveAcceptsShippingWildcardWithExactPaymentMethod(): void
     {
         $backend = $this->createBackend(
@@ -151,79 +127,6 @@ class JsonTest extends TestCase
         $backend->beforeSave();
     }
 
-    public function testBeforeSaveConvertsRequiredPaymentFieldRowsToMapping(): void
-    {
-        $backend = $this->createBackend(
-            ConfigPaths::XML_PATH_REQUIRED_PAYMENT_FIELDS,
-            [
-                [
-                    'method_code' => 'purchaseorder',
-                    'field_paths' => ['po_number'],
-                    'custom_field_paths' => 'additional_data.reference, extension_attributes.accepted',
-                ],
-                [
-                    'method_code' => 'purchaseorder',
-                    'field_paths' => ['po_number'],
-                    'custom_field_paths' => '',
-                ],
-            ]
-        );
-
-        $backend->beforeSave();
-
-        $this->assertSame(
-            '{"purchaseorder":["po_number","additional_data.reference","extension_attributes.accepted"]}',
-            $backend->getValue()
-        );
-    }
-
-    public function testBeforeSaveConvertsRequiredShippingFieldRowsToMapping(): void
-    {
-        $backend = $this->createBackend(
-            ConfigPaths::XML_PATH_REQUIRED_SHIPPING_FIELDS,
-            [
-                [
-                    'method_code' => 'customcarrier_*',
-                    'field_paths' => ['extension_attributes.locker_id'],
-                    'custom_field_paths' => "custom_attributes.point_id\nextension_attributes.zone_id",
-                ],
-            ]
-        );
-
-        $backend->beforeSave();
-
-        $this->assertSame(
-            '{"customcarrier_*":["extension_attributes.locker_id","custom_attributes.point_id","extension_attributes.zone_id"]}',
-            $backend->getValue()
-        );
-    }
-
-    public function testBeforeSaveConvertsAssociativeMagentoFieldArrayRowsToMapping(): void
-    {
-        $backend = $this->createBackend(
-            ConfigPaths::XML_PATH_REQUIRED_PAYMENT_FIELDS,
-            [
-                '__empty' => [
-                    'method_code' => '',
-                    'field_paths' => [],
-                    'custom_field_paths' => '',
-                ],
-                '_1720000000000_000' => [
-                    'method_code' => 'custom_gateway',
-                    'field_paths' => ['additional_data.token'],
-                    'custom_field_paths' => 'extension_attributes.consent',
-                ],
-            ]
-        );
-
-        $backend->beforeSave();
-
-        $this->assertSame(
-            '{"custom_gateway":["additional_data.token","extension_attributes.consent"]}',
-            $backend->getValue()
-        );
-    }
-
     public function testBeforeSaveRejectsInvalidRequiredPaymentFieldPath(): void
     {
         $backend = $this->createBackend(
@@ -280,7 +183,7 @@ class JsonTest extends TestCase
     public function testBeforeSaveRejectsInvalidJson(): void
     {
         $backend = $this->createBackend(
-            ConfigPaths::XML_PATH_RESTRICT_PAYMENT_METHODS,
+            ConfigPaths::XML_PATH_SHIPPING_PAYMENT_MAPPING,
             '{invalid json'
         );
 

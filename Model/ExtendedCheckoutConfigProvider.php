@@ -44,8 +44,6 @@ class ExtendedCheckoutConfigProvider implements ConfigProviderInterface
     public function getSettings()
     {
         $settings = [];
-        $settings['isRestrictPaymentEnable'] = $this->helper->isRestrictPaymentEnable();
-        $settings['restrictedPaymentMethods'] = $this->helper->getRestrictPaymentMethods();
         $settings['defaultShippingMethod'] = $this->helper->getDefaultShippingMethod();
         $settings['defaultPaymentMethod'] = $this->helper->getDefaultPaymentMethod();
         $settings['shippingPaymentMapping'] = $this->helper->getShippingPaymentMapping();

@@ -129,37 +129,6 @@ class DataTest extends TestCase
         $this->assertFalse($helper->isPaymentMethodCodeAllowedByRules('', ['*']));
     }
 
-    public function testGetRestrictPaymentMethodsReturnsEmptyArrayWhenJsonIsInvalid(): void
-    {
-        $logger = $this->createMock(LoggerInterface::class);
-        $jsonHelper = $this->createMock(JsonHelper::class);
-        $jsonHelper->method('jsonDecode')->willThrowException(new \InvalidArgumentException('invalid json'));
-
-        $helper = $this->createHelper('{invalid json', $jsonHelper, $logger);
-
-        $this->assertSame([], $helper->getRestrictPaymentMethods());
-    }
-
-    public function testGetRestrictPaymentMethodsReturnsEmptyArrayWhenJsonDoesNotDecodeToArray(): void
-    {
-        $jsonHelper = $this->createMock(JsonHelper::class);
-        $jsonHelper->method('jsonDecode')->willReturn('checkmo');
-
-        $helper = $this->createHelper('"checkmo"', $jsonHelper);
-
-        $this->assertSame([], $helper->getRestrictPaymentMethods());
-    }
-
-    public function testGetRestrictPaymentMethodsReturnsDecodedArray(): void
-    {
-        $jsonHelper = $this->createMock(JsonHelper::class);
-        $jsonHelper->method('jsonDecode')->willReturn(['checkmo', 'payu_blik']);
-
-        $helper = $this->createHelper('["checkmo","payu_blik"]', $jsonHelper);
-
-        $this->assertSame(['checkmo', 'payu_blik'], $helper->getRestrictPaymentMethods());
-    }
-
     public function testGetRequiredPaymentFieldsReturnsEmptyArrayWhenJsonIsInvalid(): void
     {
         $logger = $this->createMock(LoggerInterface::class);
