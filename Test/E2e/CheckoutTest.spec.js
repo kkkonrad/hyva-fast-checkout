@@ -3528,14 +3528,13 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
         await page.locator(selectors.company).fill('Acme');
         await page.locator(selectors.company).blur();
 
-        // Soft debounce is ~450ms; wait past coalesce window.
+        // Soft debounce is ~450ms; shared timer resets on each blur → one flush after idle.
         await page.waitForTimeout(900);
 
         expect(
             syncCalls.length,
-            `expected coalesced sync, got ${syncCalls.length}`
-        ).toBeLessThanOrEqual(2);
-        expect(syncCalls.length).toBeGreaterThanOrEqual(1);
+            `expected a single coalesced syncAddressFields, got ${syncCalls.length}`
+        ).toBe(1);
     });
 
     test('should push street3 to KO quote via syncFieldToKo', async ({ page }) => {

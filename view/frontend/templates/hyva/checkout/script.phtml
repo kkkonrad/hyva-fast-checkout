@@ -64,19 +64,21 @@ function initCheckout() {
 
             fieldsToWatch.forEach((field) => {
                 this.$watch(`$wire.${field}`, (value) => {
-                    if (window.fastcheckoutSuppressKoAddressToMagewire) {
-                        // Still update KO while a DOM→Magewire flush is in flight.
+                    if (
+                        !window.fastcheckoutHyvaPayment ||
+                        typeof window.fastcheckoutHyvaPayment.syncFieldToKo !== 'function'
+                    ) {
+                        return;
                     }
-                    if (window.fastcheckoutHyvaPayment && typeof window.fastcheckoutHyvaPayment.syncFieldToKo === 'function') {
-                        // Prevent KO→Magewire re-entry loop while applying server values.
-                        window.fastcheckoutSuppressKoAddressToMagewire = true;
-                        try {
-                            window.fastcheckoutHyvaPayment.syncFieldToKo(field, value);
-                        } finally {
-                            window.setTimeout(() => {
-                                window.fastcheckoutSuppressKoAddressToMagewire = false;
-                            }, 0);
-                        }
+                    // Always push server → KO (even during DOM→Magewire flush). Suppress only
+                    // the KO→Magewire feedback path while applying the value.
+                    window.fastcheckoutSuppressKoAddressToMagewire = true;
+                    try {
+                        window.fastcheckoutHyvaPayment.syncFieldToKo(field, value);
+                    } finally {
+                        window.setTimeout(() => {
+                            window.fastcheckoutSuppressKoAddressToMagewire = false;
+                        }, 0);
                     }
                 });
             });

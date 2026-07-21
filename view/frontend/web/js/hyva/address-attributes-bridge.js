@@ -371,7 +371,10 @@ define([
             magewireSyncValues[field] = typeof value === 'object'
                 ? $.extend(true, {}, value)
                 : value;
-            wire.set(field, value, false);
+            // Defer: batch attribute bags into the next Magewire round-trip instead of
+            // opening an immediate XHR. Place-order / shipping-attributes-sync still
+            // read final attrs from quote/provider and push with an explicit flush when needed.
+            wire.set(field, value, true);
         }
 
         function updateQuoteAddressAttributes(address, customAttributes, extensionAttributes) {
