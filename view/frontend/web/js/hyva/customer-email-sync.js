@@ -59,18 +59,30 @@ define([], function () {
         }
 
         function registerInputListener() {
-            document.addEventListener('input', function (event) {
-                if (
-                    event.target &&
+            // Commit on blur/change only — not on every keystroke.
+            function isEmailField(target) {
+                return !!(
+                    target &&
                     (
-                        event.target.name === 'email' ||
-                        event.target.type === 'email' ||
-                        event.target.getAttribute('data-wire-field') === 'email'
+                        target.name === 'email' ||
+                        target.name === 'username' ||
+                        target.type === 'email' ||
+                        target.getAttribute('data-wire-field') === 'email'
                     )
-                ) {
+                );
+            }
+
+            document.addEventListener('blur', function (event) {
+                if (isEmailField(event.target)) {
                     sync();
                 }
-            });
+            }, true);
+
+            document.addEventListener('change', function (event) {
+                if (isEmailField(event.target)) {
+                    sync();
+                }
+            }, true);
         }
 
         return {

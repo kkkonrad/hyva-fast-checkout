@@ -797,7 +797,8 @@ define([
                 }
 
                 function registerKoStateAdapter() {
-                    var isSyncingFromKo = false;
+                    var isSyncingFromKo = false,
+                        koAddressSyncTimers = { shipping: null, billing: null };
 
                     if (!quote || window.fastcheckoutKoStateAdapterRegistered) {
                         return;
@@ -805,21 +806,43 @@ define([
 
                     window.fastcheckoutKoStateAdapterRegistered = true;
 
+                    /**
+                     * KO quote address changes used to call wire.set on every keystroke
+                     * (via $watch → syncFieldToKo → valueHasMutated). Address save is owned
+                     * by Alpine blur/change → syncAddressFields. Only a deferred safety net
+                     * remains here for non-DOM KO updates (saved address, third-party).
+                     */
                     function syncKoAddressToMagewire(address, isBilling) {
+                        var key = isBilling ? 'billing' : 'shipping';
+
                         if (isSyncingFromKo || !address) {
                             return;
                         }
+                        if (window.fastcheckoutSuppressKoAddressToMagewire) {
+                            return;
+                        }
 
-                        isSyncingFromKo = true;
-                        writeKoAddressToMagewire(address, isBilling)
-                            .catch(function (e) {
-                                if (window.console && typeof window.console.warn === 'function') {
-                                    window.console.warn('Fastcheckout: Sync address to Magewire failed', e);
-                                }
-                            })
-                            .then(function () {
-                                isSyncingFromKo = false;
-                            });
+                        if (koAddressSyncTimers[key]) {
+                            window.clearTimeout(koAddressSyncTimers[key]);
+                        }
+
+                        koAddressSyncTimers[key] = window.setTimeout(function () {
+                            koAddressSyncTimers[key] = null;
+                            if (window.fastcheckoutSuppressKoAddressToMagewire) {
+                                return;
+                            }
+                            isSyncingFromKo = true;
+                            // deferUpdates=true: do not open a Magewire XHR on its own.
+                            writeKoAddressToMagewire(address, isBilling, true)
+                                .catch(function (e) {
+                                    if (window.console && typeof window.console.warn === 'function') {
+                                        window.console.warn('Fastcheckout: Sync address to Magewire failed', e);
+                                    }
+                                })
+                                .then(function () {
+                                    isSyncingFromKo = false;
+                                });
+                        }, 1200);
                     }
 
                     if (typeof quote.shippingAddress === 'function') {

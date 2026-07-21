@@ -31,7 +31,8 @@ function initCheckout() {
                 this.onPaymentError(event);
             });
 
-            // Alpine watches to sync state to KO
+            // Push Magewire → KO only after server-side updates (syncAddressFields, selects),
+            // not while the shopper is typing into unbound DOM inputs.
             const fieldsToWatch = [
                 'email', 'countryId', 'postcode', 'city', 'region', 'regionId',
                 'firstname', 'lastname', 'telephone', 'company', 'street1', 'street2',
@@ -42,8 +43,19 @@ function initCheckout() {
 
             fieldsToWatch.forEach((field) => {
                 this.$watch(`$wire.${field}`, (value) => {
+                    if (window.fastcheckoutSuppressKoAddressToMagewire) {
+                        // Still update KO while a DOM→Magewire flush is in flight.
+                    }
                     if (window.fastcheckoutHyvaPayment && typeof window.fastcheckoutHyvaPayment.syncFieldToKo === 'function') {
-                        window.fastcheckoutHyvaPayment.syncFieldToKo(field, value);
+                        // Prevent KO→Magewire re-entry loop while applying server values.
+                        window.fastcheckoutSuppressKoAddressToMagewire = true;
+                        try {
+                            window.fastcheckoutHyvaPayment.syncFieldToKo(field, value);
+                        } finally {
+                            window.setTimeout(() => {
+                                window.fastcheckoutSuppressKoAddressToMagewire = false;
+                            }, 0);
+                        }
                     }
                 });
             });
@@ -56,6 +68,23 @@ function initCheckout() {
                     }
                 }
             });
+
+            // Field commit outside Alpine @blur (browser autofill / some password managers).
+            // Saves once when a data-wire-field value is committed, not on every keystroke.
+            const formRoot = this.$el;
+            if (formRoot && typeof formRoot.addEventListener === 'function') {
+                formRoot.addEventListener('change', (event) => {
+                    const target = event && event.target;
+                    if (!target || !target.dataset || !target.dataset.wireField) {
+                        return;
+                    }
+                    // Selects already call onSelectChange (immediate flush).
+                    if (target.tagName === 'SELECT') {
+                        return;
+                    }
+                    this.queueAddressFieldSave(target);
+                }, true);
+            }
 
             if (window.Livewire && typeof window.Livewire.hook === 'function') {
                 window.Livewire.hook('message.processed', (message) => {
@@ -158,6 +187,8 @@ function initCheckout() {
             }
 
             const payload = this.collectAddressFieldsFromDom();
+            // Block KO quote → wire.set feedback while we push the DOM snapshot.
+            window.fastcheckoutSuppressKoAddressToMagewire = true;
             this._addressSyncInFlight = Promise.resolve(this.$wire.call('syncAddressFields', payload))
                 .catch((error) => {
                     if (window.console && typeof window.console.warn === 'function') {
@@ -166,6 +197,9 @@ function initCheckout() {
                 })
                 .finally(() => {
                     this._addressSyncInFlight = null;
+                    window.setTimeout(() => {
+                        window.fastcheckoutSuppressKoAddressToMagewire = false;
+                    }, 50);
                     if (this._addressSyncQueued) {
                         this._addressSyncQueued = false;
                         this.flushAddressSync();
@@ -176,15 +210,15 @@ function initCheckout() {
         },
 
         /**
-         * Debounced field save — called from @input.
-         * Reads data-wire-field attribute to determine the Magewire property name.
+         * Typing handler — local only (format helpers, email validity).
+         * Does NOT push to Magewire on every keystroke; server save runs on blur/change.
          */
         onFieldInput() {
             const el = this.$el;
             const field = el.dataset.wireField;
             if (!field) return;
 
-            // Debounced validity validation for email
+            // Debounced validity validation for email (UI only — no address XHR).
             if (field === 'email') {
                 if (!this._debounceTimers) {
                     this._debounceTimers = {};
@@ -197,67 +231,57 @@ function initCheckout() {
                     delete this._debounceTimers['email_val'];
                 }, 800);
             }
-
-            const fieldsToSync = [
-                'postcode', 'billingPostcode', 'email', 'region', 'billingRegion',
-                'firstname', 'lastname', 'telephone', 'city', 'street1',
-                'billingFirstname', 'billingLastname', 'billingTelephone', 'billingCity', 'billingStreet1'
-            ];
-            if (!fieldsToSync.includes(field)) return;
-
-            // Autofill / typing: batch into one atomic sync instead of per-field $wire.set races.
-            if (this._blurTimers && this._blurTimers[field]) {
-                clearTimeout(this._blurTimers[field]);
-                this._blurTimers[field] = setTimeout(() => {
-                    delete this._blurTimers[field];
-                    this.scheduleAddressSync(0);
-                }, 150);
-                return;
-            }
-
-            this.scheduleAddressSync(400);
         },
 
         /**
-         * Immediate save + validation — called from @blur on required fields.
+         * Save address snapshot when leaving a field (blur / field change).
+         * Short delay lets browser autofill finish filling sibling inputs.
+         *
+         * @param {Element|string|null} fieldOrEl
+         */
+        queueAddressFieldSave(fieldOrEl) {
+            let field = '';
+            if (typeof fieldOrEl === 'string') {
+                field = fieldOrEl;
+            } else if (fieldOrEl && fieldOrEl.dataset) {
+                field = fieldOrEl.dataset.wireField || '';
+            } else if (this.$el && this.$el.dataset) {
+                field = this.$el.dataset.wireField || '';
+            }
+            if (!this._blurTimers) {
+                this._blurTimers = {};
+            }
+            const timerKey = field || '_any';
+            if (this._blurTimers[timerKey]) {
+                clearTimeout(this._blurTimers[timerKey]);
+            }
+            this._blurTimers[timerKey] = setTimeout(() => {
+                delete this._blurTimers[timerKey];
+                this.scheduleAddressSync(0);
+            }, 150);
+        },
+
+        /**
+         * Save + validation — called from @blur on required fields.
          */
         onFieldBlur() {
-            const el = this.$el;
-            const field = el.dataset.wireField;
-            if (field) {
-                if (!this._blurTimers) {
-                    this._blurTimers = {};
-                }
-                if (this._blurTimers[field]) {
-                    clearTimeout(this._blurTimers[field]);
-                }
-                // Delay slightly so browser autocomplete can finish updating the input.
-                this._blurTimers[field] = setTimeout(() => {
-                    delete this._blurTimers[field];
-                    this.scheduleAddressSync(0);
-                }, 150);
-            }
-            this._validateEl(el);
+            this.queueAddressFieldSave(this.$el);
+            this._validateEl(this.$el);
         },
 
         /**
-         * Immediate save without validation — called from @blur on optional fields.
+         * Save without validation — called from @blur on optional fields.
          */
         onFieldBlurNoValidate() {
-            const el = this.$el;
-            const field = el.dataset.wireField;
-            if (field) {
-                if (!this._blurTimers) {
-                    this._blurTimers = {};
-                }
-                if (this._blurTimers[field]) {
-                    clearTimeout(this._blurTimers[field]);
-                }
-                this._blurTimers[field] = setTimeout(() => {
-                    delete this._blurTimers[field];
-                    this.scheduleAddressSync(0);
-                }, 150);
-            }
+            this.queueAddressFieldSave(this.$el);
+        },
+
+        /**
+         * Fires when the field value is committed (blur after edit, or some autofill).
+         * Same as blur save — safe if both fire (debounced/coalesced).
+         */
+        onFieldChange() {
+            this.queueAddressFieldSave(this.$el);
         },
 
         /**
