@@ -61,14 +61,17 @@ define([], function () {
         function registerInputListener() {
             // Commit on blur/change only — not on every keystroke.
             function isEmailField(target) {
-                return !!(
-                    target &&
-                    (
-                        target.name === 'email' ||
-                        target.name === 'username' ||
-                        target.type === 'email' ||
-                        target.getAttribute('data-wire-field') === 'email'
-                    )
+                // Document-level listeners can receive non-Element targets
+                // (text nodes, window, synthetic events) that lack getAttribute.
+                if (!target || typeof target.getAttribute !== 'function') {
+                    return false;
+                }
+
+                return (
+                    target.name === 'email' ||
+                    target.name === 'username' ||
+                    target.type === 'email' ||
+                    target.getAttribute('data-wire-field') === 'email'
                 );
             }
 

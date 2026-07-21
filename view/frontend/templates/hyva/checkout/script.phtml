@@ -20,6 +20,8 @@ function initCheckout() {
         _addressSyncTimer: null,
         _addressSyncInFlight: null,
         _addressSyncQueued: false,
+        _lastSyncedAddressJson: null,
+        _fieldValueOnFocus: null,
         isProcessing: false,
         clientOrderError: '',
 
@@ -67,12 +69,24 @@ function initCheckout() {
                         window.fastcheckoutHyvaShipping.syncShippingMethod(this.$wire.shippingMethod);
                     }
                 }
+                // Baseline: current DOM already matches server-rendered state — do not XHR on first blur-without-edit.
+                this._lastSyncedAddressJson = this.serializeAddressPayload(this.collectAddressFieldsFromDom());
             });
 
             // Field commit outside Alpine @blur (browser autofill / some password managers).
             // Saves once when a data-wire-field value is committed, not on every keystroke.
             const formRoot = this.$el;
             if (formRoot && typeof formRoot.addEventListener === 'function') {
+                formRoot.addEventListener('focusin', (event) => {
+                    const target = event && event.target;
+                    if (!target || !target.dataset || !target.dataset.wireField) {
+                        return;
+                    }
+                    // Remember value at focus so blur can skip no-op saves (clicking between fields).
+                    this._fieldValueOnFocus = target.value;
+                    this._fieldFocused = target;
+                }, true);
+
                 formRoot.addEventListener('change', (event) => {
                     const target = event && event.target;
                     if (!target || !target.dataset || !target.dataset.wireField) {
@@ -163,6 +177,30 @@ function initCheckout() {
         },
 
         /**
+         * Stable JSON for dirty-checking address snapshots.
+         * paymentMethod is owned by payment selection — ignore it here so picking
+         * a payment does not make the next address blur look "dirty".
+         */
+        serializeAddressPayload(payload) {
+            const data = payload && typeof payload === 'object' ? payload : {};
+            const keys = Object.keys(data).sort().filter((key) => key !== 'paymentMethod');
+            const normalized = {};
+            keys.forEach((key) => {
+                const value = data[key];
+                normalized[key] = value === null || value === undefined ? '' : String(value);
+            });
+            return JSON.stringify(normalized);
+        },
+
+        /**
+         * True when live DOM address differs from the last successful Magewire save.
+         */
+        isAddressPayloadDirty(payload) {
+            const next = this.serializeAddressPayload(payload || this.collectAddressFieldsFromDom());
+            return next !== (this._lastSyncedAddressJson || '');
+        },
+
+        /**
          * Debounced atomic address sync — one Magewire round-trip for all form fields.
          */
         scheduleAddressSync(delayMs) {
@@ -176,20 +214,34 @@ function initCheckout() {
             }, delay);
         },
 
-        flushAddressSync() {
+        /**
+         * @param {boolean} force When true, always push (place order / country select).
+         */
+        flushAddressSync(force) {
             if (!this.$wire || typeof this.$wire.call !== 'function') {
                 return Promise.resolve();
             }
 
             if (this._addressSyncInFlight) {
                 this._addressSyncQueued = true;
+                this._addressSyncQueuedForce = this._addressSyncQueuedForce || force === true;
                 return this._addressSyncInFlight;
             }
 
             const payload = this.collectAddressFieldsFromDom();
+            const payloadJson = this.serializeAddressPayload(payload);
+
+            // Skip no-op XHR (e.g. focus→blur without edit, or clicking between fields).
+            if (force !== true && payloadJson === (this._lastSyncedAddressJson || '')) {
+                return Promise.resolve();
+            }
+
             // Block KO quote → wire.set feedback while we push the DOM snapshot.
             window.fastcheckoutSuppressKoAddressToMagewire = true;
             this._addressSyncInFlight = Promise.resolve(this.$wire.call('syncAddressFields', payload))
+                .then(() => {
+                    this._lastSyncedAddressJson = payloadJson;
+                })
                 .catch((error) => {
                     if (window.console && typeof window.console.warn === 'function') {
                         window.console.warn('Kkkonrad Fastcheckout: address sync failed', error);
@@ -201,8 +253,10 @@ function initCheckout() {
                         window.fastcheckoutSuppressKoAddressToMagewire = false;
                     }, 50);
                     if (this._addressSyncQueued) {
+                        const queuedForce = this._addressSyncQueuedForce === true;
                         this._addressSyncQueued = false;
-                        this.flushAddressSync();
+                        this._addressSyncQueuedForce = false;
+                        this.flushAddressSync(queuedForce);
                     }
                 });
 
@@ -236,27 +290,46 @@ function initCheckout() {
         /**
          * Save address snapshot when leaving a field (blur / field change).
          * Short delay lets browser autofill finish filling sibling inputs.
+         * No Magewire request when the form is unchanged (click/tab between fields).
          *
          * @param {Element|string|null} fieldOrEl
          */
         queueAddressFieldSave(fieldOrEl) {
             let field = '';
+            let el = null;
             if (typeof fieldOrEl === 'string') {
                 field = fieldOrEl;
             } else if (fieldOrEl && fieldOrEl.dataset) {
+                el = fieldOrEl;
                 field = fieldOrEl.dataset.wireField || '';
             } else if (this.$el && this.$el.dataset) {
+                el = this.$el;
                 field = this.$el.dataset.wireField || '';
             }
+
+            // Fast path: same field value as on focus and no other form changes.
+            if (
+                el &&
+                this._fieldFocused === el &&
+                String(el.value || '') === String(this._fieldValueOnFocus || '') &&
+                !this.isAddressPayloadDirty()
+            ) {
+                return;
+            }
+
             if (!this._blurTimers) {
                 this._blurTimers = {};
             }
-            const timerKey = field || '_any';
+            // Single shared timer — multiple field blurs coalesce into one save.
+            const timerKey = '_address';
             if (this._blurTimers[timerKey]) {
                 clearTimeout(this._blurTimers[timerKey]);
             }
             this._blurTimers[timerKey] = setTimeout(() => {
                 delete this._blurTimers[timerKey];
+                if (!this.isAddressPayloadDirty()) {
+                    return;
+                }
                 this.scheduleAddressSync(0);
             }, 150);
         },
