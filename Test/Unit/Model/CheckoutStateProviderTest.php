@@ -29,23 +29,27 @@ class CheckoutStateProviderTest extends TestCase
         $quote = $this->getMockBuilder(Quote::class)
             ->disableOriginalConstructor()
             ->onlyMethods([
+                'collectTotals',
                 'getAllVisibleItems',
                 'getId',
                 'getPayment',
                 'getShippingAddress',
                 'getTotals',
                 'hasItems',
+                'hasDataChanges',
+                'isVirtual',
             ])
             ->addMethods([
                 'getCouponCode',
                 'getGrandTotal',
                 'getSubtotal',
                 'getSubtotalWithDiscount',
+                'getTotalsCollectedFlag',
             ])
             ->getMock();
         $shippingAddress = $this->getMockBuilder(QuoteAddress::class)
             ->disableOriginalConstructor()
-            ->onlyMethods(['getCountryId', 'getShippingMethod'])
+            ->onlyMethods(['getCountryId', 'getShippingMethod', 'hasDataChanges'])
             ->getMock();
         $paymentMethod = new class extends DataObject implements PaymentMethodInterface {
             public function getCode()
@@ -62,6 +66,7 @@ class CheckoutStateProviderTest extends TestCase
         $checkoutSession->method('getQuote')->willReturn($quote);
         $quote->method('getId')->willReturn(42);
         $quote->method('hasItems')->willReturn(false);
+        $quote->method('isVirtual')->willReturn(false);
         $quote->method('getPayment')->willReturn(null);
         $quote->method('getShippingAddress')->willReturn($shippingAddress);
         $quote->method('getTotals')->willReturn(null);
@@ -70,10 +75,15 @@ class CheckoutStateProviderTest extends TestCase
         $quote->method('getGrandTotal')->willReturn(0.0);
         $quote->method('getSubtotal')->willReturn(0.0);
         $quote->method('getSubtotalWithDiscount')->willReturn(0.0);
-        $shippingAddress->method('getCountryId')->willReturn('PL');
+        $quote->method('getTotalsCollectedFlag')->willReturn(true);
+        $quote->method('hasDataChanges')->willReturn(false);
+        $quote->expects($this->never())->method('collectTotals');
+        $shippingAddress->method('getCountryId')->willReturn('');
         $shippingAddress->method('getShippingMethod')->willReturn('tablerate_bestway');
+        $shippingAddress->method('hasDataChanges')->willReturn(false);
 
         $paymentMethodManagement->expects($this->once())->method('getList')->with(42)->willReturn([$paymentMethod]);
+        $cartRepository->expects($this->never())->method('save');
         $helper->method('hasShippingPaymentMapping')->willReturn(true);
         $helper->expects($this->once())
             ->method('getMappedPaymentMethodsForShipping')
@@ -109,6 +119,7 @@ class CheckoutStateProviderTest extends TestCase
                 'getShippingAddress',
                 'getTotals',
                 'hasItems',
+                'hasDataChanges',
                 'isVirtual',
             ])
             ->addMethods([
@@ -116,6 +127,7 @@ class CheckoutStateProviderTest extends TestCase
                 'getGrandTotal',
                 'getSubtotal',
                 'getSubtotalWithDiscount',
+                'getTotalsCollectedFlag',
             ])
             ->getMock();
 
@@ -125,6 +137,7 @@ class CheckoutStateProviderTest extends TestCase
                 'getCountryId',
                 'getGroupedAllShippingRates',
                 'getShippingMethod',
+                'hasDataChanges',
             ])
             ->addMethods([
                 'getCollectShippingRates',
@@ -211,8 +224,12 @@ class CheckoutStateProviderTest extends TestCase
         $quote->method('getGrandTotal')->willReturn(14.5);
         $quote->method('getSubtotal')->willReturn(0.0);
         $quote->method('getSubtotalWithDiscount')->willReturn(0.0);
+        $quote->method('getTotalsCollectedFlag')->willReturn(true);
+        $quote->method('hasDataChanges')->willReturn(false);
+        $quote->expects($this->never())->method('collectTotals');
 
-        $cartRepository->expects($this->once())->method('save')->with($quote);
+        // Clean read path: totals already collected, rates present, no dirty flags → no save.
+        $cartRepository->expects($this->never())->method('save');
         $paymentMethod = new class extends DataObject implements PaymentMethodInterface {
             public function __construct()
             {
@@ -252,6 +269,7 @@ class CheckoutStateProviderTest extends TestCase
         $shippingAddress->method('getShippingMethod')->willReturn('locker_pickup_point_cod');
         $shippingAddress->method('getCollectShippingRates')->willReturn(false);
         $shippingAddress->method('getGroupedAllShippingRates')->willReturn(['locker' => [$rate]]);
+        $shippingAddress->method('hasDataChanges')->willReturn(false);
 
         $provider = new CheckoutStateProvider(
             $checkoutSession,
@@ -313,6 +331,7 @@ class CheckoutStateProviderTest extends TestCase
                 'getShippingAddress',
                 'getTotals',
                 'hasItems',
+                'hasDataChanges',
                 'isVirtual',
             ])
             ->addMethods([
@@ -320,6 +339,7 @@ class CheckoutStateProviderTest extends TestCase
                 'getGrandTotal',
                 'getSubtotal',
                 'getSubtotalWithDiscount',
+                'getTotalsCollectedFlag',
             ])
             ->getMock();
 
@@ -329,6 +349,7 @@ class CheckoutStateProviderTest extends TestCase
                 'getCountryId',
                 'getGroupedAllShippingRates',
                 'getShippingMethod',
+                'hasDataChanges',
             ])
             ->addMethods([
                 'getCollectShippingRates',
@@ -377,14 +398,18 @@ class CheckoutStateProviderTest extends TestCase
         $quote->method('getGrandTotal')->willReturn(11.99);
         $quote->method('getSubtotal')->willReturn(0.0);
         $quote->method('getSubtotalWithDiscount')->willReturn(0.0);
+        $quote->method('getTotalsCollectedFlag')->willReturn(true);
+        $quote->method('hasDataChanges')->willReturn(false);
+        $quote->expects($this->never())->method('collectTotals');
 
-        $cartRepository->expects($this->once())->method('save')->with($quote);
+        $cartRepository->expects($this->never())->method('save');
         $paymentMethodManagement->expects($this->once())->method('getList')->with(42)->willReturn([]);
 
         $shippingAddress->method('getCountryId')->willReturn('PL');
         $shippingAddress->method('getShippingMethod')->willReturn('genericcarrier_pickup');
         $shippingAddress->method('getCollectShippingRates')->willReturn(false);
         $shippingAddress->method('getGroupedAllShippingRates')->willReturn(['genericcarrier' => [$rate]]);
+        $shippingAddress->method('hasDataChanges')->willReturn(false);
 
         $provider = new CheckoutStateProvider(
             $checkoutSession,
@@ -408,5 +433,179 @@ class CheckoutStateProviderTest extends TestCase
         $this->assertTrue($rateData['available']);
         $this->assertSame('evening', $rateData['custom_attributes']['delivery_window']);
         $this->assertSame($rateData['custom_attributes'], $rateData['customAttributes']);
+    }
+
+    public function testStateCollectsTotalsWhenFlagIsFalseAndSavesWhenDirty(): void
+    {
+        $checkoutSession = $this->createMock(CheckoutSession::class);
+        $cartRepository = $this->createMock(CartRepositoryInterface::class);
+        $paymentMethodManagement = $this->createMock(PaymentMethodManagementInterface::class);
+        $helper = $this->createMock(Helper::class);
+        $logger = $this->createMock(LoggerInterface::class);
+
+        $quote = $this->getMockBuilder(Quote::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods([
+                'collectTotals',
+                'getAllVisibleItems',
+                'getId',
+                'getPayment',
+                'getShippingAddress',
+                'getTotals',
+                'hasItems',
+                'hasDataChanges',
+                'isVirtual',
+            ])
+            ->addMethods([
+                'getCouponCode',
+                'getGrandTotal',
+                'getSubtotal',
+                'getSubtotalWithDiscount',
+                'getTotalsCollectedFlag',
+            ])
+            ->getMock();
+
+        $shippingAddress = $this->getMockBuilder(QuoteAddress::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods([
+                'getCountryId',
+                'getGroupedAllShippingRates',
+                'getShippingMethod',
+                'hasDataChanges',
+            ])
+            ->addMethods([
+                'getCollectShippingRates',
+                'setCollectShippingRates',
+            ])
+            ->getMock();
+
+        $checkoutSession->method('getQuote')->willReturn($quote);
+        $quote->method('getId')->willReturn(7);
+        $quote->method('hasItems')->willReturn(true);
+        $quote->method('isVirtual')->willReturn(true);
+        $quote->method('getShippingAddress')->willReturn($shippingAddress);
+        $quote->method('getPayment')->willReturn(null);
+        $quote->method('getTotals')->willReturn([]);
+        $quote->method('getAllVisibleItems')->willReturn([]);
+        $quote->method('getCouponCode')->willReturn('');
+        $quote->method('getGrandTotal')->willReturn(10.0);
+        $quote->method('getSubtotal')->willReturn(10.0);
+        $quote->method('getSubtotalWithDiscount')->willReturn(10.0);
+        $quote->method('getTotalsCollectedFlag')->willReturn(false);
+        $quote->expects($this->once())->method('collectTotals');
+        $quote->method('hasDataChanges')->willReturn(true);
+
+        $cartRepository->expects($this->once())->method('save')->with($quote);
+        $paymentMethodManagement->method('getList')->willReturn([]);
+        $shippingAddress->method('hasDataChanges')->willReturn(false);
+
+        $provider = new CheckoutStateProvider(
+            $checkoutSession,
+            $cartRepository,
+            $paymentMethodManagement,
+            $helper,
+            $logger
+        );
+
+        $state = $provider->getState();
+        $this->assertSame(10.0, $state['totals']['grand_total']);
+    }
+
+    public function testStateRecollectsRatesOnceWhenEmptyWithoutExtraCollectAtStart(): void
+    {
+        $checkoutSession = $this->createMock(CheckoutSession::class);
+        $cartRepository = $this->createMock(CartRepositoryInterface::class);
+        $paymentMethodManagement = $this->createMock(PaymentMethodManagementInterface::class);
+        $helper = $this->createMock(Helper::class);
+        $logger = $this->createMock(LoggerInterface::class);
+
+        $quote = $this->getMockBuilder(Quote::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods([
+                'collectTotals',
+                'getAllVisibleItems',
+                'getId',
+                'getPayment',
+                'getShippingAddress',
+                'getTotals',
+                'hasItems',
+                'hasDataChanges',
+                'isVirtual',
+            ])
+            ->addMethods([
+                'getCouponCode',
+                'getGrandTotal',
+                'getSubtotal',
+                'getSubtotalWithDiscount',
+                'getTotalsCollectedFlag',
+            ])
+            ->getMock();
+
+        $shippingAddress = $this->getMockBuilder(QuoteAddress::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods([
+                'getCountryId',
+                'getGroupedAllShippingRates',
+                'getShippingMethod',
+                'hasDataChanges',
+            ])
+            ->addMethods([
+                'getCollectShippingRates',
+                'setCollectShippingRates',
+            ])
+            ->getMock();
+
+        $rate = new DataObject([
+            'carrier' => 'flatrate',
+            'method' => 'flatrate',
+            'carrier_title' => 'Flat',
+            'method_title' => 'Fixed',
+            'price' => 5.0,
+            'amount' => 5.0,
+            'error_message' => '',
+        ]);
+
+        $call = 0;
+        $shippingAddress->method('getGroupedAllShippingRates')->willReturnCallback(function () use (&$call, $rate) {
+            $call++;
+            return $call === 1 ? [] : ['flatrate' => [$rate]];
+        });
+        $shippingAddress->method('getCollectShippingRates')->willReturn(false);
+        $shippingAddress->expects($this->once())->method('setCollectShippingRates')->with(true);
+        $shippingAddress->method('getCountryId')->willReturn('PL');
+        $shippingAddress->method('getShippingMethod')->willReturn('flatrate_flatrate');
+        $shippingAddress->method('hasDataChanges')->willReturn(false);
+
+        $checkoutSession->method('getQuote')->willReturn($quote);
+        $quote->method('getId')->willReturn(9);
+        $quote->method('hasItems')->willReturn(true);
+        $quote->method('isVirtual')->willReturn(false);
+        $quote->method('getShippingAddress')->willReturn($shippingAddress);
+        $quote->method('getPayment')->willReturn(null);
+        $quote->method('getTotals')->willReturn([]);
+        $quote->method('getAllVisibleItems')->willReturn([]);
+        $quote->method('getCouponCode')->willReturn('');
+        $quote->method('getGrandTotal')->willReturn(5.0);
+        $quote->method('getSubtotal')->willReturn(0.0);
+        $quote->method('getSubtotalWithDiscount')->willReturn(0.0);
+        // After rate recollect, totals flag is set — ensureTotalsCollected must not collect again.
+        $quote->method('getTotalsCollectedFlag')->willReturn(true);
+        $quote->expects($this->once())->method('collectTotals');
+        $quote->method('hasDataChanges')->willReturn(false);
+
+        $cartRepository->expects($this->never())->method('save');
+        $paymentMethodManagement->method('getList')->willReturn([]);
+
+        $provider = new CheckoutStateProvider(
+            $checkoutSession,
+            $cartRepository,
+            $paymentMethodManagement,
+            $helper,
+            $logger
+        );
+
+        $state = $provider->getState();
+        $this->assertCount(1, $state['shipping_rates']);
+        $this->assertSame('flatrate', $state['shipping_rates'][0]['carrier_code']);
     }
 }

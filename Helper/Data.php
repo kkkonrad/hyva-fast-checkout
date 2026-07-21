@@ -54,6 +54,13 @@ class Data extends AbstractHelper
     protected $design;
     protected $themeFactory;
 
+    /**
+     * Per-request memo of canUseHyvaNativeCheckout() (theme/config checks are not free).
+     *
+     * @var bool|null
+     */
+    private $canUseHyvaNativeCheckoutCache = null;
+
     public function __construct(
         Context $context,
         StoreManagerInterface $storeManager,
@@ -337,13 +344,17 @@ class Data extends AbstractHelper
 
     public function canUseHyvaNativeCheckout()
     {
+        if ($this->canUseHyvaNativeCheckoutCache !== null) {
+            return $this->canUseHyvaNativeCheckoutCache;
+        }
+
         if (!$this->isEnable() || !$this->isModuleOutputEnabled('Kkkonrad_Fastcheckout')) {
-            return false;
+            return $this->canUseHyvaNativeCheckoutCache = false;
         }
 
         if (!class_exists(\Hyva\Theme\ViewModel\HyvaCsp::class)
             || !class_exists(\Magewirephp\Magewire\Component::class)) {
-            return false;
+            return $this->canUseHyvaNativeCheckoutCache = false;
         }
 
         $themePath = '';
@@ -370,7 +381,7 @@ class Data extends AbstractHelper
             }
         }
 
-        return $this->isHyvaThemePath($themePath);
+        return $this->canUseHyvaNativeCheckoutCache = $this->isHyvaThemePath($themePath);
     }
 
     public function isHyvaNativePaymentMethodSupported($methodCode)

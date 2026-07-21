@@ -191,6 +191,38 @@ class DataTest extends TestCase
         $this->assertSame([], $helper->getRequiredShippingFieldsForMethod('customcarrier_pickup'));
     }
 
+    public function testCanUseHyvaNativeCheckoutMemoizesResult(): void
+    {
+        $context = $this->createMock(Context::class);
+        $scopeConfig = $this->createMock(ScopeConfigInterface::class);
+        $calls = 0;
+        $scopeConfig->method('getValue')->willReturnCallback(function () use (&$calls) {
+            $calls++;
+            return false;
+        });
+        $context->method('getScopeConfig')->willReturn($scopeConfig);
+        $context->method('getLogger')->willReturn($this->createMock(LoggerInterface::class));
+
+        $helper = new Data(
+            $context,
+            $this->createMock(StoreManagerInterface::class),
+            $this->createMock(CustomerSession::class),
+            $this->createMock(MessageSession::class),
+            $this->createMock(JsonHelper::class),
+            $this->createMock(Cart::class),
+            $this->createMock(QuoteFactory::class),
+            $this->createMock(CollectionFactory::class),
+            $this->createMock(DesignInterface::class),
+            $this->createMock(ThemeFactory::class)
+        );
+
+        $this->assertFalse($helper->canUseHyvaNativeCheckout());
+        $afterFirst = $calls;
+        $this->assertGreaterThan(0, $afterFirst);
+        $this->assertFalse($helper->canUseHyvaNativeCheckout());
+        $this->assertSame($afterFirst, $calls, 'canUseHyvaNativeCheckout must not re-read config on subsequent calls');
+    }
+
     private function createHelper(
         string $configValue,
         JsonHelper $jsonHelper,

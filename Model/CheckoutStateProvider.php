@@ -56,10 +56,10 @@ class CheckoutStateProvider
         try {
             $quote = $this->checkoutSession->getQuote();
 
-            if ($quote && $quote->getId() && $quote->hasItems()) {
-                $quote->collectTotals();
-                $this->cartRepository->save($quote);
-            }
+            // Rates first: may recollect shipping + totals once when rates are stale/empty.
+            // Avoid unconditional collectTotals()+save() on every state poll.
+            $shippingRates = $this->buildShippingRatesData($quote);
+            $this->ensureTotalsCollected($quote);
 
             $payment = $quote ? $quote->getPayment() : null;
             $selectedPaymentMethod = $selectedPaymentMethod !== ''
@@ -67,10 +67,10 @@ class CheckoutStateProvider
                 : ($payment ? (string)$payment->getMethod() : '');
             $selectedShippingMethod = $this->getSelectedShippingMethodCode($quote);
 
-            return [
+            $state = [
                 'totals' => $this->buildTotalsData($quote),
                 'payment_methods' => $this->buildPaymentMethodsData($quote),
-                'shipping_rates' => $this->buildShippingRatesData($quote),
+                'shipping_rates' => $shippingRates,
                 'selected_payment_method' => $selectedPaymentMethod,
                 'selectedPaymentMethod' => $selectedPaymentMethod,
                 'paymentMethod' => $selectedPaymentMethod,
@@ -80,6 +80,10 @@ class CheckoutStateProvider
                 'selectedShippingRate' => $selectedShippingMethod,
                 'coupon_code' => $quote ? (string)$quote->getCouponCode() : '',
             ];
+
+            $this->saveQuoteIfChanged($quote);
+
+            return $state;
         } catch (\Throwable $exception) {
             $this->logger->error(
                 'Kkkonrad Fastcheckout checkout state error: ' . $exception->getMessage(),
@@ -106,6 +110,65 @@ class CheckoutStateProvider
                 'coupon_code' => '',
             ];
         }
+    }
+
+    /**
+     * Collect totals only when Magento has not already done so in this request.
+     */
+    private function ensureTotalsCollected($quote): void
+    {
+        if (!$quote || !$quote->getId() || !$quote->hasItems()) {
+            return;
+        }
+
+        try {
+            if (method_exists($quote, 'getTotalsCollectedFlag') && $quote->getTotalsCollectedFlag()) {
+                return;
+            }
+        } catch (\Throwable $exception) {
+            // Fall through and collect.
+        }
+
+        $quote->collectTotals();
+    }
+
+    /**
+     * Persist quote only when address/payment/quote data actually changed.
+     */
+    private function saveQuoteIfChanged($quote): void
+    {
+        if (!$quote || !$quote->getId() || !$this->quoteHasChanges($quote)) {
+            return;
+        }
+
+        $this->cartRepository->save($quote);
+    }
+
+    private function quoteHasChanges($quote): bool
+    {
+        try {
+            if (method_exists($quote, 'hasDataChanges') && $quote->hasDataChanges()) {
+                return true;
+            }
+        } catch (\Throwable $exception) {
+            // Check related objects below.
+        }
+
+        foreach (['getShippingAddress', 'getBillingAddress', 'getPayment'] as $getter) {
+            try {
+                if (!method_exists($quote, $getter)) {
+                    continue;
+                }
+                $related = $quote->{$getter}();
+                if ($related && method_exists($related, 'hasDataChanges') && $related->hasDataChanges()) {
+                    return true;
+                }
+            } catch (\Throwable $exception) {
+                // Ignore transient access errors during state reads.
+            }
+        }
+
+        return false;
     }
 
     private function getSelectedShippingMethodCode($quote): string

@@ -1254,9 +1254,14 @@ class Checkout extends Component
     public function selectPaymentMethod(string $methodCode): array
     {
         $methodCode = trim($methodCode);
-        // Same method already selected: return cached checkout state without re-saving quote.
-        // Avoids client↔server feedback (selectPaymentMethod → refresh → message.processed → select…).
-        if ($methodCode !== '' && $methodCode === (string)$this->paymentMethod) {
+        // Same method + no new payment payload: skip re-save (avoids select↔refresh feedback loops).
+        // When placeOrderRequestData / paymentAdditionalData carries updated channel data for the
+        // same method, continue so importPaymentData can re-apply it.
+        if (
+            $methodCode !== ''
+            && $methodCode === (string)$this->paymentMethod
+            && !$this->hasPaymentPayloadToReapply()
+        ) {
             return $this->refreshCheckoutState();
         }
 
@@ -1289,6 +1294,36 @@ class Checkout extends Component
         }
 
         return $this->refreshCheckoutState();
+    }
+
+    /**
+     * True when client sent payment payload fields that should be re-imported on the quote
+     * even if the selected method code did not change.
+     */
+    private function hasPaymentPayloadToReapply(): bool
+    {
+        if (!empty($this->paymentAdditionalData) || !empty($this->paymentExtensionAttributes)) {
+            return true;
+        }
+
+        if (!is_array($this->placeOrderRequestData) || $this->placeOrderRequestData === []) {
+            return false;
+        }
+
+        $paymentPayload = $this->placeOrderRequestData['paymentMethod']
+            ?? $this->placeOrderRequestData['payment_method']
+            ?? null;
+        if (!is_array($paymentPayload)) {
+            return false;
+        }
+
+        foreach (['additional_data', 'additionalData', 'extension_attributes', 'extensionAttributes', 'po_number', 'poNumber'] as $key) {
+            if (!empty($paymentPayload[$key])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
