@@ -623,6 +623,14 @@ class Checkout extends Component
      */
     public function selectShippingMethod(string $methodCode): array
     {
+        $methodCode = trim($methodCode);
+        // Avoid feedback loops from KO bridge re-selecting the same rate.
+        // Returning without cache invalidation keeps rendered HTML hash stable so
+        // Magewire sends html:null instead of morphing the form on every call.
+        if ($methodCode !== '' && $methodCode === (string)$this->shippingMethod) {
+            return $this->refreshCheckoutState();
+        }
+
         try {
             $this->applyShippingMethodToQuote($methodCode);
         } catch (\Exception $e) {
@@ -1223,6 +1231,11 @@ class Checkout extends Component
      */
     public function selectPaymentMethod(string $methodCode): array
     {
+        $methodCode = trim($methodCode);
+        if ($methodCode !== '' && $methodCode === (string)$this->paymentMethod) {
+            return $this->refreshCheckoutState();
+        }
+
         try {
             $this->saveShippingAddress(true, false, false);
             $quote = $this->checkoutSession->getQuote();
@@ -1620,6 +1633,149 @@ class Checkout extends Component
     }
 
     /**
+     * Shipping / billing public properties that may be synced from the browser form.
+     *
+     * @var list<string>
+     */
+    private const SYNCABLE_ADDRESS_FIELDS = [
+        'email',
+        'firstname', 'lastname', 'company', 'street1', 'street2', 'street3', 'street4',
+        'prefix', 'middlename', 'suffix', 'fax', 'vatId',
+        'city', 'postcode', 'countryId', 'regionId', 'region', 'telephone',
+        'billingSameAsShipping',
+        'billingFirstname', 'billingLastname', 'billingCompany',
+        'billingStreet1', 'billingStreet2', 'billingStreet3', 'billingStreet4',
+        'billingPrefix', 'billingMiddlename', 'billingSuffix', 'billingFax', 'billingVatId',
+        'billingCity', 'billingPostcode', 'billingCountryId', 'billingRegionId', 'billingRegion',
+        'billingTelephone',
+        'shippingMethod', 'paymentMethod',
+    ];
+
+    /**
+     * Fields that force shipping-rate recollect when changed.
+     *
+     * @var list<string>
+     */
+    private const SHIPPING_RATE_AFFECTING_FIELDS = [
+        'countryId', 'regionId', 'region', 'postcode', 'city',
+    ];
+
+    /**
+     * Apply many address fields in one request to avoid Magewire race conditions
+     * that wipe values when concurrent updated() saves overlap.
+     *
+     * @param array<string, mixed> $fields
+     */
+    public function syncAddressFields(array $fields = []): void
+    {
+        $previousCountryId = (string)$this->countryId;
+        $previousBillingCountryId = (string)$this->billingCountryId;
+        $touchedRateFields = false;
+        $touchedShipping = false;
+        $touchedBilling = false;
+        $touchedEmail = false;
+
+        foreach ($fields as $name => $value) {
+            $name = (string)$name;
+            if ($name === '' || !in_array($name, self::SYNCABLE_ADDRESS_FIELDS, true)) {
+                continue;
+            }
+
+            if (is_bool($value) || $name === 'billingSameAsShipping') {
+                $this->{$name} = (bool)$value;
+            } else {
+                $this->{$name} = is_scalar($value) || $value === null ? (string)$value : '';
+            }
+
+            if (in_array($name, self::SHIPPING_RATE_AFFECTING_FIELDS, true)) {
+                $touchedRateFields = true;
+            }
+            if ($this->isShippingAddressFieldName($name) || $name === 'shippingMethod') {
+                $touchedShipping = true;
+            }
+            if ($this->isBillingAddressFieldName($name) || $name === 'billingSameAsShipping') {
+                $touchedBilling = true;
+            }
+            if ($name === 'email') {
+                $touchedEmail = true;
+            }
+        }
+
+        if ((int)$this->regionId <= 0) {
+            $this->regionId = '';
+        }
+        if ((int)$this->billingRegionId <= 0) {
+            $this->billingRegionId = '';
+        }
+
+        // Country change clears region unless the payload also supplies a new one.
+        if (
+            array_key_exists('countryId', $fields)
+            && (string)$this->countryId !== $previousCountryId
+            && !array_key_exists('regionId', $fields)
+            && !array_key_exists('region', $fields)
+        ) {
+            $this->regionId = '';
+            $this->region = '';
+            $touchedRateFields = true;
+        }
+        if (
+            array_key_exists('billingCountryId', $fields)
+            && (string)$this->billingCountryId !== $previousBillingCountryId
+            && !array_key_exists('billingRegionId', $fields)
+            && !array_key_exists('billingRegion', $fields)
+        ) {
+            $this->billingRegionId = '';
+            $this->billingRegion = '';
+        }
+
+        $quote = $this->checkoutSession->getQuote();
+
+        if ($touchedEmail && $this->email !== '') {
+            $quote->setCustomerEmail($this->email);
+        }
+
+        if ($touchedShipping || $touchedEmail) {
+            // Single quote write with the full address snapshot from the client.
+            $this->saveShippingAddress(true, true, $touchedRateFields);
+        } elseif ($touchedBilling) {
+            $this->saveBillingAddress(true, true);
+        } elseif ($touchedEmail) {
+            try {
+                $this->saveQuote($quote);
+            } catch (\Exception $e) {
+                // Ignore transient email persistence failures during typing.
+            }
+        }
+
+        if (
+            array_key_exists('shippingMethod', $fields)
+            && trim((string)$this->shippingMethod) !== ''
+        ) {
+            $methodCode = trim((string)$this->shippingMethod);
+            $quote = $this->checkoutSession->getQuote();
+            $currentQuoteMethod = $quote->getShippingAddress()
+                ? (string)$quote->getShippingAddress()->getShippingMethod()
+                : '';
+            // Only re-apply when quote method actually differs — prevents KO↔Magewire loops.
+            if ($methodCode !== $currentQuoteMethod) {
+                try {
+                    $this->applyShippingMethodToQuote($methodCode);
+                } catch (\Exception $e) {
+                    $this->logger->error(
+                        'Kkkonrad Fastcheckout syncAddressFields shipping method Error: ' . $e->getMessage(),
+                        ['exception' => $e]
+                    );
+                }
+            }
+        }
+
+        // Note: do not call skipRender() here. In Magewire, skipRender still emits an
+        // empty root tag which morphs away the live form and wipes typed values.
+        // Address text fields are protected with wire:ignore in the template instead.
+    }
+
+    /**
      * Listeners for reactive updates
      */
     public function updated($value, string $name)
@@ -1656,12 +1812,8 @@ class Checkout extends Component
             $this->billingRegion = '';
         }
         
-        $isShippingField = in_array($name, [
-            'firstname', 'lastname', 'company', 'street1', 'street2', 'street3', 'street4', 'city', 'postcode', 'countryId', 'regionId', 'region', 'telephone', 'prefix', 'middlename', 'suffix', 'fax', 'vatId'
-        ]);
-        $isBillingField = in_array($name, [
-            'billingFirstname', 'billingLastname', 'billingCompany', 'billingStreet1', 'billingStreet2', 'billingStreet3', 'billingStreet4', 'billingCity', 'billingPostcode', 'billingCountryId', 'billingRegionId', 'billingRegion', 'billingTelephone', 'billingPrefix', 'billingMiddlename', 'billingSuffix', 'billingFax', 'billingVatId'
-        ]);
+        $isShippingField = $this->isShippingAddressFieldName($name);
+        $isBillingField = $this->isBillingAddressFieldName($name);
 
         if ($name === 'email') {
             $quote->setCustomerEmail($value);
@@ -1681,7 +1833,9 @@ class Checkout extends Component
                 }
             }
         } elseif ($isShippingField) {
-            $affectsShippingRates = in_array($name, ['countryId', 'regionId', 'region', 'postcode', 'city']);
+            // Non-rate fields: update quote address without collectRates to reduce
+            // expensive overlapping saves. Rate-affecting fields still recollect.
+            $affectsShippingRates = in_array($name, self::SHIPPING_RATE_AFFECTING_FIELDS, true);
             $this->saveShippingAddress(true, true, $affectsShippingRates);
         } elseif ($isBillingField) {
             $this->saveBillingAddress();
@@ -1692,6 +1846,25 @@ class Checkout extends Component
         }
 
         return $value;
+    }
+
+    private function isShippingAddressFieldName(string $name): bool
+    {
+        return in_array($name, [
+            'firstname', 'lastname', 'company', 'street1', 'street2', 'street3', 'street4',
+            'city', 'postcode', 'countryId', 'regionId', 'region', 'telephone',
+            'prefix', 'middlename', 'suffix', 'fax', 'vatId',
+        ], true);
+    }
+
+    private function isBillingAddressFieldName(string $name): bool
+    {
+        return in_array($name, [
+            'billingFirstname', 'billingLastname', 'billingCompany',
+            'billingStreet1', 'billingStreet2', 'billingStreet3', 'billingStreet4',
+            'billingCity', 'billingPostcode', 'billingCountryId', 'billingRegionId', 'billingRegion',
+            'billingTelephone', 'billingPrefix', 'billingMiddlename', 'billingSuffix', 'billingFax', 'billingVatId',
+        ], true);
     }
 
     /**

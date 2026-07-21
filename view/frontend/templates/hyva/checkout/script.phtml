@@ -17,6 +17,9 @@ function initCheckout() {
     return {
         _debounceTimers: {},
         _blurTimers: {},
+        _addressSyncTimer: null,
+        _addressSyncInFlight: null,
+        _addressSyncQueued: false,
         isProcessing: false,
         clientOrderError: '',
 
@@ -81,6 +84,99 @@ function initCheckout() {
         },
 
         /**
+         * Collect current shipping/billing values from the live form DOM.
+         * Prefer DOM over $wire so rapid typing is never lost to Magewire races.
+         */
+        collectAddressFieldsFromDom() {
+            const form = document.getElementById('co-checkout-form') || this.$el;
+            const payload = {};
+            const fields = [
+                'email', 'firstname', 'lastname', 'company',
+                'street1', 'street2', 'street3', 'street4',
+                'prefix', 'middlename', 'suffix', 'fax', 'vatId',
+                'city', 'postcode', 'countryId', 'regionId', 'region', 'telephone',
+                'billingFirstname', 'billingLastname', 'billingCompany',
+                'billingStreet1', 'billingStreet2', 'billingStreet3', 'billingStreet4',
+                'billingPrefix', 'billingMiddlename', 'billingSuffix', 'billingFax', 'billingVatId',
+                'billingCity', 'billingPostcode', 'billingCountryId', 'billingRegionId',
+                'billingRegion', 'billingTelephone'
+            ];
+
+            fields.forEach((field) => {
+                const el = form.querySelector('[data-wire-field="' + field + '"]')
+                    || form.querySelector('[wire\\:model\\.blur="' + field + '"]')
+                    || form.querySelector('[wire\\:model\\.defer="' + field + '"]')
+                    || form.querySelector('[wire\\:model="' + field + '"]');
+                if (!el) {
+                    return;
+                }
+                if (el.type === 'checkbox') {
+                    payload[field] = !!el.checked;
+                } else {
+                    payload[field] = el.value;
+                }
+            });
+
+            const sameAs = form.querySelector('[wire\\:model="billingSameAsShipping"], input[type="checkbox"][wire\\:model="billingSameAsShipping"]');
+            if (sameAs) {
+                payload.billingSameAsShipping = !!sameAs.checked;
+            }
+
+            const shipping = form.querySelector('input[name="shipping_method"]:checked');
+            if (shipping && shipping.value) {
+                payload.shippingMethod = shipping.value;
+            }
+            const payment = form.querySelector('input[name="payment_method"]:checked');
+            if (payment && payment.value) {
+                payload.paymentMethod = payment.value;
+            }
+
+            return payload;
+        },
+
+        /**
+         * Debounced atomic address sync — one Magewire round-trip for all form fields.
+         */
+        scheduleAddressSync(delayMs) {
+            const delay = typeof delayMs === 'number' ? delayMs : 180;
+            if (this._addressSyncTimer) {
+                clearTimeout(this._addressSyncTimer);
+            }
+            this._addressSyncTimer = setTimeout(() => {
+                this._addressSyncTimer = null;
+                this.flushAddressSync();
+            }, delay);
+        },
+
+        flushAddressSync() {
+            if (!this.$wire || typeof this.$wire.call !== 'function') {
+                return Promise.resolve();
+            }
+
+            if (this._addressSyncInFlight) {
+                this._addressSyncQueued = true;
+                return this._addressSyncInFlight;
+            }
+
+            const payload = this.collectAddressFieldsFromDom();
+            this._addressSyncInFlight = Promise.resolve(this.$wire.call('syncAddressFields', payload))
+                .catch((error) => {
+                    if (window.console && typeof window.console.warn === 'function') {
+                        window.console.warn('Kkkonrad Fastcheckout: address sync failed', error);
+                    }
+                })
+                .finally(() => {
+                    this._addressSyncInFlight = null;
+                    if (this._addressSyncQueued) {
+                        this._addressSyncQueued = false;
+                        this.flushAddressSync();
+                    }
+                });
+
+            return this._addressSyncInFlight;
+        },
+
+        /**
          * Debounced field save — called from @input.
          * Reads data-wire-field attribute to determine the Magewire property name.
          */
@@ -103,18 +199,24 @@ function initCheckout() {
                 }, 800);
             }
 
-            const fieldsToSync = ['postcode', 'billingPostcode', 'email', 'region', 'billingRegion'];
+            const fieldsToSync = [
+                'postcode', 'billingPostcode', 'email', 'region', 'billingRegion',
+                'firstname', 'lastname', 'telephone', 'city', 'street1',
+                'billingFirstname', 'billingLastname', 'billingTelephone', 'billingCity', 'billingStreet1'
+            ];
             if (!fieldsToSync.includes(field)) return;
 
-            // If a blur timer is already active (meaning we just blurred and are now autofilling/updating),
-            // re-schedule the blur timer to save the newly entered/autofilled value.
+            // Autofill / typing: batch into one atomic sync instead of per-field $wire.set races.
             if (this._blurTimers && this._blurTimers[field]) {
                 clearTimeout(this._blurTimers[field]);
                 this._blurTimers[field] = setTimeout(() => {
-                    this.$wire.set(field, el.value);
                     delete this._blurTimers[field];
+                    this.scheduleAddressSync(0);
                 }, 150);
+                return;
             }
+
+            this.scheduleAddressSync(400);
         },
 
         /**
@@ -124,20 +226,17 @@ function initCheckout() {
             const el = this.$el;
             const field = el.dataset.wireField;
             if (field) {
-                const fieldsToSync = ['postcode', 'billingPostcode', 'email', 'region', 'billingRegion'];
-                if (fieldsToSync.includes(field)) {
-                    // Delay the blur update slightly so autocomplete events can override/re-schedule it
-                    if (!this._blurTimers) {
-                        this._blurTimers = {};
-                    }
-                    if (this._blurTimers[field]) {
-                        clearTimeout(this._blurTimers[field]);
-                    }
-                    this._blurTimers[field] = setTimeout(() => {
-                        this.$wire.set(field, el.value);
-                        delete this._blurTimers[field];
-                    }, 150);
+                if (!this._blurTimers) {
+                    this._blurTimers = {};
                 }
+                if (this._blurTimers[field]) {
+                    clearTimeout(this._blurTimers[field]);
+                }
+                // Delay slightly so browser autocomplete can finish updating the input.
+                this._blurTimers[field] = setTimeout(() => {
+                    delete this._blurTimers[field];
+                    this.scheduleAddressSync(0);
+                }, 150);
             }
             this._validateEl(el);
         },
@@ -149,20 +248,16 @@ function initCheckout() {
             const el = this.$el;
             const field = el.dataset.wireField;
             if (field) {
-                const fieldsToSync = ['postcode', 'billingPostcode', 'email', 'region', 'billingRegion'];
-                if (fieldsToSync.includes(field)) {
-                    // Delay the blur update slightly so autocomplete events can override/re-schedule it
-                    if (!this._blurTimers) {
-                        this._blurTimers = {};
-                    }
-                    if (this._blurTimers[field]) {
-                        clearTimeout(this._blurTimers[field]);
-                    }
-                    this._blurTimers[field] = setTimeout(() => {
-                        this.$wire.set(field, el.value);
-                        delete this._blurTimers[field];
-                    }, 150);
+                if (!this._blurTimers) {
+                    this._blurTimers = {};
                 }
+                if (this._blurTimers[field]) {
+                    clearTimeout(this._blurTimers[field]);
+                }
+                this._blurTimers[field] = setTimeout(() => {
+                    delete this._blurTimers[field];
+                    this.scheduleAddressSync(0);
+                }, 150);
             }
         },
 
@@ -178,16 +273,68 @@ function initCheckout() {
          */
         onSelectChange() {
             const el = this.$el;
-            const field = el.dataset.wireField ||
-                el.getAttribute('wire:model.blur') ||
-                el.getAttribute('wire:model') ||
-                el.getAttribute('wire:model.defer');
+            const field = el.dataset.wireField || '';
 
-            if (field && this.$wire && typeof this.$wire.set === 'function') {
-                this.$wire.set(field, el.value);
-            }
+            // Country / region changes affect rates — flush the whole form snapshot.
+            // Address block uses wire:ignore, so rebuild region <option>s client-side.
+            Promise.resolve(this.flushAddressSync())
+                .then(() => {
+                    if (field === 'countryId' || field === 'billingCountryId') {
+                        return this.refreshRegionOptions(field);
+                    }
+                })
+                .catch(() => {});
 
             this._validateEl(el);
+        },
+
+        /**
+         * Rebuild region select options after country change (wire:ignore blocks morph).
+         */
+        refreshRegionOptions(countryField) {
+            if (!this.$wire || typeof this.$wire.call !== 'function') {
+                return Promise.resolve();
+            }
+
+            const isBilling = countryField === 'billingCountryId';
+            const method = isBilling ? 'getBillingRegions' : 'getRegions';
+            const select = document.querySelector(
+                isBilling
+                    ? 'select[data-wire-field="billingRegionId"]'
+                    : 'select[data-wire-field="regionId"]'
+            );
+
+            return Promise.resolve(this.$wire.call(method))
+                .then((regions) => {
+                    if (!select || !Array.isArray(regions)) {
+                        return;
+                    }
+                    const previous = select.value;
+                    const placeholder = select.querySelector('option[value=""]');
+                    select.innerHTML = '';
+                    if (placeholder) {
+                        select.appendChild(placeholder);
+                    } else {
+                        const empty = document.createElement('option');
+                        empty.value = '';
+                        select.appendChild(empty);
+                    }
+                    regions.forEach((opt) => {
+                        if (!opt || opt.value === undefined || opt.value === null || opt.value === '') {
+                            return;
+                        }
+                        const option = document.createElement('option');
+                        option.value = String(opt.value);
+                        option.textContent = opt.label || String(opt.value);
+                        select.appendChild(option);
+                    });
+                    const hasPrevious = previous && Array.prototype.some.call(
+                        select.options,
+                        (option) => option.value === previous
+                    );
+                    select.value = hasPrevious ? previous : '';
+                })
+                .catch(() => {});
         },
 
         /**
@@ -205,7 +352,7 @@ function initCheckout() {
         },
 
         /**
-         * Handle form submit — validate all, then place order.
+         * Handle form submit — validate all, sync address snapshot, then place order.
          */
         handleSubmit() {
             this.clientOrderError = '';
@@ -248,32 +395,40 @@ function initCheckout() {
                 this.isProcessing = true;
                 document.body.classList.add('checkout-submitting');
 
-                if (paymentBridge && typeof paymentBridge.placeOrder === 'function') {
-                    Promise.resolve(paymentBridge.placeOrder(this.$wire, selectedMethod))
-                        .then(() => {
-                            // KO initiated the order flow. The page will redirect when Magento/Magewire confirms success.
-                        })
-                        .catch((err) => {
-                            this.isProcessing = false;
-                            document.body.classList.remove('checkout-submitting');
-                            if (!this.clientOrderError && err && err.message && !err.fastcheckoutNativePaymentError) {
-                                this.clientOrderError = err.message;
-                            }
-
-                            // Smoothly scroll to the selected payment method container so errors are visible
-                            if (selectedMethodEl) {
-                                const optionContainer = selectedMethodEl.closest('[data-fastcheckout-payment-option]');
-                                if (optionContainer) {
-                                    optionContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                } else {
-                                    selectedMethodEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                }
-                            }
-                        });
-                    return;
+                // Cancel pending debounce and push the latest DOM address before placing order.
+                if (this._addressSyncTimer) {
+                    clearTimeout(this._addressSyncTimer);
+                    this._addressSyncTimer = null;
                 }
 
-                this.$wire.call('placeOrder', selectedMethod);
+                const place = () => {
+                    if (paymentBridge && typeof paymentBridge.placeOrder === 'function') {
+                        return Promise.resolve(paymentBridge.placeOrder(this.$wire, selectedMethod));
+                    }
+                    return Promise.resolve(this.$wire.call('placeOrder', selectedMethod));
+                };
+
+                Promise.resolve(this.flushAddressSync())
+                    .then(place)
+                    .then(() => {
+                        // KO / Magewire initiated the order flow. Redirect follows on success.
+                    })
+                    .catch((err) => {
+                        this.isProcessing = false;
+                        document.body.classList.remove('checkout-submitting');
+                        if (!this.clientOrderError && err && err.message && !err.fastcheckoutNativePaymentError) {
+                            this.clientOrderError = err.message;
+                        }
+
+                        if (selectedMethodEl) {
+                            const optionContainer = selectedMethodEl.closest('[data-fastcheckout-payment-option]');
+                            if (optionContainer) {
+                                optionContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            } else {
+                                selectedMethodEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            }
+                        }
+                    });
             }
         },
 

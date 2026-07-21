@@ -801,6 +801,110 @@ class CheckoutTest extends TestCase
         $this->assertSame('inpostlocker_standard', $this->checkoutComponent->shippingMethod);
     }
 
+    public function testSyncAddressFieldsAppliesFullSnapshotInOneSave(): void
+    {
+        $shippingAddressMock = $this->createAddressMock();
+        $billingAddressMock = $this->createAddressMock();
+
+        $this->quoteMock->method('getShippingAddress')->willReturn($shippingAddressMock);
+        $this->quoteMock->method('getBillingAddress')->willReturn($billingAddressMock);
+        $this->quoteMock->expects($this->once())->method('setCustomerEmail')->with('guest-sync@example.com');
+
+        $regionCollectionMock = $this->getMockBuilder(\Magento\Directory\Model\ResourceModel\Region\Collection::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['addFieldToFilter', 'getFirstItem'])
+            ->getMock();
+        $regionMock = $this->getMockBuilder(\Magento\Directory\Model\Region::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['getId', 'getName'])
+            ->getMock();
+
+        $this->regionCollectionFactoryMock->method('create')->willReturn($regionCollectionMock);
+        $regionCollectionMock->method('addFieldToFilter')->willReturnSelf();
+        $regionCollectionMock->method('getFirstItem')->willReturn($regionMock);
+        $regionMock->method('getId')->willReturn(1024);
+        $regionMock->method('getName')->willReturn('mazowieckie');
+
+        $shippingAddressMock->expects($this->once())->method('setFirstname')->with('Gosc');
+        $shippingAddressMock->expects($this->once())->method('setLastname')->with('Testowy');
+        $shippingAddressMock->expects($this->once())->method('setPostcode')->with('00-001');
+        $shippingAddressMock->expects($this->once())->method('setTelephone')->with('500600700');
+        $shippingAddressMock->expects($this->once())->method('setCountryId')->with('PL');
+        $shippingAddressMock->expects($this->once())->method('setRegionId')->with(1024);
+        $shippingAddressMock->expects($this->once())->method('setCollectShippingRates')->with(true);
+
+        // One atomic save for the full address snapshot (no shippingMethod in payload).
+        $this->cartRepositoryMock->expects($this->once())
+            ->method('save')
+            ->with($this->quoteMock);
+
+        $this->checkoutComponent->syncAddressFields([
+            'email' => 'guest-sync@example.com',
+            'firstname' => 'Gosc',
+            'lastname' => 'Testowy',
+            'street1' => 'Testowa 12',
+            'city' => 'Warszawa',
+            'postcode' => '00-001',
+            'telephone' => '500600700',
+            'countryId' => 'PL',
+            'regionId' => '1024',
+            'billingSameAsShipping' => true,
+            'paymentMethod' => 'checkmo',
+            'ignored_field' => 'should-not-assign',
+        ]);
+
+        $this->assertSame('guest-sync@example.com', $this->checkoutComponent->email);
+        $this->assertSame('Gosc', $this->checkoutComponent->firstname);
+        $this->assertSame('Testowy', $this->checkoutComponent->lastname);
+        $this->assertSame('00-001', $this->checkoutComponent->postcode);
+        $this->assertSame('500600700', $this->checkoutComponent->telephone);
+        $this->assertSame('1024', $this->checkoutComponent->regionId);
+        $this->assertSame('checkmo', $this->checkoutComponent->paymentMethod);
+        $this->assertFalse(isset($this->checkoutComponent->ignored_field));
+    }
+
+    public function testSyncAddressFieldsDoesNotClearRegionWhenPayloadIncludesRegionId(): void
+    {
+        $shippingAddressMock = $this->createAddressMock();
+        $billingAddressMock = $this->createAddressMock();
+
+        $this->quoteMock->method('getShippingAddress')->willReturn($shippingAddressMock);
+        $this->quoteMock->method('getBillingAddress')->willReturn($billingAddressMock);
+
+        $regionCollectionMock = $this->getMockBuilder(\Magento\Directory\Model\ResourceModel\Region\Collection::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['addFieldToFilter', 'getFirstItem'])
+            ->getMock();
+        $regionMock = $this->getMockBuilder(\Magento\Directory\Model\Region::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['getId', 'getName'])
+            ->getMock();
+
+        $this->regionCollectionFactoryMock->method('create')->willReturn($regionCollectionMock);
+        $regionCollectionMock->method('addFieldToFilter')->willReturnSelf();
+        $regionCollectionMock->method('getFirstItem')->willReturn($regionMock);
+        $regionMock->method('getId')->willReturn(33);
+        $regionMock->method('getName')->willReturn('Michigan');
+
+        $this->checkoutComponent->countryId = 'PL';
+        $this->checkoutComponent->regionId = '1024';
+
+        $this->checkoutComponent->syncAddressFields([
+            'countryId' => 'US',
+            'regionId' => '33',
+            'firstname' => 'Veronica',
+            'lastname' => 'Costello',
+            'street1' => '6146 Honey Bluff Parkway',
+            'city' => 'Calder',
+            'postcode' => '49628-7978',
+            'telephone' => '5552293326',
+        ]);
+
+        $this->assertSame('US', $this->checkoutComponent->countryId);
+        $this->assertSame('33', $this->checkoutComponent->regionId);
+        $this->assertSame('Veronica', $this->checkoutComponent->firstname);
+    }
+
     public function testSelectShippingMethodClearsQuotePaymentThatIsNotAllowedForNewMethod(): void
     {
         $shippingAddressMock = $this->createAddressMock();

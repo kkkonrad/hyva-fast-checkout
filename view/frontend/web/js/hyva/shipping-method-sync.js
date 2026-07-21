@@ -73,7 +73,8 @@ define([], function () {
         }
 
         function syncToMagewireNow(methodCode) {
-            var wire;
+            var wire,
+                current;
 
             persistShippingMethod(methodCode);
 
@@ -86,8 +87,21 @@ define([], function () {
                 return Promise.resolve(false);
             }
 
+            // Skip no-op re-selects that thrash Magewire HTML morphs.
+            if (methodCode === lastMagewireShippingMethodCode) {
+                return Promise.resolve(false);
+            }
+
             wire = getMagewireComponent();
             if (!wire || typeof wire.call !== 'function') {
+                return Promise.resolve(false);
+            }
+
+            current = wire.shippingMethod
+                || (typeof wire.get === 'function' ? wire.get('shippingMethod') : '')
+                || (wire.data ? wire.data.shippingMethod : '');
+            if (current === methodCode) {
+                lastMagewireShippingMethodCode = methodCode;
                 return Promise.resolve(false);
             }
 

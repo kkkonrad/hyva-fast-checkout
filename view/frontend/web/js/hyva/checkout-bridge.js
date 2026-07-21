@@ -1603,13 +1603,46 @@ define([
                     ));
                 }
 
+                function markNativePlaceOrderHidden(button) {
+                    if (!button || !button.classList) {
+                        return;
+                    }
+
+                    // Keep KO placeOrder controls out of form submit / Playwright :submit matches.
+                    if (!button.getAttribute('data-fastcheckout-original-type')) {
+                        button.setAttribute(
+                            'data-fastcheckout-original-type',
+                            button.getAttribute('type') || 'submit'
+                        );
+                    }
+                    button.setAttribute('type', 'button');
+                    button.setAttribute('tabindex', '-1');
+                    button.setAttribute('aria-hidden', 'true');
+                    button.setAttribute('disabled', 'disabled');
+                    button.classList.add('fastcheckout-native-place-order-hidden');
+                }
+
+                function unmarkNativePlaceOrderHidden(button) {
+                    if (!button || !button.classList) {
+                        return;
+                    }
+
+                    var originalType = button.getAttribute('data-fastcheckout-original-type') || 'submit';
+                    button.setAttribute('type', originalType);
+                    button.removeAttribute('tabindex');
+                    button.removeAttribute('aria-hidden');
+                    button.removeAttribute('disabled');
+                    button.removeAttribute('data-fastcheckout-original-type');
+                    button.classList.remove('fastcheckout-native-place-order-hidden');
+                }
+
                 function annotateNativePaymentActions(root) {
                     if (!root || typeof root.querySelectorAll !== 'function') {
                         return;
                     }
 
                     Array.prototype.slice.call(root.querySelectorAll('.fastcheckout-native-place-order-hidden')).forEach(function (button) {
-                        button.classList.remove('fastcheckout-native-place-order-hidden');
+                        unmarkNativePlaceOrderHidden(button);
                     });
                     Array.prototype.slice.call(root.querySelectorAll('.fastcheckout-actions-toolbar-hidden')).forEach(function (toolbar) {
                         toolbar.classList.remove('fastcheckout-actions-toolbar-hidden');
@@ -1623,7 +1656,7 @@ define([
                             var handlerName = getKoClickHandlerName(button);
 
                             if (!handlerName || handlerName === 'placeOrder') {
-                                button.classList.add('fastcheckout-native-place-order-hidden');
+                                markNativePlaceOrderHidden(button);
                             }
                         });
 

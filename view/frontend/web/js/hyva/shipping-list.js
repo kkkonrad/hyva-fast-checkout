@@ -8,28 +8,78 @@ define([
 ], function (ko, Component, shippingService, selectShippingMethodAction, quote, priceUtils) {
     'use strict';
 
-    function renderInPostWidget() {
-        require([
-            'inPostPaczkomaty',
-            'Magento_Checkout/js/model/full-screen-loader'
-        ], function (inPostPaczkomaty, fullScreenLoader) {
-            if (!inPostPaczkomaty || typeof inPostPaczkomaty.renderInPostData !== 'function') {
-                return;
-            }
+    function isInPostModuleAvailable() {
+        var context, paths, map;
 
-            setTimeout(function () {
-                inPostPaczkomaty.renderInPostData()
-                    .then(function () {
-                        return inPostPaczkomaty.insertLogoInPost();
-                    })
-                    .then(function () {
-                        fullScreenLoader.stopLoader();
-                    })
-                    .catch(function () {
-                        fullScreenLoader.stopLoader();
-                    });
-            }, 100);
-        });
+        if (typeof require === 'undefined' || typeof require.s === 'undefined') {
+            return false;
+        }
+
+        try {
+            if (typeof require.defined === 'function' && require.defined('inPostPaczkomaty')) {
+                return true;
+            }
+            if (typeof require.specified === 'function' && require.specified('inPostPaczkomaty')) {
+                return true;
+            }
+        } catch (e) {
+            // Ignore RequireJS introspection errors.
+        }
+
+        context = require.s.contexts && require.s.contexts._;
+        if (!context || !context.config) {
+            return false;
+        }
+
+        paths = context.config.paths || {};
+        map = context.config.map || {};
+
+        if (paths.inPostPaczkomaty) {
+            return true;
+        }
+
+        // Mapped aliases (e.g. '*': { inPostPaczkomaty: '...' })
+        if (map['*'] && map['*'].inPostPaczkomaty) {
+            return true;
+        }
+
+        return false;
+    }
+
+    function renderInPostWidget() {
+        // Smartmage InPost is optional. Skip when the module is not registered to
+        // avoid RequireJS 404 + MIME "text/plain" console errors on Hyvä.
+        if (!isInPostModuleAvailable()) {
+            return;
+        }
+
+        require(
+            [
+                'inPostPaczkomaty',
+                'Magento_Checkout/js/model/full-screen-loader'
+            ],
+            function (inPostPaczkomaty, fullScreenLoader) {
+                if (!inPostPaczkomaty || typeof inPostPaczkomaty.renderInPostData !== 'function') {
+                    return;
+                }
+
+                setTimeout(function () {
+                    inPostPaczkomaty.renderInPostData()
+                        .then(function () {
+                            return inPostPaczkomaty.insertLogoInPost();
+                        })
+                        .then(function () {
+                            fullScreenLoader.stopLoader();
+                        })
+                        .catch(function () {
+                            fullScreenLoader.stopLoader();
+                        });
+                }, 100);
+            },
+            function () {
+                // Module path exists but failed to load — fail silently.
+            }
+        );
     }
 
     return Component.extend({
