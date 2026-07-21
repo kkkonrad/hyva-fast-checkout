@@ -108,6 +108,30 @@ php bin/magento cache:flush
 php bin/magento maintenance:disable
 ```
 
+### Regeneracja Tailwind CSS (wymagane dla Hyvä)
+
+Szablony Fastcheckout korzystają z klas Tailwind CSS. Observer `HyvaConfigGenerateBefore` rejestruje ścieżkę modułu w konfiguracji kompilatora Tailwind Hyvä, ale **nie generuje CSS automatycznie**. Po instalacji lub aktualizacji modułu trzeba ręcznie przebudować style aktywnego motywu Hyvä, inaczej layout checkoutu może wyglądać niepoprawnie (brakujące style).
+
+W katalogu Tailwind motywu (zwykle `app/design/frontend/<Vendor>/<theme>/web/tailwind`):
+
+```bash
+# Zależności Node (tylko jeśli brak node_modules)
+npm ci
+
+# Produkcyjna kompilacja CSS
+npm run build
+```
+
+Przykład dla typowego child theme Hyvä:
+
+```bash
+cd app/design/frontend/Vendor/theme/web/tailwind
+npm ci   # pomiń, jeśli node_modules już istnieje
+npm run build
+```
+
+Po kompilacji wyczyść cache Magento (`php bin/magento cache:clean`) i w razie potrzeby w trybie produkcyjnym ponów `setup:static-content:deploy`. W trybie developerskim możesz użyć `npm run watch` podczas pracy nad szablonami.
+
 ### Weryfikacja instalacji
 
 Sprawdź, czy Magento widzi aktywny moduł:
