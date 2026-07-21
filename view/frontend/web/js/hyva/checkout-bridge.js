@@ -951,7 +951,12 @@ define([
                             'firstname': 'firstname',
                             'lastname': 'lastname',
                             'telephone': 'telephone',
-                            'company': 'company'
+                            'company': 'company',
+                            'prefix': 'prefix',
+                            'middlename': 'middlename',
+                            'suffix': 'suffix',
+                            'fax': 'fax',
+                            'vatId': 'vatId'
                         };
 
                         if (shipping && mapping[field]) {
@@ -971,7 +976,12 @@ define([
                             'billingFirstname': 'firstname',
                             'billingLastname': 'lastname',
                             'billingTelephone': 'telephone',
-                            'billingCompany': 'company'
+                            'billingCompany': 'company',
+                            'billingPrefix': 'prefix',
+                            'billingMiddlename': 'middlename',
+                            'billingSuffix': 'suffix',
+                            'billingFax': 'fax',
+                            'billingVatId': 'vatId'
                         };
 
                         if (billing && billingMapping[field]) {
@@ -982,7 +992,10 @@ define([
                             }
                         }
 
-                        if (shipping && (field === 'street1' || field === 'street2')) {
+                        if (
+                            shipping &&
+                            (field === 'street1' || field === 'street2' || field === 'street3' || field === 'street4')
+                        ) {
                             street = shipping.street || [];
                             if (field === 'street1') {
                                 street[0] = value;
@@ -990,17 +1003,37 @@ define([
                             if (field === 'street2') {
                                 street[1] = value;
                             }
+                            if (field === 'street3') {
+                                street[2] = value;
+                            }
+                            if (field === 'street4') {
+                                street[3] = value;
+                            }
                             shipping.street = street;
                             quote.shippingAddress.valueHasMutated();
                         }
 
-                        if (billing && (field === 'billingStreet1' || field === 'billingStreet2')) {
+                        if (
+                            billing &&
+                            (
+                                field === 'billingStreet1' ||
+                                field === 'billingStreet2' ||
+                                field === 'billingStreet3' ||
+                                field === 'billingStreet4'
+                            )
+                        ) {
                             billingStreet = billing.street || [];
                             if (field === 'billingStreet1') {
                                 billingStreet[0] = value;
                             }
                             if (field === 'billingStreet2') {
                                 billingStreet[1] = value;
+                            }
+                            if (field === 'billingStreet3') {
+                                billingStreet[2] = value;
+                            }
+                            if (field === 'billingStreet4') {
+                                billingStreet[3] = value;
                             }
                             billing.street = billingStreet;
                             quote.billingAddress.valueHasMutated();

@@ -10,6 +10,22 @@
 ?>
 <script>
 /**
+ * Shared shipping/billing field catalogue used by Alpine, sessionStorage restore, and DOM snapshots.
+ * Keep in sync with Magewire SYNCABLE_ADDRESS_FIELDS (minus paymentMethod / billingSameAsShipping).
+ */
+window.fastcheckoutAddressFields = [
+    'email', 'firstname', 'lastname', 'company',
+    'street1', 'street2', 'street3', 'street4',
+    'prefix', 'middlename', 'suffix', 'fax', 'vatId',
+    'city', 'postcode', 'countryId', 'regionId', 'region', 'telephone',
+    'billingFirstname', 'billingLastname', 'billingCompany',
+    'billingStreet1', 'billingStreet2', 'billingStreet3', 'billingStreet4',
+    'billingPrefix', 'billingMiddlename', 'billingSuffix', 'billingFax', 'billingVatId',
+    'billingCity', 'billingPostcode', 'billingCountryId', 'billingRegionId',
+    'billingRegion', 'billingTelephone'
+];
+
+/**
  * Kkkonrad Fastcheckout Alpine component — CSP compatible (Hyva Alpine CSP pattern)
  * No inline expressions in x-data or event attributes.
  */
@@ -22,6 +38,15 @@ function initCheckout() {
         _addressSyncQueued: false,
         _lastSyncedAddressJson: null,
         _fieldValueOnFocus: null,
+        _pendingRateAddressSave: false,
+        // Soft text fields coalesce; rate-affecting fields flush sooner for shipping estimates.
+        SOFT_SAVE_DEBOUNCE_MS: 450,
+        RATE_SAVE_DEBOUNCE_MS: 80,
+        RATE_AFFECTING_FIELDS: [
+            'countryId', 'regionId', 'region', 'postcode', 'city',
+            'billingCountryId', 'billingRegionId', 'billingRegion',
+            'billingPostcode', 'billingCity'
+        ],
         isProcessing: false,
         clientOrderError: '',
 
@@ -35,13 +60,7 @@ function initCheckout() {
 
             // Push Magewire → KO only after server-side updates (syncAddressFields, selects),
             // not while the shopper is typing into unbound DOM inputs.
-            const fieldsToWatch = [
-                'email', 'countryId', 'postcode', 'city', 'region', 'regionId',
-                'firstname', 'lastname', 'telephone', 'company', 'street1', 'street2',
-                'billingCountryId', 'billingPostcode', 'billingCity', 'billingRegion', 'billingRegionId',
-                'billingFirstname', 'billingLastname', 'billingTelephone', 'billingCompany', 'billingStreet1', 'billingStreet2',
-                'paymentMethod'
-            ];
+            const fieldsToWatch = (window.fastcheckoutAddressFields || []).concat(['paymentMethod']);
 
             fieldsToWatch.forEach((field) => {
                 this.$watch(`$wire.${field}`, (value) => {
@@ -133,17 +152,7 @@ function initCheckout() {
         collectAddressFieldsFromDom() {
             const form = document.getElementById('co-checkout-form') || this.$el;
             const payload = {};
-            const fields = [
-                'email', 'firstname', 'lastname', 'company',
-                'street1', 'street2', 'street3', 'street4',
-                'prefix', 'middlename', 'suffix', 'fax', 'vatId',
-                'city', 'postcode', 'countryId', 'regionId', 'region', 'telephone',
-                'billingFirstname', 'billingLastname', 'billingCompany',
-                'billingStreet1', 'billingStreet2', 'billingStreet3', 'billingStreet4',
-                'billingPrefix', 'billingMiddlename', 'billingSuffix', 'billingFax', 'billingVatId',
-                'billingCity', 'billingPostcode', 'billingCountryId', 'billingRegionId',
-                'billingRegion', 'billingTelephone'
-            ];
+            const fields = window.fastcheckoutAddressFields || [];
 
             fields.forEach((field) => {
                 const el = form.querySelector('[data-wire-field="' + field + '"]')
@@ -289,7 +298,7 @@ function initCheckout() {
 
         /**
          * Save address snapshot when leaving a field (blur / field change).
-         * Short delay lets browser autofill finish filling sibling inputs.
+         * Soft fields coalesce (~450ms); rate-affecting fields flush sooner (~80ms).
          * No Magewire request when the form is unchanged (click/tab between fields).
          *
          * @param {Element|string|null} fieldOrEl
@@ -317,21 +326,31 @@ function initCheckout() {
                 return;
             }
 
+            const rateFields = this.RATE_AFFECTING_FIELDS || [];
+            if (field && rateFields.indexOf(field) !== -1) {
+                this._pendingRateAddressSave = true;
+            }
+
             if (!this._blurTimers) {
                 this._blurTimers = {};
             }
             // Single shared timer — multiple field blurs coalesce into one save.
+            // Rate field (or mixed soft+rate batch) uses the shorter debounce.
             const timerKey = '_address';
+            const delay = this._pendingRateAddressSave
+                ? (this.RATE_SAVE_DEBOUNCE_MS || 80)
+                : (this.SOFT_SAVE_DEBOUNCE_MS || 450);
             if (this._blurTimers[timerKey]) {
                 clearTimeout(this._blurTimers[timerKey]);
             }
             this._blurTimers[timerKey] = setTimeout(() => {
                 delete this._blurTimers[timerKey];
+                this._pendingRateAddressSave = false;
                 if (!this.isAddressPayloadDirty()) {
                     return;
                 }
                 this.scheduleAddressSync(0);
-            }, 150);
+            }, delay);
         },
 
         /**
@@ -706,23 +725,13 @@ window.addEventListener('alpine:init', () => Alpine.data('initCheckout', initChe
     const ORDER_PLACED_MARKER = PREFIX + 'order_placed_cleanup';
     const LAST_GUEST_ADDRESS_KEY = PREFIX + 'last_guest_address';
     const LAST_GUEST_ADDRESS_TTL = 30 * 60 * 1000;
-    const FIELDS = [
-        'email', 'firstname', 'lastname', 'company',
-        'prefix', 'middlename', 'suffix', 'fax', 'vatId',
-        'street1', 'street2', 'street3', 'street4', 'city', 'postcode',
-        'countryId', 'regionId', 'region', 'telephone',
-        'billingFirstname', 'billingLastname', 'billingCompany',
-        'billingPrefix', 'billingMiddlename', 'billingSuffix', 'billingFax', 'billingVatId',
-        'billingStreet1', 'billingStreet2', 'billingStreet3', 'billingStreet4', 'billingCity',
-        'billingPostcode', 'billingCountryId', 'billingRegionId', 'billingRegion', 'billingTelephone'
-    ];
+    const FIELDS = window.fastcheckoutAddressFields || [];
     const MEANINGFUL_SHIPPING_FIELDS = [
         'firstname', 'lastname', 'street1', 'street2', 'street3', 'street4', 'city', 'postcode', 'telephone'
     ];
+    const GUEST_RESTORE_FOLLOWUP_MS = [750, 2000];
     let lastGuestRestoreValues = null;
     let lastGuestRestoreAttempts = 0;
-    let lastGuestRestoreUntil = 0;
-    let lastGuestRestoreInterval = null;
     let lastGuestRestoreServerSynced = false;
     let lastGuestRestoreServerSyncing = false;
 
@@ -952,6 +961,12 @@ window.addEventListener('alpine:init', () => Alpine.data('initCheckout', initChe
         }
     }
 
+    function finishGuestAddressRestore() {
+        lastGuestRestoreValues = null;
+        lastGuestRestoreAttempts = 0;
+        window.fastcheckoutGuestAddressSnapshotRestorePending = false;
+    }
+
     function restoreRecentGuestAddress(wire, snapshotValues) {
         const values = snapshotValues || getLastGuestAddressValues();
 
@@ -961,7 +976,6 @@ window.addEventListener('alpine:init', () => Alpine.data('initCheckout', initChe
 
         lastGuestRestoreValues = values;
         lastGuestRestoreAttempts = 0;
-        lastGuestRestoreUntil = Date.now() + 15000;
         lastGuestRestoreServerSynced = false;
         lastGuestRestoreServerSyncing = false;
         window.fastcheckoutGuestAddressSnapshotRestorePending = true;
@@ -970,6 +984,7 @@ window.addEventListener('alpine:init', () => Alpine.data('initCheckout', initChe
                 restoreDomFieldsOnly(values);
             }
         });
+        // One server call + 1–2 short DOM follow-ups (no 15s interval spam).
         scheduleRecentGuestAddressReapply();
         return true;
     }
@@ -978,37 +993,35 @@ window.addEventListener('alpine:init', () => Alpine.data('initCheckout', initChe
         if (!lastGuestRestoreValues || window.fastcheckoutOrderPlaced) {
             return;
         }
-        if (Date.now() > lastGuestRestoreUntil || lastGuestRestoreAttempts >= 20) {
-            lastGuestRestoreValues = null;
-            window.fastcheckoutGuestAddressSnapshotRestorePending = false;
-            if (lastGuestRestoreInterval) {
-                window.clearInterval(lastGuestRestoreInterval);
-                lastGuestRestoreInterval = null;
-            }
+        if (lastGuestRestoreAttempts >= GUEST_RESTORE_FOLLOWUP_MS.length) {
+            finishGuestAddressRestore();
             return;
         }
 
         lastGuestRestoreAttempts += 1;
+        const isLastFollowUp = lastGuestRestoreAttempts >= GUEST_RESTORE_FOLLOWUP_MS.length;
+
         if (!lastGuestRestoreServerSynced) {
             syncRecentGuestAddressToServer(wire, lastGuestRestoreValues).then(function (synced) {
                 if (synced) {
                     restoreDomFieldsOnly(lastGuestRestoreValues);
+                }
+                if (isLastFollowUp) {
+                    // Brief settle so storage-mixin can see the restored state once.
+                    window.setTimeout(finishGuestAddressRestore, 300);
                 }
             });
             return;
         }
 
         restoreDomFieldsOnly(lastGuestRestoreValues);
+        if (isLastFollowUp || hasMeaningfulDomShippingData()) {
+            finishGuestAddressRestore();
+        }
     }
 
     function scheduleRecentGuestAddressReapply() {
-        if (!lastGuestRestoreInterval) {
-            lastGuestRestoreInterval = window.setInterval(function () {
-                reapplyRecentGuestAddressIfNeeded(getWire());
-            }, 500);
-        }
-
-        [50, 250, 750, 1500, 3000].forEach(function (delay) {
+        GUEST_RESTORE_FOLLOWUP_MS.forEach(function (delay) {
             window.setTimeout(function () {
                 reapplyRecentGuestAddressIfNeeded(getWire());
             }, delay);
@@ -1096,7 +1109,14 @@ window.addEventListener('alpine:init', () => Alpine.data('initCheckout', initChe
             FIELDS.forEach(function (field) {
                 try { save(field, component.data[field]); } catch (e) {}
             });
-            scheduleRecentGuestAddressReapply();
+            // Only re-apply while restore is still pending and under the follow-up cap.
+            if (
+                window.fastcheckoutGuestAddressSnapshotRestorePending === true &&
+                lastGuestRestoreValues &&
+                lastGuestRestoreAttempts < GUEST_RESTORE_FOLLOWUP_MS.length
+            ) {
+                reapplyRecentGuestAddressIfNeeded(getWire());
+            }
         });
     }
 

@@ -905,6 +905,129 @@ class CheckoutTest extends TestCase
         $this->assertSame('Veronica', $this->checkoutComponent->firstname);
     }
 
+    public function testSyncAddressFieldsIsNoOpWhenSnapshotUnchanged(): void
+    {
+        $this->checkoutComponent->email = 'same@example.com';
+        $this->checkoutComponent->firstname = 'Gosc';
+        $this->checkoutComponent->lastname = 'Testowy';
+        $this->checkoutComponent->street1 = 'Testowa 12';
+        $this->checkoutComponent->city = 'Warszawa';
+        $this->checkoutComponent->postcode = '00-001';
+        $this->checkoutComponent->telephone = '500600700';
+        $this->checkoutComponent->countryId = 'PL';
+        $this->checkoutComponent->regionId = '1024';
+        $this->checkoutComponent->billingSameAsShipping = true;
+
+        $this->cartRepositoryMock->expects($this->never())->method('save');
+        $this->quoteMock->expects($this->never())->method('setCustomerEmail');
+        $this->quoteMock->expects($this->never())->method('getShippingAddress');
+
+        $this->checkoutComponent->syncAddressFields([
+            'email' => 'same@example.com',
+            'firstname' => 'Gosc',
+            'lastname' => 'Testowy',
+            'street1' => 'Testowa 12',
+            'city' => 'Warszawa',
+            'postcode' => '00-001',
+            'telephone' => '500600700',
+            'countryId' => 'PL',
+            'regionId' => '1024',
+            'billingSameAsShipping' => true,
+        ]);
+
+        $this->assertSame('Gosc', $this->checkoutComponent->firstname);
+        $this->assertSame('00-001', $this->checkoutComponent->postcode);
+    }
+
+    public function testSyncAddressFieldsSkipsQuoteSaveWhenOnlyPaymentMethodChanges(): void
+    {
+        $this->checkoutComponent->firstname = 'Gosc';
+        $this->checkoutComponent->paymentMethod = 'checkmo';
+
+        $this->cartRepositoryMock->expects($this->never())->method('save');
+        $this->quoteMock->expects($this->never())->method('getShippingAddress');
+
+        $this->checkoutComponent->syncAddressFields([
+            'paymentMethod' => 'banktransfer',
+            'firstname' => 'Gosc',
+        ]);
+
+        $this->assertSame('banktransfer', $this->checkoutComponent->paymentMethod);
+        $this->assertSame('Gosc', $this->checkoutComponent->firstname);
+    }
+
+    public function testSyncAddressFieldsCollectsRatesOnlyForRateAffectingFields(): void
+    {
+        $shippingAddressMock = $this->createAddressMock();
+        $billingAddressMock = $this->createAddressMock();
+
+        $this->quoteMock->method('getShippingAddress')->willReturn($shippingAddressMock);
+        $this->quoteMock->method('getBillingAddress')->willReturn($billingAddressMock);
+
+        $this->checkoutComponent->email = 'guest@example.com';
+        $this->checkoutComponent->firstname = 'Old';
+        $this->checkoutComponent->lastname = 'Name';
+        $this->checkoutComponent->street1 = 'Street 1';
+        $this->checkoutComponent->city = 'Warszawa';
+        $this->checkoutComponent->postcode = '00-001';
+        $this->checkoutComponent->telephone = '500600700';
+        $this->checkoutComponent->countryId = 'PL';
+        $this->checkoutComponent->billingSameAsShipping = true;
+
+        $shippingAddressMock->expects($this->once())->method('setCollectShippingRates')->with(false);
+        $this->cartRepositoryMock->expects($this->once())->method('save')->with($this->quoteMock);
+
+        $this->checkoutComponent->syncAddressFields([
+            'email' => 'guest@example.com',
+            'firstname' => 'New',
+            'lastname' => 'Name',
+            'street1' => 'Street 1',
+            'city' => 'Warszawa',
+            'postcode' => '00-001',
+            'telephone' => '500600700',
+            'countryId' => 'PL',
+            'billingSameAsShipping' => true,
+        ]);
+
+        $this->assertSame('New', $this->checkoutComponent->firstname);
+    }
+
+    public function testSyncAddressFieldsCollectsRatesWhenPostcodeChanges(): void
+    {
+        $shippingAddressMock = $this->createAddressMock();
+        $billingAddressMock = $this->createAddressMock();
+
+        $this->quoteMock->method('getShippingAddress')->willReturn($shippingAddressMock);
+        $this->quoteMock->method('getBillingAddress')->willReturn($billingAddressMock);
+
+        $this->checkoutComponent->email = 'guest@example.com';
+        $this->checkoutComponent->firstname = 'Gosc';
+        $this->checkoutComponent->lastname = 'Testowy';
+        $this->checkoutComponent->street1 = 'Street 1';
+        $this->checkoutComponent->city = 'Warszawa';
+        $this->checkoutComponent->postcode = '00-001';
+        $this->checkoutComponent->telephone = '500600700';
+        $this->checkoutComponent->countryId = 'PL';
+        $this->checkoutComponent->billingSameAsShipping = true;
+
+        $shippingAddressMock->expects($this->once())->method('setCollectShippingRates')->with(true);
+        $this->cartRepositoryMock->expects($this->once())->method('save')->with($this->quoteMock);
+
+        $this->checkoutComponent->syncAddressFields([
+            'email' => 'guest@example.com',
+            'firstname' => 'Gosc',
+            'lastname' => 'Testowy',
+            'street1' => 'Street 1',
+            'city' => 'Warszawa',
+            'postcode' => '00-999',
+            'telephone' => '500600700',
+            'countryId' => 'PL',
+            'billingSameAsShipping' => true,
+        ]);
+
+        $this->assertSame('00-999', $this->checkoutComponent->postcode);
+    }
+
     public function testSelectShippingMethodClearsQuotePaymentThatIsNotAllowedForNewMethod(): void
     {
         $shippingAddressMock = $this->createAddressMock();

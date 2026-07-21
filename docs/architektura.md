@@ -81,7 +81,12 @@ Zbudowany przy użyciu Tailwind CSS w układzie wielokolumnowym:
 - **Desktop**: Układ trzykolumnowy, dający pełny podgląd wszystkich sekcji koszyka bez konieczności przewijania strony.
 
 ### Logika Alpine.js (`initCheckout()`):
-- **Debounced input**: Wprowadzanie wartości do pól wrażliwych na opóźnienia sieciowe (np. kod pocztowy, e-mail) posiada debouncing (opóźnienie wysyłki żądania Magewire o 150-800ms), dzięki czemu zapytania AJAX nie blokują interfejsu podczas pisania.
+- **Zapis adresu (atomic snapshot)**: Pola adresu są pod `wire:ignore` — podczas pisania **nie** ma XHR Magewire na każdy keystroke. Źródłem prawdy przy zapisie jest snapshot DOM (`collectAddressFieldsFromDom` → `$wire.call('syncAddressFields', payload)`).
+  - `input` — tylko lokalny format / walidacja UI (e-mail: debounce **800 ms** wyłącznie pod podpowiedź domeny; bez zapisu).
+  - `blur` / `change` dirty — coalescing: pola „miękkie” ~**450 ms**, pola wpływające na stawki (`postcode`, `city`, `country`, `region`) ~**80 ms**.
+  - `country` / `region` (select) — natychmiastowy `flushAddressSync()`.
+  - Brak edycji (tab/click między polami) — **0** XHR (dirty-check DOM vs `_lastSyncedAddressJson`).
+  - Po stronie PHP identyczny snapshot → no-op (bez `saveQuote` / `collectRates`); recollect stawek tylko przy realnej zmianie pól rate.
 - **Autouzupełnianie adresów**: Obsługa dropdownu pozwalającego wybrać jeden z adresów pobranych z profilu klienta (`fillSavedAddress()`).
 - **Walidacja w przeglądarce**: Niestandardowe walidatory dopasowane do polskich realiów:
   - Kod pocztowy: Wymuszenie formatu `XX-XXX` przy wysyłce do Polski.

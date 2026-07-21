@@ -3466,4 +3466,125 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
         const couponSuccess = page.locator(selectors.couponSuccess);
         await expect(couponSuccess).toBeVisible();
     });
+
+    test('should not call syncAddressFields on no-op blur between fields', async ({ page }) => {
+        const checkout = new CheckoutPage(page);
+        await checkout.goto();
+
+        await page.locator(selectors.firstname).fill('NoOp');
+        await page.locator(selectors.firstname).blur();
+        // Wait for soft debounce + any in-flight sync to settle.
+        await page.waitForTimeout(700);
+
+        const syncCalls = [];
+        await page.route('**/magewire/**', async (route) => {
+            const postData = route.request().postData() || '';
+            if (postData.includes('syncAddressFields')) {
+                syncCalls.push(Date.now());
+            }
+            await route.continue();
+        });
+        // Also catch livewire-style updates embedded in page body posts.
+        page.on('request', (request) => {
+            if (request.method() !== 'POST') {
+                return;
+            }
+            const data = request.postData() || '';
+            if (data.includes('syncAddressFields')) {
+                syncCalls.push(Date.now());
+            }
+        });
+
+        // Focus/blur without editing — should not enqueue a dirty sync.
+        await page.locator(selectors.firstname).focus();
+        await page.locator(selectors.lastname).focus();
+        await page.locator(selectors.lastname).blur();
+        await page.waitForTimeout(600);
+
+        expect(syncCalls.length, `unexpected syncAddressFields calls: ${syncCalls.length}`).toBe(0);
+    });
+
+    test('should coalesce soft field blurs into a single address sync', async ({ page }) => {
+        const checkout = new CheckoutPage(page);
+        await checkout.goto();
+
+        const syncCalls = [];
+        page.on('request', (request) => {
+            if (request.method() !== 'POST') {
+                return;
+            }
+            const data = request.postData() || '';
+            if (data.includes('syncAddressFields')) {
+                syncCalls.push(Date.now());
+            }
+        });
+
+        await page.locator(selectors.firstname).fill('Soft');
+        await page.locator(selectors.firstname).blur();
+        await page.locator(selectors.lastname).fill('Coalesce');
+        await page.locator(selectors.lastname).blur();
+        await page.locator(selectors.street1).fill('Testowa 1');
+        await page.locator(selectors.street1).blur();
+        await page.locator(selectors.company).fill('Acme');
+        await page.locator(selectors.company).blur();
+
+        // Soft debounce is ~450ms; wait past coalesce window.
+        await page.waitForTimeout(900);
+
+        expect(
+            syncCalls.length,
+            `expected coalesced sync, got ${syncCalls.length}`
+        ).toBeLessThanOrEqual(2);
+        expect(syncCalls.length).toBeGreaterThanOrEqual(1);
+    });
+
+    test('should push street3 to KO quote via syncFieldToKo', async ({ page }) => {
+        const checkout = new CheckoutPage(page);
+        await checkout.goto();
+
+        const result = await page.evaluate(() => {
+            if (
+                !window.fastcheckoutHyvaPayment ||
+                typeof window.fastcheckoutHyvaPayment.syncFieldToKo !== 'function'
+            ) {
+                return { error: 'syncFieldToKo missing' };
+            }
+
+            return new Promise((resolve) => {
+                window.require(['Magento_Checkout/js/model/quote'], (quote) => {
+                    try {
+                        const shipping = typeof quote.shippingAddress === 'function'
+                            ? (quote.shippingAddress() || {})
+                            : {};
+                        shipping.street = shipping.street || [];
+                        if (typeof quote.shippingAddress === 'function') {
+                            quote.shippingAddress(shipping);
+                        }
+
+                        window.fastcheckoutHyvaPayment.syncFieldToKo('street3', 'Line Three');
+                        window.fastcheckoutHyvaPayment.syncFieldToKo('street4', 'Line Four');
+                        window.fastcheckoutHyvaPayment.syncFieldToKo('prefix', 'Mr');
+
+                        const after = quote.shippingAddress() || {};
+                        resolve({
+                            street2: (after.street || [])[2],
+                            street3: (after.street || [])[3],
+                            prefix: after.prefix
+                        });
+                    } catch (error) {
+                        resolve({ error: String(error && error.message ? error.message : error) });
+                    }
+                }, (error) => {
+                    resolve({
+                        requireError: error && (error.requireModules || error.message || String(error))
+                    });
+                });
+            });
+        });
+
+        expect(result.error || result.requireError, JSON.stringify(result)).toBeFalsy();
+        expect(result.street2).toBe('Line Three');
+        expect(result.street3).toBe('Line Four');
+        expect(result.prefix).toBe('Mr');
+    });
 });

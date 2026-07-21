@@ -560,21 +560,12 @@ define([
                 return;
             }
 
+            // Single debounce — equality cache in setMagewireValue already skips no-ops.
+            // Avoid multi-timeout fan-out (was 50 + 200 + 600 → up to 3 XHRs per attr write).
             if (syncTimer) {
                 window.clearTimeout(syncTimer);
             }
-            syncTimer = window.setTimeout(sync, 50);
-
-            if (
-                path.indexOf('.custom_attributes.') !== -1 ||
-                path.indexOf('.customAttributes.') !== -1 ||
-                path.indexOf('.extension_attributes.') !== -1 ||
-                path.indexOf('.extensionAttributes.') !== -1
-            ) {
-                [200, 600].forEach(function (delay) {
-                    window.setTimeout(sync, delay);
-                });
-            }
+            syncTimer = window.setTimeout(sync, 200);
         }
 
         function register() {

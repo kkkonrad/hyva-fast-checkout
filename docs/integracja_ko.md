@@ -157,12 +157,14 @@ Gdy wtyczka KO wywołuje zapytanie REST AJAX (np. POST `/totals-information` lub
 
 ## 8. Dwu-kierunkowy Reaktywny Adapter Stanu (Alpine <-> Knockout)
 
-Synchronizacja stanu pól formularzy (adresy dostawy, płatności, dane kontaktowe) odbywa się automatycznie w tle:
+Synchronizacja stanu pól formularzy (adresy dostawy, płatności, dane kontaktowe) odbywa się automatycznie w tle — **bez per-keystroke Magewire** dla adresu:
 
-- **Z Alpine.js do KO**:
-  W komponencie Alpine (`checkout.phtml`) zdefiniowano pętlę obserwatorów `this.$watch` na 23 polach formularza. Każda zmiana wartości (np. wpisanie kodu pocztowego) uruchamia helper `window.fastcheckoutHyvaPayment.syncFieldToKo`, który pobiera instancję Quote w KO i bezpośrednio modyfikuje powiązane Knockout observables, wywołując metodę `valueHasMutated()`.
+- **DOM → Magewire (zapis adresu)**:
+  Po `blur`/`change` (dirty) Alpine zbiera snapshot DOM (`collectAddressFieldsFromDom`) i wywołuje atomowo `syncAddressFields`. Place order najpierw robi `flushAddressSync()`. Nie ma zapisu Magewire na każdym naciśnięciu klawisza; debounce 800 ms dotyczy wyłącznie walidacji UI e-mail.
+- **Magewire → KO** (po udanym sync / selectach):
+  W Alpine (`script.phtml`) `$watch` na polach z `window.fastcheckoutAddressFields` (+ `paymentMethod`) woła `window.fastcheckoutHyvaPayment.syncFieldToKo`, które aktualizuje observables quote KO (`street[0–3]`, atrybuty opcjonalne, billing*).
 - **Z KO do Magewire/Alpine**:
-  W [checkout-bridge.js](file:///var/www/html/app/code/Kkkonrad/Fastcheckout/view/frontend/web/js/hyva/checkout-bridge.js) most subskrybuje observables `quote.shippingAddress`, `quote.billingAddress` oraz `quote.paymentMethod`. Jeśli bramka płatności KO zmodyfikuje te obiekty (np. Braintree zaktualizuje adres rozliczeniowy), subskrypcja automatycznie synchronizuje te zmiany z powrotem do pól komponentu Magewire za pomocą `$wire.set()`.
+  W [checkout-bridge.js](file:///var/www/html/app/code/Kkkonrad/Fastcheckout/view/frontend/web/js/hyva/checkout-bridge.js) most subskrybuje observables `quote.shippingAddress`, `quote.billingAddress` oraz `quote.paymentMethod`. Jeśli bramka płatności KO zmodyfikuje te obiekty (np. Braintree zaktualizuje adres rozliczeniowy), subskrypcja automatycznie synchronizuje te zmiany z powrotem do pól komponentu Magewire za pomocą `$wire.set()` (z flagą `fastcheckoutSuppressKoAddressToMagewire` podczas DOM flush).
 
 ---
 

@@ -1689,16 +1689,16 @@ class Checkout extends Component
      * Apply many address fields in one request to avoid Magewire race conditions
      * that wipe values when concurrent updated() saves overlap.
      *
+     * Identical snapshots are a no-op (no saveQuote / collectRates). Rate recollect
+     * runs only when a shipping-rate-affecting field actually changed.
+     *
      * @param array<string, mixed> $fields
      */
     public function syncAddressFields(array $fields = []): void
     {
         $previousCountryId = (string)$this->countryId;
         $previousBillingCountryId = (string)$this->billingCountryId;
-        $touchedRateFields = false;
-        $touchedShipping = false;
-        $touchedBilling = false;
-        $touchedEmail = false;
+        $before = $this->snapshotSyncableAddressState();
 
         foreach ($fields as $name => $value) {
             $name = (string)$name;
@@ -1710,19 +1710,6 @@ class Checkout extends Component
                 $this->{$name} = (bool)$value;
             } else {
                 $this->{$name} = is_scalar($value) || $value === null ? (string)$value : '';
-            }
-
-            if (in_array($name, self::SHIPPING_RATE_AFFECTING_FIELDS, true)) {
-                $touchedRateFields = true;
-            }
-            if ($this->isShippingAddressFieldName($name) || $name === 'shippingMethod') {
-                $touchedShipping = true;
-            }
-            if ($this->isBillingAddressFieldName($name) || $name === 'billingSameAsShipping') {
-                $touchedBilling = true;
-            }
-            if ($name === 'email') {
-                $touchedEmail = true;
             }
         }
 
@@ -1742,7 +1729,6 @@ class Checkout extends Component
         ) {
             $this->regionId = '';
             $this->region = '';
-            $touchedRateFields = true;
         }
         if (
             array_key_exists('billingCountryId', $fields)
@@ -1752,6 +1738,39 @@ class Checkout extends Component
         ) {
             $this->billingRegionId = '';
             $this->billingRegion = '';
+        }
+
+        $after = $this->snapshotSyncableAddressState();
+
+        // No address/email change (paymentMethod alone is applied above, quote payment is elsewhere).
+        if ($before === $after) {
+            return;
+        }
+
+        $touchedRateFields = false;
+        foreach (self::SHIPPING_RATE_AFFECTING_FIELDS as $rateField) {
+            if (($before[$rateField] ?? '') !== ($after[$rateField] ?? '')) {
+                $touchedRateFields = true;
+                break;
+            }
+        }
+
+        $touchedShipping = false;
+        $touchedBilling = false;
+        $touchedEmail = false;
+        foreach ($after as $name => $value) {
+            if (($before[$name] ?? '') === $value) {
+                continue;
+            }
+            if ($name === 'email') {
+                $touchedEmail = true;
+            }
+            if ($this->isShippingAddressFieldName($name)) {
+                $touchedShipping = true;
+            }
+            if ($this->isBillingAddressFieldName($name) || $name === 'billingSameAsShipping') {
+                $touchedBilling = true;
+            }
         }
 
         $quote = $this->checkoutSession->getQuote();
@@ -1780,6 +1799,34 @@ class Checkout extends Component
         // Note: do not call skipRender() here. In Magewire, skipRender still emits an
         // empty root tag which morphs away the live form and wipes typed values.
         // Address text fields are protected with wire:ignore in the template instead.
+    }
+
+    /**
+     * Normalized comparable snapshot of syncable address/email state (excludes paymentMethod).
+     *
+     * @return array<string, string>
+     */
+    private function snapshotSyncableAddressState(): array
+    {
+        $state = [];
+        foreach (self::SYNCABLE_ADDRESS_FIELDS as $name) {
+            if ($name === 'paymentMethod') {
+                continue;
+            }
+            if ($name === 'billingSameAsShipping') {
+                $state[$name] = !empty($this->{$name}) ? '1' : '0';
+                continue;
+            }
+            if ($name === 'regionId' || $name === 'billingRegionId') {
+                $raw = $this->{$name} ?? '';
+                $state[$name] = ((int)$raw) <= 0 ? '' : (string)(int)$raw;
+                continue;
+            }
+            $value = $this->{$name} ?? '';
+            $state[$name] = $value === null ? '' : (string)$value;
+        }
+
+        return $state;
     }
 
     /**
