@@ -39,6 +39,7 @@ class Data extends AbstractHelper
     const XML_PATH_SHIPPING_PAYMENT_MAPPING = 'fastcheckout/extended/shipping_payment_mapping';
     const XML_PATH_REQUIRED_SHIPPING_FIELDS = 'fastcheckout/extended/required_shipping_fields';
     const XML_PATH_REQUIRED_PAYMENT_FIELDS = 'fastcheckout/extended/required_payment_fields';
+    const XML_PATH_ASSIGN_ORDER_TO_CUSTOMER = 'fastcheckout/extended/assign_order_to_customer';
 
     public $storeManager;
     public $session;
@@ -340,6 +341,18 @@ class Data extends AbstractHelper
     public function isReloadShippingOnDiscount()
     {
         return (bool)$this->scopeConfig->getValue(self::XML_PATH_RELOAD_SHIPPING_ON_DISCOUNT, ScopeInterface::SCOPE_STORE);
+    }
+
+    /**
+     * When enabled, guest orders whose email matches an existing customer are
+     * attached to that customer account after place order (previous default behaviour).
+     */
+    public function isAssignOrderToCustomer(): bool
+    {
+        return (bool)$this->scopeConfig->getValue(
+            self::XML_PATH_ASSIGN_ORDER_TO_CUSTOMER,
+            ScopeInterface::SCOPE_STORE
+        );
     }
 
     public function canUseHyvaNativeCheckout()

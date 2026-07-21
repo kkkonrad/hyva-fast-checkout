@@ -113,8 +113,8 @@ Moduł zawiera szereg wtyczek (plugins) eliminujących znane błędy w rdzeniu M
 
 1. **[QuoteSubmitSuccess.php](file:///var/www/html/app/code/Kkkonrad/Fastcheckout/Observer/QuoteSubmitSuccess.php)**:
    - Uruchamia się po pomyślnym złożeniu zamówienia.
+   - Opcjonalnie (config `fastcheckout/extended/assign_order_to_customer`, domyślnie włączone) przypisuje zamówienie gościa do istniejącego konta, gdy e-mail zamówienia pasuje do klienta w tym samym website. Klient **nie** jest automatycznie logowany.
    - Odczytuje komentarz z sesji (`fastcheckout_comment`) i zapisuje go jako widoczny dla klienta rekord w tabeli historii statusów zamówienia (`sales_order_status_history`).
-   - Nie zmienia właściciela zamówienia gościa. Powiązanie wyłącznie na podstawie adresu e-mail byłoby podatne na przejęcie danych zamówienia.
-   - Obsługę linków produktów cyfrowych pozostawia obserwatorom Magento Downloadable.
+   - Po przypisaniu aktualizuje `customer_id` na rekordach downloadable purchased (bez ponownego odpalania observerów Magento Downloadable).
 2. **[HyvaConfigGenerateBefore.php](file:///var/www/html/app/code/Kkkonrad/Fastcheckout/Observer/HyvaConfigGenerateBefore.php)**:
    - Rejestruje katalog modułu Fastcheckout w procesie kompilacji stylów Tailwind CSS w szablonie Hyvä. Gwarantuje to, że wszelkie klasy CSS użyte w plikach `.phtml` koszyka zostaną prawidłowo wygenerowane w finalnym pliku stylów motywu.

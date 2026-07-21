@@ -15,7 +15,7 @@ Moduł ten zapewnia wyjątkową szybkość działania, przejrzysty 2-kolumnowy u
 
 ### 📦 Elastyczna Konfiguracja i Logika Biznesowa
 - **Dynamiczne mapowanie metod dostawy i płatności**: Możliwość sztywnego przypisania metod płatności do wybranych metod dostawy (np. pobranie tylko przy wysyłce kurierskiej).
-- **Automatyczne przypisywanie zamówienia do konta klienta**: Jeśli klient składa zamówienie jako gość, ale podany e-mail pasuje do istniejącego konta, moduł automatycznie przypisze zamówienie do tego konta.
+- **Automatyczne przypisywanie zamówienia do konta klienta**: Jeśli gość poda e-mail istniejącego konta (ten sam website), zamówienie jest po złożeniu podpinane do tego konta (config: *Assign Guest Order to Existing Customer by Email?*, domyślnie włączone). Klient **nie** jest automatycznie logowany.
 - **Dodatkowe pola koszyka**:
   - Komentarz do zamówienia (zapisywany w historii zamówienia).
   - Newsletter (checkbox zapisu do newslettera).

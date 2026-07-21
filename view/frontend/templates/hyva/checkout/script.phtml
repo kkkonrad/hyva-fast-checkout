@@ -631,7 +631,9 @@ function initCheckout() {
                     if (countryId === 'PL') {
                         const plPostcodeRegex = /^\d{2}-\d{3}$/;
                         if (!plPostcodeRegex.test(el.value)) {
-                            el.setCustomValidity('Kod pocztowy musi mieć format XX-XXX (np. 00-950)');
+                            el.setCustomValidity(<?= /* @noEscape */ json_encode(
+                                (string)__('Postcode must be in XX-XXX format (e.g. 00-950).')
+                            ) ?>);
                         } else {
                             el.setCustomValidity('');
                         }
@@ -641,14 +643,18 @@ function initCheckout() {
                 } else if (fieldName === 'telephone' || fieldName === 'billingTelephone') {
                     const digits = el.value.replace(/\D/g, '');
                     if (digits.length < 9) {
-                        el.setCustomValidity('Numer telefonu musi mieć co najmniej 9 cyfr');
+                        el.setCustomValidity(<?= /* @noEscape */ json_encode(
+                            (string)__('Telephone number must have at least 9 digits.')
+                        ) ?>);
                     } else {
                         el.setCustomValidity('');
                     }
                 } else if (fieldName === 'email') {
                     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
                     if (el.value && !emailRegex.test(el.value)) {
-                        el.setCustomValidity('Wpisz poprawny adres e-mail (np. nazwa@domena.pl)');
+                        el.setCustomValidity(<?= /* @noEscape */ json_encode(
+                            (string)__('Please enter a valid email address (e.g. name@domain.pl).')
+                        ) ?>);
                     } else if (el.value) {
                         const typos = {
                             'gamil.com': 'gmail.com',
@@ -661,7 +667,10 @@ function initCheckout() {
                         };
                         const domain = el.value.split('@')[1];
                         if (domain && typos[domain.toLowerCase()]) {
-                            el.setCustomValidity('Czy miałeś na myśli: ' + typos[domain.toLowerCase()] + '?');
+                            const didYouMean = <?= /* @noEscape */ json_encode(
+                                (string)__('Did you mean: %1?')
+                            ) ?>;
+                            el.setCustomValidity(didYouMean.replace('%1', typos[domain.toLowerCase()]));
                         } else {
                             el.setCustomValidity('');
                         }
