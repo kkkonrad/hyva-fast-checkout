@@ -670,8 +670,13 @@ class Checkout extends Component
         if ($selectedPaymentMethod !== '') {
             $this->paymentMethod = $selectedPaymentMethod;
             if (!$this->isSelectedPaymentMethodStillAllowed($selectedPaymentMethod)) {
+                // Previously selected method is not valid for the new shipping mapping.
                 $this->selectFirstAllowedPaymentMethodOrClear($quote);
             }
+        } else {
+            // No payment chosen yet — pick the first method allowed for this shipping method
+            // so the filtered list is immediately usable after shipping selection.
+            $this->selectFirstAllowedPaymentMethodOrClear($quote);
         }
     }
 
@@ -733,7 +738,24 @@ class Checkout extends Component
         $allowedPaymentMethods = $this->getAllowedPaymentMethods();
         if (!empty($allowedPaymentMethods)) {
             $firstMethod = reset($allowedPaymentMethods);
-            $this->selectPaymentMethod((string)$firstMethod->getCode());
+            $firstCode = (string)$firstMethod->getCode();
+            // Already on a valid method for this shipping mapping — skip extra Magewire
+            // selectPaymentMethod round-trip (it re-renders payment content and flickers).
+            if ($firstCode !== '' && $firstCode === (string)$this->paymentMethod) {
+                return;
+            }
+            if (
+                $firstCode !== ''
+                && (string)$this->paymentMethod !== ''
+                && $this->isSelectedPaymentMethodStillAllowed((string)$this->paymentMethod)
+            ) {
+                return;
+            }
+            $this->selectPaymentMethod($firstCode);
+            return;
+        }
+
+        if ((string)$this->paymentMethod === '') {
             return;
         }
 
@@ -1232,6 +1254,8 @@ class Checkout extends Component
     public function selectPaymentMethod(string $methodCode): array
     {
         $methodCode = trim($methodCode);
+        // Same method already selected: return cached checkout state without re-saving quote.
+        // Avoids client↔server feedback (selectPaymentMethod → refresh → message.processed → select…).
         if ($methodCode !== '' && $methodCode === (string)$this->paymentMethod) {
             return $this->refreshCheckoutState();
         }
@@ -1648,7 +1672,8 @@ class Checkout extends Component
         'billingPrefix', 'billingMiddlename', 'billingSuffix', 'billingFax', 'billingVatId',
         'billingCity', 'billingPostcode', 'billingCountryId', 'billingRegionId', 'billingRegion',
         'billingTelephone',
-        'shippingMethod', 'paymentMethod',
+        // paymentMethod only — shippingMethod must go through selectShippingMethod()
+        'paymentMethod',
     ];
 
     /**
@@ -1748,27 +1773,9 @@ class Checkout extends Component
             }
         }
 
-        if (
-            array_key_exists('shippingMethod', $fields)
-            && trim((string)$this->shippingMethod) !== ''
-        ) {
-            $methodCode = trim((string)$this->shippingMethod);
-            $quote = $this->checkoutSession->getQuote();
-            $currentQuoteMethod = $quote->getShippingAddress()
-                ? (string)$quote->getShippingAddress()->getShippingMethod()
-                : '';
-            // Only re-apply when quote method actually differs — prevents KO↔Magewire loops.
-            if ($methodCode !== $currentQuoteMethod) {
-                try {
-                    $this->applyShippingMethodToQuote($methodCode);
-                } catch (\Exception $e) {
-                    $this->logger->error(
-                        'Kkkonrad Fastcheckout syncAddressFields shipping method Error: ' . $e->getMessage(),
-                        ['exception' => $e]
-                    );
-                }
-            }
-        }
+        // Shipping method is intentionally NOT applied from address-field batches.
+        // Stale DOM radios (or concurrent syncs) were overwriting selectShippingMethod()
+        // and resetting payment filters. Use selectShippingMethod() only.
 
         // Note: do not call skipRender() here. In Magewire, skipRender still emits an
         // empty root tag which morphs away the live form and wipes typed values.

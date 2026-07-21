@@ -327,9 +327,11 @@ define([
             quoteMethod = (quote && typeof quote.paymentMethod === 'function' && quote.paymentMethod()) ? quote.paymentMethod().method : '';
 
             if (quoteMethod && !call('domHasPaymentMethod', quoteMethod)) {
-                selectPaymentMethodAction(null);
+                // Drop stale KO quote method (e.g. after shipping→payment remap).
+                // Must NOT call selectPaymentMethodAction(null): its bridge handler
+                // hides payment panels and causes open→close→open flicker.
+                call('setQuotePaymentMethodFromBridge', null);
                 call('persistPaymentMethodToCheckoutData', null);
-                call('hidePaymentPlaceholders');
             }
 
             if (currentMethodsJson === lastMethodsJson) {

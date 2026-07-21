@@ -56,10 +56,29 @@ define([], function () {
             return selected ? selected.value : '';
         }
 
-        function hidePlaceholders() {
+        function hidePlaceholders(exceptMethodCode) {
             document.querySelectorAll('.fastcheckout-payment-method-ko-container').forEach(function (placeholder) {
+                var targetMethod = placeholder.getAttribute('data-fastcheckout-payment-method-ko-target');
+
+                // Keep the active method container visible when re-applying the same selection
+                // (avoids open → close → open flicker after shipping changes).
+                if (
+                    exceptMethodCode &&
+                    targetMethod &&
+                    compareMethodCodes(targetMethod, exceptMethodCode)
+                ) {
+                    return;
+                }
+
                 placeholder.classList.add('hidden');
                 placeholder.style.display = 'none';
+            });
+        }
+
+        function clearActivePaymentClasses() {
+            document.querySelectorAll('.payment-method._active, [data-fastcheckout-active="true"]').forEach(function (element) {
+                element.classList.remove('_active');
+                element.removeAttribute('data-fastcheckout-active');
             });
         }
 
@@ -67,7 +86,8 @@ define([], function () {
             getMethods: getMethods,
             hasMethod: hasMethod,
             getCheckedMethod: getCheckedMethod,
-            hidePlaceholders: hidePlaceholders
+            hidePlaceholders: hidePlaceholders,
+            clearActivePaymentClasses: clearActivePaymentClasses
         };
     };
 });

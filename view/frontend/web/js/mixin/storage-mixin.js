@@ -425,10 +425,28 @@ define([
         var rates,
             found = null,
             parts,
-            carrier;
+            carrier,
+            shipping = window.fastcheckoutHyvaShipping,
+            userMethod;
 
         if (!quote || typeof quote.shippingMethod !== 'function' || !methodCode) {
             return;
+        }
+
+        // Prefer the shopper's fresh selection over a lagging state payload (prevents
+        // shipping radios from jumping back to the previous rate after a change).
+        if (
+            shipping &&
+            typeof shipping.shouldIgnoreKnockoutApply === 'function' &&
+            shipping.shouldIgnoreKnockoutApply(methodCode)
+        ) {
+            userMethod = typeof shipping.getUserSelectedShippingMethod === 'function'
+                ? shipping.getUserSelectedShippingMethod()
+                : '';
+            if (!userMethod || userMethod === methodCode) {
+                return;
+            }
+            methodCode = userMethod;
         }
 
         rates = shippingService && typeof shippingService.getShippingRates === 'function'
@@ -447,17 +465,27 @@ define([
         }
 
         if (found) {
-            quote.shippingMethod(found);
+            try {
+                window.fastcheckoutSuppressShippingSync = true;
+                quote.shippingMethod(found);
+            } finally {
+                window.fastcheckoutSuppressShippingSync = false;
+            }
             return;
         }
 
         parts = String(methodCode || '').split('_');
         carrier = parts.shift() || '';
         if (carrier) {
-            quote.shippingMethod({
-                carrier_code: carrier,
-                method_code: parts.length ? parts.join('_') : carrier
-            });
+            try {
+                window.fastcheckoutSuppressShippingSync = true;
+                quote.shippingMethod({
+                    carrier_code: carrier,
+                    method_code: parts.length ? parts.join('_') : carrier
+                });
+            } finally {
+                window.fastcheckoutSuppressShippingSync = false;
+            }
         }
     }
 
@@ -590,18 +618,35 @@ define([
     }
 
     function setWireValue(wire, key, value) {
-        var currentValue;
+        var currentValue,
+            nextValue;
 
         if (!wire || typeof wire.set !== 'function' || typeof value === 'undefined') {
-            return Promise.resolve();
+            return Promise.resolve(false);
         }
 
+        nextValue = value === null ? '' : value;
         currentValue = getWireValue(wire, key);
-        if (isEmptyObjectLike(currentValue) && isEmptyObjectLike(value)) {
-            return Promise.resolve();
+        if (isEmptyObjectLike(currentValue) && isEmptyObjectLike(nextValue)) {
+            return Promise.resolve(false);
+        }
+        if (
+            (typeof currentValue === 'object' || typeof nextValue === 'object') &&
+            JSON.stringify(currentValue || {}) === JSON.stringify(nextValue || {})
+        ) {
+            return Promise.resolve(false);
+        }
+        if (
+            typeof currentValue !== 'object' &&
+            typeof nextValue !== 'object' &&
+            String(currentValue || '') === String(nextValue || '')
+        ) {
+            return Promise.resolve(false);
         }
 
-        return Promise.resolve(wire.set(key, value === null ? '' : value));
+        return Promise.resolve(wire.set(key, nextValue)).then(function () {
+            return true;
+        });
     }
 
     function getWireValue(wire, key) {
@@ -866,41 +911,57 @@ define([
     }
 
     function syncPaymentToWire(wire, paymentMethod) {
+        var dataChanged = false;
+
         paymentMethod = normalizePaymentMethodPayload(paymentMethod);
 
         if (!paymentMethod || !paymentMethod.method) {
-            return Promise.resolve();
+            return Promise.resolve(false);
         }
 
         return setWireValue(wire, 'paymentMethod', paymentMethod.method)
-            .then(function () {
+            .then(function (changed) {
+                dataChanged = dataChanged || !!changed;
                 return setWireValue(
                     wire,
                     'paymentAdditionalData',
                     getPaymentObjectValue(paymentMethod, 'additional_data', 'additionalData')
                 );
             })
-            .then(function () {
+            .then(function (changed) {
+                dataChanged = dataChanged || !!changed;
                 return setWireValue(
                     wire,
                     'paymentExtensionAttributes',
                     getPaymentObjectValue(paymentMethod, 'extension_attributes', 'extensionAttributes')
                 );
             })
-            .then(function () {
+            .then(function (changed) {
                 var poNumber = paymentMethod.po_number ||
                     paymentMethod.poNumber ||
                     (paymentMethod.additional_data && (paymentMethod.additional_data.po_number || paymentMethod.additional_data.poNumber)) ||
                     (paymentMethod.additionalData && (paymentMethod.additionalData.po_number || paymentMethod.additionalData.poNumber));
 
-                return poNumber ? setWireValue(wire, 'poNumber', poNumber) : true;
+                dataChanged = dataChanged || !!changed;
+                return poNumber ? setWireValue(wire, 'poNumber', poNumber) : false;
             })
-            .then(function () {
-                if (typeof wire.call === 'function') {
-                    return wire.call('selectPaymentMethod', paymentMethod.method);
+            .then(function (changed) {
+                var currentMethod;
+
+                dataChanged = dataChanged || !!changed;
+                currentMethod = String(getWireValue(wire, 'paymentMethod') || '');
+                // Skip selectPaymentMethod when method + payload already match — prevents
+                // set-payment-information intercepts from looping Magewire after shipping change.
+                if (currentMethod === paymentMethod.method && !dataChanged) {
+                    return false;
+                }
+                if (typeof wire.call === 'function' && currentMethod !== paymentMethod.method) {
+                    return wire.call('selectPaymentMethod', paymentMethod.method).then(function () {
+                        return true;
+                    });
                 }
 
-                return true;
+                return dataChanged;
             });
     }
 

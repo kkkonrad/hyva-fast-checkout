@@ -438,8 +438,49 @@ define([
                     return paymentDomBridge.getCheckedMethod();
                 }
 
-                function hidePaymentPlaceholders() {
-                    paymentDomBridge.hidePlaceholders();
+                // After a successful panel open, briefly refuse blank hide-all calls.
+                // Delayed Magewire/KO callbacks were closing the just-opened method
+                // (checkmo → empty → checkmo thrash after shipping remap).
+                var paymentPanelHoldCode = '';
+                var paymentPanelHoldUntil = 0;
+
+                function holdPaymentPanel(methodCode, ms) {
+                    if (!methodCode) {
+                        paymentPanelHoldCode = '';
+                        paymentPanelHoldUntil = 0;
+                        return;
+                    }
+                    paymentPanelHoldCode = methodCode;
+                    paymentPanelHoldUntil = Date.now() + (typeof ms === 'number' ? ms : 2500);
+                }
+
+                function hidePaymentPlaceholders(exceptMethodCode) {
+                    var keep = exceptMethodCode || '';
+
+                    if (
+                        !keep &&
+                        paymentPanelHoldCode &&
+                        Date.now() < paymentPanelHoldUntil
+                    ) {
+                        keep = paymentPanelHoldCode;
+                    } else if (
+                        keep &&
+                        paymentPanelHoldCode &&
+                        Date.now() < paymentPanelHoldUntil &&
+                        !paymentMethodCodesEqual(keep, paymentPanelHoldCode)
+                    ) {
+                        // Intentional switch to another method — drop the hold.
+                        paymentPanelHoldCode = keep;
+                        paymentPanelHoldUntil = Date.now() + 2500;
+                    }
+
+                    paymentDomBridge.hidePlaceholders(keep);
+                }
+
+                function clearActivePaymentClasses() {
+                    if (typeof paymentDomBridge.clearActivePaymentClasses === 'function') {
+                        paymentDomBridge.clearActivePaymentClasses();
+                    }
                 }
 
                 function setQuoteGuestEmail(email) {
@@ -796,23 +837,51 @@ define([
                     if (typeof quote.paymentMethod === 'function') {
                         quote.paymentMethod.subscribe(function (method) {
                             var wire,
-                                methodCode;
+                                methodCode,
+                                userPayment;
 
                             if (isSyncingFromKo || paymentMethodSync.isApplyingFromBridge() || !method) {
                                 return;
                             }
 
+                            methodCode = method.method || '';
+                            userPayment = paymentMethodSync.getUserSelectedPaymentMethod
+                                ? paymentMethodSync.getUserSelectedPaymentMethod()
+                                : '';
+
+                            // Stale KO select of an older method while shopper already picked another.
+                            if (
+                                userPayment &&
+                                paymentMethodSync.isUserPaymentSelectionFresh &&
+                                paymentMethodSync.isUserPaymentSelectionFresh() &&
+                                methodCode &&
+                                !paymentMethodCodesEqual(methodCode, userPayment)
+                            ) {
+                                if (paymentMethodSync.reassertUserPaymentOnQuote) {
+                                    paymentMethodSync.reassertUserPaymentOnQuote();
+                                }
+                                return;
+                            }
+
+                            // KO re-notifies on every new object even when method string is unchanged.
+                            // Never $set Magewire for an already-synced payment — that alone can loop XHR.
+                            if (!methodCode || paymentMethodSync.isSynced(methodCode)) {
+                                return;
+                            }
+
                             wire = getMagewireComponent();
-                            methodCode = method.method;
-                            if (wire && methodCode && getProperty(wire, 'paymentMethod') !== methodCode) {
+                            if (wire && getProperty(wire, 'paymentMethod') !== methodCode) {
                                 isSyncingFromKo = true;
-                                Promise.resolve(wire.set('paymentMethod', methodCode))
+                                Promise.resolve(setMagewireValue(wire, 'paymentMethod', methodCode, false))
                                     .then(function () {
+                                        paymentMethodSync.markSynced(methodCode);
                                         isSyncingFromKo = false;
                                     })
                                     .catch(function () {
                                         isSyncingFromKo = false;
                                     });
+                            } else if (methodCode) {
+                                paymentMethodSync.markSynced(methodCode);
                             }
                         });
                     }
@@ -1161,6 +1230,12 @@ define([
                     shippingMethodSync.syncToMagewire(methodCode);
                 }
 
+                function rememberUserShippingSelection(methodCode) {
+                    if (shippingMethodSync && typeof shippingMethodSync.rememberUserShippingSelection === 'function') {
+                        shippingMethodSync.rememberUserShippingSelection(methodCode);
+                    }
+                }
+
                 function resolveShippingInformationAction(originalAction) {
                     var wire = getMagewireComponent(),
                         selectedMethod = quote && typeof quote.shippingMethod === 'function' ? quote.shippingMethod() : null,
@@ -1281,6 +1356,27 @@ define([
                     syncShippingMethod: syncSelectedShippingMethodToKnockout,
                     syncShippingMethodToMagewire: syncShippingMethodToMagewire,
                     syncShippingMethodToMagewireNow: syncShippingMethodToMagewireNow,
+                    rememberUserShippingSelection: rememberUserShippingSelection,
+                    getShippingMethodCode: getShippingMethodCode,
+                    getUserSelectedShippingMethod: function () {
+                        return shippingMethodSync && typeof shippingMethodSync.getUserSelectedShippingMethod === 'function'
+                            ? shippingMethodSync.getUserSelectedShippingMethod()
+                            : '';
+                    },
+                    isUserShippingSelectionFresh: function () {
+                        return !!(
+                            shippingMethodSync &&
+                            typeof shippingMethodSync.isUserShippingSelectionFresh === 'function' &&
+                            shippingMethodSync.isUserShippingSelectionFresh()
+                        );
+                    },
+                    shouldIgnoreKnockoutApply: function (methodCode) {
+                        return !!(
+                            shippingMethodSync &&
+                            typeof shippingMethodSync.shouldIgnoreKnockoutApply === 'function' &&
+                            shippingMethodSync.shouldIgnoreKnockoutApply(methodCode)
+                        );
+                    },
                     getShippingInformationComponent: function () {
                         return shippingCompatibilityBridge.getShippingInformationComponent();
                     },
@@ -1311,8 +1407,23 @@ define([
                         return writeKoAddressToMagewire(currentBillingAddress || billingAddress, true);
                     },
                     onSelectShippingMethodAction: function (shippingMethod) {
-                        syncShippingMethodToMagewire(getShippingMethodCode(shippingMethod));
-                        runStandardShippingViewSelectMethod(shippingMethod);
+                        var code = getShippingMethodCode(shippingMethod);
+
+                        // Do not treat Magento rate-resolver overwrites as a new user choice,
+                        // and never re-lock intent from non-user paths (that re-opened the loop).
+                        if (
+                            code &&
+                            shippingMethodSync &&
+                            typeof shippingMethodSync.shouldIgnoreKnockoutApply === 'function' &&
+                            shippingMethodSync.shouldIgnoreKnockoutApply(code)
+                        ) {
+                            return;
+                        }
+
+                        // Sync to Magewire only — user lock is set exclusively by trusted clicks.
+                        syncShippingMethodToMagewire(code);
+                        // Avoid standard shipping-view select side-effects (extra rate
+                        // recollect / setShippingInformation races that bounced the radio).
                     },
                     onSetShippingInformationAction: function (originalAction) {
                         return resolveShippingInformationAction(originalAction);
@@ -1426,26 +1537,90 @@ define([
                 }
 
                 quote.shippingMethod.subscribe(function (method) {
+                    var code,
+                        userMethod;
+
                     clearShippingFieldError();
+                    if (window.fastcheckoutSuppressShippingSync) {
+                        return;
+                    }
                     if (!method) {
                         persistShippingMethodToCheckoutData(null);
+                        return;
+                    }
+
+                    code = method.carrier_code + '_' + method.method_code;
+
+                    // Magento rate recollect / checkoutData often re-selects the previous
+                    // rate after the user picked another. Snap KO back to the user choice
+                    // instead of letting the radio bounce and pushing the stale rate to Magewire.
+                    if (
+                        shippingMethodSync &&
+                        typeof shippingMethodSync.shouldIgnoreKnockoutApply === 'function' &&
+                        shippingMethodSync.shouldIgnoreKnockoutApply(code)
+                    ) {
+                        userMethod = typeof shippingMethodSync.getUserSelectedShippingMethod === 'function'
+                            ? shippingMethodSync.getUserSelectedShippingMethod()
+                            : '';
+                        if (userMethod && userMethod !== code) {
+                            syncSelectedShippingMethodToKnockout(userMethod);
+                        }
                         return;
                     }
 
                     if (checkoutTotals && checkoutTotals.isLoading && typeof checkoutTotals.isLoading === 'function') {
                         checkoutTotals.isLoading(true);
                     }
-                    syncShippingMethodToMagewire(method.carrier_code + '_' + method.method_code);
+                    syncShippingMethodToMagewire(code);
                 });
 
                 shippingService.getShippingRates().subscribe(function () {
-                    var magewireEl = document.querySelector('[wire\\:id]');
-                    if (magewireEl && magewireEl.__livewire) {
-                        var wire = magewireEl.__livewire;
-                        if (wire.shippingMethod) {
-                            syncSelectedShippingMethodToKnockout(wire.shippingMethod);
+                    var magewireEl = document.querySelector('[wire\\:id]'),
+                        wire,
+                        wireMethod,
+                        userMethod,
+                        preferred = '';
+
+                    if (!magewireEl || !magewireEl.__livewire) {
+                        return;
+                    }
+
+                    wire = magewireEl.__livewire;
+                    wireMethod = wire.shippingMethod || getProperty(wire, 'shippingMethod');
+                    // Prefer the user's fresh choice over a lagging wire value while rates rebind.
+                    if (
+                        shippingMethodSync &&
+                        typeof shippingMethodSync.getUserSelectedShippingMethod === 'function' &&
+                        typeof shippingMethodSync.isUserShippingSelectionFresh === 'function' &&
+                        shippingMethodSync.isUserShippingSelectionFresh()
+                    ) {
+                        userMethod = shippingMethodSync.getUserSelectedShippingMethod();
+                        if (userMethod) {
+                            preferred = userMethod;
                         }
                     }
+
+                    if (!preferred && wireMethod) {
+                        preferred = wireMethod;
+                    }
+
+                    if (!preferred) {
+                        return;
+                    }
+
+                    syncSelectedShippingMethodToKnockout(preferred);
+
+                    // Force the radio checked state immediately after rates re-render so the
+                    // previous rate does not flash between KO foreach cycles.
+                    window.requestAnimationFrame(function () {
+                        var radio = document.querySelector(
+                            'input[name="shipping_method"][value="' + preferred + '"]'
+                        );
+                        if (radio && !radio.checked) {
+                            radio.checked = true;
+                        }
+                        syncSelectedShippingMethodToKnockout(preferred);
+                    });
                 });
 
                 function getSelectedMethodCode() {
@@ -1758,79 +1933,173 @@ define([
                     return false;
                 }
 
-                function updateActiveRendererClass(methodCode, activeCode) {
-                    
-                    var root = document.getElementById('fastcheckout-ko-payment-root'),
-                        activeElement = null,
-                        movedToTarget = false;
+                function isPaymentPanelOpen(methodCode, activeCode) {
+                    var target,
+                        existingInTarget;
 
-                    // Always hide all target placeholders first
-                    hidePaymentPlaceholders();
-
-                    if (!root) {
-                        
+                    if (!methodCode) {
                         return false;
                     }
 
-                    var allRenderers = document.querySelectorAll('.payment-method');
-                    
+                    target = document.querySelector(
+                        '[data-fastcheckout-payment-method-ko-target="' + methodCode + '"]'
+                    );
+                    if (!target || target.classList.contains('hidden') || target.style.display === 'none') {
+                        return false;
+                    }
 
-                    allRenderers.forEach(function (element) {
-                        element.classList.remove('_active');
-                        element.removeAttribute('data-fastcheckout-active');
-                    });
+                    existingInTarget = target.querySelector('.payment-method');
+                    if (!existingInTarget) {
+                        // Some offline methods only inject light content / notes without .payment-method.
+                        return target.children.length > 0 && hasVisibleContent(target);
+                    }
 
+                    return elementMatchesMethod(existingInTarget, methodCode, activeCode || methodCode) &&
+                        (
+                            existingInTarget.classList.contains('_active') ||
+                            existingInTarget.getAttribute('data-fastcheckout-active') === 'true' ||
+                            hasVisibleContent(existingInTarget)
+                        );
+                }
+
+                function updateActiveRendererClass(methodCode, activeCode) {
+                    var root = document.getElementById('fastcheckout-ko-payment-root'),
+                        activeElement = null,
+                        movedToTarget = false,
+                        opened = false,
+                        target = methodCode
+                            ? document.querySelector('[data-fastcheckout-payment-method-ko-target="' + methodCode + '"]')
+                            : null,
+                        existingInTarget,
+                        allRenderers;
+
+                    // Already open for this method — skip hide/show cycle.
+                    if (isPaymentPanelOpen(methodCode, activeCode)) {
+                        existingInTarget = target ? target.querySelector('.payment-method') : null;
+                        if (existingInTarget) {
+                            annotateNativePaymentActions(existingInTarget);
+                        }
+                        holdPaymentPanel(methodCode);
+                        hidePaymentPlaceholders(methodCode);
+                        return true;
+                    }
+
+                    if (!root && !target) {
+                        return false;
+                    }
+
+                    allRenderers = document.querySelectorAll('.payment-method');
                     allRenderers.forEach(function (element) {
                         if (!activeElement && elementMatchesMethod(element, methodCode, activeCode)) {
                             activeElement = element;
                         }
                     });
 
-                    if (activeElement) {
-                        if (!hasVisibleContent(activeElement)) {
-                            return false;
-                        }
-
-                        activeElement.classList.add('_active');
-                        activeElement.setAttribute('data-fastcheckout-active', 'true');
-                        annotateNativePaymentActions(activeElement);
-
-                        var target = document.querySelector('[data-fastcheckout-payment-method-ko-target="' + methodCode + '"]');
-                        if (target) {
-                            if (activeElement.parentNode !== target) {
-                                target.appendChild(activeElement);
-                            }
-
-                            target.classList.remove('hidden');
-                            target.style.display = 'block';
-                            movedToTarget = true;
-                        }
-                    } else {
-                        
+                    // Critical: do not hide the previous panel until the next one is ready.
+                    // Hiding first caused open → empty → open flicker when the renderer was still booting.
+                    if (!activeElement || !hasVisibleContent(activeElement)) {
+                        return false;
                     }
 
-                    return movedToTarget;
+                    activeElement.classList.add('_active');
+                    activeElement.setAttribute('data-fastcheckout-active', 'true');
+                    annotateNativePaymentActions(activeElement);
+
+                    if (target) {
+                        if (activeElement.parentNode !== target) {
+                            target.appendChild(activeElement);
+                        }
+
+                        // Show the destination first, then hide every other panel.
+                        target.classList.remove('hidden');
+                        target.style.display = 'block';
+                        movedToTarget = true;
+                        opened = true;
+                        holdPaymentPanel(methodCode);
+                    } else {
+                        opened = true;
+                        holdPaymentPanel(methodCode);
+                    }
+
+                    hidePaymentPlaceholders(methodCode);
+
+                    allRenderers.forEach(function (element) {
+                        if (!elementMatchesMethod(element, methodCode, activeCode)) {
+                            element.classList.remove('_active');
+                            element.removeAttribute('data-fastcheckout-active');
+                        }
+                    });
+
+                    return opened || movedToTarget;
                 }
 
-                function applySelectedMethod(methodCode) {
-                    
+                function isPaymentSelectionStillWanted(methodCode, generation) {
+                    if (!methodCode) {
+                        return false;
+                    }
+                    if (
+                        paymentMethodSync.shouldAcceptPaymentSelection &&
+                        !paymentMethodSync.shouldAcceptPaymentSelection(methodCode, generation)
+                    ) {
+                        return false;
+                    }
+                    if (
+                        pendingSelectedMethodCode &&
+                        !paymentMethodCodesEqual(pendingSelectedMethodCode, methodCode)
+                    ) {
+                        return false;
+                    }
+                    return true;
+                }
+
+                function applySelectedMethod(methodCode, generation) {
                     var method,
                         renderer,
                         component,
                         activeCode,
-                        activeMethod;
+                        activeMethod,
+                        selectionGeneration = typeof generation === 'number'
+                            ? generation
+                            : (paymentMethodSync.getPaymentSelectionGeneration
+                                ? paymentMethodSync.getPaymentSelectionGeneration()
+                                : 0);
 
                     if (!methodCode) {
+                        return false;
+                    }
+
+                    // Stale call for a previous method while a newer shopper pick is active.
+                    if (!isPaymentSelectionStillWanted(methodCode, selectionGeneration)) {
                         return false;
                     }
 
                     component = getRendererComponentForMethod(methodCode);
                     if (component && !rendererManager.isLoaded(component)) {
                         loadRendererForMethod(methodCode).done(function () {
-                            if (getSelectedMethodCode() === methodCode || pendingSelectedMethodCode === methodCode) {
+                            // Only continue if this method is still the intended selection.
+                            if (!isPaymentSelectionStillWanted(methodCode, selectionGeneration)) {
+                                return;
+                            }
+                            if (
+                                pendingSelectedMethodCode === methodCode ||
+                                paymentMethodCodesEqual(
+                                    paymentMethodSync.getUserSelectedPaymentMethod
+                                        ? paymentMethodSync.getUserSelectedPaymentMethod()
+                                        : '',
+                                    methodCode
+                                ) ||
+                                getSelectedMethodCode() === methodCode
+                            ) {
+                                if (pendingSelectedMethodCode !== methodCode) {
+                                    pendingSelectedMethodCode = methodCode;
+                                }
                                 retryPendingSelectedMethod();
                             }
                         });
+                    }
+
+                    if (!isPaymentSelectionStillWanted(methodCode, selectionGeneration)) {
+                        return false;
                     }
 
                     method = getMethod(methodCode) || { method: methodCode };
@@ -1846,6 +2115,11 @@ define([
                         selectPaymentMethodAction(activeMethod);
                         persistPaymentMethodToCheckoutData(activeCode);
                     }
+
+                    if (!isPaymentSelectionStillWanted(methodCode, selectionGeneration)) {
+                        return false;
+                    }
+
                     return updateActiveRendererClass(methodCode, activeCode);
                 }
 
@@ -1863,13 +2137,21 @@ define([
                 }
 
                 function retryPendingSelectedMethod() {
-                    if (!pendingSelectedMethodCode || !domHasPaymentMethod(pendingSelectedMethodCode)) {
+                    var code = pendingSelectedMethodCode;
+
+                    if (!code || !domHasPaymentMethod(code)) {
+                        return;
+                    }
+                    if (!isPaymentSelectionStillWanted(code)) {
+                        pendingSelectedMethodCode = '';
                         return;
                     }
 
                     runPatchRenderers();
-                    if (applySelectedMethod(pendingSelectedMethodCode)) {
-                        pendingSelectedMethodCode = '';
+                    if (applySelectedMethod(code)) {
+                        if (pendingSelectedMethodCode === code) {
+                            pendingSelectedMethodCode = '';
+                        }
                     }
                 }
 
@@ -1895,9 +2177,42 @@ define([
                     });
                 }
 
+                function schedulePaymentPanelOpenRetries(methodCode) {
+                    var generation = paymentMethodSync.getPaymentSelectionGeneration
+                        ? paymentMethodSync.getPaymentSelectionGeneration()
+                        : 0;
+
+                    pendingSelectedMethodCode = methodCode;
+                    [80, 250, 700, 1500, 2500].forEach(function (delay) {
+                        window.setTimeout(function () {
+                            if (pendingSelectedMethodCode !== methodCode) {
+                                return;
+                            }
+                            if (!isPaymentSelectionStillWanted(methodCode, generation)) {
+                                if (pendingSelectedMethodCode === methodCode) {
+                                    pendingSelectedMethodCode = '';
+                                }
+                                return;
+                            }
+                            if (isPaymentPanelOpen(methodCode, methodCode)) {
+                                pendingSelectedMethodCode = '';
+                                return;
+                            }
+                            retryPendingSelectedMethod();
+                        }, delay);
+                    });
+                }
+
                 function setSelectedMethod(methodCode) {
-                    if (methodCode && methodCode === lastSetSelectedMethodCode && Date.now() - lastSetSelectedMethodAt < 250) {
-                        return;
+                    // Same method within a short window: avoid re-running full select if panel is open.
+                    // If the panel is closed (common after shipping remap), fall through and open it.
+                    if (methodCode && methodCode === lastSetSelectedMethodCode && Date.now() - lastSetSelectedMethodAt < 1500) {
+                        runPatchRenderers();
+                        if (isPaymentPanelOpen(methodCode, methodCode) || updateActiveRendererClass(methodCode, methodCode)) {
+                            pendingSelectedMethodCode = '';
+                            return;
+                        }
+                        // Panel still closed — continue into apply path below.
                     }
                     lastSetSelectedMethodCode = methodCode || '';
                     lastSetSelectedMethodAt = Date.now();
@@ -1910,14 +2225,36 @@ define([
 
                     if (!methodCode) {
                         pendingSelectedMethodCode = '';
+                        // Ignore blank clears while a just-opened panel is settling.
+                        if (paymentPanelHoldCode && Date.now() < paymentPanelHoldUntil) {
+                            return;
+                        }
+                        holdPaymentPanel('');
                         persistPaymentMethodToCheckoutData(null);
                         hidePaymentPlaceholders();
+                        clearActivePaymentClasses();
                         return;
                     }
 
+                    // Already mirrored in quote + Magewire: refresh panel only when content is open.
+                    // After shipping→payment remap markSynced runs before the KO panel is shown;
+                    // early-return without apply left the radio checked and content closed.
                     if (paymentMethodSync.isSynced(methodCode)) {
                         runPatchRenderers();
-                        if (updateActiveRendererClass(methodCode, methodCode)) {
+                        if (isPaymentPanelOpen(methodCode, methodCode) || updateActiveRendererClass(methodCode, methodCode)) {
+                            pendingSelectedMethodCode = '';
+                            return;
+                        }
+                    } else if (
+                        paymentMethodSync.getQuoteCode() === methodCode &&
+                        document.querySelector(
+                            'input[name="payment_method"]:checked:not([disabled])[value="' +
+                            methodCode.replace(/"/g, '') + '"]'
+                        )
+                    ) {
+                        paymentMethodSync.markSynced(methodCode);
+                        runPatchRenderers();
+                        if (isPaymentPanelOpen(methodCode, methodCode) || updateActiveRendererClass(methodCode, methodCode)) {
                             pendingSelectedMethodCode = '';
                             return;
                         }
@@ -1925,24 +2262,30 @@ define([
 
                     if (!domHasPaymentMethod(methodCode)) {
                         pendingSelectedMethodCode = '';
+                        if (
+                            paymentPanelHoldCode &&
+                            Date.now() < paymentPanelHoldUntil &&
+                            paymentMethodCodesEqual(paymentPanelHoldCode, methodCode)
+                        ) {
+                            return;
+                        }
+                        if (paymentPanelHoldCode && Date.now() < paymentPanelHoldUntil) {
+                            return;
+                        }
                         persistPaymentMethodToCheckoutData(null);
                         hidePaymentPlaceholders();
-                        
+                        clearActivePaymentClasses();
                         return;
                     }
 
                     pendingSelectedMethodCode = methodCode;
                     if (applySelectedMethod(methodCode)) {
                         pendingSelectedMethodCode = '';
+                        return;
                     }
 
-                    [50, 150, 350, 750, 1500, 2500].forEach(function (delay) {
-                        window.setTimeout(function () {
-                            if (pendingSelectedMethodCode === methodCode) {
-                                retryPendingSelectedMethod();
-                            }
-                        }, delay);
-                    });
+                    // Renderer still booting after shipping change — keep trying to open content.
+                    schedulePaymentPanelOpenRetries(methodCode);
 
                     // Signal the page overlay that KO renderers are fully initialized
                     window.setTimeout(dispatchReadyEvent, 850);
@@ -2404,6 +2747,25 @@ define([
                 window.fastcheckoutHyvaPayment = $.extend(window.fastcheckoutHyvaPayment || {}, {
                         registerDataAssigner: registerPaymentDataAssigner,
                         registerValidator: registerPaymentValidator,
+                        clearUserPaymentSelection: function () {
+                            if (paymentMethodSync.clearUserPaymentSelection) {
+                                paymentMethodSync.clearUserPaymentSelection();
+                            }
+                        },
+                        rememberUserPaymentSelection: function (methodCode) {
+                            if (paymentMethodSync.rememberUserPaymentSelection) {
+                                paymentMethodSync.rememberUserPaymentSelection(methodCode);
+                            }
+                        },
+                        shouldAcceptPaymentSelection: function (paymentMethod, generation) {
+                            if (paymentMethodSync.shouldAcceptPaymentSelection) {
+                                return paymentMethodSync.shouldAcceptPaymentSelection(
+                                    paymentMethod,
+                                    generation
+                                );
+                            }
+                            return true;
+                        },
 
 	                    getActivePaymentData: function () {
 	                        var component = getActiveRenderer();
@@ -2501,27 +2863,41 @@ define([
 	                        var additionalData = this.getPaymentAdditionalData(paymentData),
                                 extensionAttributes = this.getPaymentExtensionAttributes(paymentData),
 	                            methodCode = paymentData && paymentData.method ? paymentData.method : getSelectedMethodCode(),
-	                            poNumber = methodCode === 'purchaseorder' ? this.getPurchaseOrderNumber(paymentData) : '';
+	                            poNumber = methodCode === 'purchaseorder' ? this.getPurchaseOrderNumber(paymentData) : '',
+                                changed = false,
+                                write;
 
-	                        return Promise.resolve(wire.set('paymentAdditionalData', additionalData, true))
+                            // Equality-aware writes: raw wire.set always dirties Livewire and
+                            // was the main driver of idle $set → selectPaymentMethod loops.
+                            write = function (field, value) {
+                                var result = setMagewireValue(wire, field, value, true);
+
+                                if (result) {
+                                    changed = true;
+                                }
+
+                                return Promise.resolve(result);
+                            };
+
+	                        return write('paymentAdditionalData', additionalData)
                                 .then(function () {
-                                    if (typeof wire.set === 'function') {
-                                        return wire.set('paymentExtensionAttributes', extensionAttributes, true);
-                                    }
-                                    return true;
+                                    return write('paymentExtensionAttributes', extensionAttributes);
                                 })
 		                            .then(function () {
-		                                if (methodCode === 'purchaseorder' && typeof wire.set === 'function') {
-		                                    return wire.set('poNumber', poNumber, true);
+		                                if (methodCode === 'purchaseorder') {
+		                                    return write('poNumber', poNumber);
 		                                }
 		                                return true;
 		                            })
                                 .then(function () {
-                                    if (hookData) {
-                                        return syncPlaceOrderHookData(wire, hookData, true);
+                                    if (!hookData) {
+                                        return false;
                                     }
 
-                                    return true;
+                                    return syncPlaceOrderHookData(wire, hookData, true);
+                                })
+                                .then(function (hookChanged) {
+                                    return changed || !!hookChanged;
 	                            });
 	                    },
 
@@ -2603,12 +2979,48 @@ define([
 
                         onSelectPaymentMethodAction: function (paymentMethod) {
                             var methodCode = getPaymentMethodCode(paymentMethod),
-                                input;
+                                input,
+                                userPayment = paymentMethodSync.getUserSelectedPaymentMethod
+                                    ? paymentMethodSync.getUserSelectedPaymentMethod()
+                                    : '',
+                                userPaymentFresh = paymentMethodSync.isUserPaymentSelectionFresh &&
+                                    paymentMethodSync.isUserPaymentSelectionFresh();
 
                             if (!methodCode) {
                                 persistPaymentMethodToCheckoutData(null);
                                 syncPaymentMethodToMagewire(null);
                                 hidePaymentPlaceholders();
+                                return;
+                            }
+
+                            // Stale KO re-select of a previous method while shopper just picked another.
+                            if (
+                                userPaymentFresh &&
+                                userPayment &&
+                                !paymentMethodCodesEqual(methodCode, userPayment)
+                            ) {
+                                return;
+                            }
+
+                            // Re-selection of the already-synced method is a no-op for Magewire.
+                            // Magento/KO often re-fire select with a new object reference after
+                            // every totals/shipping morph; without this guard we spam XHR.
+                            if (paymentMethodSync.isSynced(methodCode)) {
+                                document.querySelectorAll('input[name="payment_method"]').forEach(function (element) {
+                                    if (
+                                        !input &&
+                                        (
+                                            paymentMethodCodesEqual(element.value, methodCode) ||
+                                            paymentMethodCodesEqual(methodCode, element.value)
+                                        )
+                                    ) {
+                                        input = element;
+                                    }
+                                });
+                                if (input && !input.checked) {
+                                    input.checked = true;
+                                }
+                                updateActiveRendererClass(methodCode, methodCode);
                                 return;
                             }
 
@@ -2684,7 +3096,9 @@ define([
                         onSetPaymentInformationAction: function (messageContainer, paymentData, skipBilling, originalAction) {
                             var wire = getMagewireComponent(),
                                 self = this,
-                                methodCode = paymentData && paymentData.method ? paymentData.method : getSelectedMethodCode();
+                                methodCode = paymentData && paymentData.method ? paymentData.method : getSelectedMethodCode(),
+                                dataChanged = false,
+                                methodChanged = false;
 
                             messageContainer = subscribePaymentMessageContainer(messageContainer) || getBridgeMessageContainer();
 
@@ -2707,15 +3121,33 @@ define([
                                                 syncCheckoutStateWithoutServer(wire);
                                                 return self.syncWirePaymentData(wire, paymentData || self.getActivePaymentData());
                                             })
-                                            .then(function () {
+                                            .then(function (changed) {
                                                 var currentMagewireMethod = getProperty(wire, 'paymentMethod');
-                                                if (methodCode && methodCode !== currentMagewireMethod && !paymentMethodSync.isSynced(methodCode) && typeof wire.call === 'function') {
+
+                                                dataChanged = !!changed;
+                                                if (
+                                                    methodCode &&
+                                                    methodCode !== currentMagewireMethod &&
+                                                    !paymentMethodSync.isSynced(methodCode) &&
+                                                    typeof wire.call === 'function'
+                                                ) {
+                                                    methodChanged = true;
                                                     paymentMethodSync.markSynced(methodCode);
                                                     return wire.call('selectPaymentMethod', methodCode);
+                                                }
+                                                if (methodCode) {
+                                                    paymentMethodSync.markSynced(methodCode);
                                                 }
                                                 return true;
                                             })
                                             .then(function () {
+                                                // Already on this payment with unchanged payload — skip idle refresh loop.
+                                                if (!methodChanged && !dataChanged && paymentMethodSync.isSynced(methodCode || '')) {
+                                                    if (checkoutTotals && checkoutTotals.isLoading && typeof checkoutTotals.isLoading === 'function') {
+                                                        checkoutTotals.isLoading(false);
+                                                    }
+                                                    return true;
+                                                }
                                                 return refreshCheckoutStateFromMagewire();
                                             })
                                             .then(function () {
@@ -3186,9 +3618,35 @@ define([
                 observePaymentRendererRoot();
                 setSelectedMethod(getSelectedMethodCode());
 
+                function rememberAndSelectPayment(methodCode) {
+                    var generation;
+
+                    if (!methodCode) {
+                        return;
+                    }
+                    // Invalidate in-flight open retries for the previous method immediately.
+                    pendingSelectedMethodCode = methodCode;
+                    if (paymentMethodSync.rememberUserPaymentSelection) {
+                        generation = paymentMethodSync.rememberUserPaymentSelection(methodCode);
+                    }
+                    // Drop hold on the previously loading method so its panel can close.
+                    if (
+                        paymentPanelHoldCode &&
+                        !paymentMethodCodesEqual(paymentPanelHoldCode, methodCode)
+                    ) {
+                        holdPaymentPanel(methodCode, 2500);
+                    }
+                    // Reset debounce so a different method always applies even within 1.5s.
+                    if (methodCode !== lastSetSelectedMethodCode) {
+                        lastSetSelectedMethodAt = 0;
+                    }
+                    setSelectedMethod(methodCode);
+                    return generation;
+                }
+
                 document.addEventListener('change', function (event) {
                     if (event.target && event.target.name === 'payment_method') {
-                        setSelectedMethod(event.target.value);
+                        rememberAndSelectPayment(event.target.value);
                     }
                 });
 
@@ -3202,8 +3660,11 @@ define([
                         input;
 
                     if (event.target && event.target.name === 'payment_method') {
+                        if (paymentMethodSync.rememberUserPaymentSelection) {
+                            paymentMethodSync.rememberUserPaymentSelection(event.target.value);
+                        }
                         window.setTimeout(function () {
-                            setSelectedMethod(event.target.value);
+                            rememberAndSelectPayment(event.target.value);
                         }, 0);
                         return;
                     }
@@ -3212,66 +3673,378 @@ define([
                         input = option.querySelector('input[name="payment_method"]');
                         if (input && !input.disabled) {
                             input.checked = true;
+                            if (paymentMethodSync.rememberUserPaymentSelection) {
+                                paymentMethodSync.rememberUserPaymentSelection(input.value);
+                            }
                             window.setTimeout(function () {
-                                setSelectedMethod(input.value);
+                                rememberAndSelectPayment(input.value);
                             }, 0);
                         }
                     }
                 }, true);
 
-                function moveRenderersBackToRoot() {
-                    var root = document.getElementById('fastcheckout-ko-payment-root');
-                    
-                    hidePaymentPlaceholders();
-                    if (root) {
-                        var count = 0;
-                        document.querySelectorAll('.payment-method').forEach(function (element) {
-                            if (element.parentNode !== root) {
-                                root.appendChild(element);
-                                count++;
+                /**
+                 * Snapshot of method codes only (not allowed/selected flags).
+                 * Same codes ⇒ card structure is stable and can be patched in place.
+                 */
+                function getPaymentOptionCodesSignature(rootEl) {
+                    return Array.from(rootEl.querySelectorAll('[data-fastcheckout-payment-option]')).map(function (el) {
+                        return el.getAttribute('data-fastcheckout-payment-option') || '';
+                    }).filter(Boolean).sort().join(',');
+                }
+
+                /**
+                 * Copy allowed/selected flags from Livewire's incoming HTML onto the live card
+                 * without morphing wire:ignore KO containers.
+                 *
+                 * Option show/hide is deferred to applyPaymentOptionVisibility() so the previously
+                 * open KO panel is not collapsed before setSelectedMethod opens the next one.
+                 */
+                function applyPaymentCardStateInPlace(fromEl, toEl) {
+                    var userPayment = paymentMethodSync.getUserSelectedPaymentMethod
+                            ? paymentMethodSync.getUserSelectedPaymentMethod()
+                            : '',
+                        userPaymentFresh = paymentMethodSync.isUserPaymentSelectionFresh &&
+                            paymentMethodSync.isUserPaymentSelectionFresh(),
+                        liveChecked = fromEl.querySelector(
+                            'input[name="payment_method"]:checked:not([disabled])'
+                        ),
+                        liveCheckedCode = liveChecked ? liveChecked.value : '',
+                        preferredCode = '';
+
+                    // Prefer shopper pick, then currently checked live radio, then server HTML.
+                    if (userPaymentFresh && userPayment) {
+                        preferredCode = userPayment;
+                    } else if (liveCheckedCode) {
+                        preferredCode = liveCheckedCode;
+                    }
+
+                    Array.from(toEl.querySelectorAll('[data-fastcheckout-payment-option]')).forEach(function (toOption) {
+                        var methodCode = toOption.getAttribute('data-fastcheckout-payment-option'),
+                            fromOption,
+                            toInput,
+                            fromInput,
+                            allowed,
+                            selected;
+
+                        if (!methodCode) {
+                            return;
+                        }
+
+                        fromOption = fromEl.querySelector(
+                            '[data-fastcheckout-payment-option="' + methodCode + '"]'
+                        );
+                        if (!fromOption) {
+                            return;
+                        }
+
+                        allowed = toOption.getAttribute('data-fastcheckout-payment-allowed') === '1';
+                        toInput = toOption.querySelector('input[name="payment_method"]');
+                        fromInput = fromOption.querySelector('input[name="payment_method"]');
+
+                        if (preferredCode) {
+                            selected = allowed && paymentMethodCodesEqual(methodCode, preferredCode);
+                        } else {
+                            selected = !!(toInput && toInput.checked && allowed);
+                        }
+
+                        // If preferred became disallowed, fall back to server-selected allowed method.
+                        if (preferredCode && paymentMethodCodesEqual(methodCode, preferredCode) && !allowed) {
+                            selected = false;
+                        }
+
+                        fromOption.setAttribute('data-fastcheckout-payment-allowed', allowed ? '1' : '0');
+
+                        if (fromInput) {
+                            fromInput.disabled = !allowed;
+                            fromInput.checked = selected;
+                        }
+                    });
+
+                    // If preferred was disallowed, apply server checked state for remaining options.
+                    if (
+                        preferredCode &&
+                        !fromEl.querySelector(
+                            'input[name="payment_method"]:checked:not([disabled])'
+                        )
+                    ) {
+                        Array.from(toEl.querySelectorAll('[data-fastcheckout-payment-option]')).forEach(function (toOption) {
+                            var methodCode = toOption.getAttribute('data-fastcheckout-payment-option'),
+                                fromOption,
+                                toInput,
+                                fromInput,
+                                allowed;
+
+                            if (!methodCode) {
+                                return;
+                            }
+                            fromOption = fromEl.querySelector(
+                                '[data-fastcheckout-payment-option="' + methodCode + '"]'
+                            );
+                            toInput = toOption.querySelector('input[name="payment_method"]');
+                            fromInput = fromOption
+                                ? fromOption.querySelector('input[name="payment_method"]')
+                                : null;
+                            allowed = toOption.getAttribute('data-fastcheckout-payment-allowed') === '1';
+                            if (fromInput && allowed && toInput && toInput.checked) {
+                                fromInput.checked = true;
                             }
                         });
-
                     }
+                }
+
+                /**
+                 * Apply option row visibility from data-fastcheckout-payment-allowed after the
+                 * active KO panel has been switched (avoids empty gap during shipping remap).
+                 */
+                function applyPaymentOptionVisibility(rootEl) {
+                    var root = rootEl || document.querySelector('[wire\\:key="checkout-payment-methods-card"]'),
+                        hasAvailable = false,
+                        emptyMessage,
+                        grid;
+
+                    if (!root) {
+                        return false;
+                    }
+
+                    emptyMessage = root.querySelector('[data-fastcheckout-no-payment-methods]');
+                    grid = root.querySelector('[wire\\:key="checkout-payment-methods-grid"]') ||
+                        root.querySelector('.grid');
+
+                    Array.from(root.querySelectorAll('[data-fastcheckout-payment-option]')).forEach(function (option) {
+                        var allowed = option.getAttribute('data-fastcheckout-payment-allowed') === '1';
+
+                        if (allowed) {
+                            option.style.display = '';
+                            option.removeAttribute('aria-hidden');
+                            hasAvailable = true;
+                        } else {
+                            option.style.display = 'none';
+                            option.setAttribute('aria-hidden', 'true');
+                        }
+                    });
+
+                    if (grid) {
+                        if (hasAvailable) {
+                            grid.classList.remove('hidden');
+                        } else {
+                            grid.classList.add('hidden');
+                        }
+                    }
+
+                    if (emptyMessage) {
+                        if (hasAvailable) {
+                            emptyMessage.classList.add('hidden');
+                            emptyMessage.style.display = 'none';
+                            emptyMessage.setAttribute('aria-hidden', 'true');
+                        } else {
+                            emptyMessage.classList.remove('hidden');
+                            emptyMessage.style.display = '';
+                            emptyMessage.removeAttribute('aria-hidden');
+                        }
+                    }
+
+                    return hasAvailable;
+                }
+
+                /**
+                 * Park non-active KO renderers in the off-DOM root before a structural morph.
+                 * Keep the selected method's panel mounted to avoid content flicker.
+                 */
+                function moveRenderersBackToRoot(keepMethodCode) {
+                    var root = document.getElementById('fastcheckout-ko-payment-root');
+
+                    hidePaymentPlaceholders(keepMethodCode);
+                    if (!root) {
+                        return;
+                    }
+
+                    document.querySelectorAll('.payment-method').forEach(function (element) {
+                        var host = element.closest('[data-fastcheckout-payment-method-ko-target]'),
+                            hostMethod = host ? host.getAttribute('data-fastcheckout-payment-method-ko-target') : '';
+
+                        if (
+                            keepMethodCode &&
+                            hostMethod &&
+                            paymentMethodCodesEqual(hostMethod, keepMethodCode)
+                        ) {
+                            return;
+                        }
+
+                        if (element.parentNode !== root) {
+                            root.appendChild(element);
+                        }
+                    });
                 }
 
                 if (window.Livewire && typeof window.Livewire.hook === 'function') {
                     window.Livewire.hook('element.updating', function (fromEl, toEl) {
-                        if (fromEl.getAttribute('wire:key') === 'checkout-payment-methods-card') {
-                            var fromCodes = Array.from(fromEl.querySelectorAll('[data-fastcheckout-payment-option]')).map(function (el) {
-                                return el.getAttribute('data-fastcheckout-payment-option') + ':' +
-                                    el.getAttribute('data-fastcheckout-payment-allowed');
-                            }).sort().join(',');
-
-                            var toCodes = Array.from(toEl.querySelectorAll('[data-fastcheckout-payment-option]')).map(function (el) {
-                                return el.getAttribute('data-fastcheckout-payment-option') + ':' +
-                                    el.getAttribute('data-fastcheckout-payment-allowed');
-                            }).sort().join(',');
-
-                            if (fromCodes === toCodes) {
-                                
-                                return false;
-                            }
-
-                            
-                            moveRenderersBackToRoot();
+                        if (fromEl.getAttribute('wire:key') !== 'checkout-payment-methods-card') {
+                            return;
                         }
+
+                        var fromMethodCodes = getPaymentOptionCodesSignature(fromEl),
+                            toMethodCodes = getPaymentOptionCodesSignature(toEl),
+                            keepCode = '',
+                            toChecked,
+                            fromChecked;
+
+                        // Same payment options in the form — only allowed/selected flags changed.
+                        // Patch attributes in place and skip morph so KO content stays open.
+                        if (fromMethodCodes && fromMethodCodes === toMethodCodes) {
+                            applyPaymentCardStateInPlace(fromEl, toEl);
+                            return false;
+                        }
+
+                        toChecked = toEl.querySelector(
+                            'input[name="payment_method"]:checked:not([disabled])'
+                        );
+                        if (toChecked && toChecked.value) {
+                            keepCode = toChecked.value;
+                        } else {
+                            fromChecked = fromEl.querySelector(
+                                'input[name="payment_method"]:checked:not([disabled])'
+                            );
+                            if (
+                                fromChecked &&
+                                fromChecked.value &&
+                                toEl.querySelector(
+                                    '[data-fastcheckout-payment-option="' + fromChecked.value + '"]' +
+                                    '[data-fastcheckout-payment-allowed="1"]'
+                                )
+                            ) {
+                                keepCode = fromChecked.value;
+                            }
+                        }
+
+                        moveRenderersBackToRoot(keepCode);
                     });
 
                     window.Livewire.hook('message.processed', function () {
+                        var magewireEl = document.querySelector('[wire\\:id]'),
+                            wire = magewireEl && magewireEl.__livewire ? magewireEl.__livewire : null,
+                            wirePayment = wire ? String(getProperty(wire, 'paymentMethod') || '') : '',
+                            code = getSelectedMethodCode(),
+                            quotePayment = paymentMethodSync.getQuoteCode(),
+                            userPayment = paymentMethodSync.getUserSelectedPaymentMethod
+                                ? paymentMethodSync.getUserSelectedPaymentMethod()
+                                : '',
+                            userPaymentFresh = paymentMethodSync.isUserPaymentSelectionFresh &&
+                                paymentMethodSync.isUserPaymentSelectionFresh(),
+                            preferUserPayment = !!(
+                                userPaymentFresh &&
+                                userPayment &&
+                                domHasPaymentMethod(userPayment)
+                            );
+
+                        // Align KO quote with Magewire BEFORE syncPaymentMethods().
+                        // Otherwise a stale quote method that is no longer allowed triggers
+                        // hidePaymentPlaceholders() and causes open → close → open flicker.
+                        // Prefer a fresh shopper payment pick over lagging wire state (reversion fix).
+                        if (preferUserPayment) {
+                            code = userPayment;
+                            document.querySelectorAll('input[name="payment_method"]').forEach(function (input) {
+                                if (input.disabled) {
+                                    input.checked = false;
+                                    return;
+                                }
+                                input.checked = paymentMethodCodesEqual(input.value, userPayment);
+                            });
+                            setQuotePaymentMethodFromBridge({ method: userPayment });
+                            if (wirePayment && paymentMethodCodesEqual(wirePayment, userPayment)) {
+                                paymentMethodSync.markSynced(userPayment);
+                            } else if (
+                                paymentMethodSync.syncToMagewire &&
+                                !paymentMethodSync.isSynced(userPayment)
+                            ) {
+                                // Push user choice if server still has the previous method.
+                                paymentMethodSync.syncToMagewire({ method: userPayment });
+                            }
+                        } else if (
+                            wirePayment &&
+                            domHasPaymentMethod(wirePayment) &&
+                            (
+                                !paymentMethodSync.shouldAcceptPaymentSelection ||
+                                paymentMethodSync.shouldAcceptPaymentSelection(wirePayment)
+                            )
+                        ) {
+                            code = wirePayment;
+                            document.querySelectorAll('input[name="payment_method"]').forEach(function (input) {
+                                if (input.disabled) {
+                                    input.checked = false;
+                                    return;
+                                }
+                                input.checked = paymentMethodCodesEqual(input.value, wirePayment);
+                            });
+                            paymentMethodSync.markSynced(wirePayment);
+                            setQuotePaymentMethodFromBridge({ method: wirePayment });
+                        } else if (!wirePayment) {
+                            // Transient empty wire payment during morph — keep existing sync if quote still holds a method.
+                            if (!quotePayment) {
+                                paymentMethodSync.markSynced('');
+                            } else if (domHasPaymentMethod(quotePayment)) {
+                                code = quotePayment;
+                            }
+                        }
+
+                        // User payment no longer available after shipping→payment remap — drop lock.
+                        if (
+                            userPayment &&
+                            !domHasPaymentMethod(userPayment) &&
+                            paymentMethodSync.clearUserPaymentSelection
+                        ) {
+                            paymentMethodSync.clearUserPaymentSelection();
+                            if (wirePayment && domHasPaymentMethod(wirePayment)) {
+                                code = wirePayment;
+                            }
+                        }
+
                         syncPaymentMethods();
                         syncQuoteTotalsFromDom();
-                        var code = getSelectedMethodCode();
-                        
-                        runPatchRenderers();
-                        setSelectedMethod(code);
 
-                        var magewireEl = document.querySelector('[wire\\:id]');
-                        if (magewireEl && magewireEl.__livewire) {
-                            var wire = magewireEl.__livewire;
+                        runPatchRenderers();
+                        // Reveal the selected option row before opening KO content. After a
+                        // shipping→payment remap the new method may still be display:none from
+                        // the previous filter, so content opened inside it would stay invisible.
+                        if (code) {
+                            document.querySelectorAll('[data-fastcheckout-payment-option]').forEach(function (option) {
+                                var optionCode = option.getAttribute('data-fastcheckout-payment-option'),
+                                    allowed = option.getAttribute('data-fastcheckout-payment-allowed') === '1';
+
+                                if (allowed && paymentMethodCodesEqual(optionCode, code)) {
+                                    option.style.display = '';
+                                    option.removeAttribute('aria-hidden');
+                                }
+                            });
+                        }
+                        // Open/switch KO panel, then collapse remaining disallowed rows.
+                        setSelectedMethod(code);
+                        applyPaymentOptionVisibility();
+
+                        if (wire) {
+                            var currentMethod = wire.shippingMethod || getProperty(wire, 'shippingMethod'),
+                                userMethod = shippingMethodSync &&
+                                    typeof shippingMethodSync.getUserSelectedShippingMethod === 'function'
+                                    ? shippingMethodSync.getUserSelectedShippingMethod()
+                                    : '',
+                                userFresh = shippingMethodSync &&
+                                    typeof shippingMethodSync.isUserShippingSelectionFresh === 'function' &&
+                                    shippingMethodSync.isUserShippingSelectionFresh();
+
                             syncAddressToKnockout(wire);
-                            var currentMethod = wire.shippingMethod || getProperty(wire, 'shippingMethod');
-                            if (currentMethod) {
+
+                            // Keep KO on the locked user method. If a lagging Livewire response
+                            // left wire on the previous rate, re-assert the lock once (coalesced).
+                            if (userFresh && userMethod) {
+                                syncSelectedShippingMethodToKnockout(userMethod);
+                                if (
+                                    currentMethod !== userMethod &&
+                                    shippingMethodSync &&
+                                    typeof shippingMethodSync.reassertLockedMethodToMagewireIfNeeded === 'function'
+                                ) {
+                                    shippingMethodSync.reassertLockedMethodToMagewireIfNeeded();
+                                }
+                            } else if (currentMethod) {
                                 syncSelectedShippingMethodToKnockout(currentMethod);
                             }
                         }

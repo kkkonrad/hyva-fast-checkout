@@ -121,16 +121,76 @@ define([
             return result;
         }
 
-        function syncHookData(wire, hookData, deferUpdate) {
+        function valuesEqual(a, b) {
+            if (a === b) {
+                return true;
+            }
+            if (a == null && b == null) {
+                return true;
+            }
+            if (typeof a === 'object' || typeof b === 'object') {
+                try {
+                    return JSON.stringify(a || {}) === JSON.stringify(b || {});
+                } catch (e) {
+                    return false;
+                }
+            }
+
+            return String(a || '') === String(b || '');
+        }
+
+        function getWireProperty(wire, name) {
+            if (!wire) {
+                return '';
+            }
+            if (typeof wire.get === 'function') {
+                return wire.get(name);
+            }
+            if (typeof wire[name] !== 'undefined') {
+                return wire[name];
+            }
+            if (wire.data && typeof wire.data[name] !== 'undefined') {
+                return wire.data[name];
+            }
+
+            return '';
+        }
+
+        function setWireIfChanged(wire, field, value, deferUpdate) {
             if (!wire || typeof wire.set !== 'function') {
-                return Promise.resolve();
+                return Promise.resolve(false);
+            }
+
+            if (valuesEqual(getWireProperty(wire, field), value)) {
+                return Promise.resolve(false);
+            }
+
+            return Promise.resolve(wire.set(field, value, deferUpdate === true)).then(function () {
+                return true;
+            });
+        }
+
+        function syncHookData(wire, hookData, deferUpdate) {
+            var headers,
+                payload,
+                changed = false;
+
+            if (!wire || typeof wire.set !== 'function') {
+                return Promise.resolve(false);
             }
 
             hookData = hookData || { headers: {}, payload: {} };
+            headers = sanitizePayload(hookData.headers || {});
+            payload = sanitizePayload(hookData.payload || {});
 
-            return Promise.resolve(wire.set('placeOrderRequestHeaders', sanitizePayload(hookData.headers || {}), deferUpdate === true))
-                .then(function () {
-                    return wire.set('placeOrderRequestData', sanitizePayload(hookData.payload || {}), deferUpdate === true);
+            return setWireIfChanged(wire, 'placeOrderRequestHeaders', headers, deferUpdate)
+                .then(function (didChange) {
+                    changed = changed || !!didChange;
+                    return setWireIfChanged(wire, 'placeOrderRequestData', payload, deferUpdate);
+                })
+                .then(function (didChange) {
+                    changed = changed || !!didChange;
+                    return changed;
                 });
         }
 

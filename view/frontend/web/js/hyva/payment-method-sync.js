@@ -9,6 +9,12 @@ define([], function () {
             getProperty = typeof deps.getProperty === 'function' ? deps.getProperty : function () { return ''; },
             persistPaymentMethod = typeof deps.persistPaymentMethod === 'function' ? deps.persistPaymentMethod : function () {},
             lastMagewirePaymentMethodCode = '',
+            // Shopper-picked payment wins over lagging Magewire / KO renderer boot.
+            lockedUserPaymentMethodCode = '',
+            lockedUserPaymentAt = 0,
+            // Bumps on every shopper payment click so late async callbacks for an
+            // older pick (renderer load, selectPaymentMethod XHR) can be ignored.
+            paymentSelectionGeneration = 0,
             syncTimer = null,
             applyingFromBridge = false;
 
@@ -29,10 +35,82 @@ define([], function () {
             return getCode(current);
         }
 
+        function rememberUserPaymentSelection(methodCode) {
+            methodCode = methodCode || '';
+            if (!methodCode) {
+                lockedUserPaymentMethodCode = '';
+                lockedUserPaymentAt = 0;
+                paymentSelectionGeneration += 1;
+                return paymentSelectionGeneration;
+            }
+            methodCode = String(methodCode);
+            if (methodCode !== lockedUserPaymentMethodCode) {
+                paymentSelectionGeneration += 1;
+            }
+            lockedUserPaymentMethodCode = methodCode;
+            lockedUserPaymentAt = Date.now();
+            return paymentSelectionGeneration;
+        }
+
+        function getUserSelectedPaymentMethod() {
+            return lockedUserPaymentMethodCode || '';
+        }
+
+        function getPaymentSelectionGeneration() {
+            return paymentSelectionGeneration;
+        }
+
+        /**
+         * User payment lock is sticky so lagging Livewire / KO callbacks cannot snap
+         * the radio back to a previously loading method after a fast re-click.
+         * Cleared only on shipping remap or explicit clear — not when wire catches up.
+         */
+        function isUserPaymentSelectionFresh(maxAgeMs) {
+            maxAgeMs = typeof maxAgeMs === 'number' ? maxAgeMs : 15000;
+            return !!(
+                lockedUserPaymentMethodCode &&
+                lockedUserPaymentAt &&
+                (Date.now() - lockedUserPaymentAt) < maxAgeMs
+            );
+        }
+
+        function clearUserPaymentSelection() {
+            lockedUserPaymentMethodCode = '';
+            lockedUserPaymentAt = 0;
+            paymentSelectionGeneration += 1;
+        }
+
+        /**
+         * True when methodCode is still the intended payment (user lock or no lock).
+         * Optional generation: if provided and stale, reject.
+         */
+        function shouldAcceptPaymentSelection(paymentMethod, generation) {
+            var methodCode = getCode(paymentMethod);
+
+            if (typeof generation === 'number' && generation !== paymentSelectionGeneration) {
+                return false;
+            }
+
+            if (!methodCode) {
+                return !isUserPaymentSelectionFresh();
+            }
+
+            if (isUserPaymentSelectionFresh() && lockedUserPaymentMethodCode) {
+                return methodCode === lockedUserPaymentMethodCode;
+            }
+
+            return true;
+        }
+
         function setQuoteFromBridge(paymentMethod) {
             var methodCode = getCode(paymentMethod);
 
             if (!quote || typeof quote.paymentMethod !== 'function') {
+                return;
+            }
+
+            // Lagging Magewire/totals payload must not overwrite a fresh shopper pick.
+            if (!shouldAcceptPaymentSelection(methodCode)) {
                 return;
             }
 
@@ -51,7 +129,8 @@ define([], function () {
         }
 
         function syncToMagewire(paymentMethod) {
-            var methodCode = getCode(paymentMethod);
+            var methodCode = getCode(paymentMethod),
+                generation = paymentSelectionGeneration;
 
             persistPaymentMethod(methodCode || null);
 
@@ -71,6 +150,10 @@ define([], function () {
                 return;
             }
 
+            if (!shouldAcceptPaymentSelection(methodCode, generation)) {
+                return;
+            }
+
             if (methodCode === lastMagewirePaymentMethodCode) {
                 return;
             }
@@ -87,6 +170,11 @@ define([], function () {
 
                 syncTimer = null;
 
+                // Shopper picked another method while this call was debounced.
+                if (!shouldAcceptPaymentSelection(methodCode, generation)) {
+                    return;
+                }
+
                 if (!wire || typeof wire.call !== 'function') {
                     return;
                 }
@@ -99,9 +187,40 @@ define([], function () {
         }
 
         function isSynced(methodCode) {
+            methodCode = methodCode || '';
+
+            // Pending debounce for the same code still counts as synced — otherwise
+            // message.processed re-enters applySelectedMethod and spams selectPaymentMethod.
+            if (syncTimer && lastMagewirePaymentMethodCode === methodCode && methodCode !== '') {
+                return getQuoteCode() === methodCode || getQuoteCode() === '';
+            }
+
             return getQuoteCode() === methodCode &&
-                lastMagewirePaymentMethodCode === methodCode &&
-                !syncTimer;
+                lastMagewirePaymentMethodCode === methodCode;
+        }
+
+        function reassertUserPaymentOnQuote() {
+            var methodCode = lockedUserPaymentMethodCode;
+
+            if (
+                !isUserPaymentSelectionFresh() ||
+                !methodCode ||
+                !quote ||
+                typeof quote.paymentMethod !== 'function'
+            ) {
+                return;
+            }
+
+            if (getQuoteCode() === methodCode) {
+                return;
+            }
+
+            applyingFromBridge = true;
+            try {
+                quote.paymentMethod({ method: methodCode });
+            } finally {
+                applyingFromBridge = false;
+            }
         }
 
         return {
@@ -109,12 +228,36 @@ define([], function () {
             getQuoteCode: getQuoteCode,
             setQuoteFromBridge: setQuoteFromBridge,
             syncToMagewire: syncToMagewire,
+            rememberUserPaymentSelection: rememberUserPaymentSelection,
+            getUserSelectedPaymentMethod: getUserSelectedPaymentMethod,
+            getPaymentSelectionGeneration: getPaymentSelectionGeneration,
+            isUserPaymentSelectionFresh: isUserPaymentSelectionFresh,
+            clearUserPaymentSelection: clearUserPaymentSelection,
+            shouldAcceptPaymentSelection: shouldAcceptPaymentSelection,
+            reassertUserPaymentOnQuote: reassertUserPaymentOnQuote,
             isApplyingFromBridge: function () {
                 return applyingFromBridge;
             },
             isSynced: isSynced,
             markSynced: function (methodCode) {
-                lastMagewirePaymentMethodCode = methodCode || '';
+                methodCode = methodCode || '';
+
+                // Lagging mark for an older method must not clobber a fresher shopper pick
+                // or cancel its debounced Magewire sync.
+                if (
+                    methodCode &&
+                    isUserPaymentSelectionFresh() &&
+                    lockedUserPaymentMethodCode &&
+                    methodCode !== lockedUserPaymentMethodCode
+                ) {
+                    return;
+                }
+
+                lastMagewirePaymentMethodCode = methodCode;
+                if (syncTimer) {
+                    window.clearTimeout(syncTimer);
+                    syncTimer = null;
+                }
             }
         };
     };

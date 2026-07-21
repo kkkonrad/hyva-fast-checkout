@@ -82,6 +82,126 @@ define([
         );
     }
 
+    // Capture trusted radio interaction before Knockout checked-write runs.
+    // KO rebinds on rates() refresh also call write(), without a real click.
+    if (!window.fastcheckoutShippingClickCaptureBound) {
+        window.fastcheckoutShippingClickCaptureBound = true;
+        window.fastcheckoutLastTrustedShippingClick = null;
+        function captureTrustedShippingChoice(event) {
+            var target = event.target,
+                code,
+                shipping,
+                rates,
+                found = null,
+                applied;
+
+            if (
+                !event.isTrusted ||
+                !target ||
+                target.name !== 'shipping_method' ||
+                !target.value
+            ) {
+                return;
+            }
+
+            // Radio fires click then change — only handle once per gesture.
+            // Headless analysis: dual listeners caused 2x remember + 2x Magewire push per click.
+            if (event.type === 'change') {
+                return;
+            }
+
+            code = String(target.value);
+            applied = window.fastcheckoutLastTrustedShippingApplied;
+            if (
+                applied &&
+                applied.code === code &&
+                (Date.now() - applied.at) < 500
+            ) {
+                return;
+            }
+
+            window.fastcheckoutLastTrustedShippingClick = {
+                code: code,
+                at: Date.now()
+            };
+
+            shipping = window.fastcheckoutHyvaShipping;
+
+            // Headless analysis: if we only lock here, KO pureComputed read() already
+            // returns the new lock and write() never runs — quote/Magewire stay on the
+            // previous rate. Apply selection immediately from the trusted click path.
+            if (shipping && typeof shipping.rememberUserShippingSelection === 'function') {
+                shipping.rememberUserShippingSelection(code);
+            }
+
+            // Shipping remap may change allowed payments — drop payment lock so server
+            // auto-select is not blocked by the previous payment choice.
+            if (
+                window.fastcheckoutHyvaPayment &&
+                typeof window.fastcheckoutHyvaPayment.clearUserPaymentSelection === 'function'
+            ) {
+                window.fastcheckoutHyvaPayment.clearUserPaymentSelection();
+            } else if (
+                window.fastcheckoutHyvaPaymentMethodSync &&
+                typeof window.fastcheckoutHyvaPaymentMethodSync.clearUserPaymentSelection === 'function'
+            ) {
+                window.fastcheckoutHyvaPaymentMethodSync.clearUserPaymentSelection();
+            }
+
+            rates = shippingService.getShippingRates()() || [];
+            rates.some(function (rate) {
+                if (rate && (rate.carrier_code + '_' + rate.method_code) === code) {
+                    found = rate;
+                    return true;
+                }
+                return false;
+            });
+
+            if (!found) {
+                var parts = code.split('_'),
+                    carrier = parts.shift() || '';
+                found = {
+                    carrier_code: carrier,
+                    method_code: parts.length ? parts.join('_') : carrier,
+                    carrier_title: '',
+                    method_title: '',
+                    amount: 0
+                };
+            }
+
+            // Suppress bridge onSelect side-effects from this intentional apply; we sync below.
+            window.fastcheckoutSuppressShippingSync = true;
+            try {
+                selectShippingMethodAction(found);
+            } finally {
+                window.fastcheckoutSuppressShippingSync = false;
+            }
+
+            if (shipping && typeof shipping.syncShippingMethodToMagewireNow === 'function') {
+                shipping.syncShippingMethodToMagewireNow(code);
+            } else if (shipping && typeof shipping.syncShippingMethodToMagewire === 'function') {
+                shipping.syncShippingMethodToMagewire(code);
+            }
+
+            // Mark write path as already handled for this click (avoid double Magewire push).
+            window.fastcheckoutLastTrustedShippingApplied = {
+                code: code,
+                at: Date.now()
+            };
+
+            // Force KO css/radio recompute — shipping lock is plain JS, not observable.
+            if (
+                window.fastcheckoutHyvaShippingListInstance &&
+                typeof window.fastcheckoutHyvaShippingListInstance.bumpSelectionRevision === 'function'
+            ) {
+                window.fastcheckoutHyvaShippingListInstance.bumpSelectionRevision();
+            }
+        }
+
+        // click only — change is ignored (see above) to prevent double apply
+        document.addEventListener('click', captureTrustedShippingChoice, true);
+    }
+
     return Component.extend({
         defaults: {
             template: 'Kkkonrad_Fastcheckout/hyva/shipping-list'
@@ -100,6 +220,16 @@ define([
             };
         },
 
+        isTrustedShippingWrite: function (value) {
+            var click = window.fastcheckoutLastTrustedShippingClick;
+
+            return !!(
+                click &&
+                click.code === String(value || '') &&
+                (Date.now() - click.at) < 750
+            );
+        },
+
         initObservable: function () {
             var self = this;
             this._super().observe({
@@ -107,9 +237,38 @@ define([
                 errorValidationMessage: ''
             });
 
+            // Plain JS shipping lock is not a KO observable — without this revision the
+            // css: getMethodCss() binding never re-runs and border-blue-500 sticks on the
+            // previous rate after a switch (radio can still look correct via native click).
+            this.selectionRevision = ko.observable(0);
+            this.bumpSelectionRevision = function () {
+                self.selectionRevision(self.selectionRevision() + 1);
+            };
+
             this.selectedMethodCode = ko.pureComputed({
                 read: function () {
-                    var active = quote.shippingMethod();
+                    var shipping = window.fastcheckoutHyvaShipping,
+                        userMethod,
+                        active;
+
+                    // Establish a KO dependency so lock/quote changes refresh radios + borders.
+                    self.selectionRevision();
+
+                    // Prefer the shopper's fresh choice so KO radio rebinds after rates()
+                    // refresh do not flash the previous rate.
+                    if (
+                        shipping &&
+                        typeof shipping.isUserShippingSelectionFresh === 'function' &&
+                        shipping.isUserShippingSelectionFresh() &&
+                        typeof shipping.getUserSelectedShippingMethod === 'function'
+                    ) {
+                        userMethod = shipping.getUserSelectedShippingMethod();
+                        if (userMethod) {
+                            return userMethod;
+                        }
+                    }
+
+                    active = quote.shippingMethod();
                     if (!active) {
                         var checkedDomRadio = document.querySelector('input[name="shipping_method"]:checked');
                         return checkedDomRadio ? checkedDomRadio.value : null;
@@ -117,14 +276,41 @@ define([
                     return active.carrier_code + '_' + active.method_code;
                 },
                 write: function (value) {
+                    var rates,
+                        found = null,
+                        shipping = window.fastcheckoutHyvaShipping,
+                        isUserGesture = self.isTrustedShippingWrite(value),
+                        alreadyApplied = window.fastcheckoutLastTrustedShippingApplied,
+                        appliedRecently = !!(
+                            alreadyApplied &&
+                            alreadyApplied.code === String(value || '') &&
+                            (Date.now() - alreadyApplied.at) < 750
+                        );
+
                     if (!value) {
                         return;
                     }
+
+                    // Trusted click handler already applied quote + Magewire — skip double push.
+                    if (appliedRecently) {
+                        return;
+                    }
+
+                    // Knockout re-binds radio `checked` when rates() is replaced. That fires
+                    // write(oldRate) without a real click and was bouncing shipping methods.
+                    if (
+                        !isUserGesture &&
+                        shipping &&
+                        typeof shipping.shouldIgnoreKnockoutApply === 'function' &&
+                        shipping.shouldIgnoreKnockoutApply(value)
+                    ) {
+                        return;
+                    }
+
                     if (self && typeof self.clearError === 'function') {
                         self.clearError();
                     }
-                    var rates = shippingService.getShippingRates()();
-                    var found = null;
+                    rates = shippingService.getShippingRates()();
                     rates.some(function (rate) {
                         var c1 = rate.carrier_code + '_' + rate.method_code;
                         var c2 = rate.method_code + '_' + rate.carrier_code;
@@ -146,33 +332,41 @@ define([
                         };
                     }
 
+                    if (
+                        isUserGesture &&
+                        shipping &&
+                        typeof shipping.rememberUserShippingSelection === 'function'
+                    ) {
+                        shipping.rememberUserShippingSelection(value);
+                    } else if (
+                        shipping &&
+                        typeof shipping.rememberUserShippingSelection === 'function' &&
+                        (
+                            !shipping.getUserSelectedShippingMethod ||
+                            !shipping.getUserSelectedShippingMethod()
+                        )
+                    ) {
+                        shipping.rememberUserShippingSelection(value);
+                    }
+
                     selectShippingMethodAction(found);
+                    if (typeof self.bumpSelectionRevision === 'function') {
+                        self.bumpSelectionRevision();
+                    }
 
                     if (
-                        window.fastcheckoutHyvaShipping &&
-                        typeof window.fastcheckoutHyvaShipping.syncShippingMethodToMagewireNow === 'function'
+                        shipping &&
+                        typeof shipping.syncShippingMethodToMagewireNow === 'function'
                     ) {
-                        window.fastcheckoutHyvaShipping.syncShippingMethodToMagewireNow(value);
+                        shipping.syncShippingMethodToMagewireNow(value);
                         return;
                     }
 
                     if (
-                        window.fastcheckoutHyvaShipping &&
-                        typeof window.fastcheckoutHyvaShipping.syncShippingMethodToMagewire === 'function'
+                        shipping &&
+                        typeof shipping.syncShippingMethodToMagewire === 'function'
                     ) {
-                        window.fastcheckoutHyvaShipping.syncShippingMethodToMagewire(value);
-                        return;
-                    }
-
-                    // Sync the selected shipping method back to Magewire
-                    var magewireEl = document.querySelector('[wire\\:id]');
-                    if (magewireEl && magewireEl.__livewire) {
-                        var wire = magewireEl.__livewire;
-                        var currentMethod = wire.shippingMethod || (typeof wire.get === 'function' ? wire.get('shippingMethod') : (wire.data ? wire.data.shippingMethod : ''));
-                        if (currentMethod !== value) {
-                            
-                            wire.call('selectShippingMethod', value);
-                        }
+                        shipping.syncShippingMethodToMagewire(value);
                     }
                 }
             }, this);
@@ -181,6 +375,8 @@ define([
         },
 
         initialize: function () {
+            var self = this;
+
             this._super();
             window.fastcheckoutHyvaShippingListInstance = this;
 
@@ -191,11 +387,17 @@ define([
             // Re-render InPost widget when shipping rates change (e.g. on payment method switch)
             shippingService.getShippingRates().subscribe(function () {
                 renderInPostWidget();
+                if (typeof self.bumpSelectionRevision === 'function') {
+                    self.bumpSelectionRevision();
+                }
             });
 
             // Re-render InPost widget when shipping method changes
             quote.shippingMethod.subscribe(function () {
                 renderInPostWidget();
+                if (typeof self.bumpSelectionRevision === 'function') {
+                    self.bumpSelectionRevision();
+                }
             });
             
             return this;
@@ -237,21 +439,60 @@ define([
             return err && (err === fullCode || err === altCode);
         },
 
+        /**
+         * Single source of truth for the blue border / radio highlight.
+         * Prefer selectedMethodCode (user lock → quote → DOM). Never OR quote with a
+         * different lock — that left border-blue-500 on the previous rate after switch.
+         */
+        getPreferredSelectedCode: function () {
+            var self = this.selectedMethodCode ? this : (window.fastcheckoutHyvaShippingListInstance || this),
+                currentSelected,
+                active,
+                checked;
+
+            // Keep css:getMethodCss reactive when only the non-KO lock changed.
+            if (typeof self.selectionRevision === 'function') {
+                self.selectionRevision();
+            }
+
+            if (typeof self.selectedMethodCode === 'function') {
+                currentSelected = self.selectedMethodCode();
+                if (currentSelected) {
+                    return String(currentSelected);
+                }
+            }
+
+            active = quote.shippingMethod();
+            if (active && active.carrier_code && active.method_code) {
+                return active.carrier_code + '_' + active.method_code;
+            }
+
+            checked = document.querySelector('input[name="shipping_method"]:checked');
+            return checked && checked.value ? String(checked.value) : '';
+        },
+
+        methodMatchesCode: function (method, code) {
+            var fullCode,
+                altCode;
+
+            if (!method || !code) {
+                return false;
+            }
+
+            fullCode = method.carrier_code + '_' + method.method_code;
+            altCode = method.method_code + '_' + method.carrier_code;
+            code = String(code);
+
+            return code === fullCode || code === altCode;
+        },
+
         getMethodCss: function (method) {
-            var self = this.selectedMethodCode ? this : (window.fastcheckoutHyvaShippingListInstance || this);
-            var fullCode = method.carrier_code + '_' + method.method_code;
-            var altCode = method.method_code + '_' + method.carrier_code;
-
-            var currentSelected = (typeof self.selectedMethodCode === 'function') ? self.selectedMethodCode() : null;
-            var active = quote.shippingMethod();
-            var activeFull = active ? active.carrier_code + '_' + active.method_code : null;
-            var activeAlt = active ? active.method_code + '_' + active.carrier_code : null;
-
-            var isSelected = (currentSelected === fullCode || currentSelected === altCode) ||
-                             (activeFull === fullCode || activeFull === altCode) ||
-                             (activeAlt === fullCode || activeAlt === altCode);
-
-            var hasErr = self.hasError ? self.hasError(method) : false;
+            var self = this.selectedMethodCode ? this : (window.fastcheckoutHyvaShippingListInstance || this),
+                preferred = self.getPreferredSelectedCode ? self.getPreferredSelectedCode() : '',
+                isSelected = self.methodMatchesCode
+                    ? self.methodMatchesCode(method, preferred)
+                    : false,
+                hasErr = self.hasError ? self.hasError(method) : false;
 
             if (hasErr) {
                 return 'border-2 border-red-400 bg-red-50/10';
@@ -263,15 +504,12 @@ define([
         },
 
         isSelectedVal: function (method) {
-            var active = quote.shippingMethod();
-            if (!active) {
-                return false;
-            }
-            var fullCode = method.carrier_code + '_' + method.method_code;
-            var altCode = method.method_code + '_' + method.carrier_code;
-            var activeFull = active.carrier_code + '_' + active.method_code;
-            var activeAlt = active.method_code + '_' + active.carrier_code;
-            return activeFull === fullCode || activeFull === altCode || activeAlt === fullCode || activeAlt === altCode;
+            var self = this.selectedMethodCode ? this : (window.fastcheckoutHyvaShippingListInstance || this),
+                preferred = self.getPreferredSelectedCode ? self.getPreferredSelectedCode() : '';
+
+            return self.methodMatchesCode
+                ? self.methodMatchesCode(method, preferred)
+                : false;
         },
 
         selectShippingMethod: function (method) {

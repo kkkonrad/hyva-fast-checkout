@@ -6,14 +6,28 @@ define([
 
     return function (selectPaymentMethodAction) {
         return wrapper.wrap(selectPaymentMethodAction, function (originalAction, paymentMethod) {
-            var result = originalAction(paymentMethod);
+            var bridge = window.fastcheckoutHyvaPayment,
+                result;
+
+            // Drop stale KO/renderer selects (previous method still booting) before they
+            // overwrite quote.paymentMethod and snap the UI back after a fast re-click.
+            if (
+                isFastcheckoutActive() &&
+                bridge &&
+                typeof bridge.shouldAcceptPaymentSelection === 'function' &&
+                !bridge.shouldAcceptPaymentSelection(paymentMethod)
+            ) {
+                return;
+            }
+
+            result = originalAction(paymentMethod);
 
             if (
                 isFastcheckoutActive() &&
-                window.fastcheckoutHyvaPayment &&
-                typeof window.fastcheckoutHyvaPayment.onSelectPaymentMethodAction === 'function'
+                bridge &&
+                typeof bridge.onSelectPaymentMethodAction === 'function'
             ) {
-                window.fastcheckoutHyvaPayment.onSelectPaymentMethodAction(paymentMethod);
+                bridge.onSelectPaymentMethodAction(paymentMethod);
             }
 
             return result;

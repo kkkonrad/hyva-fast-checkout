@@ -28,13 +28,12 @@ foreach ($paymentMethods as $paymentMethod) {
         </h2>
     </div>
 
-    <?php if (!$hasAvailablePaymentMethods): ?>
-        <p class="text-sm text-gray-500"
-           role="status"
-           data-fastcheckout-no-payment-methods>
-            <?= $escaper->escapeHtml(__('No payment methods available.')) ?>
-        </p>
-    <?php endif; ?>
+    <p class="text-sm text-gray-500<?= $hasAvailablePaymentMethods ? ' hidden' : '' ?>"
+       role="status"
+       data-fastcheckout-no-payment-methods
+        <?= $hasAvailablePaymentMethods ? 'style="display: none;" aria-hidden="true"' : '' ?>>
+        <?= $escaper->escapeHtml(__('No payment methods available.')) ?>
+    </p>
 
     <?php if (!empty($paymentMethods)): ?>
         <div class="grid gap-3 relative min-h-[50px]<?= $hasAvailablePaymentMethods ? '' : ' hidden' ?>"

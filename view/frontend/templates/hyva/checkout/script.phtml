@@ -122,11 +122,10 @@ function initCheckout() {
                 payload.billingSameAsShipping = !!sameAs.checked;
             }
 
-            const shipping = form.querySelector('input[name="shipping_method"]:checked');
-            if (shipping && shipping.value) {
-                payload.shippingMethod = shipping.value;
-            }
-            const payment = form.querySelector('input[name="payment_method"]:checked');
+            // Do NOT push shippingMethod from DOM here. Multiple radio groups / morph races can
+            // re-apply a stale checked rate and undo selectShippingMethod (breaks payment filters).
+            // Shipping is owned by KO → selectShippingMethod(). Payment is safe to collect for place-order.
+            const payment = form.querySelector('input[name="payment_method"]:checked:not(:disabled)');
             if (payment && payment.value) {
                 payload.paymentMethod = payment.value;
             }
