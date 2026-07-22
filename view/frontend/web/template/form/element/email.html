@@ -1,0 +1,97 @@
+<!--
+/**
+ * Fastcheckout override of Magento_Checkout/form/element/email.
+ *
+ * Browsers treat Magento's default markup (form-login + name=username + password in DOM)
+ * as a credential form and suggest saved passwords. This template:
+ * - uses a plain checkout email field with autocomplete="email" / name="email"
+ * - mounts the login form + password only after Magento detects an existing account
+ */
+-->
+<!-- ko ifnot: isCustomerLoggedIn() -->
+
+<!-- ko foreach: getRegion('before-login-form') -->
+<!-- ko template: getTemplate() --><!-- /ko -->
+<!-- /ko -->
+
+<!-- Guest email: NOT inside a login form, NOT named username, no password sibling. -->
+<div class="form form-email" data-role="email-with-possible-login">
+    <fieldset id="customer-email-fieldset" class="fieldset" data-bind="blockLoader: isLoading">
+        <div class="field required">
+            <label class="label" for="customer-email">
+                <span data-bind="i18n: 'Email Address'"></span>
+            </label>
+            <div class="control _with-tooltip">
+                <input class="input-text"
+                       type="email"
+                       data-bind="
+                            textInput: email,
+                            hasFocus: emailFocused,
+                            afterRender: emailHasChanged,
+                            mageInit: {'mage/trim-input':{}}"
+                       name="email"
+                       autocomplete="email"
+                       inputmode="email"
+                       autocapitalize="off"
+                       autocorrect="off"
+                       spellcheck="false"
+                       data-validate="{required:true, 'validate-email':true}"
+                       id="customer-email"/>
+                <!-- ko template: 'ui/form/element/helper/tooltip' --><!-- /ko -->
+                <span class="note"
+                      data-bind="fadeVisible: isPasswordVisible() == false">
+                    <!-- ko i18n: 'You can create an account after checkout.' --><!-- /ko -->
+                </span>
+            </div>
+        </div>
+    </fieldset>
+</div>
+
+<!-- Login only when Magento finds an existing customer email. -->
+<!-- ko if: isPasswordVisible() -->
+<form class="form form-login"
+      data-bind="submit:login"
+      method="post"
+      action="#">
+    <fieldset class="fieldset hidden-fields">
+        <!-- Magento loginAction serializes username/password -->
+        <input type="hidden" name="username" data-bind="value: email"/>
+        <div class="field">
+            <label class="label" for="customer-password">
+                <span data-bind="i18n: 'Password'"></span>
+            </label>
+            <div class="control">
+                <input class="input-text"
+                       type="password"
+                       name="password"
+                       id="customer-password"
+                       autocomplete="current-password"
+                       data-validate="{required:true}"
+                       data-bind="attr: { placeholder: $t('Password') }"/>
+                <span class="note"
+                      data-bind="i18n: 'You already have an account with us. Sign in or continue as guest.'"></span>
+            </div>
+        </div>
+        <!-- ko foreach: getRegion('additional-login-form-fields') -->
+        <!-- ko template: getTemplate() --><!-- /ko -->
+        <!-- /ko -->
+        <div class="actions-toolbar">
+            <input name="context" type="hidden" value="checkout"/>
+            <div class="primary">
+                <button type="submit"
+                        class="action login primary"
+                        data-action="checkout-method-login">
+                    <span data-bind="i18n: 'Login'"></span>
+                </button>
+            </div>
+            <div class="secondary">
+                <a class="action remind" data-bind="attr: { href: forgotPasswordUrl }">
+                    <span data-bind="i18n: 'Forgot Your Password?'"></span>
+                </a>
+            </div>
+        </div>
+    </fieldset>
+</form>
+<!-- /ko -->
+
+<!-- /ko -->

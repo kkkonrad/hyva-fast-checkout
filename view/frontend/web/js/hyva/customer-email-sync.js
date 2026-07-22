@@ -71,6 +71,7 @@ define([], function () {
                     target.name === 'email' ||
                     target.name === 'username' ||
                     target.type === 'email' ||
+                    target.id === 'customer-email' ||
                     target.getAttribute('data-wire-field') === 'email'
                 );
             }

@@ -426,8 +426,7 @@
 }
 
 #fastcheckout-checkout .billing-address-details {
-    margin-top: 0.75rem;
-    line-height: 1.5;
+    display: none !important;
 }
 
 @media (min-width: 640px) {

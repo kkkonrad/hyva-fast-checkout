@@ -1,4 +1,11 @@
 var config = {
+    map: {
+        '*': {
+            // Prefer address/contact autofill on guest email (see template override).
+            'Magento_Checkout/template/form/element/email':
+                'Kkkonrad_Fastcheckout/template/form/element/email'
+        }
+    },
     config: {
         mixins: {
             'Magento_Checkout/js/checkout-data': {
@@ -63,6 +70,9 @@ var config = {
             },
             'mage/storage': {
                 'Kkkonrad_Fastcheckout/js/mixin/storage-mixin': true
+            },
+            'Magento_Checkout/js/view/form/element/email': {
+                'Kkkonrad_Fastcheckout/js/mixin/checkout-email-autofill-mixin': true
             }
         }
     }

@@ -183,7 +183,10 @@ define(['jquery'], function ($) {
                         // so validate the standard KO forms first and show their inline
                         // messages even when no method has been selected yet.
                         emailInput = document.querySelector(
-                            'form[data-role="email-with-possible-login"] input[name="username"]'
+                            '[data-role="email-with-possible-login"] input#customer-email, ' +
+                            '[data-role="email-with-possible-login"] input[name="email"], ' +
+                            '[data-role="email-with-possible-login"] input[name="username"], ' +
+                            'input#customer-email'
                         );
                         if (emailInput) {
                             $(emailInput.form).validation();
