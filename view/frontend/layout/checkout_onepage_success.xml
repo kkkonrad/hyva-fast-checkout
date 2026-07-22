@@ -3,5 +3,7 @@
       xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
     <body>
         <referenceBlock name="checkout.tpay.order_status" remove="true"/>
+        <!-- Hide Magento guest "Create an Account" form/message on the success page. -->
+        <referenceBlock name="checkout.registration" remove="true"/>
     </body>
 </page>
