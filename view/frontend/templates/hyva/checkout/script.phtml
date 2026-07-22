@@ -132,12 +132,18 @@ function initCheckout() {
                         if (hasError) {
                             this.isProcessing = false;
                             document.body.classList.remove('checkout-submitting');
+                            this.unlockScrollForPlaceOrder();
+                            // Server-side placeOrder errors (address, agreements, etc.) — stay near CTA on mobile.
+                            if (this.shouldScrollToPaymentOnError({ message: String(hasError) })) {
+                                this.scrollToSelectedPaymentMethod();
+                            }
                         }
                     }
                 });
                 window.Livewire.hook('message.failed', () => {
                     this.isProcessing = false;
                     document.body.classList.remove('checkout-submitting');
+                    this.unlockScrollForPlaceOrder();
                 });
                 window.Livewire.hook('element.updating', (fromEl, toEl) => {
                     if (window.fastcheckoutOrderPlaced) {
@@ -469,6 +475,118 @@ function initCheckout() {
         },
 
         /**
+         * Scroll to the selected payment method block (validation failures only).
+         */
+        scrollToSelectedPaymentMethod() {
+            const selectedMethodEl = document.querySelector('input[name="payment_method"]:checked');
+            if (!selectedMethodEl) {
+                const paymentCard = document.querySelector('.fc-container-3, [data-fastcheckout-payment-option]');
+                if (paymentCard && typeof paymentCard.scrollIntoView === 'function') {
+                    this._allowPaymentScroll = true;
+                    paymentCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    window.setTimeout(() => { this._allowPaymentScroll = false; }, 800);
+                }
+                return;
+            }
+            const optionContainer = selectedMethodEl.closest('[data-fastcheckout-payment-option]');
+            const target = optionContainer || selectedMethodEl;
+            if (target && typeof target.scrollIntoView === 'function') {
+                this._allowPaymentScroll = true;
+                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                window.setTimeout(() => { this._allowPaymentScroll = false; }, 800);
+            }
+        },
+
+        /**
+         * Prefer showing the order error near the place-order controls instead of jumping to payment.
+         */
+        scrollToOrderError() {
+            const errorEl = document.querySelector(
+                '#co-checkout-form .text-red-600, #co-checkout-form [x-text="clientOrderError"], .fc-container-3 .mage-error'
+            );
+            // Sticky mobile place-order bar — keep user at the action they pressed.
+            const stickyBar = document.querySelector('[wire\\:key="mobile-sticky-order-bar"], .md\\:hidden.fixed.bottom-0');
+            if (stickyBar && window.matchMedia && window.matchMedia('(max-width: 767px)').matches) {
+                // Stay at bottom where the sticky CTA lives; do not scroll to payment.
+                return;
+            }
+            if (errorEl && typeof errorEl.scrollIntoView === 'function') {
+                errorEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        },
+
+        isPaymentValidationError(err) {
+            const msg = String((err && err.message) || err || '').toLowerCase();
+            if (!msg) {
+                return false;
+            }
+            const needles = [
+                'check the selected payment',
+                'required field',
+                'not ready',
+                'did not start order',
+                'purchase order',
+                'agree to the terms',
+                'validation',
+                'sprawdź wybraną',
+                'wymagane pole',
+                'nie jest jeszcze gotowa',
+                'nie rozpoczęła składania',
+                'regulamin',
+                'pickup point',
+                'punkt odbioru',
+                'pobraniem'
+            ];
+            return needles.some((n) => msg.indexOf(n) !== -1);
+        },
+
+        hasVisiblePaymentValidationUi() {
+            return !!document.querySelector(
+                '[data-fastcheckout-payment-option] .mage-error,' +
+                '[data-fastcheckout-payment-option] [aria-invalid="true"],' +
+                '[data-fastcheckout-payment-option] .field-error,' +
+                '.payment-method._active .mage-error,' +
+                '.payment-method._active .field-error,' +
+                'div.checkout-agreements .mage-error'
+            );
+        },
+
+        shouldScrollToPaymentOnError(err) {
+            return this.isPaymentValidationError(err) || this.hasVisiblePaymentValidationUi();
+        },
+
+        /**
+         * While place-order is in flight, Magewire morph / KO focus can yank mobile scroll
+         * up to the payment list. Hold the viewport unless we intentionally scroll for validation.
+         */
+        lockScrollForPlaceOrder() {
+            this._placeOrderScrollY = window.scrollY || window.pageYOffset || 0;
+            this._allowPaymentScroll = false;
+            if (this._scrollGuardBound) {
+                return;
+            }
+            this._scrollGuardBound = () => {
+                if (!this.isProcessing || this._allowPaymentScroll) {
+                    return;
+                }
+                const y = window.scrollY || window.pageYOffset || 0;
+                if (Math.abs(y - this._placeOrderScrollY) > 60) {
+                    window.scrollTo(0, this._placeOrderScrollY);
+                }
+            };
+            window.addEventListener('scroll', this._scrollGuardBound, { passive: true });
+        },
+
+        unlockScrollForPlaceOrder() {
+            if (this._scrollGuardBound) {
+                window.removeEventListener('scroll', this._scrollGuardBound);
+                this._scrollGuardBound = null;
+            }
+            this._placeOrderScrollY = null;
+            this._allowPaymentScroll = false;
+        },
+
+        /**
          * Handle form submit — validate all, sync address snapshot, then place order.
          */
         handleSubmit() {
@@ -497,20 +615,14 @@ function initCheckout() {
                         if (window.console && typeof window.console.warn === 'function') {
                             window.console.warn('Kkkonrad Fastcheckout: Order placement halted because Knockout payment validation failed.');
                         }
-                        if (selectedMethodEl) {
-                            const optionContainer = selectedMethodEl.closest('[data-fastcheckout-payment-option]');
-                            if (optionContainer) {
-                                optionContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                            } else {
-                                selectedMethodEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                            }
-                        }
+                        this.scrollToSelectedPaymentMethod();
                         return;
                     }
                 }
 
                 this.isProcessing = true;
                 document.body.classList.add('checkout-submitting');
+                this.lockScrollForPlaceOrder();
 
                 // Cancel pending debounce and push the latest DOM address before placing order.
                 if (this._addressSyncTimer) {
@@ -529,21 +641,22 @@ function initCheckout() {
                     .then(place)
                     .then(() => {
                         // KO / Magewire initiated the order flow. Redirect follows on success.
+                        // Keep scroll lock until redirect or payment-error clears processing.
                     })
                     .catch((err) => {
                         this.isProcessing = false;
                         document.body.classList.remove('checkout-submitting');
+                        this.unlockScrollForPlaceOrder();
                         if (!this.clientOrderError && err && err.message && !err.fastcheckoutNativePaymentError) {
                             this.clientOrderError = err.message;
                         }
 
-                        if (selectedMethodEl) {
-                            const optionContainer = selectedMethodEl.closest('[data-fastcheckout-payment-option]');
-                            if (optionContainer) {
-                                optionContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                            } else {
-                                selectedMethodEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                            }
+                        // Only jump to payment for validation / payment-field errors — not for
+                        // generic processing failures while the user was on the sticky CTA.
+                        if (this.shouldScrollToPaymentOnError(err)) {
+                            this.scrollToSelectedPaymentMethod();
+                        } else {
+                            this.scrollToOrderError();
                         }
                     });
             }
@@ -554,6 +667,10 @@ function initCheckout() {
             this.clientOrderError = detail.message || '';
             this.isProcessing = false;
             document.body.classList.remove('checkout-submitting');
+            this.unlockScrollForPlaceOrder();
+            if (this.shouldScrollToPaymentOnError({ message: this.clientOrderError })) {
+                this.scrollToSelectedPaymentMethod();
+            }
         },
 
         /**

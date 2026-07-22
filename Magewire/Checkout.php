@@ -739,8 +739,7 @@ class Checkout extends Component
         if (!empty($allowedPaymentMethods)) {
             $firstMethod = reset($allowedPaymentMethods);
             $firstCode = (string)$firstMethod->getCode();
-            // Already on a valid method for this shipping mapping — skip extra Magewire
-            // selectPaymentMethod round-trip (it re-renders payment content and flickers).
+            // Already on a valid method for this shipping mapping — skip extra work.
             if ($firstCode !== '' && $firstCode === (string)$this->paymentMethod) {
                 return;
             }
@@ -751,7 +750,10 @@ class Checkout extends Component
             ) {
                 return;
             }
-            $this->selectPaymentMethod($firstCode);
+            // Apply payment on the quote without a nested selectPaymentMethod() call.
+            // Nested public action methods can side-effect the Magewire render lifecycle
+            // when invoked mid selectShippingMethod (e.g. former skipRender wiped the DOM).
+            $this->applyPaymentMethodCodeToQuote($quote, $firstCode);
             return;
         }
 
@@ -765,6 +767,39 @@ class Checkout extends Component
             $payment->setMethod('');
             $quote->collectTotals();
             $this->saveQuote($quote);
+        }
+    }
+
+    /**
+     * Persist a payment method code on the quote for shipping-driven auto-selection.
+     * Does not return refreshCheckoutState — caller owns the Magewire response.
+     */
+    private function applyPaymentMethodCodeToQuote($quote, string $methodCode): void
+    {
+        $methodCode = trim($methodCode);
+        if ($methodCode === '' || !$quote) {
+            return;
+        }
+
+        $availableMethodCode = $this->resolveAvailablePaymentMethodCode($methodCode);
+        if ($availableMethodCode === '') {
+            $this->paymentMethod = '';
+            return;
+        }
+
+        try {
+            $payment = $quote->getPayment();
+            if ($payment) {
+                $this->importPaymentData($payment, $availableMethodCode, $methodCode);
+                $quote->collectTotals();
+                $this->saveQuote($quote);
+                $this->paymentMethod = $methodCode;
+            }
+        } catch (\Exception $e) {
+            $this->logger->error(
+                'Kkkonrad Fastcheckout applyPaymentMethodCodeToQuote Error: ' . $e->getMessage(),
+                ['exception' => $e]
+            );
         }
     }
 
