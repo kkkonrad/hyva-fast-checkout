@@ -24,8 +24,24 @@
 .fastcheckout-ko-payment-root .payment-method-billing-address,
 .fastcheckout-payment-method-ko-container .payment-method-title,
 .fastcheckout-payment-method-ko-container .actions-toolbar,
-.fastcheckout-payment-method-ko-container .payment-method-billing-address {
+.fastcheckout-payment-method-ko-container .payment-method-billing-address,
+.fastcheckout-native-place-order-hidden,
+.fastcheckout-actions-toolbar-hidden {
     display: none !important;
+    pointer-events: none !important;
+    visibility: hidden !important;
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+}
+
+@media (min-width: 1024px) {
+    .fc-grid {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
 }
 
 .fastcheckout-ko-payment-root .payment-method-content,
@@ -785,4 +801,3 @@ body.fastcheckout-scroll-locked {
     color: #374151 !important;
     border: 1px solid #d1d5db !important;
 }
-

@@ -14,8 +14,8 @@
 import { test, expect } from '@playwright/test';
 
 const CUSTOMER = {
-    email: process.env.E2E_CUSTOMER_EMAIL || 'roni_cost@example.com',
-    password: process.env.E2E_CUSTOMER_PASSWORD || 'roni_cost3@example.com',
+    email: process.env.E2E_CUSTOMER_EMAIL || '',
+    password: process.env.E2E_CUSTOMER_PASSWORD || '',
 };
 
 async function dismissOverlays(page) {
@@ -30,8 +30,17 @@ async function dismissOverlays(page) {
 async function addProduct(page) {
     await page.goto('/joust-duffle-bag.html', { waitUntil: 'domcontentloaded' });
     await dismissOverlays(page);
-    await page.locator('#product-addtocart-button').click({ force: true });
-    await page.waitForTimeout(2500);
+    await page.waitForLoadState('load');
+    await page.locator('#product_addtocart_form').evaluate((form) => form.submit());
+    await page.waitForLoadState('domcontentloaded');
+    await expect.poll(async () => {
+        const label = await page.locator('button[aria-label*="item"]').first().getAttribute('aria-label').catch(() => '');
+
+        return /\b[1-9]\d*\s+item\b/.test(label || '');
+    }, {
+        timeout: 15_000,
+        message: 'The fixture product was not added to the cart.'
+    }).toBe(true);
 }
 
 async function openCheckout(page) {
@@ -84,31 +93,40 @@ async function fillAddressAtomically(page, address) {
             region.dispatchEvent(new Event('change', { bubbles: true }));
         }
 
-        const ship = document.querySelector('input[name="shipping_method"][value="flatrate_flatrate"]')
-            || document.querySelector('input[name="shipping_method"]');
-        if (ship) {
-            ship.checked = true;
-            ship.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-        const pay = document.querySelector('input[name="payment_method"][value="checkmo"]');
-        if (pay) {
-            pay.checked = true;
-            pay.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-
         const form = document.querySelector('#co-checkout-form');
         const alpine = form && window.Alpine ? window.Alpine.$data(form) : null;
         if (!alpine || typeof alpine.flushAddressSync !== 'function') {
             return { error: 'flushAddressSync missing', hasAlpine: !!alpine };
         }
 
-        // Two flushes: first after fills, second after methods (and any region refresh).
+        // Flush address first so Magento can calculate shipping rates.
         await alpine.flushAddressSync();
         await new Promise((r) => setTimeout(r, 800));
+
+        const c = window.Livewire.find(document.querySelector('[wire\\:id]').getAttribute('wire:id'));
+        const ship = Array.from(document.querySelectorAll('input[name="shipping_method"]'))
+            .find((input) => !input.disabled && input.offsetParent !== null)
+            || document.querySelector('input[name="shipping_method"]:not(:disabled)');
+        const shippingMethod = ship ? ship.value : '';
+        if (shippingMethod) {
+            await c.call('selectShippingMethod', shippingMethod);
+            await new Promise((r) => setTimeout(r, 800));
+        }
+
+        const pay = Array.from(document.querySelectorAll('input[name="payment_method"]'))
+            .find((input) => !input.disabled && input.offsetParent !== null);
+        const paymentMethod = pay ? pay.value : '';
+        if (pay) {
+            pay.click();
+        }
+        if (paymentMethod) {
+            await c.call('selectPaymentMethod', paymentMethod);
+        }
+
+        // Second flush captures any region/rate refresh that occurred above.
         await alpine.flushAddressSync();
         await new Promise((r) => setTimeout(r, 1200));
 
-        const c = window.Livewire.find(document.querySelector('[wire\\:id]').getAttribute('wire:id'));
         return {
             dom: alpine.collectAddressFieldsFromDom(),
             wire: {
@@ -122,6 +140,7 @@ async function fillAddressAtomically(page, address) {
                 shippingMethod: c.get('shippingMethod'),
                 paymentMethod: c.get('paymentMethod'),
             },
+            selectedPaymentMethod: paymentMethod,
             wireIgnore: !!document.querySelector('[data-fastcheckout-shipping-fields][wire\\:ignore]'),
         };
     }, address);
@@ -129,10 +148,10 @@ async function fillAddressAtomically(page, address) {
     return result;
 }
 
-async function clickVisiblePlaceOrder(page) {
+async function clickVisiblePlaceOrder(page, paymentMethod) {
     const navPromise = page.waitForURL(/success/i, { timeout: 90_000 }).catch(() => null);
 
-    const result = await page.evaluate(async () => {
+    const result = await page.evaluate(async (paymentMethod) => {
         const form = document.querySelector('#co-checkout-form');
         const alpine = form && window.Alpine ? window.Alpine.$data(form) : null;
 
@@ -152,9 +171,9 @@ async function clickVisiblePlaceOrder(page) {
         }
 
         const c = window.Livewire.find(document.querySelector('[wire\\:id]').getAttribute('wire:id'));
-        const response = await c.call('placeOrder', 'checkmo');
+        const response = await c.call('placeOrder', paymentMethod);
         return { via: 'wire.placeOrder', response, orderError: c.get('orderError') };
-    });
+    }, paymentMethod);
 
     await navPromise;
     return result;
@@ -208,12 +227,17 @@ test.describe('Fastcheckout real order placement', () => {
             expect(hiddenMeta.display).toBe('none');
         }
 
-        const place = await clickVisiblePlaceOrder(page);
+        expect(state.selectedPaymentMethod, JSON.stringify(state)).toBeTruthy();
+        const place = await clickVisiblePlaceOrder(page, state.selectedPaymentMethod);
         await expect.poll(() => page.url(), { timeout: 90_000 }).toMatch(/success/i);
         expect(place?.error, JSON.stringify(place)).toBeFalsy();
     });
 
     test('logged-in customer places order via atomic address sync', async ({ page }) => {
+        test.skip(
+            !CUSTOMER.email || !CUSTOMER.password,
+            'Set E2E_CUSTOMER_EMAIL and E2E_CUSTOMER_PASSWORD to run the logged-in order test.'
+        );
         await page.goto('/customer/account/login/', { waitUntil: 'domcontentloaded' });
         await dismissOverlays(page);
         await page.locator('#email').fill(CUSTOMER.email);
@@ -241,18 +265,19 @@ test.describe('Fastcheckout real order placement', () => {
         expect(state.wire.firstname, JSON.stringify(state)).toBe('Veronica');
         expect(state.wire.postcode, JSON.stringify(state)).toBe('49628-7978');
 
-        const place = await clickVisiblePlaceOrder(page);
+        expect(state.selectedPaymentMethod, JSON.stringify(state)).toBeTruthy();
+        const place = await clickVisiblePlaceOrder(page, state.selectedPaymentMethod);
         // If bridge validation blocked, fall back to direct Magewire placeOrder with synced state.
         if (!/success/i.test(page.url())) {
-            await page.evaluate(async () => {
+            await page.evaluate(async (paymentMethod) => {
                 const form = document.querySelector('#co-checkout-form');
                 const alpine = window.Alpine.$data(form);
                 if (alpine?.flushAddressSync) {
                     await alpine.flushAddressSync();
                 }
                 const c = window.Livewire.find(document.querySelector('[wire\\:id]').getAttribute('wire:id'));
-                await c.call('placeOrder', 'checkmo');
-            });
+                await c.call('placeOrder', paymentMethod);
+            }, state.selectedPaymentMethod);
         }
         await expect.poll(() => page.url(), { timeout: 90_000 }).toMatch(/success/i);
         expect(place?.error, JSON.stringify(place)).toBeFalsy();

@@ -701,7 +701,8 @@ class Checkout extends Component
     {
         $methods = $this->getPaymentMethods();
         $allowedCodes = $this->getAllowedPaymentMethodCodes();
-        $hasShippingPaymentMapping = $this->helper->hasShippingPaymentMapping();
+        $hasShippingPaymentMapping = $this->hasSelectedShippingMethod()
+            && $this->helper->hasShippingPaymentMapping();
 
         return array_values(array_filter($methods, function ($method) use ($allowedCodes, $hasShippingPaymentMapping) {
             return $this->isPaymentMethodAllowedByRules(
@@ -717,8 +718,21 @@ class Checkout extends Component
         return $this->isPaymentMethodAllowedByRules(
             $paymentMethodCode,
             $shippingAllowedCodes === null ? $this->getAllowedPaymentMethodCodes() : $shippingAllowedCodes,
-            $this->helper->hasShippingPaymentMapping()
+            ($shippingAllowedCodes !== null || $this->hasSelectedShippingMethod())
+                && $this->helper->hasShippingPaymentMapping()
         );
+    }
+
+    private function hasSelectedShippingMethod(): bool
+    {
+        if (trim((string)$this->shippingMethod) !== '') {
+            return true;
+        }
+
+        $quote = $this->checkoutSession->getQuote();
+        $shippingAddress = $quote ? $quote->getShippingAddress() : null;
+
+        return $shippingAddress && trim((string)$shippingAddress->getShippingMethod()) !== '';
     }
 
     public function isPaymentMethodSelected(string $paymentMethodCode): bool
@@ -1742,8 +1756,16 @@ class Checkout extends Component
         'billingPrefix', 'billingMiddlename', 'billingSuffix', 'billingFax', 'billingVatId',
         'billingCity', 'billingPostcode', 'billingCountryId', 'billingRegionId', 'billingRegion',
         'billingTelephone',
+        'shippingCustomAttributes', 'shippingExtensionAttributes',
+        'billingCustomAttributes', 'billingExtensionAttributes',
         // paymentMethod only — shippingMethod must go through selectShippingMethod()
         'paymentMethod',
+    ];
+
+    /** @var list<string> */
+    private const SYNCABLE_ADDRESS_ATTRIBUTE_FIELDS = [
+        'shippingCustomAttributes', 'shippingExtensionAttributes',
+        'billingCustomAttributes', 'billingExtensionAttributes',
     ];
 
     /**
@@ -1776,7 +1798,9 @@ class Checkout extends Component
                 continue;
             }
 
-            if (is_bool($value) || $name === 'billingSameAsShipping') {
+            if (in_array($name, self::SYNCABLE_ADDRESS_ATTRIBUTE_FIELDS, true)) {
+                $this->{$name} = $this->normalizeGenericData($value);
+            } elseif (is_bool($value) || $name === 'billingSameAsShipping') {
                 $this->{$name} = (bool)$value;
             } else {
                 $this->{$name} = is_scalar($value) || $value === null ? (string)$value : '';
@@ -1892,6 +1916,13 @@ class Checkout extends Component
                 $state[$name] = ((int)$raw) <= 0 ? '' : (string)(int)$raw;
                 continue;
             }
+            if (in_array($name, self::SYNCABLE_ADDRESS_ATTRIBUTE_FIELDS, true)) {
+                $state[$name] = json_encode(
+                    $this->normalizeGenericData($this->{$name} ?? []),
+                    JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+                ) ?: '{}';
+                continue;
+            }
             $value = $this->{$name} ?? '';
             $state[$name] = $value === null ? '' : (string)$value;
         }
@@ -1978,6 +2009,7 @@ class Checkout extends Component
             'firstname', 'lastname', 'company', 'street1', 'street2', 'street3', 'street4',
             'city', 'postcode', 'countryId', 'regionId', 'region', 'telephone',
             'prefix', 'middlename', 'suffix', 'fax', 'vatId',
+            'shippingCustomAttributes', 'shippingExtensionAttributes',
         ], true);
     }
 
@@ -1988,6 +2020,7 @@ class Checkout extends Component
             'billingStreet1', 'billingStreet2', 'billingStreet3', 'billingStreet4',
             'billingCity', 'billingPostcode', 'billingCountryId', 'billingRegionId', 'billingRegion',
             'billingTelephone', 'billingPrefix', 'billingMiddlename', 'billingSuffix', 'billingFax', 'billingVatId',
+            'billingCustomAttributes', 'billingExtensionAttributes',
         ], true);
     }
 

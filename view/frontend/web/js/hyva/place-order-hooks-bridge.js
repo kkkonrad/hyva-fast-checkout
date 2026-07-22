@@ -165,6 +165,12 @@ define([
                 return Promise.resolve(false);
             }
 
+            if (deferUpdate !== true && typeof wire.call === 'function') {
+                return Promise.resolve(wire.call('$set', field, value)).then(function () {
+                    return true;
+                });
+            }
+
             return Promise.resolve(wire.set(field, value, deferUpdate === true)).then(function () {
                 return true;
             });
@@ -183,7 +189,9 @@ define([
             headers = sanitizePayload(hookData.headers || {});
             payload = sanitizePayload(hookData.payload || {});
 
-            return setWireIfChanged(wire, 'placeOrderRequestHeaders', headers, deferUpdate)
+            // Headers and payload form one logical request. Keep the first write
+            // deferred so a non-deferred payload write flushes both in one POST.
+            return setWireIfChanged(wire, 'placeOrderRequestHeaders', headers, true)
                 .then(function (didChange) {
                     changed = changed || !!didChange;
                     return setWireIfChanged(wire, 'placeOrderRequestData', payload, deferUpdate);

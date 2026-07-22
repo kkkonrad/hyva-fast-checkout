@@ -17,7 +17,7 @@
                 <show_all_ship_methods>0</show_all_ship_methods>
                 <required_shipping_fields>{"instore_pickup":["extension_attributes.pickup_location_code"]}</required_shipping_fields>
                 <required_payment_fields>{"purchaseorder":["po_number"]}</required_payment_fields>
-                <assign_order_to_customer>1</assign_order_to_customer>
+                <assign_order_to_customer>0</assign_order_to_customer>
             </extended>
         </fastcheckout>
     </default>

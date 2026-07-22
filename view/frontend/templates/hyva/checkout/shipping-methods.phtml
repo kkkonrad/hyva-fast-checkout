@@ -5,6 +5,7 @@
  * @var \Kkkonrad\Fastcheckout\Block\Hyva\Checkout $block
  * @var \Magento\Framework\Escaper $escaper
  * @var \Kkkonrad\Fastcheckout\Magewire\Checkout $magewire
+ * @var \Hyva\Theme\ViewModel\HyvaCsp $hyvaCsp
  */
 $shippingMethods = $magewire->getShippingMethods();
 
@@ -102,3 +103,4 @@ foreach ($shippingMethods as $carrierCode => $rates) {
     window.fastcheckoutInitialShippingRates = <?= /* @noEscape */ json_encode($jsRates) ?>;
     window.fastcheckoutInitialShippingMethod = <?= /* @noEscape */ json_encode($magewire->shippingMethod) ?>;
 </script>
+<?php $hyvaCsp->registerInlineScript() ?>

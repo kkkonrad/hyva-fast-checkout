@@ -1,7 +1,6 @@
 define([
     'jquery',
     'Kkkonrad_Fastcheckout/js/hyva/renderer-manager',
-    'Kkkonrad_Fastcheckout/js/hyva/shadow-selector-bridge',
     'Kkkonrad_Fastcheckout/js/hyva/checkout-provider-bridge',
     'Kkkonrad_Fastcheckout/js/hyva/address-attributes-bridge',
     'Kkkonrad_Fastcheckout/js/hyva/form-data-collector',
@@ -25,7 +24,7 @@ define([
     'Kkkonrad_Fastcheckout/js/hyva/shipping-method-sync',
     'Kkkonrad_Fastcheckout/js/hyva/shipping-error-bridge',
     'Kkkonrad_Fastcheckout/js/hyva/step-navigator-bridge'
-], function ($, createRendererManager, initShadowSelectorBridge, createCheckoutProviderBridge, createAddressAttributesBridge, formDataCollector, createPaymentMessageBridge, createPaymentValidationRegistry, createShippingCompatibilityBridge, checkoutCompatibility, createCheckoutDataPersistence, createCheckoutTotalsSync, createCheckoutLayoutBridge, createAddressDataBuilder, createCheckoutStateBridge, createPaymentDomBridge, createPlaceOrderHooksBridge, createShippingAttributesSync, createCheckoutComponentFallbacks, magewireUtils, createPaymentMethodSync, createCustomerEmailSync, checkoutAgreementsFallback, createShippingMethodSync, createShippingErrorBridge, createStepNavigatorBridge) {
+], function ($, createRendererManager, createCheckoutProviderBridge, createAddressAttributesBridge, formDataCollector, createPaymentMessageBridge, createPaymentValidationRegistry, createShippingCompatibilityBridge, checkoutCompatibility, createCheckoutDataPersistence, createCheckoutTotalsSync, createCheckoutLayoutBridge, createAddressDataBuilder, createCheckoutStateBridge, createPaymentDomBridge, createPlaceOrderHooksBridge, createShippingAttributesSync, createCheckoutComponentFallbacks, magewireUtils, createPaymentMethodSync, createCustomerEmailSync, checkoutAgreementsFallback, createShippingMethodSync, createShippingErrorBridge, createStepNavigatorBridge) {
     'use strict';
 
     return function (config) {
@@ -36,7 +35,6 @@ define([
         window.fastcheckoutKoCheckoutBridgeInitialized = true;
         window.fastcheckoutKoPaymentBridgeInitialized = true;
         
-        initShadowSelectorBridge();
         window.fastcheckoutKoPaymentBridgeInitCount = (window.fastcheckoutKoPaymentBridgeInitCount || 0) + 1;
         
         var scope = config.scope || 'fastcheckoutHyvaPaymentRenderers',
@@ -336,6 +334,7 @@ define([
                     getShippingMethodCode: getShippingMethodCode,
                     collectStructuredFields: collectFastcheckoutStructuredFields,
                     getShippingFormRoots: getFastcheckoutShippingFormRoots,
+                    getCheckoutProvider: getCheckoutProvider,
                     normalizeAddressAttributeMap: normalizeAddressAttributeMap,
                     getAddressAttributes: getAddressAttributes,
                     updateQuoteAddressAttributes: updateQuoteAddressAttributes,
@@ -723,10 +722,30 @@ define([
                     var wire = getMagewireComponent(),
                         prefix = isBilling ? 'billing' : '',
                         operations = [],
+                        payload = {},
                         street,
                         customAttributes,
                         extensionAttributes,
                         fields;
+
+                    function valuesEqual(current, value) {
+                        var currentJson,
+                            valueJson;
+
+                        if (typeof current === 'object' || typeof value === 'object') {
+                            currentJson = JSON.stringify(current || {});
+                            valueJson = JSON.stringify(value || {});
+
+                            // Magewire hydrates empty PHP arrays as [], while Magento's
+                            // address models expose empty attribute bags as {}.
+                            currentJson = currentJson === '[]' ? '{}' : currentJson;
+                            valueJson = valueJson === '[]' ? '{}' : valueJson;
+
+                            return currentJson === valueJson;
+                        }
+
+                        return String(current || '') === String(value || '');
+                    }
 
                     if (!wire || !address) {
                         return Promise.resolve(false);
@@ -750,15 +769,7 @@ define([
                     ];
 
                     fields.forEach(function (field) {
-                        var operation = setMagewireValue(
-                            wire,
-                            field[2],
-                            getAddressValue(address, field[0], field[1]),
-                            deferUpdates === true
-                        );
-                        if (operation && typeof operation.then === 'function') {
-                            operations.push(operation);
-                        }
+                        payload[field[2]] = getAddressValue(address, field[0], field[1]);
                     });
 
                     street = getAddressValue(address, 'street');
@@ -769,27 +780,50 @@ define([
                             [prefix ? 'billingStreet3' : 'street3', street[2]],
                             [prefix ? 'billingStreet4' : 'street4', street[3]]
                         ].forEach(function (line) {
-                            var operation = setMagewireValue(wire, line[0], line[1], deferUpdates === true);
-                            if (operation && typeof operation.then === 'function') {
-                                operations.push(operation);
-                            }
+                            payload[line[0]] = typeof line[1] === 'undefined' ? '' : line[1];
                         });
                     }
 
                     customAttributes = normalizeAddressAttributeMap(getAddressAttributes(address, 'customAttributes', 'custom_attributes'));
                     extensionAttributes = getAddressAttributes(address, 'extensionAttributes', 'extension_attributes');
 
-                    [
-                        [prefix ? 'billingCustomAttributes' : 'shippingCustomAttributes', customAttributes],
-                        [prefix ? 'billingExtensionAttributes' : 'shippingExtensionAttributes', extensionAttributes]
-                    ].forEach(function (attributeData) {
-                        var operation = setMagewireValue(wire, attributeData[0], attributeData[1], deferUpdates === true);
-                        if (operation && typeof operation.then === 'function') {
-                            operations.push(operation);
+                    payload[prefix ? 'billingCustomAttributes' : 'shippingCustomAttributes'] = customAttributes;
+                    payload[prefix ? 'billingExtensionAttributes' : 'shippingExtensionAttributes'] = extensionAttributes;
+
+                    Object.keys(payload).forEach(function (field) {
+                        var current = getProperty(wire, field),
+                            value = payload[field],
+                            equal = valuesEqual(current, value);
+
+                        if (equal) {
+                            delete payload[field];
                         }
                     });
 
-                    return operations.length ? Promise.all(operations).then(function () { return true; }) : Promise.resolve(false);
+                    if (!Object.keys(payload).length) {
+                        return Promise.resolve(false);
+                    }
+
+                    // Deferred KO safety-net updates stay local until the next intentional
+                    // request. User actions use one atomic component call instead of a POST
+                    // per address field.
+                    if (deferUpdates === true || typeof wire.call !== 'function') {
+                        Object.keys(payload).forEach(function (field) {
+                            var operation = setMagewireValue(wire, field, payload[field], deferUpdates === true);
+
+                        if (operation && typeof operation.then === 'function') {
+                            operations.push(operation);
+                        }
+                        });
+
+                        return operations.length
+                            ? Promise.all(operations).then(function () { return true; })
+                            : Promise.resolve(true);
+                    }
+
+                    return Promise.resolve(wire.call('syncAddressFields', payload)).then(function () {
+                        return true;
+                    });
                 }
 
                 function syncDomShippingAttributesToMagewire(wire, deferUpdates) {
@@ -963,7 +997,11 @@ define([
                             koField = mapping[field];
                             if (shipping[koField] !== value) {
                                 shipping[koField] = value;
-                                quote.shippingAddress.valueHasMutated();
+                                if (typeof quote.shippingAddress.valueHasMutated === 'function') {
+                                    quote.shippingAddress.valueHasMutated();
+                                } else {
+                                    quote.shippingAddress(shipping);
+                                }
                             }
                         }
 
@@ -988,7 +1026,11 @@ define([
                             koFieldBilling = billingMapping[field];
                             if (billing[koFieldBilling] !== value) {
                                 billing[koFieldBilling] = value;
-                                quote.billingAddress.valueHasMutated();
+                                if (typeof quote.billingAddress.valueHasMutated === 'function') {
+                                    quote.billingAddress.valueHasMutated();
+                                } else {
+                                    quote.billingAddress(billing);
+                                }
                             }
                         }
 
@@ -1010,7 +1052,11 @@ define([
                                 street[3] = value;
                             }
                             shipping.street = street;
-                            quote.shippingAddress.valueHasMutated();
+                            if (typeof quote.shippingAddress.valueHasMutated === 'function') {
+                                quote.shippingAddress.valueHasMutated();
+                            } else {
+                                quote.shippingAddress(shipping);
+                            }
                         }
 
                         if (
@@ -1036,7 +1082,11 @@ define([
                                 billingStreet[3] = value;
                             }
                             billing.street = billingStreet;
-                            quote.billingAddress.valueHasMutated();
+                            if (typeof quote.billingAddress.valueHasMutated === 'function') {
+                                quote.billingAddress.valueHasMutated();
+                            } else {
+                                quote.billingAddress(billing);
+                            }
                         }
                     };
                 }
@@ -1071,22 +1121,32 @@ define([
                         if (pending.email) {
                             setQuoteGuestEmail(pending.email);
                             syncEmailCompatibilityComponent(pending.email, false);
-                            operations.push(setMagewireValue(wire, 'email', pending.email, false));
+                            operations.push(function () {
+                                return setMagewireValue(wire, 'email', pending.email, false);
+                            });
                         }
 
                         if (pending.shippingAddress) {
                             shippingAddress = addressConverter.formAddressDataToQuoteAddress(pending.shippingAddress);
                             syncAddressDataToCheckoutProvider(normalizeKoAddressData(shippingAddress), 'shipping');
-                            operations.push(writeKoAddressToMagewire(shippingAddress, false, false));
+                            operations.push(function () {
+                                return writeKoAddressToMagewire(shippingAddress, false, false);
+                            });
                         }
 
                         if (pending.billingAddress) {
                             billingAddress = addressConverter.formAddressDataToQuoteAddress(pending.billingAddress);
                             syncAddressDataToCheckoutProvider(normalizeKoAddressData(billingAddress), 'billing');
-                            operations.push(writeKoAddressToMagewire(billingAddress, true, false));
+                            operations.push(function () {
+                                return writeKoAddressToMagewire(billingAddress, true, false);
+                            });
                         }
 
-                        return Promise.all(operations.filter(Boolean)).then(function () {
+                        return operations.reduce(function (promise, operation) {
+                            return promise.then(function () {
+                                return operation();
+                            });
+                        }, Promise.resolve()).then(function () {
                             if (!pending.selectedShippingRate) {
                                 return true;
                             }
@@ -1447,7 +1507,11 @@ define([
                             ? quote.shippingAddress()
                             : null;
 
-                        return writeKoAddressToMagewire(currentShippingAddress || shippingAddress, false);
+                        return Promise.resolve(
+                            writeKoAddressToMagewire(currentShippingAddress || shippingAddress, false, true)
+                        ).then(function () {
+                            return syncDomShippingAttributesToMagewire(getMagewireComponent(), true);
+                        });
                     },
                     onSelectBillingAddressAction: function (billingAddress) {
                         var addressData = normalizeKoAddressData(billingAddress),
@@ -2436,8 +2500,33 @@ define([
                 }
 
                 function getScopedPurchaseOrderInput() {
-                    var roots = getActivePaymentFormRoots(),
+                    var selectedMethod = getSelectedMethodCode(),
+                        selectedTarget,
+                        roots = getActivePaymentFormRoots(),
                         input = null;
+
+                    if (selectedMethod) {
+                        Array.prototype.slice.call(document.querySelectorAll(
+                            '[data-fastcheckout-payment-method-ko-target]'
+                        )).some(function (target) {
+                            if (!paymentMethodCodesEqual(
+                                target.getAttribute('data-fastcheckout-payment-method-ko-target'),
+                                selectedMethod
+                            )) {
+                                return false;
+                            }
+
+                            input = target.querySelector('input[name="payment[po_number]"], #po_number');
+                            if (input) {
+                                selectedTarget = target;
+                            }
+
+                            return !!input;
+                        });
+                        if (selectedTarget && input) {
+                            return input;
+                        }
+                    }
 
                     roots.some(function (root) {
                         input = root.querySelector('input[name="payment[po_number]"], #po_number');
@@ -2478,25 +2567,6 @@ define([
                     }
 
                     return null;
-                }
-
-                function fieldErrorElementHasVisibleText(element) {
-                    var style,
-                        rect;
-
-                    if (!element || !String(element.textContent || '').trim()) {
-                        return false;
-                    }
-
-                    style = window.getComputedStyle ? window.getComputedStyle(element) : null;
-                    rect = typeof element.getBoundingClientRect === 'function' ? element.getBoundingClientRect() : null;
-
-                    return !style || (
-                        style.display !== 'none' &&
-                        style.visibility !== 'hidden' &&
-                        style.opacity !== '0' &&
-                        (!rect || rect.height > 0)
-                    );
                 }
 
                 function getRequiredFieldMessage(input) {
@@ -2543,10 +2613,6 @@ define([
                     }
 
                     errorElement = getFieldValidationErrorElement(input);
-                    if (fieldErrorElementHasVisibleText(errorElement)) {
-                        return;
-                    }
-
                     if (!errorElement) {
                         errorElement = document.createElement('div');
                         errorElement.id = input.id ? input.id + '-error' : 'fastcheckout-payment-field-error';
@@ -2560,6 +2626,7 @@ define([
 
                     errorElement.textContent = message || getRequiredFieldMessage(input);
                     errorElement.style.display = 'block';
+                    errorElement.style.visibility = 'visible';
                     errorElement.classList.add('mage-error');
 
                     input.classList.add('mage-error');
@@ -2933,7 +3000,7 @@ define([
 	                        return extensionAttributes;
 	                    },
 
-	                    syncWirePaymentData: function (wire, paymentData, hookData) {
+                        syncWirePaymentData: function (wire, paymentData, hookData, deferHookUpdate) {
                             paymentData = applyPaymentDataAssigners(
                                 (hookData && hookData.paymentData) || paymentData || this.getActivePaymentData()
                             );
@@ -2973,7 +3040,7 @@ define([
                                         return false;
                                     }
 
-                                    return syncPlaceOrderHookData(wire, hookData, true);
+                                    return syncPlaceOrderHookData(wire, hookData, deferHookUpdate !== false);
                                 })
                                 .then(function (hookChanged) {
                                     return changed || !!hookChanged;
@@ -3451,10 +3518,11 @@ define([
 	                                }
 
 	                                this.syncWirePaymentData(
-                                        this.syncWire,
-                                        paymentData,
-                                        runPlaceOrderRequestModifiers(paymentData, true, true)
-                                    )
+	                                    this.syncWire,
+	                                    paymentData,
+	                                    runPlaceOrderRequestModifiers(paymentData, true, true),
+                                        false
+	                                )
 	                                    .then(function () {
                                             return selectPaymentMethodIfNeeded(this.syncWire, methodCode);
 	                                    }.bind(this))
@@ -3524,7 +3592,8 @@ define([
                                 this.syncWirePaymentData(
                                     wire,
                                     paymentData,
-                                    runPlaceOrderRequestModifiers(paymentData, true, true)
+                                    runPlaceOrderRequestModifiers(paymentData, true, true),
+                                    false
                                 )
                                     .then(function () {
                                         return selectPaymentMethodIfNeeded(wire, methodCode);

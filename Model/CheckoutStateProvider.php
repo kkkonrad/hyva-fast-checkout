@@ -283,7 +283,11 @@ class CheckoutStateProvider
         }
 
         $allowedCodes = $this->getAllowedPaymentMethodCodes($quote);
-        $hasShippingPaymentMapping = $this->helper->hasShippingPaymentMapping();
+        // A mapping can only be enforced after a shipping method is selected.
+        // Filtering against an empty rule set during address hydration clears all
+        // native Magento payment methods from the KO payment service.
+        $hasShippingPaymentMapping = $this->getSelectedShippingMethodCode($quote) !== ''
+            && $this->helper->hasShippingPaymentMapping();
 
         return array_values(array_filter($methods, function ($method) use ($allowedCodes, $hasShippingPaymentMapping): bool {
             return $this->isPaymentMethodAllowedByRules(

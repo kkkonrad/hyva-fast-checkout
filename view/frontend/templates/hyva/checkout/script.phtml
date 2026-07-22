@@ -1366,14 +1366,3 @@ window.addEventListener('alpine:init', () => Alpine.data('initCheckout', initChe
 })();
 </script>
 <?php $hyvaCsp->registerInlineScript() ?>
-<div wire:ignore>
-<style>
-@media (min-width: 1024px) {
-    /* Desktop layout keeps the address and checkout details in 2 columns. */
-    .fc-grid {
-        display: grid !important;
-        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    }
-}
-</style>
-</div>

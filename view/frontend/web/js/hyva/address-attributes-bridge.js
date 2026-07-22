@@ -7,6 +7,8 @@ define([
         var quote = options.quote,
             getCheckoutProvider = options.getCheckoutProvider,
             syncTimer = null,
+            syncInFlight = false,
+            syncPending = false,
             wireRetryCount = 0,
             magewireSyncValues = {};
 
@@ -333,6 +335,38 @@ define([
             return !value || (typeof value === 'object' && Object.keys(value).length === 0);
         }
 
+        function normalizeComparableAttributeData(value) {
+            var result;
+
+            if (value === null || typeof value === 'undefined' || value === '') {
+                return undefined;
+            }
+            if (Array.isArray(value)) {
+                result = value.map(normalizeComparableAttributeData).filter(function (item) {
+                    return typeof item !== 'undefined';
+                });
+                return result.length ? result : undefined;
+            }
+            if (typeof value === 'object') {
+                result = {};
+                Object.keys(value).sort().forEach(function (key) {
+                    var normalized = normalizeComparableAttributeData(value[key]);
+
+                    if (typeof normalized !== 'undefined') {
+                        result[key] = normalized;
+                    }
+                });
+                return Object.keys(result).length ? result : undefined;
+            }
+
+            return value;
+        }
+
+        function attributeDataEquals(first, second) {
+            return JSON.stringify(normalizeComparableAttributeData(first) || {}) ===
+                JSON.stringify(normalizeComparableAttributeData(second) || {});
+        }
+
         function setMagewireValue(wire, field, value) {
             var currentValue,
                 cachedValue;
@@ -552,6 +586,44 @@ define([
             }
 
             wireRetryCount = 0;
+            if (typeof wire.call === 'function') {
+                if (
+                    attributeDataEquals(getWireProperty(wire, 'shippingCustomAttributes'), shippingCustomAttributes) &&
+                    attributeDataEquals(getWireProperty(wire, 'shippingExtensionAttributes'), shippingExtensionAttributes) &&
+                    attributeDataEquals(getWireProperty(wire, 'billingCustomAttributes'), billingCustomAttributes) &&
+                    attributeDataEquals(getWireProperty(wire, 'billingExtensionAttributes'), billingExtensionAttributes)
+                ) {
+                    return;
+                }
+
+                if (syncInFlight) {
+                    syncPending = true;
+                    return;
+                }
+
+                syncInFlight = true;
+                syncPending = false;
+                magewireSyncValues.shippingCustomAttributes = $.extend(true, {}, shippingCustomAttributes);
+                magewireSyncValues.shippingExtensionAttributes = $.extend(true, {}, shippingExtensionAttributes);
+                magewireSyncValues.billingCustomAttributes = $.extend(true, {}, billingCustomAttributes);
+                magewireSyncValues.billingExtensionAttributes = $.extend(true, {}, billingExtensionAttributes);
+                Promise.resolve(wire.call('syncAddressFields', {
+                    shippingCustomAttributes: shippingCustomAttributes,
+                    shippingExtensionAttributes: shippingExtensionAttributes,
+                    billingCustomAttributes: billingCustomAttributes,
+                    billingExtensionAttributes: billingExtensionAttributes
+                })).catch(function () {
+                    // A later provider event can retry; never create a rejection loop here.
+                }).then(function () {
+                    syncInFlight = false;
+                    if (syncPending) {
+                        syncPending = false;
+                        schedule('shippingAddress.custom_attributes');
+                    }
+                });
+                return;
+            }
+
             setMagewireValue(wire, 'shippingCustomAttributes', shippingCustomAttributes);
             setMagewireValue(wire, 'shippingExtensionAttributes', shippingExtensionAttributes);
             setMagewireValue(wire, 'billingCustomAttributes', billingCustomAttributes);

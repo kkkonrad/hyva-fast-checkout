@@ -939,6 +939,38 @@ class CheckoutTest extends TestCase
         $this->assertSame('00-001', $this->checkoutComponent->postcode);
     }
 
+    public function testSyncAddressFieldsPersistsAddressAttributeBagsInOneSave(): void
+    {
+        $shippingAddressMock = $this->createAddressMock();
+        $this->quoteMock->method('getShippingAddress')->willReturn($shippingAddressMock);
+        $this->checkoutComponent->billingSameAsShipping = false;
+
+        $shippingAddressMock->expects($this->once())
+            ->method('setCollectShippingRates')
+            ->with(false);
+        $this->cartRepositoryMock->expects($this->once())
+            ->method('save')
+            ->with($this->quoteMock);
+
+        $this->checkoutComponent->syncAddressFields([
+            'shippingCustomAttributes' => [
+                ['attribute_code' => 'delivery_note', 'value' => 'Leave at reception'],
+            ],
+            'shippingExtensionAttributes' => [
+                'delivery_code' => 'ABC-123',
+            ],
+        ]);
+
+        $this->assertSame(
+            ['delivery_note' => 'Leave at reception'],
+            $this->checkoutComponent->shippingCustomAttributes
+        );
+        $this->assertSame(
+            ['delivery_code' => 'ABC-123'],
+            $this->checkoutComponent->shippingExtensionAttributes
+        );
+    }
+
     public function testSyncAddressFieldsSkipsQuoteSaveWhenOnlyPaymentMethodChanges(): void
     {
         $this->checkoutComponent->firstname = 'Gosc';
@@ -1665,6 +1697,35 @@ class CheckoutTest extends TestCase
         $this->assertSame(['cashondelivery'], array_map(static function (PaymentMethodInterface $method): string {
             return $method->getCode();
         }, $methods));
+    }
+
+    public function testGetAllowedPaymentMethodsDoesNotApplyMappingBeforeShippingSelection(): void
+    {
+        $this->quoteMock->method('getId')->willReturn(42);
+
+        $shippingAddressMock = $this->createAddressMock();
+        $shippingAddressMock->method('getShippingMethod')->willReturn('');
+        $this->quoteMock->method('getShippingAddress')->willReturn($shippingAddressMock);
+
+        $this->paymentMethodManagementMock->expects($this->once())
+            ->method('getList')
+            ->with(42)
+            ->willReturn([
+                $this->createPaymentMethodMock('checkmo'),
+                $this->createPaymentMethodMock('cashondelivery'),
+            ]);
+        $this->helperMock->method('hasShippingPaymentMapping')->willReturn(true);
+        $this->helperMock->expects($this->never())
+            ->method('getMappedPaymentMethodsForShipping');
+
+        $methods = $this->checkoutComponent->getAllowedPaymentMethods();
+
+        $this->assertSame(['checkmo', 'cashondelivery'], array_map(
+            static function (PaymentMethodInterface $method): string {
+                return $method->getCode();
+            },
+            $methods
+        ));
     }
 
     public function testGetAllowedPaymentMethodsUsesCurrentMagewireShippingMethodBeforeStaleQuoteValue(): void

@@ -38,7 +38,7 @@
                 <field id="assign_order_to_customer" translate="label comment" type="select"
                        sortOrder="4" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Assign order to customer if customer were not logged in (by email)?</label>
-                    <comment>If Yes, a guest order is linked to the customer account that matches the order email (same website). The shopper is not logged in automatically.</comment>
+                    <comment>Security warning: enable only if the store verifies ownership of the guest email. Matching an email address alone can attach an order, its addresses, and downloadable purchases to an existing customer account.</comment>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                 </field>
                 <field id="show_subscribe" translate="label" type="select"

@@ -4,8 +4,10 @@
  *
  * @var \Kkkonrad\Fastcheckout\Block\Hyva\Checkout $block
  * @var \Magento\Framework\Escaper $escaper
+ * @var \Hyva\Theme\ViewModel\HyvaCsp $hyvaCsp
  */
 
+$hyvaCsp = $block->getHyvaCsp();
 $checkoutConfig = $block->getCheckoutConfig();
 $paymentMethods = $block->getData('payment_methods');
 if (!is_array($paymentMethods) || $paymentMethods === []) {
@@ -56,74 +58,6 @@ $mageInitConfig = [
 ];
 $block->ensureRequireJsAssets();
 ?>
-<style>
-    .fastcheckout-ko-payment-root .payment-method-title,
-    .fastcheckout-ko-payment-root .payment-method-billing-address,
-    .fastcheckout-payment-method-ko-container .payment-method-title,
-    .fastcheckout-payment-method-ko-container .payment-method-billing-address,
-    .fastcheckout-native-place-order-hidden,
-    .fastcheckout-actions-toolbar-hidden {
-        display: none !important;
-        pointer-events: none !important;
-        visibility: hidden !important;
-        position: absolute !important;
-        width: 1px !important;
-        height: 1px !important;
-        overflow: hidden !important;
-        clip: rect(0, 0, 0, 0) !important;
-    }
-    .required-captcha.checkbox {
-        position: absolute !important;
-        display: block !important;
-        visibility: visible !important;
-        overflow: hidden !important;
-        opacity: 0 !important;
-        width: 1px !important;
-        height: 1px !important;
-        padding: 0 !important;
-        border: none !important;
-    }
-    .recaptcha-checkout-place-order .field {
-        margin: 0 !important;
-        padding: 0 !important;
-        height: 0 !important;
-        overflow: hidden !important;
-    }
-    .modal-popup,
-    .modal-slide {
-        position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-        right: 0 !important;
-        bottom: 0 !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
-        z-index: 9999 !important;
-        transition: opacity 0.3s ease, visibility 0s 0.3s !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        pointer-events: none !important;
-    }
-    .modal-popup._show,
-    .modal-slide._show {
-        visibility: visible !important;
-        opacity: 1 !important;
-        transition: opacity 0.3s ease !important;
-        pointer-events: auto !important;
-    }
-    .modals-overlay {
-        position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-        right: 0 !important;
-        bottom: 0 !important;
-        background: rgba(0, 0, 0, 0.6) !important;
-        backdrop-filter: blur(4px) !important;
-        z-index: 9998 !important;
-    }
-</style>
-
 <?php
 $layoutAssets = $block->getCheckoutLayoutAssets();
 foreach ($layoutAssets['css'] as $cssAsset) {
@@ -228,129 +162,6 @@ foreach ($layoutAssets['css'] as $cssAsset) {
         document.head.appendChild(script);
     }
 
-    var originalGetElementById = document.getElementById;
-    var originalQuerySelector = document.querySelector;
-    var originalQuerySelectorAll = document.querySelectorAll;
-    var originalGetElementsByClassName = document.getElementsByClassName;
-
-    function getFastcheckoutRoot() {
-        return originalGetElementById.call(document, 'fastcheckout-checkout');
-    }
-
-    function shouldSkipShadowLookup(selector) {
-        return typeof selector === 'string' && (
-            selector.indexOf('wire:') !== -1 ||
-            selector.indexOf('x-') !== -1 ||
-            selector.indexOf('[wire') !== -1 ||
-            selector.indexOf('[x-') !== -1 ||
-            selector.indexOf('livewire') !== -1 ||
-            selector.indexOf('alpine') !== -1
-        );
-    }
-
-    function getPaymentPlaceholders() {
-        if (!getFastcheckoutRoot()) {
-            return [];
-        }
-
-        return originalQuerySelectorAll.call(document, '[data-fastcheckout-payment-method-ko-target]');
-    }
-
-    function setupDomOverrides() {
-        if (window.fastcheckoutKoDomOverridesApplied || !getFastcheckoutRoot()) {
-            return;
-        }
-
-        window.fastcheckoutKoDomOverridesApplied = true;
-
-        document.getElementById = function (id) {
-            var el = originalGetElementById.call(document, id);
-            if (!el) {
-                var placeholders = getPaymentPlaceholders();
-                for (var i = 0; i < placeholders.length; i++) {
-                    if (placeholders[i].shadowRoot) {
-                        el = placeholders[i].shadowRoot.getElementById(id);
-                        if (el) break;
-                    }
-                }
-            }
-            return el;
-        };
-
-        document.querySelector = function (selector) {
-            var el = null;
-            try {
-                el = originalQuerySelector.call(document, selector);
-            } catch (e) {
-                throw e;
-            }
-            if (!el) {
-                if (shouldSkipShadowLookup(selector)) {
-                    return el;
-                }
-
-                var placeholders = getPaymentPlaceholders();
-                for (var i = 0; i < placeholders.length; i++) {
-                    if (placeholders[i].shadowRoot) {
-                        try {
-                            el = placeholders[i].shadowRoot.querySelector(selector);
-                            if (el) break;
-                        } catch (e) {
-                            // Ignore query errors in shadow DOM
-                        }
-                    }
-                }
-            }
-            return el;
-        };
-
-        document.querySelectorAll = function (selector) {
-            var lightList = [];
-            try {
-                lightList = Array.from(originalQuerySelectorAll.call(document, selector));
-            } catch (e) {
-                throw e;
-            }
-            
-            if (shouldSkipShadowLookup(selector)) {
-                return lightList;
-            }
-
-            var shadowElements = [];
-            var placeholders = getPaymentPlaceholders();
-            for (var i = 0; i < placeholders.length; i++) {
-                if (placeholders[i].shadowRoot) {
-                    try {
-                        placeholders[i].shadowRoot.querySelectorAll(selector).forEach(function (el) {
-                            shadowElements.push(el);
-                        });
-                    } catch (e) {
-                        // Ignore query errors in shadow DOM
-                    }
-                }
-            }
-            return lightList.concat(shadowElements);
-        };
-
-        document.getElementsByClassName = function (className) {
-            var lightList = Array.from(originalGetElementsByClassName.call(document, className));
-            var shadowElements = [];
-            var placeholders = getPaymentPlaceholders();
-            for (var i = 0; i < placeholders.length; i++) {
-                if (placeholders[i].shadowRoot) {
-                    try {
-                        placeholders[i].shadowRoot.querySelectorAll('.' + className).forEach(function (el) {
-                            shadowElements.push(el);
-                        });
-                    } catch (e) {
-                        // Ignore
-                    }
-                }
-            }
-            return lightList.concat(shadowElements);
-        };
-    }
-
     function initCheckoutBridge() {
         if (
             started ||
@@ -361,8 +172,6 @@ foreach ($layoutAssets['css'] as $cssAsset) {
         ) {
             return;
         }
-
-        setupDomOverrides();
 
         started = true;
         window.fastcheckoutKoCheckoutRenderersStarted = true;
@@ -414,3 +223,4 @@ foreach ($layoutAssets['css'] as $cssAsset) {
     startAfterMagewire();
 })();
 </script>
+<?php $hyvaCsp->registerInlineScript() ?>
