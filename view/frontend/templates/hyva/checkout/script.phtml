@@ -811,7 +811,7 @@ function initCheckout() {
 
         _validateEl(el) {
             const wrapper = el.closest('label');
-            let msg = wrapper ? wrapper.querySelector('.field-error') : null;
+            let msg = wrapper ? wrapper.querySelector('.messages') : null;
             const errorId = (el.id || el.name || el.dataset.wireField || Math.random().toString(36).substring(2, 9)) + '-error';
 
             // Custom validation rules
@@ -872,22 +872,24 @@ function initCheckout() {
             }
 
             if (!el.validity.valid) {
-                el.classList.add('border-red-400', 'ring-1', 'ring-red-400');
-                el.classList.remove('border-gray-300');
+                if (wrapper) {
+                    wrapper.classList.add('field-error');
+                }
                 el.setAttribute('aria-invalid', 'true');
                 el.setAttribute('aria-describedby', errorId);
 
                 if (!msg && wrapper) {
                     msg = document.createElement('span');
                     msg.id = errorId;
-                    msg.className = 'field-error mt-1 text-xs text-red-600 block';
+                    msg.className = 'messages';
                     msg.setAttribute('role', 'alert');
                     wrapper.appendChild(msg);
                 }
                 if (msg) msg.textContent = el.validationMessage;
             } else {
-                el.classList.remove('border-red-400', 'ring-1', 'ring-red-400');
-                el.classList.add('border-gray-300');
+                if (wrapper) {
+                    wrapper.classList.remove('field-error');
+                }
                 el.removeAttribute('aria-invalid');
                 el.removeAttribute('aria-describedby');
                 if (msg) msg.remove();

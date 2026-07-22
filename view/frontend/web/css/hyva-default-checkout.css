@@ -1,0 +1,63 @@
+/*
+ * Keep the Fastcheckout form on the public Hyva/default design tokens.
+ * Child themes can still style the surrounding page, while checkout controls,
+ * buttons and validation retain the baseline Hyva appearance.
+ */
+#fastcheckout-checkout,
+.fastcheckout-ko-payment-root {
+    --color-primary-lighter: oklch(52% 0.2 265);
+    --color-primary: oklch(46% 0.2 265);
+    --color-primary-darker: oklch(28% 0.2 265);
+    --color-secondary-lighter: oklch(72% 0.2 150);
+    --color-secondary: oklch(53% 0.15 150);
+    --color-secondary-darker: oklch(39% 0.1 153);
+    --color-on-primary: #fff;
+    --color-on-secondary: #fff;
+    --form-radius: var(--radius-lg);
+    --form-stroke: var(--color-slate-400);
+    --form-active-color: var(--color-primary);
+}
+
+#fastcheckout-checkout :is(.form-input, .form-textarea, .form-select, .form-multiselect) {
+    min-height: initial;
+    border-color: var(--form-stroke);
+    border-radius: var(--form-radius);
+    background-color: var(--form-bg);
+    color: var(--form-color);
+    font-size: inherit;
+    box-shadow: none;
+}
+
+#fastcheckout-checkout :is(.form-input, .form-textarea, .form-select, .form-multiselect):focus {
+    border-color: var(--form-active-color);
+    outline-color: var(--form-active-color);
+    box-shadow: none;
+}
+
+#fastcheckout-checkout label.field > span:first-child {
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+#fastcheckout-checkout .field.field-error .messages {
+    display: block;
+    max-width: fit-content;
+    margin-top: 0.25rem;
+    color: var(--color-red-600);
+    font-size: var(--text-sm);
+}
+
+/* Restore Hyva/default button metrics after child-theme overrides. */
+#fastcheckout-checkout .btn {
+    min-height: initial;
+    padding-inline: calc(var(--spacing) * 4);
+    border-radius: var(--radius-lg);
+    font-size: inherit;
+    letter-spacing: normal;
+    text-transform: none;
+    transform: none;
+}
+
+#fastcheckout-checkout .btn:hover {
+    transform: none;
+}

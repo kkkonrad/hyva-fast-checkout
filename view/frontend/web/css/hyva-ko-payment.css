@@ -48,7 +48,6 @@
 .fastcheckout-payment-method-ko-container .payment-method-content {
     display: block;
     padding: 1rem;
-    font-size: 0.875rem;
 }
 
 .fastcheckout-ko-payment-root img,
@@ -59,7 +58,7 @@
 
 .fastcheckout-ko-payment-root .field,
 .fastcheckout-payment-method-ko-container .field {
-    margin-bottom: 1rem;
+    margin-bottom: 1.75rem;
 }
 
 .fastcheckout-ko-payment-root input[type='text'],
@@ -74,10 +73,6 @@
 .fastcheckout-payment-method-ko-container select {
     width: 100%;
     max-width: 100%;
-    border: 1px solid #d1d5db;
-    border-radius: 0.375rem;
-    background: #fff;
-    padding: 0.5rem 0.75rem;
 }
 
 .fastcheckout-ko-payment-root .checkout-agreements-block,
@@ -134,7 +129,7 @@
     padding: 0 !important;
     display: inline-block !important;
     font-size: 0.875rem !important;
-    color: #374151 !important;
+    color: var(--color-fg-secondary) !important;
     line-height: 1.25 !important;
 }
 
@@ -144,7 +139,7 @@
     border: none !important;
     padding: 0 !important;
     margin: 0 !important;
-    color: #3b82f6 !important;
+    color: var(--color-primary) !important;
     text-decoration: underline !important;
     cursor: pointer !important;
     font-size: 0.875rem !important;
@@ -156,7 +151,7 @@
 
 .fastcheckout-ko-payment-root a,
 .fastcheckout-payment-method-ko-container a {
-    color: #2563eb;
+    color: var(--color-primary);
     text-decoration: underline;
 }
 
@@ -179,8 +174,8 @@
 }
 
 [data-fastcheckout-payment-option]:has(input[name="payment_method"]:checked) {
-    border-color: #2563eb !important; /* border-blue-600 */
-    background-color: rgba(239, 246, 255, 0.1) !important; /* bg-blue-50/10 */
+    border-color: var(--color-primary) !important;
+    background-color: color-mix(in srgb, var(--color-primary) 5%, transparent) !important;
     box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important; /* shadow-sm */
 }
 
@@ -190,11 +185,11 @@
 .fastcheckout-ko-payment-root .payment-method-content > p {
     display: block;
     padding: 0.75rem 1rem;
-    background-color: #eff6ff; /* Blue 50 */
-    border-left: 4px solid #3b82f6; /* Blue 500 */
+    background-color: color-mix(in srgb, var(--color-primary) 8%, white);
+    border-left: 4px solid var(--color-primary);
     border-radius: 0 0.5rem 0.5rem 0;
     font-size: 0.875rem;
-    color: #1e3a8a; /* Blue 900 */
+    color: var(--color-primary-darker);
     line-height: 1.6;
     margin: 0;
     box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
@@ -205,11 +200,11 @@
 .fastcheckout-ko-payment-root .items.check.payable {
     display: block;
     padding: 1rem;
-    background-color: #eff6ff; /* Blue 50 */
-    border-left: 4px solid #3b82f6; /* Blue 500 */
+    background-color: color-mix(in srgb, var(--color-primary) 8%, white);
+    border-left: 4px solid var(--color-primary);
     border-radius: 0 0.5rem 0.5rem 0;
     font-size: 0.875rem;
-    color: #1e3a8a; /* Blue 900 */
+    color: var(--color-primary-darker);
     line-height: 1.6;
     margin: 0;
     box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
@@ -218,7 +213,7 @@
 .fastcheckout-payment-method-ko-container .items.check.payable dt,
 .fastcheckout-ko-payment-root .items.check.payable dt {
     font-weight: 600;
-    color: #1e3a8a;
+    color: var(--color-primary-darker);
     margin-top: 0.5rem;
 }
 
@@ -250,37 +245,10 @@
     margin: 0;
 }
 
-.fastcheckout-payment-method-ko-container .field {
-    margin-bottom: 1.25rem;
-}
-
-.fastcheckout-payment-method-ko-container .field .label {
-    display: block;
-    margin-bottom: 0.375rem;
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: #374151; /* Gray 700 */
-}
-
 .fastcheckout-payment-method-ko-container input.input-text,
 .fastcheckout-payment-method-ko-container select {
     width: 100%;
     max-width: 100%;
-    border: 1px solid #d1d5db;
-    border-radius: 0.375rem;
-    background: #fff;
-    padding: 0.625rem 0.875rem;
-    font-size: 0.875rem;
-    color: #111827;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
-}
-
-.fastcheckout-payment-method-ko-container input.input-text:focus,
-.fastcheckout-payment-method-ko-container select:focus {
-    outline: none;
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
 }
 
 /* Styling for jQuery validation / Knockout error messages and invalid input states */
@@ -291,39 +259,9 @@
 .fastcheckout-payment-method-ko-container .msg__error,
 .fastcheckout-ko-payment-root .msg__error {
     display: block;
-    color: #ef4444 !important; /* Red 500 */
-    font-size: 0.7rem !important;
-    margin-top: 0.375rem;
-    font-weight: 500;
-}
-
-input.mage-error,
-select.mage-error,
-textarea.mage-error,
-input.msg__error,
-select.msg__error,
-textarea.msg__error,
-.fastcheckout-payment-method-ko-container input.mage-error,
-.fastcheckout-payment-method-ko-container select.mage-error,
-.fastcheckout-payment-method-ko-container input.error,
-.fastcheckout-payment-method-ko-container select.error {
-    border-color: #f87171 !important; /* Red 400 */
-    background-color: #fef2f2 !important; /* Red 50 */
-}
-
-input.mage-error:focus,
-select.mage-error:focus,
-textarea.mage-error:focus,
-input.msg__error:focus,
-select.msg__error:focus,
-textarea.msg__error:focus,
-.fastcheckout-payment-method-ko-container input.mage-error:focus,
-.fastcheckout-payment-method-ko-container select.mage-error:focus,
-.fastcheckout-payment-method-ko-container input.error:focus,
-.fastcheckout-payment-method-ko-container select.error:focus {
-    outline: none;
-    border-color: #ef4444 !important;
-    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+    margin-top: 0.25rem;
+    color: var(--color-red-600) !important;
+    font-size: var(--text-sm) !important;
 }
 
 /* InPost Paczkomaty / Locker Widget Styles */
@@ -475,44 +413,29 @@ body.fastcheckout-scroll-locked {
     display: none !important; /* Hide standard legend */
 }
 
-.payment-method-content .braintree .field {
-    margin-bottom: 1.25rem;
-}
-
-.payment-method-content .braintree .field .label {
-    display: block;
-    margin-bottom: 0.375rem;
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: #374151; /* Gray 700 */
-}
-
 /* Hosted Field Container (the pseudo-input) */
 .payment-method-content .hosted-control {
     display: block;
     width: 100%;
-    height: 42px; /* Set fixed height so the iframe has space */
-    border: 1px solid #d1d5db;
-    border-radius: 0.375rem;
-    background-color: #ffffff;
-    padding: 0 12px; /* Vertical padding 0 to prevent vertical cutoff, horizontal padding 12px */
-    font-size: 0.875rem;
-    color: #111827;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    height: 42px;
+    border: 1px solid var(--form-stroke);
+    border-radius: var(--form-radius);
+    background-color: var(--form-bg);
+    padding: 0 var(--form-px);
+    color: var(--form-color);
     box-sizing: border-box;
-    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    transition: border-color 0.15s ease-in-out;
 }
 
 .payment-method-content .hosted-control:focus-within,
 .payment-method-content .hosted-control.braintree-hosted-fields-focused {
-    outline: none;
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+    border-color: var(--form-active-color);
+    outline: 1px solid var(--form-active-color);
 }
 
 .payment-method-content .hosted-control.braintree-hosted-fields-invalid {
-    border-color: #f87171 !important;
-    background-color: #fef2f2 !important;
+    border-color: var(--form-stroke) !important;
+    background-color: var(--form-bg) !important;
 }
 
 .payment-method-content .hosted-control iframe {
@@ -790,7 +713,7 @@ body.fastcheckout-scroll-locked {
 
 .modal-popup .modal-footer .action-primary,
 .modal-slide .modal-footer .action-primary {
-    background-color: #3b82f6 !important;
+    background-color: var(--color-primary) !important;
     color: #ffffff !important;
     border: none !important;
 }

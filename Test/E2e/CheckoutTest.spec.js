@@ -3281,9 +3281,68 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
         await emailInput.focus();
         await emailInput.blur();
 
-        const errorMsg = page.locator('label:has(input[data-wire-field="email"]) .field-error');
+        const emailField = page.locator('label:has(input[data-wire-field="email"])');
+        const errorMsg = emailField.locator('.messages');
         await expect(errorMsg).toBeVisible();
-        await expect(emailInput).toHaveClass(/border-red-400/);
+        await expect(emailField).toHaveClass(/field-error/);
+        await expect(emailInput).toHaveAttribute('aria-invalid', 'true');
+    });
+
+    test('should use Hyva default form control styles', async ({ page }) => {
+        const checkout = new CheckoutPage(page);
+        await checkout.goto();
+
+        await page.locator(selectors.email).focus();
+
+        const styles = await page.locator('#fastcheckout-checkout').evaluate((checkoutRoot) => {
+            const input = checkoutRoot.querySelector('input[data-wire-field="email"]');
+            const checkbox = checkoutRoot.querySelector('input.form-checkbox');
+            const button = checkoutRoot.querySelector('.btn-primary');
+            const inputStyle = window.getComputedStyle(input);
+            const checkboxStyle = window.getComputedStyle(checkbox);
+            const buttonStyle = window.getComputedStyle(button);
+
+            return {
+                input: {
+                    borderColor: inputStyle.borderColor,
+                    borderRadius: inputStyle.borderRadius,
+                    boxShadow: inputStyle.boxShadow,
+                    fontSize: inputStyle.fontSize,
+                    minHeight: inputStyle.minHeight
+                },
+                checkbox: {
+                    width: checkboxStyle.width,
+                    height: checkboxStyle.height
+                },
+                button: {
+                    backgroundColor: buttonStyle.backgroundColor,
+                    borderRadius: buttonStyle.borderRadius,
+                    fontSize: buttonStyle.fontSize,
+                    minHeight: buttonStyle.minHeight,
+                    textTransform: buttonStyle.textTransform
+                }
+            };
+        });
+
+        expect(styles.input.borderColor).toBe(styles.button.backgroundColor);
+        expect(styles).toMatchObject({
+            input: {
+                borderRadius: '8px',
+                boxShadow: 'none',
+                fontSize: '16px',
+                minHeight: '0px'
+            },
+            checkbox: {
+                width: '18px',
+                height: '18px'
+            },
+            button: {
+                borderRadius: '8px',
+                fontSize: '16px',
+                minHeight: 'auto',
+                textTransform: 'none'
+            }
+        });
     });
 
     test('should show inline validation messages after mobile place-order submit', async ({ page }) => {
@@ -3303,7 +3362,7 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
         const mobileOrderBar = page.locator('[wire\\:key="mobile-sticky-order-bar"]');
         await mobileOrderBar.locator('button[type="submit"]').evaluate((button) => button.click());
 
-        const errorMessage = page.locator('label[for="co-shipping-email"] .field-error');
+        const errorMessage = page.locator('label[for="co-shipping-email"] .messages');
         await expect(errorMessage).toBeVisible();
         await expect(errorMessage).not.toHaveText('');
         await expect(emailInput).toHaveAttribute('aria-invalid', 'true');

@@ -21,7 +21,7 @@ foreach ($paymentMethods as $paymentMethod) {
 <!-- Container 3: Payment Method -->
 <div class="fc-container-3 space-y-6 min-w-0 w-full">
 <!-- Payment Methods Section -->
-<div class="card bg-white p-4 md:p-6 shadow rounded-lg border border-gray-200 relative" wire:key="checkout-payment-methods-card">
+<div class="card relative" wire:key="checkout-payment-methods-card">
     <div class="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
         <h2 class="text-xl font-semibold text-gray-900">
             <?= $escaper->escapeHtml(__('Payment Method')) ?>
@@ -42,7 +42,7 @@ foreach ($paymentMethods as $paymentMethod) {
                  wire:target="countryId,regionId,region,postcode,city,street1,street2,fillFromSavedAddress,selectShippingMethod"
                  class="absolute inset-0 bg-white/80 backdrop-blur-[1px] z-20 rounded items-center justify-center transition-all duration-200"
                  style="display: none;">
-                <svg class="animate-spin h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24">
+                <svg class="animate-spin h-8 w-8 text-primary" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
@@ -60,7 +60,7 @@ foreach ($paymentMethods as $paymentMethod) {
                      <?= $isPaymentMethodAllowed ? '' : 'style="display:none;" aria-hidden="true"' ?>>
                     <label class="flex items-center gap-3 p-3 cursor-pointer hover:bg-gray-50/50 mb-0">
                         <input type="radio"
-                               class="form-radio h-4 w-4 text-blue-600 focus:ring-blue-500"
+                               class="form-radio"
                                name="payment_method"
                                value="<?= $escaper->escapeHtmlAttr($methodCode) ?>"
                                data-fastcheckout-payment-option-input="<?= $escaper->escapeHtmlAttr($methodCode) ?>"

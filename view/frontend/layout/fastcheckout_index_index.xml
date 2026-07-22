@@ -4,6 +4,7 @@
       xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
     <head>
         <css src="Kkkonrad_Fastcheckout::css/hyva-ko-payment.css"/>
+        <css src="Kkkonrad_Fastcheckout::css/hyva-default-checkout.css"/>
     </head>
     <body>
         <referenceBlock name="page.main.title" remove="true"/>

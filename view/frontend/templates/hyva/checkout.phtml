@@ -38,7 +38,7 @@ $allowedPaymentMethodCodes = $magewire->getAllowedPaymentMethodCodes();
 
     <!-- Empty State -->
     <?php if (!$items): ?>
-        <div class="card text-center py-16 bg-white shadow rounded-lg border border-gray-200">
+        <div class="card text-center py-16">
             <h2 class="text-2xl font-semibold text-gray-900">
                 <?= $escaper->escapeHtml(__('Your cart is empty.')) ?>
             </h2>
