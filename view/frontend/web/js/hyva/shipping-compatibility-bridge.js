@@ -14,7 +14,81 @@ define(['jquery'], function ($) {
             hasConfiguredEmailComponent = deps.hasConfiguredEmailComponent === true,
             standardShippingViewSelectMethod = null,
             standardShippingInformationComponent = null,
-            standardEmailComponent = null;
+            standardEmailComponent = null,
+            initialRegionValidationState = window.fastcheckoutInitialRegionValidationState || {
+                interacted: false,
+                validationRequested: false,
+                registered: false
+            };
+
+        window.fastcheckoutInitialRegionValidationState = initialRegionValidationState;
+
+        function isShippingRegionInput(element) {
+            return Boolean(
+                element &&
+                element.matches &&
+                element.matches(
+                    '.fastcheckout-native-shipping-address [name="region_id"], ' +
+                    '.fastcheckout-native-shipping-address [name="region"]'
+                )
+            );
+        }
+
+        function clearPrematureRegionValidation(component) {
+            var value,
+                error;
+
+            if (
+                !component ||
+                initialRegionValidationState.interacted ||
+                initialRegionValidationState.validationRequested
+            ) {
+                return;
+            }
+
+            value = typeof component.value === 'function' ? component.value() : component.value;
+            error = typeof component.error === 'function' ? component.error() : '';
+
+            if (!String(value || '').trim() && error && typeof component.error === 'function') {
+                component.error('');
+            }
+        }
+
+        function registerInitialRegionValidationGuard() {
+            var regionComponentName =
+                'checkout.steps.shipping-step.shippingAddress.shipping-address-fieldset.region_id';
+
+            if (!initialRegionValidationState.registered) {
+                initialRegionValidationState.registered = true;
+
+                ['pointerdown', 'keydown', 'change'].forEach(function (eventName) {
+                    document.addEventListener(eventName, function (event) {
+                        if (isShippingRegionInput(event.target)) {
+                            initialRegionValidationState.interacted = true;
+                        }
+                    }, true);
+                });
+            }
+
+            if (!registry || typeof registry.async !== 'function') {
+                return;
+            }
+
+            registry.async(regionComponentName)(function (component) {
+                if (!component || component.fastcheckoutInitialValidationGuard) {
+                    return;
+                }
+
+                component.fastcheckoutInitialValidationGuard = true;
+                clearPrematureRegionValidation(component);
+
+                if (component.error && typeof component.error.subscribe === 'function') {
+                    component.error.subscribe(function () {
+                        clearPrematureRegionValidation(component);
+                    });
+                }
+            });
+        }
 
         function prepareShippingViewCompatibilityComponent() {
             var component = getShippingAddressComponent(),
@@ -99,6 +173,7 @@ define(['jquery'], function ($) {
                         return true;
                     }
 
+                    initialRegionValidationState.validationRequested = true;
                     window.fastcheckoutKoShippingViewValidationActive = true;
                     try {
                         provider = getCheckoutProvider();
@@ -309,6 +384,7 @@ define(['jquery'], function ($) {
         }
 
         function init() {
+            registerInitialRegionValidationGuard();
             registerShippingViewCompatibilityValidator();
             registerShippingInformationCompatibilityComponent();
             registerEmailCompatibilityComponent();

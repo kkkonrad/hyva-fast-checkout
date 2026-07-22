@@ -172,6 +172,14 @@
 }
 
 /* Only the street group has a visible label; line labels remain accessible. */
+#fastcheckout-checkout .fastcheckout-native-shipping-address .field.street > :is(
+    .control,
+    .admin__control-fields
+) {
+    display: grid;
+    gap: 0.75rem;
+}
+
 #fastcheckout-checkout .fastcheckout-native-shipping-address .field.street :is(
     .control,
     .admin__control-fields

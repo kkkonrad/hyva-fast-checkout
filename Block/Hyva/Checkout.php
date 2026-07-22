@@ -709,7 +709,34 @@ class Checkout extends Template
             $children['customer-email']['template'] = 'Magento_Checkout/form/element/email';
         }
 
-        return $children;
+        return $this->translateShippingAddressConfig($children);
+    }
+
+    /**
+     * Resolve address labels on the server as well as through Magento's KO
+     * translate binding. This avoids an English-label flash when the JS
+     * translation dictionary is still loading on the custom checkout route.
+     *
+     * @param array $config
+     * @return array
+     */
+    private function translateShippingAddressConfig(array $config): array
+    {
+        foreach ($config as $key => $value) {
+            if (is_array($value)) {
+                $config[$key] = $this->translateShippingAddressConfig($value);
+                continue;
+            }
+
+            if (
+                is_string($value) &&
+                in_array((string)$key, ['label', 'caption', 'notice', 'placeholder'], true)
+            ) {
+                $config[$key] = (string)__($value);
+            }
+        }
+
+        return $config;
     }
 
     /**

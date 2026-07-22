@@ -115,6 +115,47 @@ export class CheckoutPage {
 
 test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
 
+    test('should start with translated untouched shipping address fields', async ({ page }) => {
+        const checkout = new CheckoutPage(page);
+        await checkout.goto();
+
+        const shippingRoot = page.locator('.fastcheckout-native-shipping-address');
+        await expect(shippingRoot.getByLabel('Adres e-mail')).toBeVisible();
+        await expect(shippingRoot.getByLabel('Imię')).toBeVisible();
+        await expect(shippingRoot.getByLabel('Nazwisko')).toBeVisible();
+        await expect(shippingRoot.getByLabel('Kraj')).toBeVisible();
+        await expect(shippingRoot.getByLabel('Województwo').first()).toBeVisible();
+        await expect(shippingRoot.getByLabel('Miasto')).toBeVisible();
+        await expect(shippingRoot.getByLabel('Kod pocztowy')).toBeVisible();
+        await expect(shippingRoot.getByLabel('Numer telefonu')).toBeVisible();
+
+        const region = shippingRoot.locator('select[name="region_id"]');
+        const regionField = region.locator('xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " field ")][1]');
+        await expect(region).toHaveValue('');
+        await expect(region).toHaveAttribute('aria-invalid', 'false');
+        await expect(regionField.locator('.field-error')).toHaveCount(0);
+
+        const streetGap = await shippingRoot.locator(
+            '.field.street > .control, .field.street > .admin__control-fields'
+        ).evaluate((control) => getComputedStyle(control).rowGap);
+        expect(streetGap).toBe('12px');
+
+        const backgroundValidation = await page.evaluate(() => new Promise((resolve) => {
+            window.require(['uiRegistry'], (registry) => {
+                const component = registry.get(
+                    'checkout.steps.shipping-step.shippingAddress.shipping-address-fieldset.region_id'
+                );
+
+                component.error('To jest wymagane pole.');
+                window.setTimeout(() => resolve(component.error()), 0);
+            }, (error) => resolve(String(error)));
+        }));
+
+        expect(backgroundValidation).toBe('');
+        await expect(region).toHaveAttribute('aria-invalid', 'false');
+        await expect(regionField.locator('.field-error')).toHaveCount(0);
+    });
+
     test('should render Magento standard shipping fields and validation', async ({ page }) => {
         const pageErrors = [];
         page.on('pageerror', (error) => pageErrors.push(error.message));
