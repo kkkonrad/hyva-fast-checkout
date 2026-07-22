@@ -442,6 +442,12 @@ body.checkout-submitting .btn-primary {
     pointer-events: none !important;
 }
 
+/* Place-order scroll freeze (body position:fixed applied from Alpine). */
+body.fastcheckout-scroll-locked {
+    overscroll-behavior: none;
+    touch-action: none;
+}
+
 /* ── Braintree Payments Styling ─────────────────────────────────────────── */
 .payment-method-content .braintree {
     border: none;

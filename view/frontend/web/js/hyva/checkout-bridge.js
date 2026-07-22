@@ -2696,6 +2696,29 @@ define([
                     return placeOrderHooksBridge.syncHookData(wire, hookData, deferUpdate);
                 }
 
+                /**
+                 * Call selectPaymentMethod only when the Magewire property differs.
+                 * Avoids a full component re-render (and mobile scroll jump) on every place-order click.
+                 * Payment payload is already pushed via syncWirePaymentData / placeOrderRequestData.
+                 */
+                function selectPaymentMethodIfNeeded(wire, methodCode) {
+                    if (!methodCode || !wire || typeof wire.call !== 'function') {
+                        return Promise.resolve(true);
+                    }
+                    var current = '';
+                    try {
+                        current = typeof wire.get === 'function'
+                            ? String(wire.get('paymentMethod') || '')
+                            : String(wire.paymentMethod || '');
+                    } catch (e) {
+                        current = '';
+                    }
+                    if (current === String(methodCode)) {
+                        return Promise.resolve(true);
+                    }
+                    return Promise.resolve(wire.call('selectPaymentMethod', methodCode));
+                }
+
                 function isAsyncTokenizationInProgress(component, result) {
                     return result === false &&
                         component &&
@@ -3359,11 +3382,7 @@ define([
                                     paymentData,
                                     buildPlaceOrderSyncPayload(paymentData)
                                 ).then(function () {
-                                    if (methodCode && typeof wire.call === 'function') {
-                                        return wire.call('selectPaymentMethod', methodCode);
-                                    }
-
-                                    return true;
+                                    return selectPaymentMethodIfNeeded(wire, methodCode);
                                 }).then(function () {
 		                            self.cleanupKoOrderState();
 		                            self.syncWire = wire;
@@ -3437,11 +3456,7 @@ define([
                                         runPlaceOrderRequestModifiers(paymentData, true, true)
                                     )
 	                                    .then(function () {
-                                            if (methodCode && typeof this.syncWire.call === 'function') {
-                                                return this.syncWire.call('selectPaymentMethod', methodCode);
-                                            }
-
-                                            return true;
+                                            return selectPaymentMethodIfNeeded(this.syncWire, methodCode);
 	                                    }.bind(this))
                                         .then(function () {
                                             return originalAction(paymentData, messageContainer);
@@ -3512,11 +3527,7 @@ define([
                                     runPlaceOrderRequestModifiers(paymentData, true, true)
                                 )
                                     .then(function () {
-                                        if (methodCode && typeof wire.call === 'function') {
-                                            return wire.call('selectPaymentMethod', methodCode);
-                                        }
-
-                                        return true;
+                                        return selectPaymentMethodIfNeeded(wire, methodCode);
                                     })
                                     .then(function () {
                                         return originalAction(paymentData, messageContainer);

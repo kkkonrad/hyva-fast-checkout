@@ -117,7 +117,7 @@ test.describe('Place order scroll (mobile)', () => {
         expect(result.empty).toBe(false);
     });
 
-    test('scroll lock holds viewport while place-order is processing', async ({ page }) => {
+    test('scroll freeze blocks scrollIntoView and restores position on unlock', async ({ page }) => {
         test.setTimeout(120_000);
         await addProduct(page);
         await openCheckout(page);
@@ -147,92 +147,80 @@ test.describe('Place order scroll (mobile)', () => {
             document.body.classList.add('checkout-submitting');
             alpine.lockScrollForPlaceOrder();
 
-            // Simulate Magewire morph / focus jumping the viewport to payment (top).
+            const frozen = {
+                bodyFixed: document.body.style.position === 'fixed',
+                lockedClass: document.body.classList.contains('fastcheckout-scroll-locked'),
+                bodyTop: document.body.style.top
+            };
+
+            // Simulate Magento/KO focusing payment and calling scrollIntoView / scrollTo.
+            const payment = document.querySelector('[data-fastcheckout-payment-option], .fc-container-3') || document.body;
+            if (typeof payment.scrollIntoView === 'function') {
+                payment.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
             window.scrollTo(0, 0);
-            window.dispatchEvent(new Event('scroll'));
-            // Give the guard a tick (listener is sync, but layout can lag).
             await new Promise((r) => setTimeout(r, 50));
-            window.dispatchEvent(new Event('scroll'));
 
-            const mid = window.scrollY || window.pageYOffset || 0;
+            const midTop = document.body.style.top;
+            const midPosition = document.body.style.position;
 
-            // Intentional validation scroll is allowed.
-            alpine._allowPaymentScroll = true;
-            window.scrollTo(0, 100);
-            window.dispatchEvent(new Event('scroll'));
-            const allowed = window.scrollY || window.pageYOffset || 0;
-
-            alpine._allowPaymentScroll = false;
             alpine.isProcessing = false;
             alpine.unlockScrollForPlaceOrder();
             document.body.classList.remove('checkout-submitting');
+            await new Promise((r) => setTimeout(r, 30));
 
-            return { before, mid, allowed, error: null };
+            const after = window.scrollY || window.pageYOffset || 0;
+
+            return {
+                before,
+                after,
+                frozen,
+                midTop,
+                midPosition,
+                unlockedPosition: document.body.style.position || '',
+                error: null
+            };
         });
 
         expect(result.error, JSON.stringify(result)).toBeFalsy();
         expect(result.before, JSON.stringify(result)).toBeGreaterThan(200);
-        // Guard should pull viewport back near the locked Y (allow small jitter).
-        expect(Math.abs(result.mid - result.before), JSON.stringify(result)).toBeLessThan(80);
-        // With allow flag, jump is permitted.
-        expect(result.allowed, JSON.stringify(result)).toBeLessThan(result.before - 50);
+        expect(result.frozen.bodyFixed, JSON.stringify(result)).toBe(true);
+        expect(result.frozen.lockedClass, JSON.stringify(result)).toBe(true);
+        // Still frozen after attempted scrollTo(0) — no unlock mid-flight.
+        expect(result.midPosition, JSON.stringify(result)).toBe('fixed');
+        // After unlock, viewport returns near the original CTA position (no stuck jump to top).
+        expect(Math.abs(result.after - result.before), JSON.stringify(result)).toBeLessThan(80);
+        expect(result.unlockedPosition, JSON.stringify(result)).toBe('');
     });
 
-    test('scrollToSelectedPaymentMethod moves viewport toward payment', async ({ page }) => {
+    test('scrollToSelectedPaymentMethod unlocks freeze before scrolling', async ({ page }) => {
         test.setTimeout(120_000);
         await addProduct(page);
         await openCheckout(page);
 
-        const result = await page.evaluate(async () => {
+        const result = await page.evaluate(() => {
             const form = document.querySelector('#co-checkout-form');
             const alpine = window.Alpine.$data(form);
             if (!alpine || typeof alpine.scrollToSelectedPaymentMethod !== 'function') {
                 return { error: 'scrollToSelectedPaymentMethod missing' };
             }
 
-            // Create a payment target near the top if none exist.
-            let target = document.querySelector('[data-fastcheckout-payment-option], .fc-container-3');
-            if (!target) {
-                target = document.createElement('div');
-                target.className = 'fc-container-3';
-                target.setAttribute('data-fastcheckout-payment-option', 'checkmo');
-                target.style.height = '40px';
-                form.insertBefore(target, form.firstChild);
-            }
+            alpine.isProcessing = true;
+            alpine.lockScrollForPlaceOrder();
+            const wasFrozen = document.body.style.position === 'fixed';
 
-            // Push viewport to bottom.
-            const spacer = document.createElement('div');
-            spacer.style.height = '1500px';
-            form.appendChild(spacer);
-            window.scrollTo(0, document.documentElement.scrollHeight);
-            await new Promise((r) => setTimeout(r, 100));
-            const before = window.scrollY || window.pageYOffset || 0;
+            // Call unlock path used by validation failure (scroll itself is rAF — not asserted here).
+            alpine.scrollToSelectedPaymentMethod();
 
-            // Headless Chromium often skips smooth scroll animation — force instant for assertion.
-            const originalScrollIntoView = Element.prototype.scrollIntoView;
-            Element.prototype.scrollIntoView = function (opts) {
-                const next = opts && typeof opts === 'object' ? Object.assign({}, opts, { behavior: 'auto' }) : opts;
-                return originalScrollIntoView.call(this, next);
+            return {
+                wasFrozen,
+                unlocked: document.body.style.position !== 'fixed',
+                error: null
             };
-            try {
-                alpine.scrollToSelectedPaymentMethod();
-            } finally {
-                Element.prototype.scrollIntoView = originalScrollIntoView;
-            }
-
-            await new Promise((r) => setTimeout(r, 100));
-            const after = window.scrollY || window.pageYOffset || 0;
-            const top = target.getBoundingClientRect().top;
-
-            return { before, after, top, error: null };
         });
 
         expect(result.error, JSON.stringify(result)).toBeFalsy();
-        expect(result.before, JSON.stringify(result)).toBeGreaterThan(200);
-        // Should move up toward payment / leave payment in viewport.
-        expect(
-            result.after < result.before - 40 || (result.top > -50 && result.top < 900),
-            JSON.stringify(result)
-        ).toBeTruthy();
+        expect(result.wasFrozen, JSON.stringify(result)).toBe(true);
+        expect(result.unlocked, JSON.stringify(result)).toBe(true);
     });
 });

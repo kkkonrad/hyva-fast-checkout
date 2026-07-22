@@ -478,22 +478,21 @@ function initCheckout() {
          * Scroll to the selected payment method block (validation failures only).
          */
         scrollToSelectedPaymentMethod() {
+            // Must unlock freeze first, otherwise scrollIntoView is no-op / fights body:fixed.
+            this.unlockScrollForPlaceOrder();
             const selectedMethodEl = document.querySelector('input[name="payment_method"]:checked');
-            if (!selectedMethodEl) {
-                const paymentCard = document.querySelector('.fc-container-3, [data-fastcheckout-payment-option]');
-                if (paymentCard && typeof paymentCard.scrollIntoView === 'function') {
-                    this._allowPaymentScroll = true;
-                    paymentCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    window.setTimeout(() => { this._allowPaymentScroll = false; }, 800);
-                }
-                return;
+            const paymentCard = document.querySelector('.fc-container-3, [data-fastcheckout-payment-option]');
+            let target = null;
+            if (selectedMethodEl) {
+                target = selectedMethodEl.closest('[data-fastcheckout-payment-option]') || selectedMethodEl;
+            } else {
+                target = paymentCard;
             }
-            const optionContainer = selectedMethodEl.closest('[data-fastcheckout-payment-option]');
-            const target = optionContainer || selectedMethodEl;
             if (target && typeof target.scrollIntoView === 'function') {
-                this._allowPaymentScroll = true;
-                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                window.setTimeout(() => { this._allowPaymentScroll = false; }, 800);
+                // rAF: wait one frame after body unlock so layout is scrollable again.
+                window.requestAnimationFrame(() => {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                });
             }
         },
 
@@ -501,15 +500,13 @@ function initCheckout() {
          * Prefer showing the order error near the place-order controls instead of jumping to payment.
          */
         scrollToOrderError() {
-            const errorEl = document.querySelector(
-                '#co-checkout-form .text-red-600, #co-checkout-form [x-text="clientOrderError"], .fc-container-3 .mage-error'
-            );
-            // Sticky mobile place-order bar — keep user at the action they pressed.
-            const stickyBar = document.querySelector('[wire\\:key="mobile-sticky-order-bar"], .md\\:hidden.fixed.bottom-0');
-            if (stickyBar && window.matchMedia && window.matchMedia('(max-width: 767px)').matches) {
-                // Stay at bottom where the sticky CTA lives; do not scroll to payment.
+            // On mobile sticky CTA, stay put — user already pressed the button there.
+            if (window.matchMedia && window.matchMedia('(max-width: 767px)').matches) {
                 return;
             }
+            const errorEl = document.querySelector(
+                '#co-checkout-form .text-red-600, #co-checkout-form [x-text="clientOrderError"]'
+            );
             if (errorEl && typeof errorEl.scrollIntoView === 'function') {
                 errorEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
@@ -556,34 +553,111 @@ function initCheckout() {
         },
 
         /**
-         * While place-order is in flight, Magewire morph / KO focus can yank mobile scroll
-         * up to the payment list. Hold the viewport unless we intentionally scroll for validation.
+         * Freeze viewport during place-order so Magewire morph / KO focus / native
+         * form focus cannot yank the page to the payment block (no bounce-back either).
          */
         lockScrollForPlaceOrder() {
-            this._placeOrderScrollY = window.scrollY || window.pageYOffset || 0;
-            this._allowPaymentScroll = false;
-            if (this._scrollGuardBound) {
+            if (this._scrollFrozen) {
                 return;
             }
-            this._scrollGuardBound = () => {
-                if (!this.isProcessing || this._allowPaymentScroll) {
-                    return;
-                }
-                const y = window.scrollY || window.pageYOffset || 0;
-                if (Math.abs(y - this._placeOrderScrollY) > 60) {
-                    window.scrollTo(0, this._placeOrderScrollY);
-                }
+            const y = window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0;
+            this._placeOrderScrollY = y;
+            this._scrollFrozen = true;
+            this._allowPaymentScroll = false;
+
+            const body = document.body;
+            const html = document.documentElement;
+            this._scrollLockStyles = {
+                bodyPosition: body.style.position,
+                bodyTop: body.style.top,
+                bodyLeft: body.style.left,
+                bodyRight: body.style.right,
+                bodyWidth: body.style.width,
+                bodyOverflow: body.style.overflow,
+                htmlOverflow: html.style.overflow,
+                htmlScrollBehavior: html.style.scrollBehavior
             };
-            window.addEventListener('scroll', this._scrollGuardBound, { passive: true });
+
+            html.style.scrollBehavior = 'auto';
+            html.style.overflow = 'hidden';
+            body.style.position = 'fixed';
+            body.style.top = '-' + y + 'px';
+            body.style.left = '0';
+            body.style.right = '0';
+            body.style.width = '100%';
+            body.style.overflow = 'hidden';
+            body.classList.add('fastcheckout-scroll-locked');
+
+            // Magento KO / browser often call scrollIntoView on payment radios or invalid fields.
+            if (!this._origScrollIntoView) {
+                this._origScrollIntoView = Element.prototype.scrollIntoView;
+                const self = this;
+                Element.prototype.scrollIntoView = function () {
+                    if (self._scrollFrozen && !self._allowPaymentScroll) {
+                        return;
+                    }
+                    return self._origScrollIntoView.apply(this, arguments);
+                };
+            }
+
+            // window.scrollTo / scroll during freeze — keep pinned.
+            if (!this._origWindowScrollTo) {
+                this._origWindowScrollTo = window.scrollTo.bind(window);
+                const self = this;
+                window.scrollTo = function () {
+                    if (self._scrollFrozen && !self._allowPaymentScroll) {
+                        return;
+                    }
+                    return self._origWindowScrollTo.apply(window, arguments);
+                };
+            }
         },
 
         unlockScrollForPlaceOrder() {
-            if (this._scrollGuardBound) {
-                window.removeEventListener('scroll', this._scrollGuardBound);
-                this._scrollGuardBound = null;
+            if (!this._scrollFrozen && !this._scrollLockStyles) {
+                // Still restore prototype patches if any.
+                if (this._origScrollIntoView) {
+                    Element.prototype.scrollIntoView = this._origScrollIntoView;
+                    this._origScrollIntoView = null;
+                }
+                if (this._origWindowScrollTo) {
+                    window.scrollTo = this._origWindowScrollTo;
+                    this._origWindowScrollTo = null;
+                }
+                return;
             }
-            this._placeOrderScrollY = null;
+
+            const y = this._placeOrderScrollY || 0;
+            const body = document.body;
+            const html = document.documentElement;
+            const saved = this._scrollLockStyles || {};
+
+            this._scrollFrozen = false;
             this._allowPaymentScroll = false;
+            body.classList.remove('fastcheckout-scroll-locked');
+
+            body.style.position = saved.bodyPosition || '';
+            body.style.top = saved.bodyTop || '';
+            body.style.left = saved.bodyLeft || '';
+            body.style.right = saved.bodyRight || '';
+            body.style.width = saved.bodyWidth || '';
+            body.style.overflow = saved.bodyOverflow || '';
+            html.style.overflow = saved.htmlOverflow || '';
+            html.style.scrollBehavior = saved.htmlScrollBehavior || '';
+            this._scrollLockStyles = null;
+            this._placeOrderScrollY = null;
+
+            if (this._origScrollIntoView) {
+                Element.prototype.scrollIntoView = this._origScrollIntoView;
+                this._origScrollIntoView = null;
+            }
+            if (this._origWindowScrollTo) {
+                window.scrollTo = this._origWindowScrollTo;
+                this._origWindowScrollTo = null;
+            }
+
+            // Restore exact pre-submit position (no smooth — avoid visual jump).
+            window.scrollTo(0, y);
         },
 
         /**
