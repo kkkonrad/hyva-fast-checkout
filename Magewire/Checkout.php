@@ -908,9 +908,13 @@ class Checkout extends Component
     {
         try {
             $quote = $this->checkoutSession->getQuote();
+            $shippingRates = $this->buildShippingRatesData($quote);
+            $hasPersistableQuote = $quote && $quote->getId() && $quote->hasItems();
 
-            if ($quote && $quote->getId() && $quote->hasItems()) {
-                $quote->collectTotals();
+            if (
+                $hasPersistableQuote &&
+                ($this->ensureTotalsCollected($quote) || $this->quoteHasChanges($quote))
+            ) {
                 $this->saveQuote($quote);
             }
 
@@ -921,7 +925,7 @@ class Checkout extends Component
             return [
                 'totals' => $this->buildTotalsData($quote),
                 'payment_methods' => $this->buildPaymentMethodsData(),
-                'shipping_rates' => $this->buildShippingRatesData(),
+                'shipping_rates' => $shippingRates,
                 'selected_payment_method' => $this->paymentMethod,
                 'selectedPaymentMethod' => $this->paymentMethod,
                 'paymentMethod' => $this->paymentMethod,
@@ -955,6 +959,27 @@ class Checkout extends Component
                 'coupon_code' => $this->couponCode,
             ];
         }
+    }
+
+    /**
+     * Collect totals only when Magento has not already done so for the current
+     * quote state. Most bridge calls happen directly after an action that has
+     * collected totals, so repeating it here needlessly runs carriers, tax and
+     * sales rules and dirties the quote for another database write.
+     */
+    private function ensureTotalsCollected($quote): bool
+    {
+        try {
+            if (is_callable([$quote, 'getTotalsCollectedFlag']) && $quote->getTotalsCollectedFlag()) {
+                return false;
+            }
+        } catch (\Throwable $e) {
+            // Fall through and collect to preserve Magento's previous behavior.
+        }
+
+        $quote->collectTotals();
+
+        return true;
     }
 
     private function getSelectedShippingMethodCode($quote = null): string
@@ -3824,8 +3849,21 @@ class Checkout extends Component
      */
     private function saveQuote($quote): void
     {
-        $hasChanges = $quote->hasDataChanges() 
-            || defined('PHPUNIT_COMPOSER_INSTALL');
+        $hasChanges = defined('PHPUNIT_COMPOSER_INSTALL')
+            || $this->quoteHasChanges($quote);
+
+        if ($hasChanges) {
+            $this->cartRepository->save($quote);
+        }
+    }
+
+    private function quoteHasChanges($quote): bool
+    {
+        if (!$quote) {
+            return false;
+        }
+
+        $hasChanges = $quote->hasDataChanges();
 
         if (!$hasChanges) {
             try {
@@ -3860,8 +3898,6 @@ class Checkout extends Component
             }
         }
 
-        if ($hasChanges) {
-            $this->cartRepository->save($quote);
-        }
+        return $hasChanges;
     }
 }

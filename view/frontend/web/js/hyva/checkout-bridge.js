@@ -511,8 +511,8 @@ define([
                     return checkoutTotalsSync.syncFromDom();
                 }
 
-                function refreshCheckoutStateFromMagewire() {
-                    return checkoutStateBridge.refresh();
+                function refreshCheckoutStateFromMagewire(force) {
+                    return checkoutStateBridge.refresh(force === true);
                 }
 
                 function resolveCheckoutStateRefresh(callbacks, deferred, messageContainer) {
@@ -1401,7 +1401,7 @@ define([
                                 if (wire && typeof wire.call === 'function') {
                                     return wire.call('saveShippingAddress', true, true, true)
                                         .then(function () {
-                                            return refreshCheckoutStateFromMagewire();
+                                            return refreshCheckoutStateFromMagewire(true);
                                         })
                                         .then(function (payload) {
                                             payload = payload && typeof payload === 'object' ? payload : {};
@@ -3294,7 +3294,7 @@ define([
                                                     }
                                                     return true;
                                                 }
-                                                return refreshCheckoutStateFromMagewire();
+                                                return refreshCheckoutStateFromMagewire(true);
                                             })
                                             .then(function () {
                                                 resolve(true);

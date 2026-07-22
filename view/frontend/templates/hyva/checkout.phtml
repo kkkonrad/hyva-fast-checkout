@@ -54,6 +54,7 @@ $allowedPaymentMethodCodes = $magewire->getAllowedPaymentMethodCodes();
     <form id="co-checkout-form"
           x-data="initCheckout"
           @submit.prevent="handleSubmit"
+          novalidate
           data-role="email-with-possible-login"
           class="contents">
 

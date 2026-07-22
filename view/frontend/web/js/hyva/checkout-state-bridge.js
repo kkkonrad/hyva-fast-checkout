@@ -1,6 +1,7 @@
 define([
-    'jquery'
-], function ($) {
+    'jquery',
+    'Kkkonrad_Fastcheckout/js/hyva/checkout-state-refresh-coordinator'
+], function ($, refreshCoordinator) {
     'use strict';
 
     return function (deps) {
@@ -15,10 +16,7 @@ define([
             selectPaymentMethodAction = deps.selectPaymentMethodAction,
             selectShippingMethodAction = deps.selectShippingMethodAction,
             callbacks = deps.callbacks || {},
-            lastMethodsJson = '',
-            refreshPromise = null,
-            lastPayload = null,
-            lastPayloadAt = 0;
+            lastMethodsJson = '';
 
         function call(name) {
             var callback = callbacks[name],
@@ -203,7 +201,7 @@ define([
             });
         }
 
-        function refresh() {
+        function refresh(force) {
             var wire = call('getMagewireComponent');
 
             if (!wire || typeof wire.call !== 'function') {
@@ -211,39 +209,14 @@ define([
                 return Promise.resolve(false);
             }
 
-            if (lastPayload && Date.now() - lastPayloadAt < 750) {
-                return Promise.resolve(lastPayload);
-            }
-
-            if (refreshPromise) {
-                return refreshPromise;
-            }
-
-            refreshPromise = Promise.resolve(wire.call('refreshCheckoutState'))
-                .then(function (payload) {
-                    if (payload && typeof payload === 'object' && payload.totals) {
-                        return payload;
-                    }
-                    return fetchState(wire);
-                })
-                .catch(function () {
-                    return fetchState(wire);
-                })
+            return refreshCoordinator.refresh(wire, {
+                force: force === true,
+                fetchState: fetchState
+            })
                 .then(function (payload) {
                     applyPayload(payload);
-                    lastPayload = payload;
-                    lastPayloadAt = Date.now();
                     return payload;
-                })
-                .then(function (payload) {
-                    refreshPromise = null;
-                    return payload;
-                }, function (error) {
-                    refreshPromise = null;
-                    throw error;
                 });
-
-            return refreshPromise;
         }
 
         function resolveRefresh(refreshCallbacks, deferred, messageContainer) {
@@ -290,7 +263,7 @@ define([
                 shippingService.isLoading(true);
             }
 
-            return refresh()
+            return refresh(true)
                 .then(function (payload) {
                     if (shippingService && shippingService.isLoading && typeof shippingService.isLoading === 'function') {
                         shippingService.isLoading(false);

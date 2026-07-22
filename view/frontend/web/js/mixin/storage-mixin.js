@@ -1,13 +1,10 @@
 define([
     'jquery',
     'mage/utils/wrapper',
-    'Kkkonrad_Fastcheckout/js/mixin/is-fastcheckout-active'
-], function ($, wrapper, isFastcheckoutActive) {
+    'Kkkonrad_Fastcheckout/js/mixin/is-fastcheckout-active',
+    'Kkkonrad_Fastcheckout/js/hyva/checkout-state-refresh-coordinator'
+], function ($, wrapper, isFastcheckoutActive, refreshCoordinator) {
     'use strict';
-
-    var checkoutStateRefreshPromise = null,
-        checkoutStateLastPayload = null,
-        checkoutStateLastPayloadAt = 0;
 
     function getEmailFromDomOrQuote() {
         var emailEl = document.getElementById('co-shipping-email') ||
@@ -117,52 +114,10 @@ define([
     }
 
     function refreshCheckoutState(wire, force) {
-        if (!wire || typeof wire.call !== 'function') {
-            return Promise.reject(new Error('Magewire not available'));
-        }
-
-        if (!force && checkoutStateLastPayload && Date.now() - checkoutStateLastPayloadAt < 750) {
-            return Promise.resolve(checkoutStateLastPayload);
-        }
-
-        if (checkoutStateRefreshPromise) {
-            if (force) {
-                return checkoutStateRefreshPromise.catch(function () {
-                    return true;
-                }).then(function () {
-                    return refreshCheckoutState(wire, true);
-                });
-            }
-
-            return checkoutStateRefreshPromise;
-        }
-
-        checkoutStateRefreshPromise = Promise.resolve(wire.call('refreshCheckoutState'))
-            .then(function (payload) {
-                if (payload && typeof payload === 'object' && payload.totals) {
-                    return payload;
-                }
-
-                return fetchCheckoutState(wire);
-            })
-            .catch(function () {
-                return fetchCheckoutState(wire);
-            })
-            .then(function (payload) {
-                checkoutStateLastPayload = payload;
-                checkoutStateLastPayloadAt = Date.now();
-
-                return payload;
-            })
-            .then(function (payload) {
-                checkoutStateRefreshPromise = null;
-                return payload;
-            }, function (error) {
-                checkoutStateRefreshPromise = null;
-                throw error;
-            });
-
-        return checkoutStateRefreshPromise;
+        return refreshCoordinator.refresh(wire, {
+            force: force === true,
+            fetchState: fetchCheckoutState
+        });
     }
 
     function parsePayload(data) {
@@ -292,7 +247,7 @@ define([
             return;
         }
 
-        deferred.resolve((checkoutStateLastPayload || {}).totals || {});
+        deferred.resolve((refreshCoordinator.getLastPayload(getWire()) || {}).totals || {});
     }
 
     function getAddressObjectValue(address, camelKey, snakeKey) {

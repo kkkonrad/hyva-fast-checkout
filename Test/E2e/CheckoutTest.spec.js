@@ -1734,6 +1734,100 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
         expect(requests.magewire, JSON.stringify(requests, null, 2)).toBeLessThanOrEqual(3);
     });
 
+    test('should share and deduplicate checkout state refreshes across bridge consumers', async ({ page }) => {
+        const checkout = new CheckoutPage(page);
+        await checkout.goto();
+        await page.waitForURL(/\/fast-checkout\//);
+        await page.waitForLoadState('load');
+        await expect(page.locator('#co-checkout-form')).toBeVisible();
+        await expect.poll(async () => page.evaluate(() => typeof window.require === 'function')).toBe(true);
+
+        const result = await page.evaluate(async () => {
+            const coordinator = window.require(
+                'Kkkonrad_Fastcheckout/js/hyva/checkout-state-refresh-coordinator'
+            );
+            let calls = 0;
+            const wire = {
+                call(method) {
+                    calls += 1;
+                    return new Promise((resolveCall) => {
+                        window.setTimeout(() => resolveCall({
+                            totals: { grand_total: calls },
+                            method
+                        }), 40);
+                    });
+                }
+            };
+
+            coordinator.invalidate(wire);
+            const initial = coordinator.refresh(wire);
+            const concurrent = coordinator.refresh(wire);
+            const forced = coordinator.refresh(wire, { force: true });
+            const concurrentForced = coordinator.refresh(wire, { force: true });
+            const identities = {
+                concurrent: initial === concurrent,
+                forced: forced === concurrentForced
+            };
+
+            const payloads = await Promise.all([
+                initial,
+                concurrent,
+                forced,
+                concurrentForced
+            ]);
+            const callsAfterQueue = calls;
+            const cached = await coordinator.refresh(wire);
+            const callsAfterCache = calls;
+
+            coordinator.invalidate(wire);
+            await coordinator.refresh(wire);
+
+            let lateCalls = 0;
+            const lateWire = {
+                call() {
+                    lateCalls += 1;
+                    const callNumber = lateCalls;
+
+                    return new Promise((resolveCall) => {
+                        window.setTimeout(() => resolveCall({
+                            totals: { grand_total: callNumber }
+                        }), 40);
+                    });
+                }
+            };
+            const lateInitial = coordinator.refresh(lateWire);
+            const lateQueued = coordinator.refresh(lateWire, { force: true });
+            const lateMutation = new Promise((resolveLate) => {
+                window.setTimeout(() => {
+                    resolveLate(coordinator.refresh(lateWire, { force: true }));
+                }, 60);
+            });
+            await Promise.all([lateInitial, lateQueued, lateMutation]);
+
+            return {
+                identities,
+                payloads,
+                cached,
+                callsAfterQueue,
+                callsAfterCache,
+                callsAfterInvalidation: calls,
+                lateMutationCalls: lateCalls
+            };
+        });
+
+        expect(result.identities).toEqual({
+            concurrent: true,
+            forced: true
+        });
+        expect(result.callsAfterQueue).toBe(2);
+        expect(result.callsAfterCache).toBe(2);
+        expect(result.callsAfterInvalidation).toBe(3);
+        expect(result.lateMutationCalls).toBe(3);
+        expect(result.payloads[0]).toEqual(result.payloads[1]);
+        expect(result.payloads[2]).toEqual(result.payloads[3]);
+        expect(result.cached).toEqual(result.payloads[2]);
+    });
+
     test('should lazy load third-party payment renderers', async ({ page }) => {
         const pageErrors = [];
 
@@ -3190,6 +3284,35 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
         const errorMsg = page.locator('label:has(input[data-wire-field="email"]) .field-error');
         await expect(errorMsg).toBeVisible();
         await expect(emailInput).toHaveClass(/border-red-400/);
+    });
+
+    test('should show inline validation messages after mobile place-order submit', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+
+        const checkout = new CheckoutPage(page);
+        await checkout.goto();
+
+        const cookieDecline = page.getByRole('button', { name: /Odrzuć opcjonalne|Reject optional/i });
+        if (await cookieDecline.isVisible()) {
+            await cookieDecline.evaluate((button) => button.click());
+        }
+
+        const emailInput = page.locator(selectors.email);
+        await emailInput.fill('');
+
+        const mobileOrderBar = page.locator('[wire\\:key="mobile-sticky-order-bar"]');
+        await mobileOrderBar.locator('button[type="submit"]').evaluate((button) => button.click());
+
+        const errorMessage = page.locator('label[for="co-shipping-email"] .field-error');
+        await expect(errorMessage).toBeVisible();
+        await expect(errorMessage).not.toHaveText('');
+        await expect(emailInput).toHaveAttribute('aria-invalid', 'true');
+        await expect(emailInput).toHaveAttribute('aria-describedby', 'co-shipping-email-error');
+        await expect.poll(async () => errorMessage.evaluate((message) => {
+            const rect = message.getBoundingClientRect();
+
+            return rect.top >= 0 && rect.bottom <= window.innerHeight;
+        })).toBe(true);
     });
 
     test('should allow guest checkout flow with manual input', async ({ page }) => {

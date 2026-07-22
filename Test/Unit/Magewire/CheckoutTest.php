@@ -1657,6 +1657,48 @@ class CheckoutTest extends TestCase
         $this->assertSame($state['shipping_rates'][0]['custom_attributes'], $state['shipping_rates'][0]['customAttributes']);
     }
 
+    public function testRefreshCheckoutStateDoesNotRecollectOrSaveAnAlreadyCollectedQuote(): void
+    {
+        $shippingAddressMock = $this->createAddressMock();
+
+        $this->quoteMock->setData('totals_collected_flag', true);
+        $this->quoteMock->setDataChanges(false);
+        $this->quoteMock->expects($this->any())
+            ->method('getId')
+            ->willReturn(42);
+        $this->quoteMock->expects($this->once())
+            ->method('hasItems')
+            ->willReturn(true);
+        $this->quoteMock->expects($this->never())
+            ->method('collectTotals');
+        $this->cartRepositoryMock->expects($this->never())
+            ->method('save');
+        $this->quoteMock->expects($this->any())
+            ->method('getShippingAddress')
+            ->willReturn($shippingAddressMock);
+        $this->quoteMock->expects($this->once())
+            ->method('getAllVisibleItems')
+            ->willReturn([]);
+        $this->quoteMock->expects($this->once())
+            ->method('getTotals')
+            ->willReturn([]);
+        $shippingAddressMock->expects($this->any())
+            ->method('getCountryId')
+            ->willReturn('');
+        $shippingAddressMock->expects($this->any())
+            ->method('getShippingMethod')
+            ->willReturn('');
+        $this->paymentMethodManagementMock->expects($this->once())
+            ->method('getList')
+            ->with(42)
+            ->willReturn([]);
+
+        $state = $this->checkoutComponent->refreshCheckoutState();
+
+        $this->assertSame([], $state['shipping_rates']);
+        $this->assertSame([], $state['payment_methods']);
+    }
+
     public function testGetAllowedPaymentMethodsFiltersMethodsByShippingMapping(): void
     {
         $this->quoteMock->expects($this->any())

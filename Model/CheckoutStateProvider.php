@@ -122,7 +122,7 @@ class CheckoutStateProvider
         }
 
         try {
-            if (method_exists($quote, 'getTotalsCollectedFlag') && $quote->getTotalsCollectedFlag()) {
+            if (is_callable([$quote, 'getTotalsCollectedFlag']) && $quote->getTotalsCollectedFlag()) {
                 return;
             }
         } catch (\Throwable $exception) {
