@@ -60,7 +60,11 @@ function initCheckout() {
 
             // Push Magewire → KO only after server-side updates (syncAddressFields, selects),
             // not while the shopper is typing into unbound DOM inputs.
-            const fieldsToWatch = (window.fastcheckoutAddressFields || []).concat(['paymentMethod']);
+            // Native Magento UI components own address state through checkoutProvider.
+            // Watching Magewire address properties here would replay a server response
+            // over fields the shopper has just edited. Payment selection still needs
+            // the legacy Magewire -> KO watcher.
+            const fieldsToWatch = ['paymentMethod'];
 
             fieldsToWatch.forEach((field) => {
                 this.$watch(`$wire.${field}`, (value) => {
@@ -111,6 +115,9 @@ function initCheckout() {
                 formRoot.addEventListener('change', (event) => {
                     const target = event && event.target;
                     if (!target || !target.dataset || !target.dataset.wireField) {
+                        return;
+                    }
+                    if (target.closest('.fastcheckout-native-shipping-address, .payment-method-billing-address')) {
                         return;
                     }
                     // Selects already call onSelectChange (immediate flush).
@@ -237,6 +244,13 @@ function initCheckout() {
         flushAddressSync(force) {
             if (!this.$wire || typeof this.$wire.call !== 'function') {
                 return Promise.resolve();
+            }
+
+            if (
+                window.fastcheckoutHyvaShipping &&
+                typeof window.fastcheckoutHyvaShipping.syncAddressFormsToMagewire === 'function'
+            ) {
+                return Promise.resolve(window.fastcheckoutHyvaShipping.syncAddressFormsToMagewire());
             }
 
             if (this._addressSyncInFlight) {
@@ -666,17 +680,19 @@ function initCheckout() {
         handleSubmit() {
             this.clientOrderError = '';
 
-            if (this._validateAll()) {
-                // Invoke shipping locker validation if available
-                if (window.fastcheckoutHyvaShipping && typeof window.fastcheckoutHyvaShipping.validate === 'function') {
-                    if (!window.fastcheckoutHyvaShipping.validate()) {
-                        if (window.console && typeof window.console.warn === 'function') {
-                            window.console.warn('Kkkonrad Fastcheckout: Order placement halted because shipping validation failed.');
-                        }
-                        return;
+            // Standard Magento UI components need to validate first. In
+            // particular, their required rules are data-validate/KO rules and
+            // are not visible to the browser's native form validity API.
+            if (window.fastcheckoutHyvaShipping && typeof window.fastcheckoutHyvaShipping.validate === 'function') {
+                if (!window.fastcheckoutHyvaShipping.validate()) {
+                    if (window.console && typeof window.console.warn === 'function') {
+                        window.console.warn('Kkkonrad Fastcheckout: Order placement halted because shipping validation failed.');
                     }
+                    return;
                 }
+            }
 
+            if (this._validateAll()) {
                 const paymentBridge = window.fastcheckoutHyvaPayment;
 
                 // Read selected payment method directly from DOM (no Magewire state needed)
@@ -901,6 +917,11 @@ function initCheckout() {
             let firstInvalidEl = null;
             const form = this.$el; // on @submit.prevent this.$el is the <form>
             for (const el of form.elements) {
+                // Magento UI components own validation and inline errors for the
+                // standard shipping and billing forms rendered by Knockout.
+                if (el.closest('.fastcheckout-native-shipping-address, .payment-method-billing-address')) {
+                    continue;
+                }
                 if (el.willValidate) {
                     this._validateEl(el);
                     if (!el.validity.valid) {
@@ -1334,6 +1355,13 @@ window.addEventListener('alpine:init', () => Alpine.data('initCheckout', initChe
             save(field, target.value);
         }
     });
+
+    window.addEventListener('fastcheckout:address-fields-ready', function () {
+        const wire = getWire();
+        if (wire) {
+            restore(wire);
+        }
+    }, {once: true});
 
     document.addEventListener('DOMContentLoaded', function () {
         setTimeout(function () {

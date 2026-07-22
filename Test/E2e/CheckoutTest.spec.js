@@ -10,8 +10,8 @@ const selectors = {
     city: 'input[data-wire-field="city"]',
     postcode: 'input[data-wire-field="postcode"]',
     telephone: 'input[data-wire-field="telephone"]',
-    country: 'select[wire\\:model\\.blur="countryId"]',
-    region: 'select[wire\\:model\\.blur="regionId"]',
+    country: '.fastcheckout-native-shipping-address select[name="country_id"]',
+    region: '.fastcheckout-native-shipping-address select[name="region_id"]',
     savedAddresses: '#saved-address-select',
     useSavedAddressBtn: 'button[data-select-id="saved-address-select"]',
     placeOrderBtn: '#co-checkout-form button[type="submit"]',
@@ -114,6 +114,129 @@ export class CheckoutPage {
 }
 
 test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
+
+    test('should render Magento standard shipping fields and validation', async ({ page }) => {
+        const pageErrors = [];
+        page.on('pageerror', (error) => pageErrors.push(error.message));
+
+        const checkout = new CheckoutPage(page);
+        await checkout.goto();
+
+        const shippingRoot = page.locator('.fastcheckout-native-shipping-address');
+        await expect(shippingRoot.getByLabel(/E-mail|Email Address/i)).toBeVisible();
+        await expect(shippingRoot.locator('input[name="firstname"]')).toBeVisible();
+        await expect(shippingRoot.locator('input[name="street[0]"]')).toBeVisible();
+        await expect(shippingRoot.locator('select[name="country_id"]')).toBeVisible();
+
+        const result = await page.evaluate(() => new Promise((resolve) => {
+            window.require(['uiRegistry'], (registry) => {
+                const component = registry.get('checkout.steps.shipping-step.shippingAddress');
+
+                component.source.set('params.invalid', false);
+                component.triggerShippingDataValidateEvent();
+                resolve({
+                    component: component.component,
+                    invalid: component.source.get('params.invalid')
+                });
+            }, (error) => resolve({ requireError: String(error) }));
+        }));
+
+        expect(result.requireError).toBeFalsy();
+        expect(result.component).toBe('Magento_Checkout/js/view/shipping');
+        expect(result.invalid).toBe(true);
+        await expect(shippingRoot.locator('input[name="firstname"]')).toHaveAttribute('aria-invalid', 'true');
+        await expect(shippingRoot.locator('input[name="street[1]"]')).not.toHaveAttribute('aria-invalid', 'true');
+        await expect(shippingRoot).toContainText(/required field|wymagane pole/i);
+        expect(pageErrors).toEqual([]);
+    });
+
+    test('should use the standard billing form for the selected payment method', async ({ page }) => {
+        const pageErrors = [];
+        page.on('pageerror', (error) => pageErrors.push(error.message));
+
+        const checkout = new CheckoutPage(page);
+        await checkout.goto();
+
+        const shippingRoot = page.locator('.fastcheckout-native-shipping-address');
+        const fields = {
+            username: 'standard-billing@example.com',
+            firstname: 'Jan',
+            lastname: 'Kowalski',
+            'street[0]': 'Testowa 1',
+            city: 'Warszawa',
+            postcode: '00-001',
+            telephone: '500600700'
+        };
+
+        for (const [name, value] of Object.entries(fields)) {
+            const field = shippingRoot.locator(`[name="${name}"]`);
+            await field.fill(value);
+            await field.blur();
+        }
+
+        const region = shippingRoot.locator('select[name="region_id"]');
+        if (await region.isVisible()) {
+            await region.selectOption({ index: 1 });
+        }
+
+        const shippingRates = page.locator(
+            'input[name="shipping_method"]:not(:disabled):not([value="flatrate_flatrate"])'
+        );
+        await expect(shippingRates.first()).toBeVisible({ timeout: 30_000 });
+        await shippingRates.first().evaluate((input) => input.click());
+        await expect(shippingRates.first()).toBeChecked();
+
+        const paymentMethods = page.locator('input[name="payment_method"]:not(:disabled)');
+        await expect(paymentMethods.first()).toBeVisible({ timeout: 30_000 });
+        const methodCodes = await paymentMethods.evaluateAll((inputs) => inputs.map((input) => input.value));
+        const standardMethod = methodCodes.find((code) => /checkmo|banktransfer|cashondelivery|free/.test(code));
+        test.skip(!standardMethod, 'No standard Magento payment renderer is currently available.');
+
+        const standardPayment = page.locator(
+            `input[name="payment_method"][value="${standardMethod}"]`
+        );
+        if (!await standardPayment.isChecked()) {
+            await standardPayment.evaluate((input) => input.click());
+        }
+        const target = page.locator(`[data-fastcheckout-payment-method-ko-target="${standardMethod}"]`);
+        const billing = target.locator('.payment-method-billing-address');
+
+        await expect(billing).toBeVisible({ timeout: 30_000 });
+        const sameAsShipping = billing.getByRole('checkbox', {
+            name: /billing.*shipping|rozliczeniowy.*dostawy/i
+        });
+        await expect(sameAsShipping).toBeVisible();
+        await expect(sameAsShipping).toBeChecked();
+
+        // The payment island can move while asynchronous rate totals settle;
+        // invoke the checkbox's normal DOM click handler without waiting for a
+        // transiently stable bounding box.
+        await sameAsShipping.evaluate((input) => input.click());
+        await expect(sameAsShipping).not.toBeChecked();
+        const billingFirstname = billing.locator('input[name="firstname"]');
+        await expect(billingFirstname).toBeVisible();
+        await billingFirstname.fill('');
+        await billing.getByRole('button', { name: /Update|Aktualizuj/i }).evaluate((button) => button.click());
+        await expect(billingFirstname).toHaveAttribute('aria-invalid', 'true');
+        await expect(billing).toContainText(/required field|wymagane pole/i);
+
+        const result = await page.evaluate((methodCode) => new Promise((resolve) => {
+            window.require(['uiRegistry'], (registry) => {
+                const component = registry.get(
+                    `fastcheckoutHyvaPaymentRenderers.paymentList.${methodCode}-form`
+                );
+                resolve({
+                    component: component && component.component,
+                    dataScopePrefix: component && component.dataScopePrefix
+                });
+            }, (error) => resolve({ requireError: String(error) }));
+        }), standardMethod);
+
+        expect(result.requireError).toBeFalsy();
+        expect(result.component).toBe('Magento_Checkout/js/view/billing-address');
+        expect(result.dataScopePrefix).toBe(`billingAddress${standardMethod}`);
+        expect(pageErrors).toEqual([]);
+    });
 
     test('should initialize InPost pickup selector before the shipping address is filled', async ({ page }) => {
         const checkout = new CheckoutPage(page);
@@ -2579,7 +2702,7 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
             beforeFormComponent: 'checkout.steps.shipping-step.shippingAddress.before-form',
             beforeFieldsComponent: 'checkout.steps.shipping-step.shippingAddress.before-fields',
             additionalAddressesComponent: 'checkout.steps.shipping-step.shippingAddress.address-list-additional-addresses',
-            beforeShippingMethodAlias: 'fastcheckoutHyvaShippingRenderers.shippingList.before-shipping-method-form'
+            beforeShippingMethodAlias: 'checkout.steps.shipping-step.shippingAddress.before-shipping-method-form'
         });
         expect(result.beforeFormLength, JSON.stringify(result, null, 2)).toBeGreaterThan(0);
         expect(result.beforeFieldsLength, JSON.stringify(result, null, 2)).toBeGreaterThan(0);
@@ -3276,15 +3399,14 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
         const checkout = new CheckoutPage(page);
         await checkout.goto();
 
-        // Blur empty required field to trigger validation message
+        // Standard Magento email component validates a malformed value on blur.
         const emailInput = page.locator(selectors.email);
-        await emailInput.focus();
+        await emailInput.fill('not-an-email');
         await emailInput.blur();
 
-        const emailField = page.locator('label:has(input[data-wire-field="email"])');
-        const errorMsg = emailField.locator('.messages');
+        const errorMsg = page.locator('#customer-email-error');
         await expect(errorMsg).toBeVisible();
-        await expect(emailField).toHaveClass(/field-error/);
+        await expect(errorMsg).not.toHaveText('');
         await expect(emailInput).toHaveAttribute('aria-invalid', 'true');
     });
 
@@ -3362,11 +3484,11 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
         const mobileOrderBar = page.locator('[wire\\:key="mobile-sticky-order-bar"]');
         await mobileOrderBar.locator('button[type="submit"]').evaluate((button) => button.click());
 
-        const errorMessage = page.locator('label[for="co-shipping-email"] .messages');
+        const errorMessage = page.locator('#customer-email-error');
         await expect(errorMessage).toBeVisible();
         await expect(errorMessage).not.toHaveText('');
         await expect(emailInput).toHaveAttribute('aria-invalid', 'true');
-        await expect(emailInput).toHaveAttribute('aria-describedby', 'co-shipping-email-error');
+        await expect(emailInput).toHaveAttribute('aria-describedby', 'customer-email-error');
         await expect.poll(async () => errorMessage.evaluate((message) => {
             const rect = message.getBoundingClientRect();
 

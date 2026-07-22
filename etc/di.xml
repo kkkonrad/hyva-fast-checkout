@@ -2,6 +2,13 @@
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
 
+    <type name="Kkkonrad\Fastcheckout\Block\Hyva\Checkout">
+        <arguments>
+            <argument name="checkoutLayoutProcessor" xsi:type="object">Magento\Checkout\Block\Checkout\LayoutProcessor</argument>
+            <argument name="checkoutDirectoryDataProcessor" xsi:type="object">Magento\Checkout\Block\Checkout\DirectoryDataProcessor</argument>
+        </arguments>
+    </type>
+
     <type name="Magento\Quote\Api\CartRepositoryInterface">
         <plugin name="fastcheckout_preserve_inpost_locker" type="Kkkonrad\Fastcheckout\Plugin\Quote\PreserveInpostLocker"/>
     </type>

@@ -5,7 +5,8 @@ define([], function () {
         deps = deps || {};
 
         var ko = deps.ko,
-            stepNavigator = deps.stepNavigator;
+            stepNavigator = deps.stepNavigator,
+            nativeShippingComponent = deps.nativeShippingComponent === true;
 
         function findStep(code) {
             var steps = stepNavigator && typeof stepNavigator.steps === 'function'
@@ -86,7 +87,9 @@ define([], function () {
                 return;
             }
 
-            ensureStep('shipping', 'Shipping', 10, true);
+            if (!nativeShippingComponent) {
+                ensureStep('shipping', 'Shipping', 10, true);
+            }
             ensureStep('payment', 'Review & Payments', 20, false);
         }
 

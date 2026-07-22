@@ -89,7 +89,8 @@ define([], function () {
             var component;
 
             try {
-                component = registry.get('index = shippingAddress');
+                component = registry.get('checkout.steps.shipping-step.shippingAddress') ||
+                    registry.get('index = shippingAddress');
             } catch (e) {
                 component = null;
             }

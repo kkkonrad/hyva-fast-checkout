@@ -1,4 +1,4 @@
-define([], function () {
+define(['jquery'], function ($) {
     'use strict';
 
     return function (deps) {
@@ -11,6 +11,7 @@ define([], function () {
             getCountryOptionsByValue = deps.getCountryOptionsByValue,
             getBridgeMessageContainer = deps.getBridgeMessageContainer,
             getCheckoutErrorsComponent = deps.getCheckoutErrorsComponent,
+            hasConfiguredEmailComponent = deps.hasConfiguredEmailComponent === true,
             standardShippingViewSelectMethod = null,
             standardShippingInformationComponent = null,
             standardEmailComponent = null;
@@ -83,7 +84,11 @@ define([], function () {
                     : null;
 
                 validator = function () {
-                    var component;
+                    var component,
+                        provider,
+                        emailValid = true,
+                        addressValid = true,
+                        emailInput;
 
                     if (window.fastcheckoutKoShippingViewValidationActive) {
                         return true;
@@ -96,6 +101,49 @@ define([], function () {
 
                     window.fastcheckoutKoShippingViewValidationActive = true;
                     try {
+                        provider = getCheckoutProvider();
+
+                        // The stock shipping view checks the shipping method before it
+                        // validates the address. Fastcheckout has a separate method card,
+                        // so validate the standard KO forms first and show their inline
+                        // messages even when no method has been selected yet.
+                        emailInput = document.querySelector(
+                            'form[data-role="email-with-possible-login"] input[name="username"]'
+                        );
+                        if (emailInput) {
+                            $(emailInput.form).validation();
+                            emailValid = Boolean($(emailInput).valid());
+                        } else if (
+                            standardEmailComponent &&
+                            typeof standardEmailComponent.validateEmail === 'function'
+                        ) {
+                            emailValid = standardEmailComponent.validateEmail() !== false;
+                        }
+
+                        if (
+                            component.isFormInline &&
+                            provider &&
+                            typeof provider.set === 'function' &&
+                            typeof provider.get === 'function'
+                        ) {
+                            provider.set('params.invalid', false);
+                            component.triggerShippingDataValidateEvent();
+                            addressValid = provider.get('params.invalid') !== true;
+                        }
+
+                        if (!emailValid || !addressValid) {
+                            if (!emailValid) {
+                                if (emailInput) {
+                                    emailInput.focus();
+                                    emailInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                }
+                            } else if (typeof component.focusInvalid === 'function') {
+                                component.focusInvalid();
+                            }
+
+                            return false;
+                        }
+
                         return validateMethod.call(component) !== false;
                     } catch (e) {
                         if (window.console && typeof window.console.warn === 'function') {
@@ -181,6 +229,14 @@ define([], function () {
             }
 
             window.fastcheckoutKoEmailComponentRegistered = true;
+
+            if (hasConfiguredEmailComponent && registry && typeof registry.async === 'function') {
+                registry.async('checkout.steps.shipping-step.shippingAddress.customer-email')(function (component) {
+                    standardEmailComponent = component;
+                    window.fastcheckoutKoEmailCompatibilityComponent = component;
+                });
+                return;
+            }
 
             require([
                 'Magento_Checkout/js/view/form/element/email'

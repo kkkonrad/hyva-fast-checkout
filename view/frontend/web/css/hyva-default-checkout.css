@@ -61,3 +61,241 @@
 #fastcheckout-checkout .btn:hover {
     transform: none;
 }
+
+/* Magento UI address components, expressed with Hyva/default form metrics. */
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) :is(.fieldset.address, .billing-address-form .fieldset) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+    min-width: 0;
+    margin: 0;
+}
+
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) :is(.admin__field, .field) {
+    min-width: 0;
+    margin: 0;
+}
+
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) :is(.admin__field-label label, .field > .label) {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--color-slate-800);
+    font-size: inherit;
+    font-weight: 400;
+}
+
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) .admin__field._required > .admin__field-label label::after {
+    content: ' *';
+    color: var(--color-red-600);
+}
+
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) :is(
+    .admin__control-text,
+    .admin__control-select,
+    .input-text,
+    select
+) {
+    width: 100%;
+    max-width: 100%;
+    min-height: initial;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--form-stroke);
+    border-radius: var(--form-radius);
+    background-color: var(--form-bg, #fff);
+    color: var(--form-color, var(--color-slate-900));
+    font: inherit;
+    line-height: 1.5;
+    box-shadow: none;
+}
+
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) :is(
+    .admin__control-text,
+    .admin__control-select,
+    .input-text,
+    select
+):focus {
+    border-color: var(--form-active-color);
+    outline: 2px solid var(--form-active-color);
+    outline-offset: 1px;
+    box-shadow: none;
+}
+
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) :is(.admin__field-error, .mage-error) {
+    display: block;
+    margin-top: 0.25rem;
+    color: var(--color-red-600);
+    font-size: var(--text-sm);
+    line-height: 1.25rem;
+}
+
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) :is(.field.choice, .choice.field) {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+}
+
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) :is(.field.choice, .choice.field) > label {
+    margin: 0;
+}
+
+#fastcheckout-checkout .fastcheckout-native-shipping-address .form-login {
+    margin-bottom: 1rem;
+}
+
+#fastcheckout-checkout .fastcheckout-native-shipping-address .note {
+    display: block;
+    margin-top: 0.25rem;
+    color: var(--color-slate-500);
+    font-size: var(--text-sm);
+}
+
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) .actions-toolbar {
+    margin-top: 1rem;
+}
+
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) .actions-toolbar .primary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) .actions-toolbar .action {
+    display: inline-flex;
+    min-height: initial;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--color-primary);
+    border-radius: var(--radius-lg);
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    font: inherit;
+    font-weight: 600;
+    line-height: 1.5;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) .actions-toolbar .action:hover {
+    background: var(--color-primary-darker);
+    border-color: var(--color-primary-darker);
+}
+
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) .actions-toolbar .action.secondary,
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) .actions-toolbar .action-cancel {
+    background: #fff;
+    color: var(--color-primary);
+}
+
+#fastcheckout-checkout .shipping-address-items {
+    display: grid;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+#fastcheckout-checkout .shipping-address-item {
+    padding: 1rem;
+    border: 1px solid var(--color-slate-300);
+    border-radius: var(--radius-lg);
+    background: #fff;
+}
+
+#fastcheckout-checkout .shipping-address-item.selected-item {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 1px var(--color-primary);
+}
+
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) :is(.action-show-popup, .action-select-shipping-item, .action-update) {
+    min-height: initial;
+    margin-top: 0.75rem;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--color-primary);
+    border-radius: var(--radius-lg);
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    font: inherit;
+    cursor: pointer;
+}
+
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) :is(.edit-address-link, .action-cancel) {
+    margin-top: 0.75rem;
+    margin-right: 0.75rem;
+    color: var(--color-primary);
+    text-decoration: underline;
+}
+
+#fastcheckout-checkout .checkout-billing-address {
+    color: var(--color-slate-800);
+}
+
+#fastcheckout-checkout .billing-address-details {
+    margin-top: 0.75rem;
+    line-height: 1.5;
+}
+
+@media (min-width: 640px) {
+    #fastcheckout-checkout :is(
+        .fastcheckout-native-shipping-address,
+        .payment-method-billing-address
+    ) :is(.fieldset.address, .billing-address-form .fieldset) {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    #fastcheckout-checkout :is(
+        .fastcheckout-native-shipping-address,
+        .payment-method-billing-address
+    ) :is(.street, [data-index='street']) {
+        grid-column: 1 / -1;
+    }
+}

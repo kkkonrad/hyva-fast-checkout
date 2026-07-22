@@ -21,6 +21,8 @@ $paymentListChildren = $block->getPaymentListChildren();
 $paymentRegionChildren = $block->getPaymentRegionChildren();
 $shippingListChildren = $block->getShippingListChildren();
 $shippingAddressChildren = $block->getShippingAddressChildren();
+$shippingAddress = $block->getShippingAddressComponentConfig();
+$checkoutProvider = $block->getCheckoutProviderConfig();
 $checkoutStepChildren = $block->getCheckoutStepChildren();
 $layoutScripts = $block->getCheckoutLayoutScripts();
 
@@ -51,6 +53,8 @@ $mageInitConfig = [
     'paymentRegionChildren' => $paymentRegionChildren,
     'shippingListChildren' => $shippingListChildren,
     'shippingAddressChildren' => $shippingAddressChildren,
+    'shippingAddress' => $shippingAddress,
+    'checkoutProvider' => $checkoutProvider,
     'checkoutStepChildren' => $checkoutStepChildren,
     'layoutScripts' => $layoutScripts['modules'] ?? [],
     'layoutExternalScripts' => $layoutScripts['external'] ?? [],

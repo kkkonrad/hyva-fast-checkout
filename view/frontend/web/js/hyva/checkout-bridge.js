@@ -158,7 +158,11 @@ define([
 
             createStepNavigatorBridge({
                 ko: ko,
-                stepNavigator: stepNavigator
+                stepNavigator: stepNavigator,
+                nativeShippingComponent: Boolean(
+                    config.shippingAddress &&
+                    config.shippingAddress.component === 'Magento_Checkout/js/view/shipping'
+                )
             }).init();
 
             function getCountryDictionaryOptions() {
@@ -192,10 +196,6 @@ define([
             function getBillingAddressComponent() {
                 return checkoutComponentFallbacks.getBillingAddressComponent();
             }
-
-            getCheckoutProvider();
-            getShippingAddressComponent();
-            getBillingAddressComponent();
 
             window.fastcheckoutHyvaPayment = window.fastcheckoutHyvaPayment || {};
 
@@ -270,7 +270,10 @@ define([
                     getCheckoutProvider: getCheckoutProvider,
                     getCountryOptionsByValue: getCountryOptionsByValue,
                     getBridgeMessageContainer: getBridgeMessageContainer,
-                    getCheckoutErrorsComponent: getCheckoutErrorsComponent
+                    getCheckoutErrorsComponent: getCheckoutErrorsComponent,
+                    hasConfiguredEmailComponent: Boolean(
+                        config.shippingAddressChildren && config.shippingAddressChildren['customer-email']
+                    )
                 });
                 var checkoutDataPersistence = createCheckoutDataPersistence({
                     checkoutData: checkoutData
@@ -497,6 +500,75 @@ define([
                     if (window.fastcheckoutHyvaPaymentList && typeof window.fastcheckoutHyvaPaymentList.syncRenderers === 'function') {
                         window.fastcheckoutHyvaPaymentList.syncRenderers();
                     }
+                    window.setTimeout(annotateStandardAddressFields, 0);
+                }
+
+                function annotateStandardAddressFields() {
+                    var shippingMap = {
+                            username: 'email',
+                            firstname: 'firstname',
+                            lastname: 'lastname',
+                            company: 'company',
+                            city: 'city',
+                            postcode: 'postcode',
+                            country_id: 'countryId',
+                            region_id: 'regionId',
+                            region: 'region',
+                            telephone: 'telephone',
+                            prefix: 'prefix',
+                            middlename: 'middlename',
+                            suffix: 'suffix',
+                            fax: 'fax',
+                            vat_id: 'vatId'
+                        },
+                        billingMap = {
+                            firstname: 'billingFirstname',
+                            lastname: 'billingLastname',
+                            company: 'billingCompany',
+                            city: 'billingCity',
+                            postcode: 'billingPostcode',
+                            country_id: 'billingCountryId',
+                            region_id: 'billingRegionId',
+                            region: 'billingRegion',
+                            telephone: 'billingTelephone',
+                            prefix: 'billingPrefix',
+                            middlename: 'billingMiddlename',
+                            suffix: 'billingSuffix',
+                            fax: 'billingFax',
+                            vat_id: 'billingVatId'
+                        };
+
+                    function annotate(root, map, streetPrefix) {
+                        if (!root) {
+                            return;
+                        }
+
+                        Array.prototype.slice.call(root.querySelectorAll('input[name], select[name], textarea[name]')).forEach(function (input) {
+                            var name = input.getAttribute('name') || '',
+                                streetMatch = name.match(/^street\[(\d+)]$/),
+                                field = map[name] || '';
+
+                            if (streetMatch) {
+                                field = streetPrefix + (parseInt(streetMatch[1], 10) + 1);
+                            }
+                            if (field) {
+                                input.setAttribute('data-wire-field', field);
+                            }
+                        });
+                    }
+
+                    annotate(
+                        document.querySelector('.fastcheckout-native-shipping-address'),
+                        shippingMap,
+                        'street'
+                    );
+                    Array.prototype.slice.call(document.querySelectorAll('.payment-method-billing-address')).forEach(function (root) {
+                        annotate(root, billingMap, 'billingStreet');
+                    });
+
+                    if (document.querySelector('.fastcheckout-native-shipping-address [data-wire-field="firstname"]')) {
+                        window.dispatchEvent(new CustomEvent('fastcheckout:address-fields-ready'));
+                    }
                 }
 
                 function syncQuoteTotals(totalsData) {
@@ -534,10 +606,18 @@ define([
                 loadShippingRatesValidationComponents();
                 loadPaymentValidationComponents();
 
-                registerCheckoutProviderAddressAttributeSync();
-
                 app({
                     components: {
+                        'checkoutProvider': $.extend(
+                            true,
+                            {
+                                component: 'uiComponent',
+                                shippingAddress: {
+                                    street: ['', '']
+                                }
+                            },
+                            checkoutLayoutBridge.checkoutProvider
+                        ),
                         [scope]: {
                             component: 'uiComponent',
                             children: checkoutLayoutBridge.paymentRegionChildren
@@ -561,10 +641,15 @@ define([
                                         'shipping-step': {
                                             component: 'uiComponent',
                                             children: {
-                                                shippingAddress: {
-                                                    component: 'uiComponent',
-                                                    children: checkoutLayoutBridge.shippingAddressChildren
-                                                }
+                                                'step-config': {
+                                                    component: 'uiComponent'
+                                                },
+                                                shippingAddress: $.extend(
+                                                    true,
+                                                    {},
+                                                    checkoutLayoutBridge.shippingAddress,
+                                                    {children: checkoutLayoutBridge.shippingAddressChildren}
+                                                )
                                             }
                                         }
                                     })
@@ -574,9 +659,17 @@ define([
                     }
                 });
 
-                [0, 50, 250, 750].forEach(function (delay) {
+                [0, 50, 250, 750, 1500, 3000].forEach(function (delay) {
                     window.setTimeout(checkoutLayoutBridge.aliasStandardShippingRegistryPaths, delay);
-                    window.setTimeout(registerCheckoutProviderAddressAttributeSync, delay);
+                    window.setTimeout(annotateStandardAddressFields, delay);
+                    window.setTimeout(function () {
+                        getCheckoutProvider();
+                        if (delay === 750) {
+                            getShippingAddressComponent();
+                            getBillingAddressComponent();
+                        }
+                        registerCheckoutProviderAddressAttributeSync();
+                    }, delay);
                 });
 
                 function getProperty(wire, name) {
@@ -718,7 +811,7 @@ define([
                     return magewireUtils.setValue(wire, field, value, deferUpdate);
                 }
 
-                function writeKoAddressToMagewire(address, isBilling, deferUpdates) {
+                function writeKoAddressToMagewire(address, isBilling, deferUpdates, additionalPayload) {
                     var wire = getMagewireComponent(),
                         prefix = isBilling ? 'billing' : '',
                         operations = [],
@@ -790,6 +883,12 @@ define([
                     payload[prefix ? 'billingCustomAttributes' : 'shippingCustomAttributes'] = customAttributes;
                     payload[prefix ? 'billingExtensionAttributes' : 'shippingExtensionAttributes'] = extensionAttributes;
 
+                    if (additionalPayload && typeof additionalPayload === 'object') {
+                        Object.keys(additionalPayload).forEach(function (field) {
+                            payload[field] = additionalPayload[field];
+                        });
+                    }
+
                     Object.keys(payload).forEach(function (field) {
                         var current = getProperty(wire, field),
                             value = payload[field],
@@ -823,6 +922,68 @@ define([
 
                     return Promise.resolve(wire.call('syncAddressFields', payload)).then(function () {
                         return true;
+                    });
+                }
+
+                function syncStandardAddressFormsToMagewire() {
+                    var shippingAddress = quote && typeof quote.shippingAddress === 'function'
+                            ? quote.shippingAddress()
+                            : null,
+                        billingAddress = quote && typeof quote.billingAddress === 'function'
+                            ? quote.billingAddress()
+                            : null,
+                        wire = getMagewireComponent(),
+                        shippingKey,
+                        billingKey,
+                        billingSameAsShipping,
+                        addressChanged = false;
+
+                    if (!shippingAddress && !(quote.isVirtual && quote.isVirtual())) {
+                        return Promise.resolve(false);
+                    }
+
+                    shippingKey = shippingAddress && typeof shippingAddress.getCacheKey === 'function'
+                        ? shippingAddress.getCacheKey()
+                        : '';
+                    billingKey = billingAddress && typeof billingAddress.getCacheKey === 'function'
+                        ? billingAddress.getCacheKey()
+                        : '';
+                    billingSameAsShipping = Boolean(
+                        shippingAddress && billingAddress &&
+                        (shippingAddress === billingAddress || (shippingKey && shippingKey === billingKey))
+                    );
+
+                    return Promise.resolve(
+                        shippingAddress
+                            ? writeKoAddressToMagewire(shippingAddress, false, true, {
+                                email: getEmailForQuote()
+                            })
+                            : false
+                    ).then(function (changed) {
+                        addressChanged = addressChanged || changed === true;
+                        if (!billingAddress && billingSameAsShipping) {
+                            billingAddress = shippingAddress;
+                        }
+
+                        if (!billingAddress) {
+                            return false;
+                        }
+
+                        return writeKoAddressToMagewire(billingAddress, true, true, {
+                            billingSameAsShipping: billingSameAsShipping
+                        });
+                    }).then(function (changed) {
+                        addressChanged = addressChanged || changed === true;
+                        if (!addressChanged || !wire || typeof wire.call !== 'function') {
+                            return addressChanged;
+                        }
+
+                        // Deferred wire.set calls above are included in this one
+                        // request; the method remains the server-side atomic
+                        // boundary for shipping and billing address state.
+                        return Promise.resolve(wire.call('syncAddressFields', {})).then(function () {
+                            return true;
+                        });
                     });
                 }
 
@@ -1381,8 +1542,23 @@ define([
                     return deferred.promise();
                 }
 
+                var lastShippingRateEstimateKey = '';
+                var shippingRateEstimatePromise = null;
+                var lastShippingRateEstimateRates = [];
+
                 function resolveShippingRatesEstimate(address) {
-                    var wire = getMagewireComponent();
+                    var wire = getMagewireComponent(),
+                        addressData = getCurrentShippingAddressData(address),
+                        estimateKey = JSON.stringify({
+                            countryId: addressData.countryId || addressData.country_id || '',
+                            regionId: addressData.regionId || addressData.region_id || '',
+                            region: addressData.region || '',
+                            postcode: addressData.postcode || '',
+                            city: addressData.city || '',
+                            street: addressData.street || []
+                        }),
+                        estimatePromise,
+                        addressChanged = false;
 
                     if (!validateShippingRatesAddress(address, false)) {
                         if (shippingService && shippingService.isLoading && typeof shippingService.isLoading === 'function') {
@@ -1395,8 +1571,23 @@ define([
                         return Promise.resolve([]);
                     }
 
-                    return writeKoAddressToMagewire(address, false)
+                    if (estimateKey === lastShippingRateEstimateKey) {
+                        if (shippingRateEstimatePromise) {
+                            return shippingRateEstimatePromise;
+                        }
+
+                        return Promise.resolve(
+                            shippingService.getShippingRates()().length
+                                ? shippingService.getShippingRates()()
+                                : lastShippingRateEstimateRates
+                        );
+                    }
+
+                    lastShippingRateEstimateKey = estimateKey;
+
+                    estimatePromise = writeKoAddressToMagewire(address, false)
                         .then(function (changed) {
+                            addressChanged = !!changed;
                             if (changed) {
                                 if (wire && typeof wire.call === 'function') {
                                     return wire.call('saveShippingAddress', true, true, true)
@@ -1409,8 +1600,26 @@ define([
                                         });
                                 }
                             }
-                            return shippingService.getShippingRates()();
+                            return shippingService.getShippingRates()().length
+                                ? shippingService.getShippingRates()()
+                                : lastShippingRateEstimateRates;
+                        })
+                        .then(function (rates) {
+                            rates = Array.isArray(rates) ? rates : [];
+                            if (addressChanged || rates.length) {
+                                lastShippingRateEstimateRates = rates;
+                            }
+
+                            return rates;
+                        })
+                        .finally(function () {
+                            if (shippingRateEstimatePromise === estimatePromise) {
+                                shippingRateEstimatePromise = null;
+                            }
                         });
+                    shippingRateEstimatePromise = estimatePromise;
+
+                    return estimatePromise;
                 }
 
                 function getPaymentMethodCode(paymentMethod) {
@@ -1469,6 +1678,7 @@ define([
 
                 window.fastcheckoutHyvaShipping = {
                     syncAddress: syncAddressToKnockout,
+                    syncAddressFormsToMagewire: syncStandardAddressFormsToMagewire,
                     syncShippingMethod: syncSelectedShippingMethodToKnockout,
                     syncShippingMethodToMagewire: syncShippingMethodToMagewire,
                     syncShippingMethodToMagewireNow: syncShippingMethodToMagewireNow,
@@ -1498,7 +1708,9 @@ define([
                     },
                     onSelectShippingAddressAction: function (shippingAddress) {
                         var addressData = normalizeKoAddressData(shippingAddress),
-                            currentShippingAddress;
+                            currentShippingAddress,
+                            wire = getMagewireComponent(),
+                            billingSameAsShipping;
 
                         persistAddressToCheckoutData(addressData, 'shipping');
                         syncAddressDataToCheckoutProvider(addressData, 'shipping');
@@ -1506,6 +1718,15 @@ define([
                         currentShippingAddress = quote && typeof quote.shippingAddress === 'function'
                             ? quote.shippingAddress()
                             : null;
+                        billingSameAsShipping = getProperty(wire, 'billingSameAsShipping');
+
+                        if (
+                            (billingSameAsShipping === true || billingSameAsShipping === 1 || billingSameAsShipping === '1') &&
+                            currentShippingAddress &&
+                            typeof selectBillingAddressAction === 'function'
+                        ) {
+                            selectBillingAddressAction(currentShippingAddress);
+                        }
 
                         return Promise.resolve(
                             writeKoAddressToMagewire(currentShippingAddress || shippingAddress, false, true)
@@ -1515,7 +1736,20 @@ define([
                     },
                     onSelectBillingAddressAction: function (billingAddress) {
                         var addressData = normalizeKoAddressData(billingAddress),
-                            currentBillingAddress;
+                            currentBillingAddress,
+                            currentShippingAddress,
+                            billingKey,
+                            shippingKey,
+                            billingSameAsShipping,
+                            wire = getMagewireComponent();
+
+                        if (!billingAddress) {
+                            return Promise.resolve(
+                                setMagewireValue(wire, 'billingSameAsShipping', false, true)
+                            ).then(function () {
+                                return false;
+                            });
+                        }
 
                         persistAddressToCheckoutData(addressData, 'billing');
                         syncAddressDataToCheckoutProvider(addressData, 'billing');
@@ -1523,8 +1757,26 @@ define([
                         currentBillingAddress = quote && typeof quote.billingAddress === 'function'
                             ? quote.billingAddress()
                             : null;
+                        currentShippingAddress = quote && typeof quote.shippingAddress === 'function'
+                            ? quote.shippingAddress()
+                            : null;
+                        billingKey = currentBillingAddress && typeof currentBillingAddress.getCacheKey === 'function'
+                            ? currentBillingAddress.getCacheKey()
+                            : '';
+                        shippingKey = currentShippingAddress && typeof currentShippingAddress.getCacheKey === 'function'
+                            ? currentShippingAddress.getCacheKey()
+                            : '';
+                        billingSameAsShipping = Boolean(
+                            currentBillingAddress && currentShippingAddress &&
+                            (
+                                currentBillingAddress === currentShippingAddress ||
+                                (billingKey && billingKey === shippingKey)
+                            )
+                        );
 
-                        return writeKoAddressToMagewire(currentBillingAddress || billingAddress, true);
+                        return writeKoAddressToMagewire(currentBillingAddress || billingAddress, true, true, {
+                            billingSameAsShipping: billingSameAsShipping
+                        });
                     },
                     onSelectShippingMethodAction: function (shippingMethod) {
                         var code = getShippingMethodCode(shippingMethod);
@@ -1585,15 +1837,20 @@ define([
                                 methodCode = activeMethod.method_code || '';
                             }
 
-                            if (!carrierCode) {
-                                return true;
-                            }
-
                             // InPost locker point selection validation
                             var fullMethodCode = (methodCode + '_' + carrierCode).toLowerCase();
-                            var isInPostLocker = fullMethodCode.indexOf('inpostlocker') !== -1 || 
-                                                 fullMethodCode.indexOf('paczkomat') !== -1 || 
-                                                 (fullMethodCode.indexOf('inpost') !== -1 && (fullMethodCode.indexOf('locker') !== -1 || fullMethodCode.indexOf('box') !== -1 || fullMethodCode.indexOf('point') !== -1));
+                            var isInPostLocker = carrierCode && (
+                                fullMethodCode.indexOf('inpostlocker') !== -1 ||
+                                fullMethodCode.indexOf('paczkomat') !== -1 ||
+                                (
+                                    fullMethodCode.indexOf('inpost') !== -1 &&
+                                    (
+                                        fullMethodCode.indexOf('locker') !== -1 ||
+                                        fullMethodCode.indexOf('box') !== -1 ||
+                                        fullMethodCode.indexOf('point') !== -1
+                                    )
+                                )
+                            );
                             if (isInPostLocker) {
                                 var pointData = null;
                                 if (checkoutData && typeof checkoutData.getShippingInPostPoint === 'function') {
@@ -2016,8 +2273,7 @@ define([
                     // Remove components we explicitly hide or handle globally
                     var selectorsToRemove = [
                         '.payment-method-title',
-                        '.fastcheckout-actions-toolbar-hidden',
-                        '.payment-method-billing-address'
+                        '.fastcheckout-actions-toolbar-hidden'
                     ];
                     selectorsToRemove.forEach(function (selector) {
                         clone.querySelectorAll(selector).forEach(function (el) {
@@ -4167,7 +4423,12 @@ define([
                                     typeof shippingMethodSync.isUserShippingSelectionFresh === 'function' &&
                                     shippingMethodSync.isUserShippingSelectionFresh();
 
-                            syncAddressToKnockout(wire);
+                            if (!(
+                                config.shippingAddress &&
+                                config.shippingAddress.component === 'Magento_Checkout/js/view/shipping'
+                            )) {
+                                syncAddressToKnockout(wire);
+                            }
 
                             // Keep KO on the locked user method. If a lagging Livewire response
                             // left wire on the previous rate, re-assert the lock once (coalesced).

@@ -1,0 +1,26 @@
+<!--
+/**
+ * Address-only variant of Magento_Checkout/shipping.
+ * The Fastcheckout page keeps its own shipping-method list and final CTA.
+ */
+-->
+<each if="!quoteIsVirtual" args="getRegion('customer-email')" render=""></each>
+<each args="getRegion('address-list')" render=""></each>
+<each args="getRegion('address-list-additional-addresses')" render=""></each>
+
+<if args="!isFormInline">
+    <div class="new-address-popup">
+        <button type="button"
+                class="btn btn-secondary action action-show-popup"
+                click="showFormPopUp"
+                visible="!isNewAddressAdded()">
+            <span translate="'New Address'"></span>
+        </button>
+    </div>
+    <div id="opc-new-shipping-address"
+         visible="isFormPopUpVisible()"
+         render="shippingFormTemplate"></div>
+</if>
+
+<each args="getRegion('before-form')" render=""></each>
+<render if="isFormInline" args="shippingFormTemplate"></render>

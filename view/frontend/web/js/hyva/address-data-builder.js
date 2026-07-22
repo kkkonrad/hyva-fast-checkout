@@ -36,18 +36,19 @@ define([], function () {
         }
 
         function getStreetLines(magewire, prefix) {
-            var street = [],
+            var street,
                 isBilling = prefix === 'billing',
                 line1 = getProperty(magewire, isBilling ? 'billingStreet1' : 'street1'),
                 line2 = getProperty(magewire, isBilling ? 'billingStreet2' : 'street2'),
                 line3 = getProperty(magewire, isBilling ? 'billingStreet3' : 'street3'),
                 line4 = getProperty(magewire, isBilling ? 'billingStreet4' : 'street4');
 
-            [line1, line2, line3, line4].forEach(function (line) {
-                if (line) {
-                    street.push(line);
-                }
-            });
+            // Preserve line indexes and initialize the two standard Magento
+            // street controls with form values instead of `undefined`.
+            street = [line1 || '', line2 || ''];
+            if (line3 || line4) {
+                street.push(line3 || '', line4 || '');
+            }
 
             return street;
         }

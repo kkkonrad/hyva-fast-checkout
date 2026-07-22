@@ -15,6 +15,8 @@ define([
             paymentRegionChildren = $.extend(true, {}, config.paymentRegionChildren || {}),
             shippingListChildren = $.extend(true, {}, config.shippingListChildren || {}),
             shippingAddressChildren = $.extend(true, {}, config.shippingAddressChildren || {}),
+            shippingAddress = $.extend(true, {}, config.shippingAddress || {}),
+            checkoutProvider = $.extend(true, {}, config.checkoutProvider || {}),
             checkoutStepChildren = $.extend(true, {}, config.checkoutStepChildren || {});
 
         function containsDeferredPaymentComponent(name, node) {
@@ -120,6 +122,8 @@ define([
             paymentRegionChildren: paymentRegionChildren,
             shippingListChildren: shippingListChildren,
             shippingAddressChildren: shippingAddressChildren,
+            shippingAddress: shippingAddress,
+            checkoutProvider: checkoutProvider,
             checkoutStepChildren: checkoutStepChildren,
             activateDeferredPaymentListChildren: activateDeferredPaymentListChildren,
             aliasAdditionalCheckoutStepRegistryPaths: aliasAdditionalCheckoutStepRegistryPaths,

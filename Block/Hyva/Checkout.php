@@ -8,6 +8,8 @@ use Magento\Catalog\Helper\Image as ImageHelper;
 use Magento\Catalog\Helper\Product\Configuration as ProductConfiguration;
 use Magento\Checkout\Model\CompositeConfigProvider;
 use Magento\Checkout\Model\Session as CheckoutSession;
+use Magento\Checkout\Block\Checkout\LayoutProcessor;
+use Magento\Checkout\Block\Checkout\DirectoryDataProcessor;
 use Magento\Framework\Component\ComponentRegistrar;
 use Magento\Framework\Component\ComponentRegistrarInterface;
 use Magento\Framework\Locale\ResolverInterface;
@@ -141,6 +143,11 @@ class Checkout extends Template
     /**
      * @var array|null
      */
+    private $standardAddressLayoutCache;
+
+    /**
+     * @var array|null
+     */
     private $checkoutStepChildrenCache;
 
     /**
@@ -172,6 +179,12 @@ class Checkout extends Template
     /** @var TaxHelper|null */
     private $taxHelper;
 
+    /** @var LayoutProcessor|null */
+    private $checkoutLayoutProcessor;
+
+    /** @var DirectoryDataProcessor|null */
+    private $checkoutDirectoryDataProcessor;
+
 
     /**
      * @param Context $context
@@ -201,7 +214,9 @@ class Checkout extends Template
         array $data = [],
         RequireJsAssets $requireJsAssets = null,
         AddressHelper $addressHelper = null,
-        TaxHelper $taxHelper = null
+        TaxHelper $taxHelper = null,
+        LayoutProcessor $checkoutLayoutProcessor = null,
+        DirectoryDataProcessor $checkoutDirectoryDataProcessor = null
     ) {
         $this->checkoutSession = $checkoutSession;
         $this->pricingHelper = $pricingHelper;
@@ -216,6 +231,8 @@ class Checkout extends Template
         $this->requireJsAssets = $requireJsAssets;
         $this->addressHelper = $addressHelper;
         $this->taxHelper = $taxHelper;
+        $this->checkoutLayoutProcessor = $checkoutLayoutProcessor;
+        $this->checkoutDirectoryDataProcessor = $checkoutDirectoryDataProcessor;
 
         parent::__construct($context, $data);
     }
@@ -487,6 +504,13 @@ class Checkout extends Template
             return $this->paymentListChildrenCache;
         }
 
+        $standardLayout = $this->getProcessedStandardAddressLayout();
+        $processedChildren = $standardLayout['payment']['children']['payments-list']['children'] ?? null;
+        if (is_array($processedChildren)) {
+            $this->paymentListChildrenCache = $processedChildren;
+            return $this->paymentListChildrenCache;
+        }
+
         $moduleList = $this->getModuleList();
         $componentRegistrar = $this->getComponentRegistrar();
         if ($moduleList === null || $componentRegistrar === null) {
@@ -526,6 +550,18 @@ class Checkout extends Template
     public function getPaymentRegionChildren()
     {
         if ($this->paymentRegionChildrenCache !== null) {
+            return $this->paymentRegionChildrenCache;
+        }
+
+        $standardLayout = $this->getProcessedStandardAddressLayout();
+        $paymentChildren = $standardLayout['payment']['children'] ?? null;
+        if (is_array($paymentChildren)) {
+            $this->paymentRegionChildrenCache = [];
+            foreach (['place-order-captcha', 'beforeMethods', 'afterMethods'] as $name) {
+                if (isset($paymentChildren[$name]) && is_array($paymentChildren[$name])) {
+                    $this->paymentRegionChildrenCache[$name] = $paymentChildren[$name];
+                }
+            }
             return $this->paymentRegionChildrenCache;
         }
 
@@ -611,6 +647,13 @@ class Checkout extends Template
             return $this->shippingAddressChildrenCache;
         }
 
+        $standardLayout = $this->getProcessedStandardAddressLayout();
+        $processedChildren = $standardLayout['shippingAddress']['children'] ?? null;
+        if (is_array($processedChildren)) {
+            $this->shippingAddressChildrenCache = $processedChildren;
+            return $this->shippingAddressChildrenCache;
+        }
+
         $moduleList = $this->getModuleList();
         $componentRegistrar = $this->getComponentRegistrar();
         if ($moduleList === null || $componentRegistrar === null) {
@@ -639,6 +682,47 @@ class Checkout extends Template
         $this->shippingAddressChildrenCache = $children;
 
         return $this->shippingAddressChildrenCache;
+    }
+
+    /**
+     * Return the native Magento shipping component configuration with a
+     * Fastcheckout template that renders only address regions (not methods).
+     *
+     * @return array
+     */
+    public function getShippingAddressComponentConfig()
+    {
+        $standardLayout = $this->getProcessedStandardAddressLayout();
+        $component = $standardLayout['shippingAddress'] ?? [];
+
+        if (!is_array($component)) {
+            $component = [];
+        }
+
+        $component['component'] = $component['component'] ?? 'Magento_Checkout/js/view/shipping';
+        $component['provider'] = $component['provider'] ?? 'checkoutProvider';
+        $component['children'] = $this->getShippingAddressChildren();
+        $component['config'] = isset($component['config']) && is_array($component['config'])
+            ? $component['config']
+            : [];
+        // The provider and step-config are initialized in the same reduced app
+        // tree. Keeping the core async deps here can deadlock the parent while
+        // its children are already registered by the UI layout renderer.
+        unset($component['config']['deps']);
+        $component['config']['template'] = 'Kkkonrad_Fastcheckout/hyva/shipping-address';
+
+        return $component;
+    }
+
+    /**
+     * @return array
+     */
+    public function getCheckoutProviderConfig()
+    {
+        $standardLayout = $this->getProcessedStandardAddressLayout();
+        $provider = $standardLayout['checkoutProvider'] ?? [];
+
+        return is_array($provider) ? $provider : [];
     }
 
     /**
@@ -1135,6 +1219,181 @@ class Checkout extends Template
             }
 
             return $children;
+        } catch (\Exception $e) {
+            return [];
+        } finally {
+            libxml_clear_errors();
+            libxml_use_internal_errors($previous);
+        }
+    }
+
+    /**
+     * Build the address-related part of the standard checkout jsLayout and let
+     * Magento's own layout processor add EAV fields, validation and billing
+     * forms. The result is intentionally limited to address components so the
+     * native checkout step and shipping-method UI are not rendered twice.
+     *
+     * @return array
+     */
+    private function getProcessedStandardAddressLayout()
+    {
+        if ($this->standardAddressLayoutCache !== null) {
+            return $this->standardAddressLayoutCache;
+        }
+
+        $this->standardAddressLayoutCache = [];
+        $moduleList = $this->getModuleList();
+        $componentRegistrar = $this->getComponentRegistrar();
+        if (
+            $this->checkoutLayoutProcessor === null ||
+            $moduleList === null ||
+            $componentRegistrar === null
+        ) {
+            return $this->standardAddressLayoutCache;
+        }
+
+        $shippingAddress = [];
+        $payment = [];
+        foreach ($moduleList->getNames() as $moduleName) {
+            $modulePath = $componentRegistrar->getPath(ComponentRegistrar::MODULE, $moduleName);
+            if (!$modulePath) {
+                continue;
+            }
+
+            $layoutFile = $modulePath . '/view/frontend/layout/checkout_index_index.xml';
+            if (!is_file($layoutFile)) {
+                continue;
+            }
+
+            $shippingAddress = $this->mergeJsLayoutArrays(
+                $shippingAddress,
+                $this->getCheckoutStepComponentFromLayout($layoutFile, 'shipping-step', 'shippingAddress')
+            );
+            $payment = $this->mergeJsLayoutArrays(
+                $payment,
+                $this->getCheckoutStepComponentFromLayout($layoutFile, 'billing-step', 'payment')
+            );
+        }
+
+        if ($shippingAddress === [] || $payment === []) {
+            return $this->standardAddressLayoutCache;
+        }
+
+        $layout = [
+            'components' => [
+                'checkoutProvider' => [
+                    'component' => 'uiComponent'
+                ],
+                'checkout' => [
+                    'children' => [
+                        'steps' => [
+                            'children' => [
+                                'shipping-step' => [
+                                    'children' => [
+                                        'shippingAddress' => $shippingAddress
+                                    ]
+                                ],
+                                'billing-step' => [
+                                    'children' => [
+                                        'payment' => $payment
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ];
+
+        try {
+            $layout = $this->checkoutLayoutProcessor->process($layout);
+            if ($this->checkoutDirectoryDataProcessor !== null) {
+                $layout = $this->checkoutDirectoryDataProcessor->process($layout);
+            }
+            $layout = $this->normalizeStandardStreetLineDefaults($layout);
+        } catch (\Throwable $exception) {
+            return $this->standardAddressLayoutCache;
+        }
+
+        $this->standardAddressLayoutCache = [
+            'shippingAddress' => $layout['components']['checkout']['children']['steps']['children']
+                ['shipping-step']['children']['shippingAddress'] ?? [],
+            'payment' => $layout['components']['checkout']['children']['steps']['children']
+                ['billing-step']['children']['payment'] ?? [],
+            'checkoutProvider' => $layout['components']['checkoutProvider'] ?? []
+        ];
+
+        return $this->standardAddressLayoutCache;
+    }
+
+    /**
+     * UI form elements start with `undefined` when checkoutProvider has no
+     * persisted address. Magento's max_text_length validator treats that as an
+     * error, even for optional street lines. An empty string is the normal form
+     * value and keeps the stock validation rules intact.
+     *
+     * @param array $node
+     * @return array
+     */
+    private function normalizeStandardStreetLineDefaults(array $node)
+    {
+        $dataScope = isset($node['dataScope']) ? (string)$node['dataScope'] : '';
+        if (
+            substr($dataScope, -7) === '.street' &&
+            isset($node['children']) &&
+            is_array($node['children'])
+        ) {
+            foreach ($node['children'] as $key => $child) {
+                if (!is_array($child)) {
+                    continue;
+                }
+                if (!array_key_exists('value', $child) && !array_key_exists('default', $child)) {
+                    $child['default'] = '';
+                }
+                $node['children'][$key] = $child;
+            }
+        }
+
+        foreach ($node as $key => $value) {
+            if (is_array($value)) {
+                $node[$key] = $this->normalizeStandardStreetLineDefaults($value);
+            }
+        }
+
+        return $node;
+    }
+
+    /**
+     * @param string $layoutFile
+     * @param string $stepName
+     * @param string $componentName
+     * @return array
+     */
+    private function getCheckoutStepComponentFromLayout($layoutFile, $stepName, $componentName)
+    {
+        $dom = new \DOMDocument();
+        $previous = libxml_use_internal_errors(true);
+
+        try {
+            if (!$dom->load($layoutFile)) {
+                return [];
+            }
+
+            $xpath = new \DOMXPath($dom);
+            $nodes = $xpath->query(
+                '//*[local-name()="item"][@name="' . $stepName . '"]' .
+                '/*[local-name()="item"][@name="children"]' .
+                '/*[local-name()="item"][@name="' . $componentName . '"]'
+            );
+            $component = [];
+            foreach ($nodes as $node) {
+                $parsed = $this->parseJsLayoutItem($node);
+                if (is_array($parsed)) {
+                    $component = $this->mergeJsLayoutArrays($component, $parsed);
+                }
+            }
+
+            return $component;
         } catch (\Exception $e) {
             return [];
         } finally {
