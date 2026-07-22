@@ -56,10 +56,14 @@ define([
                 this._super();
 
                 if (isFastcheckoutActive()) {
+                    this.fastcheckoutRestorePersistedEmail();
                     // After KO paint + after any delayed Magento re-render of email.
                     setTimeout(this.fastcheckoutHardenEmailAutofill.bind(this), 0);
                     setTimeout(this.fastcheckoutHardenEmailAutofill.bind(this), 400);
                     setTimeout(this.fastcheckoutHardenEmailAutofill.bind(this), 1200);
+                    // Late restore: session/last-guest snapshot may apply after component init.
+                    setTimeout(this.fastcheckoutRestorePersistedEmail.bind(this), 300);
+                    setTimeout(this.fastcheckoutRestorePersistedEmail.bind(this), 1200);
                 }
 
                 return this;
@@ -125,6 +129,74 @@ define([
 
                 hardenEmailInput(input);
                 removeHiddenPasswordFields();
+            },
+
+            /**
+             * Rehydrate guest email after order-success cleanup wiped in-memory state.
+             * Prefer Magento checkout-data, then Fastcheckout session / last-guest snapshot.
+             */
+            fastcheckoutRestorePersistedEmail: function () {
+                var self = this,
+                    current = typeof this.email === 'function' ? String(this.email() || '').trim() : '',
+                    restored = '';
+
+                if (current) {
+                    this.fastcheckoutHardenEmailAutofill();
+                    return;
+                }
+
+                try {
+                    if (typeof window.require === 'function') {
+                        window.require(['Magento_Checkout/js/checkout-data'], function (checkoutData) {
+                            var value = '';
+
+                            try {
+                                if (checkoutData && typeof checkoutData.getInputFieldEmailValue === 'function') {
+                                    value = checkoutData.getInputFieldEmailValue() || '';
+                                }
+                                if (!value && checkoutData && typeof checkoutData.getValidatedEmailValue === 'function') {
+                                    value = checkoutData.getValidatedEmailValue() || '';
+                                }
+                            } catch (e) {}
+
+                            if (!value) {
+                                try {
+                                    value = window.sessionStorage.getItem('fastcheckout_email') || '';
+                                } catch (e2) {}
+                            }
+
+                            if (!value) {
+                                try {
+                                    var raw = window.sessionStorage.getItem('fastcheckout_last_guest_address');
+                                    var payload = raw ? JSON.parse(raw) : null;
+                                    if (payload && payload.values && payload.values.email) {
+                                        value = String(payload.values.email || '');
+                                    }
+                                } catch (e3) {}
+                            }
+
+                            value = String(value || '').trim();
+                            if (!value || typeof self.email !== 'function') {
+                                self.fastcheckoutHardenEmailAutofill();
+                                return;
+                            }
+
+                            if (self.email() !== value) {
+                                self.email(value);
+                                if (typeof self.emailHasChanged === 'function') {
+                                    self.emailHasChanged();
+                                }
+                            }
+
+                            self.fastcheckoutHardenEmailAutofill();
+                        }, function () {
+                            self.fastcheckoutHardenEmailAutofill();
+                        });
+                        return;
+                    }
+                } catch (e) {}
+
+                this.fastcheckoutHardenEmailAutofill();
             }
         });
     };

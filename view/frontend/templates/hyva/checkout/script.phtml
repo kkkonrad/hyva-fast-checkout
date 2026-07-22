@@ -1077,6 +1077,17 @@ window.addEventListener('alpine:init', () => Alpine.data('initCheckout', initChe
     }
 
     function getFieldElement(field) {
+        // Magento KO guest email may not have data-wire-field yet (annotated async).
+        if (field === 'email') {
+            return document.querySelector(
+                '[data-wire-field="email"], ' +
+                '#customer-email, ' +
+                '[data-role="email-with-possible-login"] input[name="email"], ' +
+                '[data-role="email-with-possible-login"] input[name="username"], ' +
+                '.fastcheckout-native-shipping-address input[type="email"]'
+            );
+        }
+
         return document.querySelector('[data-wire-field="' + field + '"]');
     }
 
@@ -1090,6 +1101,10 @@ window.addEventListener('alpine:init', () => Alpine.data('initCheckout', initChe
         input.value = value;
         try { input.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) {}
         try { input.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) {}
+
+        if (field === 'email') {
+            syncRestoredGuestEmail(value, true);
+        }
     }
 
     function setDomFieldValueQuietly(field, value) {
@@ -1100,6 +1115,73 @@ window.addEventListener('alpine:init', () => Alpine.data('initCheckout', initChe
         }
 
         input.value = value;
+
+        if (field === 'email') {
+            syncRestoredGuestEmail(value, false);
+        }
+    }
+
+    /**
+     * Keep Magento checkout-data + KO email component in sync after restore.
+     * Order success clears mage-cache-storage email keys; without this rehydrate
+     * the next checkout starts empty even when last-guest snapshot has email.
+     */
+    function syncRestoredGuestEmail(email, triggerChange) {
+        const value = String(email || '').trim();
+        if (!value) {
+            return;
+        }
+
+        try {
+            if (typeof window.require === 'function') {
+                window.require([
+                    'Magento_Checkout/js/checkout-data',
+                    'Magento_Checkout/js/model/quote',
+                    'uiRegistry'
+                ], function (checkoutData, quote, registry) {
+                    try {
+                        if (checkoutData && typeof checkoutData.setValidatedEmailValue === 'function') {
+                            checkoutData.setValidatedEmailValue(value);
+                        }
+                        if (checkoutData && typeof checkoutData.setInputFieldEmailValue === 'function') {
+                            checkoutData.setInputFieldEmailValue(value);
+                        }
+                    } catch (e) {}
+
+                    try {
+                        if (quote) {
+                            if (typeof quote.guestEmail === 'function') {
+                                quote.guestEmail(value);
+                            } else {
+                                quote.guestEmail = value;
+                            }
+                        }
+                    } catch (e) {}
+
+                    try {
+                        const component = registry && typeof registry.get === 'function'
+                            ? registry.get('checkout.steps.shipping-step.shippingAddress.customer-email')
+                            : null;
+                        if (component && typeof component.email === 'function' && component.email() !== value) {
+                            component.email(value);
+                            if (triggerChange && typeof component.emailHasChanged === 'function') {
+                                component.emailHasChanged();
+                            }
+                        }
+                    } catch (e) {}
+                }, function () {});
+            }
+        } catch (e) {}
+
+        // Username mirror used by Magento stock validators.
+        try {
+            const mirror = document.querySelector(
+                'form[data-role="email-with-possible-login"] input[name="username"]'
+            );
+            if (mirror) {
+                mirror.value = value;
+            }
+        } catch (e) {}
     }
 
     function setWireValue(wire, field, value, deferUpdate) {
@@ -1217,11 +1299,19 @@ window.addEventListener('alpine:init', () => Alpine.data('initCheckout', initChe
                 setWireValue(wire, field, val, deferUpdates === true);
             }
         });
+
+        if (values.email) {
+            syncRestoredGuestEmail(values.email, true);
+        }
     }
 
     function restoreDomFieldsOnly(values) {
         if (!values) {
             return;
+        }
+
+        if (values.email) {
+            syncRestoredGuestEmail(values.email, false);
         }
 
         FIELDS.forEach(function (field) {
@@ -1365,7 +1455,7 @@ window.addEventListener('alpine:init', () => Alpine.data('initCheckout', initChe
         });
     }
 
-    function clearCheckoutDataStorage() {
+    function clearCheckoutDataStorage(preservedEmail) {
         try {
             if (!window.localStorage) {
                 return;
@@ -1382,23 +1472,70 @@ window.addEventListener('alpine:init', () => Alpine.data('initCheckout', initChe
                 'selectedBillingAddress',
                 'billingAddressFromData',
                 'newCustomerBillingAddress',
-                'validatedEmailValue',
-                'inputFieldEmailValue',
                 'checkedEmailValue'
             ].forEach(function (key) {
                 delete checkoutData[key];
             });
+
+            // Keep guest email for the next checkout (KO email component reads these).
+            const email = String(preservedEmail || '').trim();
+            if (email) {
+                checkoutData.validatedEmailValue = email;
+                checkoutData.inputFieldEmailValue = email;
+            } else {
+                delete checkoutData.validatedEmailValue;
+                delete checkoutData.inputFieldEmailValue;
+            }
+
             cache['checkout-data'] = checkoutData;
             window.localStorage.setItem('mage-cache-storage', JSON.stringify(cache));
         } catch (e) {}
     }
 
+    function resolveEmailForPersistence() {
+        try {
+            const fromDom = readCurrentFieldValue('email');
+            if (fromDom && String(fromDom).trim()) {
+                return String(fromDom).trim();
+            }
+        } catch (e) {}
+
+        try {
+            const fromSession = readSessionField('email');
+            if (fromSession && String(fromSession).trim()) {
+                return String(fromSession).trim();
+            }
+        } catch (e) {}
+
+        try {
+            const snapshot = getLastGuestAddressValues();
+            if (snapshot && snapshot.email && String(snapshot.email).trim()) {
+                return String(snapshot.email).trim();
+            }
+        } catch (e) {}
+
+        try {
+            const input = document.getElementById('customer-email') ||
+                document.querySelector('[data-role="email-with-possible-login"] input[name="email"]');
+            if (input && input.value && String(input.value).trim()) {
+                return String(input.value).trim();
+            }
+        } catch (e) {}
+
+        return '';
+    }
+
     function clearPersistedCheckoutState() {
         persistLastGuestAddress();
+        const emailToKeep = resolveEmailForPersistence();
         window.fastcheckoutOrderPlaced = true;
         try { sessionStorage.setItem(ORDER_PLACED_MARKER, '1'); } catch (e) {}
         clearStorage();
-        clearCheckoutDataStorage();
+        // Re-save email into session so restore() can fill wire/DOM before KO boots.
+        if (emailToKeep) {
+            try { sessionStorage.setItem(PREFIX + 'email', emailToKeep); } catch (e) {}
+        }
+        clearCheckoutDataStorage(emailToKeep);
     }
 
     function getWire() {

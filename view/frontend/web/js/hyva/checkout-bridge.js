@@ -505,6 +505,8 @@ define([
 
                 function annotateStandardAddressFields() {
                     var shippingMap = {
+                            // Guest email uses name="email" (not username) for autofill safety.
+                            email: 'email',
                             username: 'email',
                             firstname: 'firstname',
                             lastname: 'lastname',
