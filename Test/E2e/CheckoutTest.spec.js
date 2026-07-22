@@ -147,6 +147,81 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
         await expect(shippingRoot.locator('input[name="firstname"]')).toHaveAttribute('aria-invalid', 'true');
         await expect(shippingRoot.locator('input[name="street[1]"]')).not.toHaveAttribute('aria-invalid', 'true');
         await expect(shippingRoot).toContainText(/required field|wymagane pole/i);
+
+        await expect(shippingRoot.getByText(/Ekspresowa kasa|Express Checkout/i)).toHaveCount(0);
+        await expect(shippingRoot.getByText(/standardowego procesu zamówienia/i)).toHaveCount(0);
+        await expect(shippingRoot.getByText("We'll send your order confirmation here.")).not.toBeVisible();
+
+        const presentation = await shippingRoot.evaluate((root) => {
+            const firstname = root.querySelector('input[name="firstname"]');
+            const requiredField = firstname && firstname.closest('.field');
+            const requiredLabel = requiredField && requiredField.querySelector(':scope > .label');
+            const streetLabel = root.querySelector('.field.street > .label');
+            const streetLineLabels = Array.from(root.querySelectorAll(
+                '.field.street :is(.control, .admin__control-fields) > .field > .label'
+            ));
+            const tooltip = root.querySelector('.field-tooltip');
+            const tooltipAction = tooltip && tooltip.querySelector('.field-tooltip-action');
+            const tooltipLabel = tooltip && tooltip.querySelector(':scope > .label');
+            const tooltipContent = tooltip && tooltip.querySelector('.field-tooltip-content');
+            const error = root.querySelector('.field-error, .admin__field-error, label.mage-error, div.mage-error');
+
+            return {
+                requiredMarker: requiredLabel
+                    ? getComputedStyle(requiredLabel, '::after').content
+                    : null,
+                requiredMarkerColor: requiredLabel
+                    ? getComputedStyle(requiredLabel, '::after').color
+                    : null,
+                streetMarker: streetLabel
+                    ? getComputedStyle(streetLabel, '::after').content
+                    : null,
+                invalidBorderColor: firstname ? getComputedStyle(firstname).borderColor : null,
+                streetLabels: streetLineLabels.map((label) => {
+                    const style = getComputedStyle(label);
+
+                    return {
+                        position: style.position,
+                        width: style.width,
+                        height: style.height,
+                        overflow: style.overflow
+                    };
+                }),
+                tooltip: tooltipAction && tooltipLabel && tooltipContent ? {
+                    marker: getComputedStyle(tooltipAction, '::before').content,
+                    labelWidth: getComputedStyle(tooltipLabel).width,
+                    labelOverflow: getComputedStyle(tooltipLabel).overflow,
+                    contentDisplay: getComputedStyle(tooltipContent).display
+                } : null,
+                error: error ? {
+                    color: getComputedStyle(error).color,
+                    fontSize: getComputedStyle(error).fontSize,
+                    marginTop: getComputedStyle(error).marginTop
+                } : null
+            };
+        });
+
+        expect(presentation.requiredMarker).toContain('*');
+        expect(presentation.streetMarker).toContain('*');
+        expect(presentation.streetLabels.length).toBeGreaterThanOrEqual(2);
+        expect(presentation.streetLabels.every((label) => (
+            label.position === 'absolute' &&
+            label.width === '1px' &&
+            label.height === '1px' &&
+            label.overflow === 'hidden'
+        ))).toBe(true);
+        expect(presentation.tooltip).toMatchObject({
+            marker: '"?"',
+            labelWidth: '1px',
+            labelOverflow: 'hidden',
+            contentDisplay: 'none'
+        });
+        expect(presentation.error).toMatchObject({
+            fontSize: '14px',
+            marginTop: '4px'
+        });
+        expect(presentation.error.color).toBe(presentation.requiredMarkerColor);
+        expect(presentation.invalidBorderColor).toBe(presentation.requiredMarkerColor);
         expect(pageErrors).toEqual([]);
     });
 

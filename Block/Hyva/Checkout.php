@@ -650,7 +650,7 @@ class Checkout extends Template
         $standardLayout = $this->getProcessedStandardAddressLayout();
         $processedChildren = $standardLayout['shippingAddress']['children'] ?? null;
         if (is_array($processedChildren)) {
-            $this->shippingAddressChildrenCache = $processedChildren;
+            $this->shippingAddressChildrenCache = $this->normalizeShippingAddressChildren($processedChildren);
             return $this->shippingAddressChildrenCache;
         }
 
@@ -679,9 +679,37 @@ class Checkout extends Template
             );
         }
 
-        $this->shippingAddressChildrenCache = $children;
+        $this->shippingAddressChildrenCache = $this->normalizeShippingAddressChildren($children);
 
         return $this->shippingAddressChildrenCache;
+    }
+
+    /**
+     * Keep the customer-email region limited to the address form. Payment
+     * modules place express checkout groups in the same region on the native
+     * one-page checkout, but Fastcheckout renders payment methods separately.
+     * Also restore Magento's email template when a payment module replaces it.
+     *
+     * @param array $children
+     * @return array
+     */
+    private function normalizeShippingAddressChildren(array $children): array
+    {
+        foreach ($children as $name => $child) {
+            if (
+                $name !== 'customer-email' &&
+                is_array($child) &&
+                ($child['displayArea'] ?? null) === 'customer-email'
+            ) {
+                unset($children[$name]);
+            }
+        }
+
+        if (isset($children['customer-email']) && is_array($children['customer-email'])) {
+            $children['customer-email']['template'] = 'Magento_Checkout/form/element/email';
+        }
+
+        return $children;
     }
 
     /**
