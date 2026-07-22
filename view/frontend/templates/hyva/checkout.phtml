@@ -105,6 +105,10 @@ $allowedPaymentMethodCodes = $magewire->getAllowedPaymentMethodCodes();
                 </span>
                 <span><?= $escaper->escapeHtml(__('Place Order')) ?></span>
             </button>
+            <p class="text-sm text-red-600 font-medium text-center"
+               x-show="clientOrderError"
+               x-text="clientOrderError"
+               x-cloak></p>
         </div>
     </form>
     <?php endif; ?>

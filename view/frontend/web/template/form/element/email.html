@@ -14,8 +14,12 @@
 <!-- ko template: getTemplate() --><!-- /ko -->
 <!-- /ko -->
 
-<!-- Guest email: NOT inside a login form, NOT named username, no password sibling. -->
-<div class="form form-email" data-role="email-with-possible-login">
+<!-- Guest email: real <form> so Magento/jQuery validators can use input.form,
+     but NOT form-login and NOT name=username (avoids credential managers). -->
+<form class="form form-email"
+      data-role="email-with-possible-login"
+      novalidate="novalidate"
+      onsubmit="return false;">
     <fieldset id="customer-email-fieldset" class="fieldset" data-bind="blockLoader: isLoading">
         <div class="field required">
             <label class="label" for="customer-email">
@@ -45,7 +49,7 @@
             </div>
         </div>
     </fieldset>
-</div>
+</form>
 
 <!-- Login only when Magento finds an existing customer email. -->
 <!-- ko if: isPasswordVisible() -->

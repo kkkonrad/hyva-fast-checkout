@@ -1822,11 +1822,25 @@ define([
                         try {
                             clearShippingFieldError();
                             syncDomShippingAttributesToMagewire(getMagewireComponent(), true);
-                            var checkedDomRadio = document.querySelector('input[name="shipping_method"]:checked');
+                            var checkedDomRadio = document.querySelector('input[name="shipping_method"]:checked:not(:disabled)');
                             var activeMethod = quote.shippingMethod();
 
                             var carrierCode = '';
                             var methodCode = '';
+
+                            // Require an explicit shipping-method radio selection in the Fastcheckout UI.
+                            if (!checkedDomRadio || !checkedDomRadio.value) {
+                                var missingMethodMessage = $t('Please select a shipping method.');
+
+                                showShippingFieldError('', '', missingMethodMessage);
+
+                                // Expose for Alpine handleSubmit fallback banner.
+                                window.fastcheckoutLastShippingValidationError = missingMethodMessage;
+
+                                return false;
+                            }
+
+                            window.fastcheckoutLastShippingValidationError = '';
 
                             if (checkedDomRadio && checkedDomRadio.value) {
                                 var parsedMethod = splitShippingMethodCode(checkedDomRadio.value);
@@ -2996,6 +3010,469 @@ define([
                     });
                 }
 
+                /**
+                 * Magento billing-address components for the active (or any separate) payment form.
+                 */
+                function getBillingAddressComponentsForValidation() {
+                    var methodCode = getSelectedMethodCode(),
+                        components = [],
+                        preferred = [];
+
+                    if (!registry || typeof registry.filter !== 'function') {
+                        return components;
+                    }
+
+                    components = registry.filter(function (component) {
+                        return Boolean(
+                            component &&
+                            component.source &&
+                            component.dataScopePrefix &&
+                            String(component.dataScopePrefix).indexOf('billingAddress') === 0 &&
+                            typeof component.isAddressSameAsShipping === 'function' &&
+                            typeof component.updateAddress === 'function' &&
+                            // Skip Fastcheckout fallback stub (no real form fields).
+                            component.name !== 'fastcheckout.billingAddress'
+                        );
+                    }) || [];
+
+                    if (methodCode) {
+                        preferred = components.filter(function (component) {
+                            return component.dataScopePrefix === 'billingAddress' + methodCode ||
+                                (component.name && String(component.name).indexOf(methodCode) !== -1);
+                        });
+
+                        if (preferred.length) {
+                            return preferred;
+                        }
+                    }
+
+                    return components;
+                }
+
+                function isSeparateBillingAddressRequired(component) {
+                    if (!component || typeof component.isAddressSameAsShipping !== 'function') {
+                        return false;
+                    }
+
+                    // Same as shipping — no separate form validation needed.
+                    if (component.isAddressSameAsShipping()) {
+                        return false;
+                    }
+
+                    // Saved address selected without new-address form.
+                    if (
+                        typeof component.isAddressFormVisible === 'function' &&
+                        !component.isAddressFormVisible() &&
+                        typeof component.selectedAddress === 'function' &&
+                        component.selectedAddress()
+                    ) {
+                        return true;
+                    }
+
+                    // New billing form is shown (details hidden after uncheck / edit).
+                    if (
+                        typeof component.isAddressDetailsVisible === 'function' &&
+                        !component.isAddressDetailsVisible()
+                    ) {
+                        return true;
+                    }
+
+                    // Fallback: form visible in DOM under payment method billing block.
+                    return Boolean(
+                        document.querySelector(
+                            '.payment-method-billing-address .billing-address-form:not([style*="display: none"]), ' +
+                            '.payment-method-billing-address [data-form="billing-new-address"]'
+                        )
+                    );
+                }
+
+                function isElementVisibleForFocus(element) {
+                    if (!element || element.disabled) {
+                        return false;
+                    }
+
+                    if (element.getClientRects && element.getClientRects().length > 0) {
+                        return true;
+                    }
+
+                    return element.offsetParent !== null;
+                }
+
+                function focusElementCentered(element) {
+                    if (!element) {
+                        return false;
+                    }
+
+                    if (typeof element.scrollIntoView === 'function') {
+                        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+
+                    if (typeof element.focus === 'function') {
+                        try {
+                            element.focus({ preventScroll: true });
+                        } catch (e) {
+                            element.focus();
+                        }
+                    }
+
+                    return true;
+                }
+
+                function focusInvalidBillingField() {
+                    var invalid = document.querySelector(
+                        '.payment-method._active .payment-method-billing-address [aria-invalid="true"], ' +
+                        '.payment-method-billing-address [aria-invalid="true"], ' +
+                        '.payment-method-billing-address .admin__field._error input, ' +
+                        '.payment-method-billing-address .admin__field._error select, ' +
+                        '.payment-method-billing-address .field._error input, ' +
+                        '.payment-method-billing-address .field._error select, ' +
+                        '.payment-method-billing-address .admin__field-error, ' +
+                        '.payment-method-billing-address .field-error'
+                    );
+
+                    return focusElementCentered(invalid);
+                }
+
+                /**
+                 * Focus the first invalid checkout field in document order
+                 * (shipping/email before billing/payment).
+                 *
+                 * @returns {Boolean}
+                 */
+                function focusFirstInvalidCheckoutField() {
+                    var root = document.getElementById('fastcheckout-checkout') ||
+                            document.getElementById('co-checkout-form') ||
+                            document,
+                        candidates,
+                        i,
+                        element;
+
+                    candidates = root.querySelectorAll(
+                        // Prefer real form controls with Magento/native invalid state.
+                        'input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="true"], ' +
+                        '.admin__field._error input:not([type="hidden"]), ' +
+                        '.admin__field._error select, ' +
+                        '.admin__field._error textarea, ' +
+                        '.field._error input:not([type="hidden"]), ' +
+                        '.field._error select, ' +
+                        '.field._error textarea, ' +
+                        'input.mage-error, select.mage-error, textarea.mage-error'
+                    );
+
+                    for (i = 0; i < candidates.length; i++) {
+                        element = candidates[i];
+                        if (isElementVisibleForFocus(element)) {
+                            return focusElementCentered(element);
+                        }
+                    }
+
+                    // Fallback: error labels / messages (scroll only).
+                    candidates = root.querySelectorAll(
+                        '.admin__field-error, .field-error, label.mage-error, div.mage-error, [role="alert"]'
+                    );
+
+                    for (i = 0; i < candidates.length; i++) {
+                        element = candidates[i];
+                        if (isElementVisibleForFocus(element)) {
+                            return focusElementCentered(element);
+                        }
+                    }
+
+                    return false;
+                }
+
+                /**
+                 * Validate (and when valid, apply) the separate billing address form.
+                 * Used on Place Order together with shipping validation.
+                 *
+                 * @param {Object} [options]
+                 * @param {Boolean} [options.focus=true] Scroll/focus first invalid billing field.
+                 * @returns {Boolean}
+                 */
+                /**
+                 * Magento max_text_length fails on undefined street lines. Ensure optional
+                 * billing street lines are empty strings before KO validation runs.
+                 */
+                function normalizeBillingStreetProviderData(component) {
+                    var streetPath,
+                        streetData,
+                        key,
+                        line;
+
+                    if (!component || !component.source || !component.dataScopePrefix) {
+                        return;
+                    }
+
+                    streetPath = component.dataScopePrefix + '.street';
+
+                    if (typeof component.source.get !== 'function' || typeof component.source.set !== 'function') {
+                        return;
+                    }
+
+                    streetData = component.source.get(streetPath);
+
+                    if (Array.isArray(streetData)) {
+                        for (line = 0; line < streetData.length; line++) {
+                            if (streetData[line] == null) {
+                                streetData[line] = '';
+                            }
+                        }
+                        // Ensure at least two lines exist as empty strings.
+                        if (streetData.length < 2) {
+                            streetData.push('');
+                        }
+                        component.source.set(streetPath, streetData);
+                        return;
+                    }
+
+                    if (streetData && typeof streetData === 'object') {
+                        for (key in streetData) {
+                            if (Object.prototype.hasOwnProperty.call(streetData, key) && streetData[key] == null) {
+                                streetData[key] = '';
+                            }
+                        }
+                        if (typeof streetData[0] === 'undefined' && typeof streetData['0'] === 'undefined') {
+                            streetData[0] = '';
+                        }
+                        if (typeof streetData[1] === 'undefined' && typeof streetData['1'] === 'undefined') {
+                            streetData[1] = '';
+                        }
+                        component.source.set(streetPath, streetData);
+                    }
+                }
+
+                function validateBillingAddressForm(options) {
+                    var components = getBillingAddressComponentsForValidation(),
+                        isValid = true,
+                        validatedSeparate = false,
+                        shouldFocus = !(options && options.focus === false),
+                        i,
+                        component,
+                        needsUpdate;
+
+                    for (i = 0; i < components.length; i++) {
+                        component = components[i];
+
+                        if (!isSeparateBillingAddressRequired(component)) {
+                            continue;
+                        }
+
+                        validatedSeparate = true;
+
+                        if (typeof component._fastcheckoutAllowBillingValidation === 'function') {
+                            component._fastcheckoutAllowBillingValidation();
+                        }
+
+                        if (typeof component._fastcheckoutNormalizeBillingStreetLines === 'function') {
+                            component._fastcheckoutNormalizeBillingStreetLines();
+                        }
+
+                        if (typeof component._fastcheckoutGuardBillingFields === 'function') {
+                            component._fastcheckoutGuardBillingFields();
+                        }
+
+                        normalizeBillingStreetProviderData(component);
+
+                        if (component.source && typeof component.source.set === 'function') {
+                            component.source.set('params.invalid', false);
+                        }
+
+                        // Magento updateAddress validates the form fields and, when valid,
+                        // selects the quote billing address so place-order can continue.
+                        if (typeof component.updateAddress === 'function') {
+                            component.updateAddress();
+                        } else if (
+                            component.source &&
+                            component.dataScopePrefix &&
+                            typeof component.source.trigger === 'function'
+                        ) {
+                            component.source.trigger(component.dataScopePrefix + '.data.validate');
+
+                            if (component.source.get(component.dataScopePrefix + '.custom_attributes')) {
+                                component.source.trigger(
+                                    component.dataScopePrefix + '.custom_attributes.data.validate'
+                                );
+                            }
+                        }
+
+                        needsUpdate = component.source &&
+                            typeof component.source.get === 'function' &&
+                            component.source.get('params.invalid') === true;
+
+                        if (needsUpdate) {
+                            isValid = false;
+                        }
+                    }
+
+                    // DOM fallback when KO components are not registered yet but the
+                    // shopper unchecked same-as-shipping and the form is empty/invalid.
+                    if (!validatedSeparate) {
+                        var sameAsCheckbox = document.querySelector(
+                            '.payment-method._active .payment-method-billing-address ' +
+                            'input[name="billing-address-same-as-shipping"], ' +
+                            '.payment-method-billing-address input[name="billing-address-same-as-shipping"]'
+                        );
+
+                        if (sameAsCheckbox && !sameAsCheckbox.checked) {
+                            var requiredBillingInputs = document.querySelectorAll(
+                                '.payment-method._active .payment-method-billing-address ' +
+                                '.billing-address-form input[name="firstname"], ' +
+                                '.payment-method._active .payment-method-billing-address ' +
+                                '.billing-address-form input[name="lastname"], ' +
+                                '.payment-method-billing-address .billing-address-form input[name="firstname"], ' +
+                                '.payment-method-billing-address .billing-address-form input[name="lastname"]'
+                            );
+
+                            Array.prototype.slice.call(requiredBillingInputs).forEach(function (input) {
+                                if (input && !String(input.value || '').trim()) {
+                                    isValid = false;
+                                    input.setAttribute('aria-invalid', 'true');
+                                }
+                            });
+                        }
+                    }
+
+                    if (!isValid && shouldFocus) {
+                        focusInvalidBillingField();
+                    }
+
+                    // When the form is valid (or same-as-shipping), Magento payment
+                    // renderers require quote.billingAddress() so isPlaceOrderActionAllowed
+                    // becomes true. Unchecking same-as-shipping nulls it until Update.
+                    if (isValid) {
+                        ensureQuoteBillingAddressForPlaceOrder();
+                    }
+
+                    return isValid;
+                }
+
+                /**
+                 * Active method checkbox: same-as-shipping (default true when missing).
+                 */
+                function isActiveBillingSameAsShipping() {
+                    var root = document.querySelector(
+                            '.payment-method._active .payment-method-billing-address, ' +
+                            '[data-fastcheckout-active="true"] .payment-method-billing-address, ' +
+                            '.fastcheckout-payment-method-ko-container:not(.hidden) .payment-method-billing-address'
+                        ),
+                        checkbox;
+
+                    if (!root) {
+                        return true;
+                    }
+
+                    checkbox = root.querySelector('input[name="billing-address-same-as-shipping"]');
+                    if (!checkbox) {
+                        return true;
+                    }
+
+                    return !!checkbox.checked;
+                }
+
+                function allowPlaceOrderOnActivePayment() {
+                    var component = getActiveRenderer();
+
+                    if (
+                        component &&
+                        component.isPlaceOrderActionAllowed &&
+                        typeof component.isPlaceOrderActionAllowed === 'function'
+                    ) {
+                        try {
+                            component.isPlaceOrderActionAllowed(true);
+                        } catch (e) {
+                            // ignore non-writable flags
+                        }
+                    }
+                }
+
+                /**
+                 * Ensure quote.billingAddress is set before Magento payment placeOrder.
+                 * - same as shipping → select shipping as billing
+                 * - separate form → use address already selected by updateAddress, or
+                 *   build from the active billing form provider data
+                 *
+                 * @returns {Boolean}
+                 */
+                function ensureQuoteBillingAddressForPlaceOrder() {
+                    var shipping = quote && typeof quote.shippingAddress === 'function'
+                            ? quote.shippingAddress()
+                            : null,
+                        billing = quote && typeof quote.billingAddress === 'function'
+                            ? quote.billingAddress()
+                            : null,
+                        sameAsShipping = isActiveBillingSameAsShipping(),
+                        components,
+                        component,
+                        addressData,
+                        newAddress,
+                        i;
+
+                    if (sameAsShipping) {
+                        if (shipping && typeof selectBillingAddressAction === 'function') {
+                            selectBillingAddressAction(shipping);
+                        }
+                        allowPlaceOrderOnActivePayment();
+                        return !!(quote && typeof quote.billingAddress === 'function' && quote.billingAddress());
+                    }
+
+                    billing = quote && typeof quote.billingAddress === 'function'
+                        ? quote.billingAddress()
+                        : null;
+
+                    if (billing) {
+                        allowPlaceOrderOnActivePayment();
+                        return true;
+                    }
+
+                    components = getBillingAddressComponentsForValidation();
+                    for (i = 0; i < components.length; i++) {
+                        component = components[i];
+                        if (!isSeparateBillingAddressRequired(component)) {
+                            continue;
+                        }
+                        if (
+                            !component.source ||
+                            !component.dataScopePrefix ||
+                            typeof component.source.get !== 'function'
+                        ) {
+                            continue;
+                        }
+
+                        addressData = component.source.get(component.dataScopePrefix);
+                        if (!addressData || typeof addressData !== 'object') {
+                            continue;
+                        }
+
+                        try {
+                            newAddress = addressConverter.formAddressDataToQuoteAddress(
+                                $.extend(true, {}, addressData)
+                            );
+                            if (newAddress && typeof selectBillingAddressAction === 'function') {
+                                selectBillingAddressAction(newAddress);
+                            }
+                        } catch (e) {
+                            if (window.console && typeof window.console.warn === 'function') {
+                                window.console.warn(
+                                    'Kkkonrad Fastcheckout: could not apply billing form data to quote.',
+                                    e
+                                );
+                            }
+                        }
+                        break;
+                    }
+
+                    billing = quote && typeof quote.billingAddress === 'function'
+                        ? quote.billingAddress()
+                        : null;
+
+                    if (billing) {
+                        allowPlaceOrderOnActivePayment();
+                        return true;
+                    }
+
+                    return false;
+                }
+
                 loadOptionalValidationComponents();
                 loadPaymentValidationComponents();
 
@@ -3678,14 +4155,25 @@ define([
 		                                    handlePaymentError(activeValidationError, component.messageContainer || getBridgeMessageContainer());
 			                                return Promise.reject(activeValidationError);
 		                            }
+
+                            // Magento payment renderers set isPlaceOrderActionAllowed from
+                            // quote.billingAddress(). Unchecking same-as-shipping nulls it;
+                            // re-apply shipping or form billing before the readiness check.
+                            ensureQuoteBillingAddressForPlaceOrder();
+                            allowPlaceOrderOnActivePayment();
+
 		                            if (
 	                                typeof component.isPlaceOrderActionAllowed === 'function' &&
-	                                !component.isPlaceOrderActionAllowed()
+	                                !component.isPlaceOrderActionAllowed() &&
+                                    !(quote && typeof quote.billingAddress === 'function' && quote.billingAddress())
 	                            ) {
                                     var notReadyError = new Error(translateFastcheckoutMessage('The selected payment method is not ready. Please try again.'));
                                     handlePaymentError(notReadyError, component.messageContainer || getBridgeMessageContainer());
 	                                return Promise.reject(notReadyError);
 	                            }
+
+                            // Hidden Magento place-order buttons stay disabled while billing
+                            // was null; once quote billing is set, do not block on that flag.
                                 if (
                                     nativeSubmitAction &&
                                     nativeSubmitAction.button &&
@@ -3693,7 +4181,8 @@ define([
                                         nativeSubmitAction.button.disabled ||
                                         nativeSubmitAction.button.classList.contains('disabled') ||
                                         nativeSubmitAction.button.getAttribute('aria-disabled') === 'true'
-                                    )
+                                    ) &&
+                                    !(quote && typeof quote.billingAddress === 'function' && quote.billingAddress())
                                 ) {
                                     var nativeActionNotReadyError = new Error(translateFastcheckoutMessage('The selected payment method is not ready. Please try again.'));
                                     handlePaymentError(nativeActionNotReadyError, component.messageContainer || getBridgeMessageContainer());
@@ -3894,10 +4383,19 @@ define([
 
 	                    validate: function () {
 	                        var component = getActiveRenderer(),
-                                methodCode = getSelectedMethodCode();
+                                methodCode = getSelectedMethodCode(),
+                                billingValid,
+                                paymentValid = true;
+
+                            // Separate billing form (same-as-shipping unchecked) must validate
+                            // together with payment method fields on place order.
+                            billingValid = validateBillingAddressForm();
 
                             if (methodCode === 'purchaseorder') {
-                                return validatePurchaseOrderWithNativeValidation() && validateAdditionalValidators(false);
+                                paymentValid = validatePurchaseOrderWithNativeValidation() &&
+                                    validateAdditionalValidators(false);
+
+                                return billingValid && paymentValid;
                             }
 
                             // Hosted card renderers can expose field validation separately from validate().
@@ -3924,17 +4422,38 @@ define([
                                     !isExpirationDateValid ||
                                     !isCvvValid
                                 ) {
-                                    return false;
+                                    paymentValid = false;
                                 }
                             }
 
-	                        if (component && typeof component.validate === 'function') {
-	                            var isValid = component.validate();
-	                            if (!isValid) {
-                                return false;
+	                        if (paymentValid && component && typeof component.validate === 'function') {
+	                            paymentValid = component.validate() !== false;
                             }
-                        }
-                        return validateAdditionalValidators(false);
+
+                            if (paymentValid) {
+                                paymentValid = validateAdditionalValidators(false);
+                            }
+
+                            return billingValid && paymentValid;
+                    },
+
+                    /**
+                     * Public: validate separate billing address on place order.
+                     *
+                     * @param {Object} [options]
+                     * @param {Boolean} [options.focus=true]
+                     * @returns {Boolean}
+                     */
+                    validateBillingAddress: function (options) {
+                        return validateBillingAddressForm(options);
+                    },
+
+                    /**
+                     * Public: focus first invalid field in document order (shipping before billing).
+                     * @returns {Boolean}
+                     */
+                    focusFirstInvalidField: function () {
+                        return focusFirstInvalidCheckoutField();
                     },
 
                     afterPlaceOrder: function () {

@@ -90,9 +90,59 @@ define(['jquery'], function ($) {
             });
         }
 
+        /**
+         * Magento shipping.js does:
+         *   $(form[data-role=email-with-possible-login] input[name=username]).valid()
+         * Fastcheckout guest email uses name="email" (not username) to avoid password
+         * managers. Empty jQuery set → TypeError: can't access property "form", this[0]
+         * is undefined. Keep a hidden username mirror inside the login form.
+         */
+        function ensureMagentoEmailUsernameMirror() {
+            var loginForm = document.querySelector('form[data-role="email-with-possible-login"]'),
+                emailInput,
+                usernameInput;
+
+            if (!loginForm) {
+                return;
+            }
+
+            emailInput = loginForm.querySelector(
+                'input#customer-email, input[name="email"], input[name="username"]'
+            );
+            usernameInput = loginForm.querySelector('input[name="username"]');
+
+            if (!usernameInput) {
+                usernameInput = document.createElement('input');
+                usernameInput.type = 'hidden';
+                usernameInput.name = 'username';
+                usernameInput.setAttribute('data-fastcheckout-username-mirror', '1');
+                loginForm.appendChild(usernameInput);
+            }
+
+            if (emailInput && emailInput !== usernameInput) {
+                usernameInput.value = emailInput.value || '';
+
+                if (!emailInput.getAttribute('data-fastcheckout-username-mirror-bound')) {
+                    emailInput.setAttribute('data-fastcheckout-username-mirror-bound', '1');
+                    ['input', 'change', 'blur'].forEach(function (eventName) {
+                        emailInput.addEventListener(eventName, function () {
+                            var mirror = loginForm.querySelector(
+                                'input[data-fastcheckout-username-mirror="1"], input[name="username"]'
+                            );
+
+                            if (mirror) {
+                                mirror.value = emailInput.value || '';
+                            }
+                        });
+                    });
+                }
+            }
+        }
+
         function prepareShippingViewCompatibilityComponent() {
             var component = getShippingAddressComponent(),
-                provider = getCheckoutProvider();
+                provider = getCheckoutProvider(),
+                originalValidateShippingInformation;
 
             if (!component) {
                 return null;
@@ -123,6 +173,20 @@ define(['jquery'], function ($) {
                     if (invalid) {
                         invalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     }
+                };
+            }
+
+            // Guard stock Magento email validation that expects input[name=username].
+            if (
+                typeof component.validateShippingInformation === 'function' &&
+                !component.fastcheckoutValidateShippingInformationWrapped
+            ) {
+                component.fastcheckoutValidateShippingInformationWrapped = true;
+                originalValidateShippingInformation = component.validateShippingInformation;
+                component.validateShippingInformation = function () {
+                    ensureMagentoEmailUsernameMirror();
+
+                    return originalValidateShippingInformation.apply(this, arguments);
                 };
             }
 
@@ -189,8 +253,21 @@ define(['jquery'], function ($) {
                             'input#customer-email'
                         );
                         if (emailInput) {
-                            $(emailInput.form).validation();
-                            emailValid = Boolean($(emailInput).valid());
+                            // Guest email may live outside a credential form; only use
+                            // jQuery validator when the input is associated with a form.
+                            if (emailInput.form) {
+                                $(emailInput.form).validation();
+                                emailValid = Boolean($(emailInput).valid());
+                            } else if (
+                                standardEmailComponent &&
+                                typeof standardEmailComponent.validateEmail === 'function'
+                            ) {
+                                emailValid = standardEmailComponent.validateEmail() !== false;
+                            } else if (typeof emailInput.checkValidity === 'function') {
+                                emailValid = emailInput.checkValidity();
+                            } else {
+                                emailValid = Boolean(String(emailInput.value || '').trim());
+                            }
                         } else if (
                             standardEmailComponent &&
                             typeof standardEmailComponent.validateEmail === 'function'
@@ -222,13 +299,20 @@ define(['jquery'], function ($) {
                             return false;
                         }
 
+                        // Stock validateShippingInformation re-checks email via
+                        // input[name=username] and throws without the mirror field.
+                        ensureMagentoEmailUsernameMirror();
+
                         return validateMethod.call(component) !== false;
                     } catch (e) {
                         if (window.console && typeof window.console.warn === 'function') {
                             window.console.warn('Kkkonrad Fastcheckout: standard shipping view validation could not run.', e);
                         }
 
-                        return true;
+                        // Do not soft-pass: email/address already validated above; if Magento
+                        // still throws after the username mirror, treat as failure only when
+                        // we could not validate address/email ourselves.
+                        return emailValid && addressValid;
                     } finally {
                         window.fastcheckoutKoShippingViewValidationActive = false;
                     }

@@ -33,11 +33,41 @@
     clip: rect(0, 0, 0, 0) !important;
 }
 
-.fastcheckout-payment-method-ko-container .payment-method-billing-address {
+/*
+ * Magento payment templates put .payment-method-billing-address at the top of
+ * .payment-method-content. Reorder with flex so method-specific content
+ * (instructions, card fields, PO number, etc.) comes first, then billing,
+ * then agreements / place-order toolbar when present.
+ */
+.fastcheckout-ko-payment-root .payment-method-content,
+.fastcheckout-payment-method-ko-container .payment-method-content,
+#fastcheckout-checkout .payment-method-content {
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
+    gap: 0;
+}
+
+.fastcheckout-ko-payment-root .payment-method-content > .payment-method-billing-address,
+.fastcheckout-payment-method-ko-container .payment-method-content > .payment-method-billing-address,
+#fastcheckout-checkout .payment-method-content > .payment-method-billing-address {
     display: block;
+    order: 50;
     margin-top: 1rem;
     padding-top: 1rem;
     border-top: 1px solid #e5e7eb;
+}
+
+.fastcheckout-ko-payment-root .payment-method-content > .checkout-agreements-block,
+.fastcheckout-payment-method-ko-container .payment-method-content > .checkout-agreements-block,
+#fastcheckout-checkout .payment-method-content > .checkout-agreements-block {
+    order: 60;
+}
+
+.fastcheckout-ko-payment-root .payment-method-content > .actions-toolbar,
+.fastcheckout-payment-method-ko-container .payment-method-content > .actions-toolbar,
+#fastcheckout-checkout .payment-method-content > .actions-toolbar {
+    order: 70;
 }
 
 @media (min-width: 1024px) {
@@ -45,12 +75,6 @@
         display: grid !important;
         grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     }
-}
-
-.fastcheckout-ko-payment-root .payment-method-content,
-.fastcheckout-payment-method-ko-container .payment-method-content {
-    display: block;
-    padding: 1rem;
 }
 
 .fastcheckout-ko-payment-root img,
@@ -453,17 +477,65 @@ body.fastcheckout-scroll-locked {
     max-width: 140px;
 }
 
-.payment-method-content .control._with-tooltip {
+/*
+ * Keep Braintree CVV compact only — do NOT apply to Magento billing telephone
+ * (also uses .control._with-tooltip / admin__field-control._with-tooltip).
+ */
+.payment-method-content .braintree .control._with-tooltip,
+.payment-method-content .braintree-card-control .control._with-tooltip,
+.payment-method-content #braintree_cc_cid.hosted-control {
     position: relative;
     display: inline-block;
     width: 100%;
-    max-width: 140px; /* Keep CVV compact */
+    max-width: 140px;
 }
 
 .payment-method-content #braintree_cc_cid.hosted-control {
     width: 100%;
-    max-width: 100%;
+    max-width: 140px;
     padding-right: 42px !important; /* Make room for tooltip icon inside the input */
+}
+
+/* Billing / Magento address tooltips: full-width control, icon absolutely positioned. */
+.payment-method-content .payment-method-billing-address :is(
+    .control._with-tooltip,
+    .admin__field-control._with-tooltip
+) {
+    position: relative;
+    display: block;
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+/* Telephone must span the full billing address row (not half the 2-col grid). */
+.payment-method-content .payment-method-billing-address :is(
+    .admin__field[data-index='telephone'],
+    .field[data-index='telephone'],
+    .field.telephone,
+    [name='telephone']
+) {
+    grid-column: 1 / -1 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+.payment-method-content .payment-method-billing-address :is(
+    .admin__field[data-index='telephone'],
+    .field[data-index='telephone'],
+    .field.telephone
+) :is(
+    .admin__field-control,
+    .control,
+    .admin__control-text,
+    .input-text,
+    input[name='telephone'],
+    input[type='tel'],
+    input[type='text']
+) {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
 }
 
 /* Braintree CC types icons list below */

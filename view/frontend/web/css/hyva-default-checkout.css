@@ -106,7 +106,17 @@
     .field._required,
     .field.required
 ) > .label::after,
-#fastcheckout-checkout .fastcheckout-native-shipping-address .field.street.required > .label::after {
+#fastcheckout-checkout .fastcheckout-native-shipping-address .field.street.required > .label::after,
+/* Billing street group uses Magento UI admin field classes. */
+#fastcheckout-checkout .payment-method-billing-address :is(
+    .admin__field._required,
+    .field._required,
+    .field.required
+) > :is(.label, .admin__field-label)::after,
+#fastcheckout-checkout .payment-method-billing-address :is(
+    .field.street.required,
+    .admin__field[data-index='street']._required
+) > :is(.label, .admin__field-label, legend.admin__field-label)::after {
     content: ' *';
     color: var(--color-red-600);
 }
@@ -159,11 +169,17 @@
     line-height: 1.25rem;
 }
 
-#fastcheckout-checkout .fastcheckout-native-shipping-address :is(
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) :is(
     .field._error,
     .admin__field._error
 ) :is(input, select, textarea),
-#fastcheckout-checkout .fastcheckout-native-shipping-address :is(
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) :is(
     input,
     select,
     textarea
@@ -171,19 +187,40 @@
     border-color: var(--color-red-600);
 }
 
-/* Only the street group has a visible label; line labels remain accessible. */
-#fastcheckout-checkout .fastcheckout-native-shipping-address .field.street > :is(
+/*
+ * Street: only the group label is visible.
+ * Line labels (shipping frontend .field + billing Magento UI admin fields) stay
+ * in the DOM for accessibility but are visually hidden — otherwise the same
+ * "Ulica, nr budynku..." string repeats on every street line in billing.
+ */
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) :is(
+    .field.street,
+    .admin__field[data-index='street'],
+    [data-index='street'].admin__field
+) > :is(
     .control,
+    .admin__field-control,
     .admin__control-fields
 ) {
     display: grid;
     gap: 0.75rem;
 }
 
-#fastcheckout-checkout .fastcheckout-native-shipping-address .field.street :is(
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) :is(
+    .field.street,
+    .admin__field[data-index='street'],
+    [data-index='street'].admin__field
+) :is(
     .control,
+    .admin__field-control,
     .admin__control-fields
-) > .field > .label {
+) > :is(.field, .admin__field) > :is(.label, .admin__field-label) {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -195,8 +232,30 @@
     border: 0;
 }
 
+/* Group legend must remain a normal block label (not sr-only). */
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) :is(
+    .field.street > .label,
+    .field.street > legend.label,
+    .admin__field[data-index='street'] > .admin__field-label,
+    .admin__field[data-index='street'] > legend.admin__field-label
+) {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0 0 0.5rem;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+}
+
 /* Recreate the native checkout tooltip without depending on Luma icon fonts. */
-#fastcheckout-checkout .fastcheckout-native-shipping-address :is(
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) :is(
     .control._with-tooltip,
     .admin__field-control._with-tooltip
 ) {
@@ -204,7 +263,10 @@
     padding-right: 2.5rem;
 }
 
-#fastcheckout-checkout .fastcheckout-native-shipping-address :is(
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) :is(
     .field-tooltip,
     .admin__field-tooltip
 ) {
@@ -215,7 +277,16 @@
     cursor: help;
 }
 
-#fastcheckout-checkout .fastcheckout-native-shipping-address .field-tooltip > .label {
+/* Hide the "Tooltip" / aria label text next to telephone (and other) tooltips. */
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) :is(
+    .field-tooltip > .label,
+    .admin__field-tooltip > .label,
+    .field-tooltip > .admin__field-tooltip-label,
+    .admin__field-tooltip > .admin__field-tooltip-label
+) {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -227,7 +298,10 @@
     border: 0;
 }
 
-#fastcheckout-checkout .fastcheckout-native-shipping-address :is(
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) :is(
     .field-tooltip-action,
     .admin__field-tooltip-action
 ) {
@@ -245,7 +319,10 @@
     text-decoration: none;
 }
 
-#fastcheckout-checkout .fastcheckout-native-shipping-address :is(
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) :is(
     .field-tooltip-action,
     .admin__field-tooltip-action
 )::before {
@@ -256,7 +333,10 @@
     line-height: 1;
 }
 
-#fastcheckout-checkout .fastcheckout-native-shipping-address :is(
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) :is(
     .field-tooltip-action,
     .admin__field-tooltip-action
 ):is(:hover, :focus-visible) {
@@ -264,7 +344,10 @@
     color: var(--color-primary);
 }
 
-#fastcheckout-checkout .fastcheckout-native-shipping-address :is(
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) :is(
     .field-tooltip-content,
     .admin__field-tooltip-content
 ) {
@@ -285,7 +368,10 @@
     text-transform: none;
 }
 
-#fastcheckout-checkout .fastcheckout-native-shipping-address :is(
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) :is(
     .field-tooltip,
     .admin__field-tooltip
 ):is(._active, :hover, :focus-within) :is(
@@ -425,8 +511,32 @@
     color: var(--color-slate-800);
 }
 
-#fastcheckout-checkout .billing-address-details {
+/*
+ * Magento shows .billing-address-details when a billing address is selected
+ * (including same-as-shipping). Hide that summary only while the checkbox is
+ * checked — when shipping is reused for billing the address is already clear
+ * from the shipping form. After uncheck + Update, the separate billing summary
+ * must stay visible.
+ */
+#fastcheckout-checkout .checkout-billing-address:has(
+    input[name='billing-address-same-as-shipping']:checked
+) .billing-address-details {
     display: none !important;
+}
+
+#fastcheckout-checkout .billing-address-details {
+    margin-top: 0.75rem;
+    padding: 1rem;
+    border: 1px solid var(--color-slate-300);
+    border-radius: var(--radius-lg);
+    background: #fff;
+    color: var(--color-slate-800);
+    font-size: inherit;
+    line-height: 1.5;
+}
+
+#fastcheckout-checkout .billing-address-details .action-edit-address {
+    margin-top: 0.75rem;
 }
 
 @media (min-width: 640px) {
@@ -437,10 +547,77 @@
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
+    /* Full-width rows: street group + telephone (tooltip made half-column feel tiny). */
     #fastcheckout-checkout :is(
         .fastcheckout-native-shipping-address,
         .payment-method-billing-address
-    ) :is(.street, [data-index='street']) {
+    ) :is(
+        .street,
+        [data-index='street'],
+        .telephone,
+        [data-index='telephone'],
+        .field[name='telephone'],
+        .admin__field[data-index='telephone']
+    ) {
         grid-column: 1 / -1;
     }
+}
+
+/*
+ * Magento admin UI telephone often keeps a short admin control width. Force the
+ * field and its control/input to fill the address grid row (tooltip padding
+ * already reserved via ._with-tooltip).
+ */
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) :is(
+    .field.telephone,
+    .telephone,
+    [data-index='telephone'],
+    .admin__field[data-index='telephone']
+) {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+}
+
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) :is(
+    .field.telephone,
+    .telephone,
+    [data-index='telephone'],
+    .admin__field[data-index='telephone']
+) :is(
+    .admin__field-control,
+    .control,
+    .admin__control-addon
+) {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) :is(
+    .field.telephone,
+    .telephone,
+    [data-index='telephone'],
+    .admin__field[data-index='telephone']
+) :is(
+    .admin__control-text,
+    .input-text,
+    input[type='text'],
+    input[type='tel'],
+    input[name='telephone']
+) {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0;
+    box-sizing: border-box;
 }

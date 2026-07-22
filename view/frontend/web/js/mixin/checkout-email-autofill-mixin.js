@@ -76,6 +76,49 @@ define([
                 return this._super();
             },
 
+            /**
+             * Magento core targets form-login + input[name=username]. Fastcheckout guest
+             * email uses name=email in form-email — avoid jQuery-validator edge cases on
+             * that markup and use a small native/format check instead.
+             *
+             * @param {Boolean} focused
+             * @returns {Boolean}
+             */
+            validateEmail: function (focused) {
+                var email,
+                    input,
+                    valid;
+
+                if (!isFastcheckoutActive()) {
+                    return this._super(focused);
+                }
+
+                email = typeof this.email === 'function' ? this.email() : '';
+                input = document.getElementById('customer-email') ||
+                    document.querySelector(
+                        '[data-role="email-with-possible-login"] input[name="email"], ' +
+                        '[data-role="email-with-possible-login"] input[name="username"]'
+                    );
+
+                if (focused === false && email) {
+                    valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim());
+
+                    if (input) {
+                        if (valid) {
+                            input.removeAttribute('aria-invalid');
+                            input.removeAttribute('aria-describedby');
+                        } else {
+                            input.setAttribute('aria-invalid', 'true');
+                        }
+                    }
+
+                    return valid;
+                }
+
+                // While typing / empty: do not mark invalid; place-order paths re-check.
+                return true;
+            },
+
             fastcheckoutHardenEmailAutofill: function () {
                 var selector = this.emailInputId || '#customer-email',
                     input = document.querySelector(selector) || document.getElementById('customer-email');

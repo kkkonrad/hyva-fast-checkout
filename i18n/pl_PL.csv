@@ -351,3 +351,5 @@
 "Telephone number must have at least 9 digits.","Numer telefonu musi mieć co najmniej 9 cyfr."
 "Please enter a valid email address (e.g. name@domain.pl).","Wpisz poprawny adres e-mail (np. nazwa@domena.pl)."
 "Did you mean: %1?","Czy miałeś na myśli: %1?"
+"Please enter less or equal than {0} symbols.","Podaj co najwyżej {0} symboli."
+"Please enter more or equal than {0} symbols.","Podaj co najmniej {0} symboli."

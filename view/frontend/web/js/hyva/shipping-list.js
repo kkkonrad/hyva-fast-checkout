@@ -237,6 +237,14 @@ define([
                 errorValidationMessage: ''
             });
 
+            // Pure computed so <!-- ko if: hasGeneralError --> re-renders when message changes.
+            this.hasGeneralError = ko.pureComputed(function () {
+                var err = self.errorMethodCode(),
+                    msg = self.errorValidationMessage();
+
+                return !!(msg && (!err || err === 'general' || err === '_'));
+            });
+
             // Plain JS shipping lock is not a KO observable — without this revision the
             // css: getMethodCss() binding never re-runs and border-blue-500 sticks on the
             // previous rate after a switch (radio can still look correct via native click).
@@ -410,13 +418,14 @@ define([
                 self._errorTimer = null;
             }
             if (typeof self.errorMethodCode === 'function') {
-                self.errorMethodCode(methodCode);
-                self.errorValidationMessage(message);
+                // Empty / "general" = list-level message (e.g. no method selected).
+                self.errorMethodCode(methodCode || 'general');
+                self.errorValidationMessage(message || '');
             }
 
             self._errorTimer = setTimeout(function () {
                 self.clearError();
-            }, 4000);
+            }, 8000);
         },
 
         clearError: function () {
@@ -436,7 +445,13 @@ define([
             var fullCode = method.carrier_code + '_' + method.method_code;
             var altCode = method.method_code + '_' + method.carrier_code;
             var err = (typeof self.errorMethodCode === 'function') ? self.errorMethodCode() : '';
-            return err && (err === fullCode || err === altCode);
+
+            // General errors are rendered once under the whole list, not per rate.
+            if (!err || err === 'general' || err === '_') {
+                return false;
+            }
+
+            return err === fullCode || err === altCode;
         },
 
         /**

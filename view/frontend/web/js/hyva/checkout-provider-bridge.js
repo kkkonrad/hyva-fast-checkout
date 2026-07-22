@@ -244,10 +244,51 @@ define([
             }
         }
 
+        /**
+         * Magento UI street lines bind to provider paths like scope.street.0 / .1.
+         * An array (`['a']`) does not drive those children reliably; convert to
+         * an object map with empty-string defaults for optional lines.
+         *
+         * @param {*} street
+         * @returns {Object}
+         */
+        function normalizeStreetForUiProvider(street) {
+            var streetObject = {},
+                i,
+                lineCount = 2;
+
+            if (Array.isArray(street)) {
+                for (i = 0; i < Math.max(street.length, lineCount); i++) {
+                    streetObject[i] = street[i] == null ? '' : String(street[i]);
+                }
+                return streetObject;
+            }
+
+            if (street && typeof street === 'object') {
+                Object.keys(street).forEach(function (key) {
+                    streetObject[key] = street[key] == null ? '' : String(street[key]);
+                });
+                if (typeof streetObject[0] === 'undefined' && typeof streetObject['0'] === 'undefined') {
+                    streetObject[0] = '';
+                }
+                if (typeof streetObject[1] === 'undefined' && typeof streetObject['1'] === 'undefined') {
+                    streetObject[1] = '';
+                }
+                return streetObject;
+            }
+
+            return {
+                0: street == null || street === '' ? '' : String(street),
+                1: ''
+            };
+        }
+
         function syncAddressData(addressData, type) {
             var provider = getCheckoutProvider(),
                 paymentMethods = getPaymentMethods(),
-                dataToSet;
+                dataToSet,
+                scopePaths = [],
+                pathIndex;
 
             if (!provider || !addressData) {
                 return;
@@ -255,14 +296,25 @@ define([
 
             refreshDictionaries(provider);
             dataToSet = $.extend(true, {}, addressData);
+            dataToSet.street = normalizeStreetForUiProvider(dataToSet.street);
 
             if (type === 'billing') {
                 if (typeof provider.set === 'function') {
-                    provider.set('billingAddress', dataToSet);
-                    provider.set('billingAddressshared', dataToSet);
+                    scopePaths = ['billingAddress', 'billingAddressshared'];
                     paymentMethods.forEach(function (method) {
                         if (method.method) {
-                            provider.set('billingAddress' + method.method, dataToSet);
+                            scopePaths.push('billingAddress' + method.method);
+                        }
+                    });
+
+                    scopePaths.forEach(function (scopePath) {
+                        provider.set(scopePath, $.extend(true, {}, dataToSet));
+                        // Explicit line sets force already-mounted street UI components
+                        // to refresh (parent object replace is not always enough).
+                        if (dataToSet.street) {
+                            Object.keys(dataToSet.street).forEach(function (lineKey) {
+                                provider.set(scopePath + '.street.' + lineKey, dataToSet.street[lineKey]);
+                            });
                         }
                     });
                 }
@@ -271,6 +323,11 @@ define([
 
             if (typeof provider.set === 'function') {
                 provider.set('shippingAddress', dataToSet);
+                if (dataToSet.street) {
+                    Object.keys(dataToSet.street).forEach(function (lineKey) {
+                        provider.set('shippingAddress.street.' + lineKey, dataToSet.street[lineKey]);
+                    });
+                }
             } else {
                 provider.shippingAddress = dataToSet;
             }

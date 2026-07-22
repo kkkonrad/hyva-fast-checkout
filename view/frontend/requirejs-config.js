@@ -73,6 +73,14 @@ var config = {
             },
             'Magento_Checkout/js/view/form/element/email': {
                 'Kkkonrad_Fastcheckout/js/mixin/checkout-email-autofill-mixin': true
+            },
+            'Magento_Checkout/js/view/billing-address': {
+                'Kkkonrad_Fastcheckout/js/mixin/billing-address-validation-mixin': true
+            },
+            // Empty optional fields (street line 2+) stay undefined in provider data;
+            // stock max_text_length treats that as invalid ("255 symbols").
+            'Magento_Ui/js/lib/validation/rules': {
+                'Kkkonrad_Fastcheckout/js/mixin/ui-validation-rules-mixin': true
             }
         }
     }

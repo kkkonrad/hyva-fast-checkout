@@ -1382,10 +1382,14 @@ class Checkout extends Template
     }
 
     /**
-     * UI form elements start with `undefined` when checkoutProvider has no
-     * persisted address. Magento's max_text_length validator treats that as an
-     * error, even for optional street lines. An empty string is the normal form
-     * value and keeps the stock validation rules intact.
+     * Normalize Magento multiline street UI config for shipping and billing.
+     *
+     * - UI form elements start with `undefined` when checkoutProvider has no
+     *   persisted address. Magento's max_text_length validator treats that as an
+     *   error; an empty string is the normal form value.
+     * - AttributeMerger copies attribute validation (e.g. min_text_length) onto
+     *   every street line. Only line 0 is required; optional lines must not
+     *   carry required-entry and must accept empty values.
      *
      * @param array $node
      * @return array
@@ -1398,14 +1402,54 @@ class Checkout extends Template
             isset($node['children']) &&
             is_array($node['children'])
         ) {
+            $ordinal = 0;
             foreach ($node['children'] as $key => $child) {
                 if (!is_array($child)) {
                     continue;
                 }
+
                 if (!array_key_exists('value', $child) && !array_key_exists('default', $child)) {
                     $child['default'] = '';
                 }
+
+                $lineIndex = $ordinal;
+                if (isset($child['dataScope']) && is_numeric($child['dataScope'])) {
+                    $lineIndex = (int)$child['dataScope'];
+                } elseif (is_numeric($key)) {
+                    $lineIndex = (int)$key;
+                }
+
+                // Only the first street line is required.
+                // Always materialize empty defaults for every line — Magento's
+                // max_text_length rule treats `undefined` as invalid and shows
+                // "Please enter less or equal than 255 symbols" on empty optional lines.
+                $child['default'] = array_key_exists('default', $child) ? $child['default'] : '';
+                if ($child['default'] === null) {
+                    $child['default'] = '';
+                }
+                if (!array_key_exists('value', $child)) {
+                    $child['value'] = '';
+                } elseif ($child['value'] === null) {
+                    $child['value'] = '';
+                }
+
+                if ($lineIndex > 0) {
+                    if (!isset($child['validation']) || !is_array($child['validation'])) {
+                        $child['validation'] = [];
+                    }
+                    unset($child['validation']['required-entry']);
+                    if (array_key_exists('min_text_length', $child['validation'])) {
+                        $child['validation']['min_text_length'] = 0;
+                    }
+                    // max_text_length is fine for non-empty values; empty is handled via value "".
+                    $child['required'] = false;
+                    $child['additionalClasses'] = isset($child['additionalClasses'])
+                        ? $child['additionalClasses']
+                        : 'additional';
+                }
+
                 $node['children'][$key] = $child;
+                $ordinal++;
             }
         }
 

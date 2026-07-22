@@ -683,23 +683,108 @@ function initCheckout() {
             // Standard Magento UI components need to validate first. In
             // particular, their required rules are data-validate/KO rules and
             // are not visible to the browser's native form validity API.
+            //
+            // Run shipping + separate billing validation together so both forms
+            // paint errors in one Place Order click (no short-circuit on shipping).
+            const paymentBridge = window.fastcheckoutHyvaPayment;
+            let shippingValid = true;
+            let billingValid = true;
+
             if (window.fastcheckoutHyvaShipping && typeof window.fastcheckoutHyvaShipping.validate === 'function') {
-                if (!window.fastcheckoutHyvaShipping.validate()) {
-                    if (window.console && typeof window.console.warn === 'function') {
-                        window.console.warn('Kkkonrad Fastcheckout: Order placement halted because shipping validation failed.');
+                shippingValid = window.fastcheckoutHyvaShipping.validate() !== false;
+            }
+
+            // Paint billing errors without stealing focus — after both validators run
+            // we jump to the first invalid field in document order (email/shipping first).
+            if (paymentBridge && typeof paymentBridge.validateBillingAddress === 'function') {
+                billingValid = paymentBridge.validateBillingAddress({ focus: false }) !== false;
+            }
+
+            if (!shippingValid || !billingValid) {
+                const missingShippingMethodMessage = <?= /* @noEscape */ json_encode(
+                    (string)__('Please select a shipping method.')
+                ) ?>;
+                const hasShippingMethodSelected = !!document.querySelector(
+                    'input[name="shipping_method"]:checked:not(:disabled)'
+                );
+
+                if (window.console && typeof window.console.warn === 'function') {
+                    window.console.warn(
+                        'Kkkonrad Fastcheckout: Order placement halted because address validation failed.',
+                        { shippingValid, billingValid }
+                    );
+                }
+
+                // Missing shipping method: show a user-visible message immediately
+                // (do not rely only on console / late rAF focus logic).
+                if (!shippingValid && !hasShippingMethodSelected) {
+                    this.clientOrderError =
+                        window.fastcheckoutLastShippingValidationError ||
+                        missingShippingMethodMessage;
+
+                    const shippingRoot = document.getElementById('fastcheckout-ko-shipping-root') ||
+                        document.querySelector('[name="shipping_method"]');
+                    if (shippingRoot && typeof shippingRoot.scrollIntoView === 'function') {
+                        shippingRoot.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     }
                     return;
                 }
+
+                // rAF: wait for KO to paint aria-invalid / shipping-method errors.
+                window.requestAnimationFrame(() => {
+                    const shippingRoot = document.getElementById('fastcheckout-ko-shipping-root') ||
+                        document.querySelector('[name="shipping_method"]');
+
+                    // Prefer focusing address field errors first (email, name, …).
+                    if (
+                        paymentBridge &&
+                        typeof paymentBridge.focusFirstInvalidField === 'function' &&
+                        paymentBridge.focusFirstInvalidField()
+                    ) {
+                        return;
+                    }
+
+                    const firstInvalid = document.querySelector(
+                        '#fastcheckout-checkout input[aria-invalid="true"], ' +
+                        '#fastcheckout-checkout select[aria-invalid="true"], ' +
+                        '#fastcheckout-checkout textarea[aria-invalid="true"], ' +
+                        '#co-checkout-form input[aria-invalid="true"], ' +
+                        '#co-checkout-form select[aria-invalid="true"]'
+                    );
+                    if (firstInvalid) {
+                        firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        try {
+                            firstInvalid.focus({ preventScroll: true });
+                        } catch (e) {
+                            firstInvalid.focus();
+                        }
+                        return;
+                    }
+
+                    if (!shippingValid) {
+                        this.clientOrderError =
+                            window.fastcheckoutLastShippingValidationError ||
+                            missingShippingMethodMessage;
+                        if (shippingRoot && typeof shippingRoot.scrollIntoView === 'function') {
+                            shippingRoot.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                        return;
+                    }
+
+                    if (shippingValid && !billingValid) {
+                        this.scrollToSelectedPaymentMethod();
+                    }
+                });
+                return;
             }
 
             if (this._validateAll()) {
-                const paymentBridge = window.fastcheckoutHyvaPayment;
-
                 // Read selected payment method directly from DOM (no Magewire state needed)
                 const selectedMethodEl = document.querySelector('input[name="payment_method"]:checked');
                 const selectedMethod = selectedMethodEl ? selectedMethodEl.value : '';
 
                 // Invoke Knockout JS validation first if available
+                // (payment fields + agreements; billing already validated above)
                 if (paymentBridge && typeof paymentBridge.validate === 'function') {
                     if (!paymentBridge.validate()) {
                         if (window.console && typeof window.console.warn === 'function') {

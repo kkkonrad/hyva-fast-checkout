@@ -275,7 +275,6 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
 
         const shippingRoot = page.locator('.fastcheckout-native-shipping-address');
         const fields = {
-            username: 'standard-billing@example.com',
             firstname: 'Jan',
             lastname: 'Kowalski',
             'street[0]': 'Testowa 1',
@@ -283,6 +282,13 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
             postcode: '00-001',
             telephone: '500600700'
         };
+
+        // Email autofill mixin may expose name=email instead of Magento's name=username.
+        const emailField = shippingRoot.locator(
+            'input#customer-email, input[name="email"], input[name="username"]'
+        ).first();
+        await emailField.fill('standard-billing@example.com');
+        await emailField.blur();
 
         for (const [name, value] of Object.entries(fields)) {
             const field = shippingRoot.locator(`[name="${name}"]`);
@@ -331,10 +337,145 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
         await expect(sameAsShipping).not.toBeChecked();
         const billingFirstname = billing.locator('input[name="firstname"]');
         await expect(billingFirstname).toBeVisible();
+
+        // Unchecking same-as-shipping should prefill billing from shipping, including street.
+        await expect(billingFirstname).toHaveValue('Jan');
+        const billingStreet1 = billing.locator(
+            'input[name="street[0]"], [data-index="street"] input[name="0"], ' +
+            '.admin__field[data-index="street"] .admin__field[data-index="0"] input, ' +
+            '.admin__field[data-index="street"] input'
+        ).first();
+        await expect(billingStreet1).toHaveValue('Testowa 1', { timeout: 5_000 });
+
+        // Unchecking same-as-shipping must not paint fields as invalid before
+        // the shopper interacts or clicks Update / Place Order.
+        await expect(billingFirstname).not.toHaveAttribute('aria-invalid', 'true');
+        await expect(billing.locator('.admin__field-error, .field-error, label.mage-error, div.mage-error')).toHaveCount(0);
+
+        // Street group: one visible group label, line labels + telephone tooltip label sr-only.
+        const billingPresentation = await billing.evaluate((root) => {
+            const streetRoot = root.querySelector(
+                '.field.street, .admin__field[data-index="street"], [data-index="street"].admin__field'
+            );
+            const groupLabel = streetRoot && streetRoot.querySelector(
+                ':scope > .label, :scope > legend.label, :scope > .admin__field-label, :scope > legend.admin__field-label'
+            );
+            const lineLabels = streetRoot
+                ? Array.from(streetRoot.querySelectorAll(
+                    ':scope :is(.control, .admin__field-control, .admin__control-fields) > :is(.field, .admin__field) > :is(.label, .admin__field-label)'
+                ))
+                : [];
+            const tooltipLabel = root.querySelector(
+                '.field-tooltip > .label, .admin__field-tooltip > .label'
+            );
+
+            const isSrOnly = (el) => {
+                if (!el) {
+                    return false;
+                }
+                const style = getComputedStyle(el);
+                return style.position === 'absolute' &&
+                    (style.width === '1px' || parseFloat(style.width) <= 1) &&
+                    style.overflow === 'hidden';
+            };
+
+            return {
+                hasStreet: Boolean(streetRoot),
+                groupLabelVisible: groupLabel
+                    ? getComputedStyle(groupLabel).position !== 'absolute' ||
+                        getComputedStyle(groupLabel).width !== '1px'
+                    : false,
+                lineLabelsHidden: lineLabels.length
+                    ? lineLabels.every(isSrOnly)
+                    : true,
+                tooltipLabelHidden: tooltipLabel ? isSrOnly(tooltipLabel) : true
+            };
+        });
+        expect(billingPresentation.hasStreet).toBe(true);
+        expect(billingPresentation.groupLabelVisible).toBe(true);
+        expect(billingPresentation.lineLabelsHidden).toBe(true);
+        expect(billingPresentation.tooltipLabelHidden).toBe(true);
+
+        // Optional street line 2 must not be required; telephone should span full width.
+        const billingStreet2 = billing.locator(
+            'input[name="street[1]"], [data-index="street"] input[name="1"], ' +
+            '.admin__field[data-index="street"] .admin__field[data-index="1"] input, ' +
+            '.admin__field[data-index="street"] input'
+        ).nth(1);
+        if (await billingStreet2.count()) {
+            await billingStreet2.fill('');
+            await billingStreet2.blur();
+            // Empty optional street line must not show max_text_length (255) error.
+            await expect(billingStreet2).not.toHaveAttribute('aria-invalid', 'true');
+            await expect(billing.locator('.admin__field-error, .field-error')).not.toContainText(/255/);
+        }
+        const telephoneField = billing.locator(
+            'input[name="telephone"], [data-index="telephone"] input, .telephone input'
+        ).first();
+        if (await telephoneField.count()) {
+            const telephoneWidth = await telephoneField.evaluate((el) => {
+                const form = el.closest('.fieldset, form, .billing-address-form') || el.parentElement;
+                return {
+                    inputWidth: el.getBoundingClientRect().width,
+                    formWidth: form ? form.getBoundingClientRect().width : 0
+                };
+            });
+            // Telephone should no longer be the old CVV-capped ~140px stub.
+            expect(telephoneWidth.formWidth).toBeGreaterThan(0);
+            expect(telephoneWidth.inputWidth).toBeGreaterThan(180);
+            expect(telephoneWidth.inputWidth).toBeGreaterThan(telephoneWidth.formWidth * 0.4);
+        }
+
         await billingFirstname.fill('');
         await billing.getByRole('button', { name: /Update|Aktualizuj/i }).evaluate((button) => button.click());
         await expect(billingFirstname).toHaveAttribute('aria-invalid', 'true');
         await expect(billing).toContainText(/required field|wymagane pole/i);
+        if (await billingStreet2.count()) {
+            await expect(billingStreet2).not.toHaveAttribute('aria-invalid', 'true');
+        }
+
+        // Place Order must validate shipping + separate billing together.
+        // Clear shipping firstname and leave billing empty, then submit.
+        const shippingFirstname = shippingRoot.locator('input[name="firstname"]');
+        await shippingFirstname.fill('');
+        await shippingFirstname.blur();
+        // Clear residual billing error state from Update, then place order.
+        await page.evaluate(() => {
+            if (window.fastcheckoutHyvaPayment &&
+                typeof window.fastcheckoutHyvaPayment.validateBillingAddress === 'function') {
+                // Ensure API exists before place-order path is exercised.
+                return true;
+            }
+            return false;
+        }).then((hasApi) => expect(hasApi).toBe(true));
+
+        // Also clear email so the first document-order error is shipping email.
+        await emailField.fill('');
+        await emailField.blur();
+
+        // Sticky/mobile CTA can be unstable while totals re-render; force the submit path.
+        await page.locator(selectors.placeOrderBtn).first().evaluate((button) => {
+            const form = button.closest('form');
+            if (form && typeof form.requestSubmit === 'function') {
+                form.requestSubmit(button);
+                return;
+            }
+            button.click();
+        });
+
+        await expect(shippingFirstname).toHaveAttribute('aria-invalid', 'true', { timeout: 10_000 });
+        await expect(billingFirstname).toHaveAttribute('aria-invalid', 'true');
+        await expect(shippingRoot).toContainText(/required field|wymagane pole/i);
+        await expect(billing).toContainText(/required field|wymagane pole/i);
+
+        // Focus must land on the first invalid field (shipping email), not billing firstname.
+        await expect.poll(async () => page.evaluate(() => {
+            const active = document.activeElement;
+            if (!active) {
+                return '';
+            }
+            return active.id || active.getAttribute('name') || active.tagName;
+        }), { timeout: 5_000 }).toMatch(/customer-email|email|username/i);
 
         const result = await page.evaluate((methodCode) => new Promise((resolve) => {
             window.require(['uiRegistry'], (registry) => {
@@ -343,7 +484,11 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
                 );
                 resolve({
                     component: component && component.component,
-                    dataScopePrefix: component && component.dataScopePrefix
+                    dataScopePrefix: component && component.dataScopePrefix,
+                    hasValidateBilling: Boolean(
+                        window.fastcheckoutHyvaPayment &&
+                        typeof window.fastcheckoutHyvaPayment.validateBillingAddress === 'function'
+                    )
                 });
             }, (error) => resolve({ requireError: String(error) }));
         }), standardMethod);
@@ -351,6 +496,7 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
         expect(result.requireError).toBeFalsy();
         expect(result.component).toBe('Magento_Checkout/js/view/billing-address');
         expect(result.dataScopePrefix).toBe(`billingAddress${standardMethod}`);
+        expect(result.hasValidateBilling).toBe(true);
         expect(pageErrors).toEqual([]);
     });
 
