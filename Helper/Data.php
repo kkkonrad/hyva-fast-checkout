@@ -217,7 +217,7 @@ class Data extends AbstractHelper
             return false;
         }
 
-        if ($ruleShippingMethod === $carrierCode || $ruleShippingMethod === $carrierCode . '_*') {
+        if ($ruleShippingMethod === $carrierCode) {
             return true;
         }
 

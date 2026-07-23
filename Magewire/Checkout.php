@@ -915,7 +915,7 @@ class Checkout extends Component
     {
         try {
             $quote = $this->checkoutSession->getQuote();
-            $shippingRates = $this->buildShippingRatesData($quote);
+            $shippingRates = $this->buildShippingRatesData();
             $hasPersistableQuote = $quote && $quote->getId() && $quote->hasItems();
 
             if (

@@ -4,8 +4,18 @@ declare(strict_types=1);
 
 namespace Kkkonrad\Fastcheckout\Plugin\Tpay;
 
+use Psr\Log\LoggerInterface;
+
 class PatchTpayChannelsScript
 {
+    /** @var LoggerInterface */
+    private $logger;
+
+    public function __construct(LoggerInterface $logger)
+    {
+        $this->logger = $logger;
+    }
+
     /**
      * Patch the showChannels javascript to wait defensively for the DOM element to load.
      *
@@ -20,7 +30,7 @@ class PatchTpayChannelsScript
         }
 
         $pattern = '/ShowChannelsCombo\(\);\s*checkBlikInput\(\);\s*setBlikInputAction\(\);\s*payButton\.addClass\(\'disabled\'\);/s';
-        
+
         $replacement = "
         (function() {
             var retries = 0;
@@ -42,6 +52,15 @@ class PatchTpayChannelsScript
 
         $patched = preg_replace($pattern, $replacement, $result);
 
-        return $patched ?? $result;
+        if ($patched === null || $patched === $result) {
+            $this->logger->warning(
+                'Kkkonrad Fastcheckout: PatchTpayChannelsScript pattern did not match Tpay showChannels script; '
+                . 'the defensive DOM-wait patch was not applied. The vendor script may have changed.'
+            );
+
+            return $result;
+        }
+
+        return $patched;
     }
 }

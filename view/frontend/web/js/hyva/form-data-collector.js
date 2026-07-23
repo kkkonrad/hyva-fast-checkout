@@ -403,8 +403,7 @@ define([
                 '#onepage-checkout-shipping-method-additional-load',
                 '#fastcheckout-ko-shipping-root',
                 '.fastcheckout-ko-shipping-root',
-                '.fastcheckout-ko-shipping-container',
-                '[data-fastcheckout-shipping-fields]'
+                '.fastcheckout-ko-shipping-container'
             ];
 
         function addRoot(root) {

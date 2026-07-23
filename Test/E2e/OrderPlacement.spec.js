@@ -141,7 +141,7 @@ async function fillAddressAtomically(page, address) {
                 paymentMethod: c.get('paymentMethod'),
             },
             selectedPaymentMethod: paymentMethod,
-            wireIgnore: !!document.querySelector('[data-fastcheckout-shipping-fields][wire\\:ignore]'),
+            wireIgnore: !!document.querySelector('.fastcheckout-native-shipping-address[wire\\:ignore]'),
         };
     }, address);
 

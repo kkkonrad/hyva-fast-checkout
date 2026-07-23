@@ -42,46 +42,46 @@
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                 </field>
                 <field id="show_subscribe" translate="label" type="select"
-                       sortOrder="7" showInDefault="1" showInWebsite="1" showInStore="1">
+                       sortOrder="5" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Show Subscribe to Newsletter?</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                 </field>
                 <field id="subscribe_by_default" translate="label" type="select"
-                       sortOrder="8" showInDefault="1" showInWebsite="1" showInStore="1">
+                       sortOrder="6" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Subscribe by Default?</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                 </field>
                 <field id="show_gift_message" translate="label" type="select"
-                       sortOrder="8" showInDefault="1" showInWebsite="1" showInStore="1">
+                       sortOrder="7" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Show Gift Message?</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                 </field>
                 <field id="reload_shipping_methods_on_discount" translate="label" type="select"
-                       sortOrder="9" showInDefault="1" showInWebsite="1" showInStore="1">
+                       sortOrder="8" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Reload Shipping Methods After Discount Change?</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                 </field>
                 <field id="show_all_ship_methods" translate="label" type="select"
-                       sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                       sortOrder="9" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Show All Shipping Methods?</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                 </field>
                 <field id="payment_title_type" translate="label" type="text"
-                       sortOrder="11" showInDefault="1" showInWebsite="1" showInStore="1">
+                       sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Payment Title Type</label>
                 </field>
                 <field id="default_shipping_method" translate="label comment" type="select"
-                       sortOrder="9" showInDefault="1" showInWebsite="1" showInStore="1">
+                       sortOrder="11" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Default Shipping Method</label>
                     <source_model>Kkkonrad\Fastcheckout\Model\Config\Source\Shipping</source_model>
                 </field>
                 <field id="default_payment_method" translate="label" type="select"
-                       sortOrder="10" showInDefault="1" showInWebsite="1" showInStore="1">
+                       sortOrder="12" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Default Payment Method</label>
                     <source_model>Kkkonrad\Fastcheckout\Model\Config\Source\Payment</source_model>
                 </field>
                 <field id="shipping_payment_mapping" translate="label comment" type="text"
-                       sortOrder="20" showInDefault="1" showInWebsite="1" showInStore="1">
+                       sortOrder="13" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Payment Methods by Shipping Method</label>
                     <comment>Shipping methods may use wildcard entries such as carrier_*. Payment methods must be selected by exact method code.</comment>
                     <frontend_model>Kkkonrad\Fastcheckout\Block\Adminhtml\System\Config\ShippingPaymentMapping</frontend_model>
