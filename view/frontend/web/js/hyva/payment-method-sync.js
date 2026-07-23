@@ -35,6 +35,22 @@ define([], function () {
             return getCode(current);
         }
 
+        /**
+         * Code of the payment radio the shopper can actually see selected, if any.
+         * Disallowed methods are rendered disabled by the shipping->payment mapping.
+         */
+        function getCheckedEnabledPaymentCode() {
+            var checked;
+
+            if (typeof document === 'undefined' || !document.querySelector) {
+                return '';
+            }
+
+            checked = document.querySelector('input[name="payment_method"]:checked:not([disabled])');
+
+            return checked && checked.value ? String(checked.value) : '';
+        }
+
         function rememberUserPaymentSelection(methodCode) {
             methodCode = methodCode || '';
             if (!methodCode) {
@@ -155,6 +171,17 @@ define([], function () {
                     // message.processed — and each $set is itself a Livewire roundtrip
                     // whose response re-enters here, looping forever.
                     if (String(getProperty(wire, 'paymentMethod') || '') === '') {
+                        return;
+                    }
+
+                    // A shipping remap rebuilds the KO payment list, and mid-rebuild KO
+                    // reports "no method" (onSelectPaymentMethodAction(null)). That is a
+                    // transient render artifact, not the shopper deselecting: the server
+                    // has already auto-picked the first allowed method and the DOM shows
+                    // it. Clearing here wiped that valid selection, leaving Magewire empty
+                    // while the radio stayed checked. Only clear when the DOM agrees that
+                    // nothing selectable is checked.
+                    if (getCheckedEnabledPaymentCode() !== '') {
                         return;
                     }
 
