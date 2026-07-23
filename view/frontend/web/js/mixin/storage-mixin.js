@@ -1293,15 +1293,30 @@ define([
         return deferred.promise();
     }
 
+    function normalizeUrl(url) {
+        if (!url || typeof url !== 'string') {
+            return url;
+        }
+
+        // Strip leading slash from relative rest/ paths so mage/url (which appends to baseUrl ending with /)
+        // does not build URLs with double slashes like https://domain.com//rest/...
+        if (url.indexOf('/rest/') === 0) {
+            url = url.substring(1);
+        }
+
+        // Collapse any double slashes (except after http:// or https://)
+        return url.replace(/(https?:\/\/)|(\/)+/g, function (match, protocol) {
+            return protocol ? protocol : '/';
+        });
+    }
+
     return function (storage) {
         if (!storage) {
             return storage;
         }
 
         storage.get = wrapper.wrap(storage.get, function (originalGet, url, global, contentType, headers) {
-            if (url && url.indexOf('rest/') === 0) {
-                url = '/' + url;
-            }
+            url = normalizeUrl(url);
             if (shouldIntercept(url, 'GET') && getWire()) {
                 return handleIntercept(url, null, 'GET', headers);
             }
@@ -1309,9 +1324,7 @@ define([
         });
 
         storage.post = wrapper.wrap(storage.post, function (originalPost, url, data, global, contentType, headers, async) {
-            if (url && url.indexOf('rest/') === 0) {
-                url = '/' + url;
-            }
+            url = normalizeUrl(url);
 
             if (url && url.indexOf('/guest-carts/') !== -1 && (url.indexOf('/payment-information') !== -1 || url.indexOf('/set-payment-information') !== -1 || url.indexOf('/order') !== -1)) {
                 var payload = parsePayload(data);
@@ -1341,9 +1354,7 @@ define([
         });
 
         storage.put = wrapper.wrap(storage.put, function (originalPut, url, data, global, contentType, headers) {
-            if (url && url.indexOf('rest/') === 0) {
-                url = '/' + url;
-            }
+            url = normalizeUrl(url);
             if (shouldIntercept(url, 'PUT') && getWire()) {
                 return handleIntercept(url, data, 'PUT', headers);
             }
@@ -1351,9 +1362,7 @@ define([
         });
 
         storage.delete = wrapper.wrap(storage.delete, function (originalDelete, url, global, contentType, headers) {
-            if (url && url.indexOf('rest/') === 0) {
-                url = '/' + url;
-            }
+            url = normalizeUrl(url);
             if (shouldIntercept(url, 'DELETE') && getWire()) {
                 return handleIntercept(url, null, 'DELETE', headers);
             }
