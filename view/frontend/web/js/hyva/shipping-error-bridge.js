@@ -74,9 +74,8 @@ define([], function () {
                 painted = true;
             }
 
-            // Always ensure a visible DOM message for general "pick a method" errors,
-            // even if the KO list instance is missing or has not re-rendered yet.
-            if (errorCode === 'general') {
+            // Ensure a visible DOM message for general "pick a method" errors if component didn't paint it.
+            if (errorCode === 'general' && !painted) {
                 ensureDomFallbackMessage(errorMessage);
                 painted = true;
             }
