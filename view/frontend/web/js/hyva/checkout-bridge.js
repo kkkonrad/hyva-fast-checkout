@@ -361,7 +361,16 @@ define([
                     selectShippingMethodAction: selectShippingMethodAction,
                     getMagewireComponent: getMagewireComponent,
                     getProperty: getProperty,
-                    persistShippingMethod: persistShippingMethodToCheckoutData
+                    persistShippingMethod: persistShippingMethodToCheckoutData,
+                    applyCheckoutState: function (payload, options) {
+                        if (
+                            checkoutStateBridge &&
+                            typeof checkoutStateBridge.applyPayload === 'function'
+                        ) {
+                            return checkoutStateBridge.applyPayload(payload, options);
+                        }
+                        return false;
+                    }
                 });
                 var shippingErrorBridge = createShippingErrorBridge({
                     registry: registry
@@ -1429,21 +1438,44 @@ define([
                     );
                 }
 
+                function normalizeStreetForCompare(street) {
+                    var lines = Array.isArray(street) ? street.slice() : (street ? [street] : []);
+
+                    // Drop trailing empty lines so ["Foo 1", ""] matches ["Foo 1"].
+                    while (lines.length && String(lines[lines.length - 1] || '').trim() === '') {
+                        lines.pop();
+                    }
+
+                    return lines.map(function (line) {
+                        return String(line || '').trim();
+                    });
+                }
+
                 function addressesMatch(currentAddress, newAddress) {
-                    return currentAddress &&
-                        currentAddress.countryId === newAddress.countryId &&
-                        currentAddress.postcode === newAddress.postcode &&
-                        currentAddress.city === newAddress.city &&
-                        JSON.stringify(currentAddress.street || []) === JSON.stringify(newAddress.street || []) &&
-                        currentAddress.regionId == newAddress.regionId &&
-                        currentAddress.region === newAddress.region &&
-                        currentAddress.firstname === newAddress.firstname &&
-                        currentAddress.lastname === newAddress.lastname &&
-                        currentAddress.telephone === newAddress.telephone;
+                    if (!currentAddress || !newAddress) {
+                        return false;
+                    }
+
+                    return String(currentAddress.countryId || '') === String(newAddress.countryId || '') &&
+                        String(currentAddress.postcode || '') === String(newAddress.postcode || '') &&
+                        String(currentAddress.city || '') === String(newAddress.city || '') &&
+                        JSON.stringify(normalizeStreetForCompare(currentAddress.street)) ===
+                            JSON.stringify(normalizeStreetForCompare(newAddress.street)) &&
+                        String(currentAddress.regionId || '') === String(newAddress.regionId || '') &&
+                        String(currentAddress.region || '') === String(newAddress.region || '') &&
+                        String(currentAddress.firstname || '') === String(newAddress.firstname || '') &&
+                        String(currentAddress.lastname || '') === String(newAddress.lastname || '') &&
+                        String(currentAddress.telephone || '') === String(newAddress.telephone || '');
                 }
 
                 function syncAddressToKnockout(magewire) {
                     if (!magewire) return null;
+
+                    // Selecting a shipping method only remaps payment/totals. Re-pushing the
+                    // address into KO re-triggers rate processors and reloads the methods list.
+                    if (window.fastcheckoutSelectingShippingMethod || window.fastcheckoutLockShippingRatesList) {
+                        return quote.shippingAddress();
+                    }
 
                     var addressData = buildAddressData(magewire, ''),
                         newAddress = addressConverter.formAddressDataToQuoteAddress(addressData),
@@ -1810,6 +1842,13 @@ define([
                     },
                     registerValidator: registerShippingValidator,
                     onRecollectShippingRatesAction: function (originalAction) {
+                        if (
+                            window.fastcheckoutLockShippingRatesList ||
+                            window.fastcheckoutSelectingShippingMethod
+                        ) {
+                            return Promise.resolve(null);
+                        }
+
                         if (!getMagewireComponent()) {
                             return originalAction();
                         }
@@ -4942,12 +4981,22 @@ define([
                                     : '',
                                 userFresh = shippingMethodSync &&
                                     typeof shippingMethodSync.isUserShippingSelectionFresh === 'function' &&
-                                    shippingMethodSync.isUserShippingSelectionFresh();
+                                    shippingMethodSync.isUserShippingSelectionFresh(),
+                                selectingShipping = !!(
+                                    window.fastcheckoutSelectingShippingMethod ||
+                                    window.fastcheckoutLockShippingRatesList
+                                );
 
-                            if (!(
-                                config.shippingAddress &&
-                                config.shippingAddress.component === 'Magento_Checkout/js/view/shipping'
-                            )) {
+                            // Never re-push shipping address into KO during method selection —
+                            // that re-fires rate processors and reloads the shipping list.
+                            // Address sync stays for real address/payment updates.
+                            if (
+                                !selectingShipping &&
+                                !(
+                                    config.shippingAddress &&
+                                    config.shippingAddress.component === 'Magento_Checkout/js/view/shipping'
+                                )
+                            ) {
                                 syncAddressToKnockout(wire);
                             }
 
@@ -4956,13 +5005,14 @@ define([
                             if (userFresh && userMethod) {
                                 syncSelectedShippingMethodToKnockout(userMethod);
                                 if (
+                                    !selectingShipping &&
                                     currentMethod !== userMethod &&
                                     shippingMethodSync &&
                                     typeof shippingMethodSync.reassertLockedMethodToMagewireIfNeeded === 'function'
                                 ) {
                                     shippingMethodSync.reassertLockedMethodToMagewireIfNeeded();
                                 }
-                            } else if (currentMethod) {
+                            } else if (currentMethod && !selectingShipping) {
                                 syncSelectedShippingMethodToKnockout(currentMethod);
                             }
                         }

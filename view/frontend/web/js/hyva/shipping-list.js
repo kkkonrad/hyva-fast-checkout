@@ -170,7 +170,10 @@ define([
             }
 
             // Suppress bridge onSelect side-effects from this intentional apply; we sync below.
+            // Also lock the rates list so Magewire payment remap cannot flash a reload.
             window.fastcheckoutSuppressShippingSync = true;
+            window.fastcheckoutLockShippingRatesList = true;
+            window.fastcheckoutSelectingShippingMethod = true;
             try {
                 selectShippingMethodAction(found);
             } finally {

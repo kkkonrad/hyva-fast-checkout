@@ -9,6 +9,7 @@ define([], function () {
             selectShippingMethodAction = deps.selectShippingMethodAction,
             getMagewireComponent = typeof deps.getMagewireComponent === 'function' ? deps.getMagewireComponent : function () { return null; },
             persistShippingMethod = typeof deps.persistShippingMethod === 'function' ? deps.persistShippingMethod : function () {},
+            applyCheckoutState = typeof deps.applyCheckoutState === 'function' ? deps.applyCheckoutState : null,
             lastMagewireShippingMethodCode = '',
             lastMagewireShippingPushedAt = 0,
             // Hard lock: once the shopper picks a rate, only another shopper pick
@@ -282,11 +283,30 @@ define([], function () {
             pushGen = shippingLockGeneration;
             magewirePushGeneration = pushGen;
 
+            // Block shipping-service setShippingRates / getRates rebuilds while the
+            // method call only remaps payment methods + totals.
+            window.fastcheckoutLockShippingRatesList = true;
+            window.fastcheckoutSelectingShippingMethod = true;
+
             return Promise.resolve(wire.call('selectShippingMethod', methodCode)).then(function (result) {
                 // Ignore completion of an outdated push after a newer user pick.
                 if (pushGen === shippingLockGeneration) {
                     magewirePushInFlight = false;
                     lastMagewireShippingPushedAt = Date.now();
+
+                    // Apply totals/payment from the method response, but never rebuild the
+                    // rates list — the shopper already sees the estimated methods.
+                    if (
+                        result &&
+                        typeof result === 'object' &&
+                        typeof applyCheckoutState === 'function'
+                    ) {
+                        try {
+                            applyCheckoutState(result, { skipShippingRates: true });
+                        } catch (e) {
+                            // Totals can still refresh from DOM morph; ignore apply errors.
+                        }
+                    }
                 } else if (magewirePushGeneration === pushGen) {
                     magewirePushInFlight = false;
                 }
@@ -302,6 +322,14 @@ define([], function () {
                     magewirePushInFlight = false;
                 }
                 return Promise.reject(error);
+            }).finally(function () {
+                // Keep the lock through Livewire message.processed (same tick + rAF).
+                window.setTimeout(function () {
+                    if (pushGen === shippingLockGeneration) {
+                        window.fastcheckoutLockShippingRatesList = false;
+                        window.fastcheckoutSelectingShippingMethod = false;
+                    }
+                }, 300);
             });
         }
 

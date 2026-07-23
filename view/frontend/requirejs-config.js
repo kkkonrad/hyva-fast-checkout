@@ -38,6 +38,9 @@ var config = {
             'Magento_Checkout/js/model/shipping-rate-service': {
                 'Kkkonrad_Fastcheckout/js/mixin/shipping-rate-service-mixin': true
             },
+            'Magento_Checkout/js/model/shipping-service': {
+                'Kkkonrad_Fastcheckout/js/mixin/shipping-service-mixin': true
+            },
             'Magento_Checkout/js/model/checkout-data-resolver': {
                 'Kkkonrad_Fastcheckout/js/mixin/checkout-data-resolver-mixin': true
             },

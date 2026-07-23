@@ -654,7 +654,14 @@ class Checkout extends Component
         }
 
         $shippingAddress->setShippingMethod($methodCode);
-        $shippingAddress->setCollectShippingRates(true);
+        // Match Magento ShippingMethodManagement::apply(): selecting a rate must not
+        // force a full carrier re-estimate. Recollecting rates here rebuilds the list,
+        // morphs checkout state, and makes the KO shipping methods flash/reload on first pick.
+        // Only recollect when the address has no rates yet (e.g. method applied before estimate).
+        $existingRates = $shippingAddress->getGroupedAllShippingRates();
+        if (empty($existingRates)) {
+            $shippingAddress->setCollectShippingRates(true);
+        }
         $quote->collectTotals();
         $this->cartRepository->save($quote);
         $this->shippingMethod = $methodCode;

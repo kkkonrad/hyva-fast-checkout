@@ -641,10 +641,24 @@ define([
         });
     }
 
+    function numericEqual(a, b) {
+        var na = Number(a),
+            nb = Number(b);
+
+        if (isNaN(na) && isNaN(nb)) {
+            return true;
+        }
+
+        return Math.abs(na - nb) < 0.00001;
+    }
+
     function ratesChanged(currentRates, nextRates) {
         var i,
             current,
-            next;
+            next,
+            currentMap = {},
+            nextMap = {},
+            code;
 
         currentRates = Array.isArray(currentRates) ? currentRates : [];
         nextRates = Array.isArray(nextRates) ? nextRates : [];
@@ -653,24 +667,42 @@ define([
             return true;
         }
 
+        if (!currentRates.length) {
+            return false;
+        }
+
+        // Identity + visible price/labels only. Extension attributes differ between
+        // initial PHP rates and recollected Magento rates and used to reload the list.
         for (i = 0; i < currentRates.length; i++) {
             current = currentRates[i] || {};
-            next = nextRates[i] || {};
+            code = String(current.carrier_code || '') + '_' + String(current.method_code || '');
+            currentMap[code] = current;
+        }
 
+        for (i = 0; i < nextRates.length; i++) {
+            next = nextRates[i] || {};
+            code = String(next.carrier_code || '') + '_' + String(next.method_code || '');
+            nextMap[code] = next;
+            current = currentMap[code];
+            if (!current) {
+                return true;
+            }
             if (
-                current.carrier_code !== next.carrier_code ||
-                current.method_code !== next.method_code ||
-                current.amount !== next.amount ||
-                current.base_amount !== next.base_amount ||
-                current.price_excl_tax !== next.price_excl_tax ||
-                current.price_incl_tax !== next.price_incl_tax ||
-                current.available !== next.available ||
-                current.error_message !== next.error_message ||
-                current.carrier_title !== next.carrier_title ||
-                current.method_title !== next.method_title ||
-                JSON.stringify(current.extension_attributes || {}) !== JSON.stringify(next.extension_attributes || {}) ||
-                JSON.stringify(current.extensionAttributes || {}) !== JSON.stringify(next.extensionAttributes || {})
+                !numericEqual(current.amount, next.amount) ||
+                !numericEqual(current.base_amount, next.base_amount) ||
+                !numericEqual(current.price_excl_tax, next.price_excl_tax) ||
+                !numericEqual(current.price_incl_tax, next.price_incl_tax) ||
+                Boolean(current.available) !== Boolean(next.available) ||
+                String(current.error_message || '') !== String(next.error_message || '') ||
+                String(current.carrier_title || '') !== String(next.carrier_title || '') ||
+                String(current.method_title || '') !== String(next.method_title || '')
             ) {
+                return true;
+            }
+        }
+
+        for (code in currentMap) {
+            if (Object.prototype.hasOwnProperty.call(currentMap, code) && !nextMap[code]) {
                 return true;
             }
         }

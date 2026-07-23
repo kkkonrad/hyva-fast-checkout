@@ -783,6 +783,48 @@ class CheckoutTest extends TestCase
         $this->assertEquals('customcarrier_pickup_point_cod', $this->checkoutComponent->shippingMethod);
     }
 
+    public function testSelectShippingMethodDoesNotRecollectRatesWhenRatesAlreadyExist(): void
+    {
+        $shippingAddressMock = $this->createAddressMock();
+        $rate = new \stdClass();
+
+        $this->quoteMock->method('getShippingAddress')->willReturn($shippingAddressMock);
+        $shippingAddressMock->method('getCountryId')->willReturn('PL');
+        $shippingAddressMock->method('getGroupedAllShippingRates')->willReturn(['flatrate' => [$rate]]);
+        $shippingAddressMock->expects($this->once())
+            ->method('setShippingMethod')
+            ->with('flatrate_flatrate');
+        // Selecting a method must not force carrier re-estimate (that reloads the UI list).
+        $shippingAddressMock->expects($this->never())->method('setCollectShippingRates');
+        $this->quoteMock->expects($this->atLeastOnce())->method('collectTotals');
+        $this->cartRepositoryMock->expects($this->once())->method('save')->with($this->quoteMock);
+
+        $this->checkoutComponent->selectShippingMethod('flatrate_flatrate');
+
+        $this->assertSame('flatrate_flatrate', $this->checkoutComponent->shippingMethod);
+    }
+
+    public function testSelectShippingMethodRecollectsRatesWhenNoRatesOnAddress(): void
+    {
+        $shippingAddressMock = $this->createAddressMock();
+
+        $this->quoteMock->method('getShippingAddress')->willReturn($shippingAddressMock);
+        $shippingAddressMock->method('getCountryId')->willReturn('PL');
+        $shippingAddressMock->method('getGroupedAllShippingRates')->willReturn([]);
+        $shippingAddressMock->expects($this->once())
+            ->method('setShippingMethod')
+            ->with('tablerate_bestway');
+        // applyShippingMethodToQuote recollects when empty; refreshCheckoutState/getShippingMethods
+        // may request collection again if the mock still has no rates.
+        $shippingAddressMock->expects($this->atLeastOnce())
+            ->method('setCollectShippingRates')
+            ->with(true);
+
+        $this->checkoutComponent->selectShippingMethod('tablerate_bestway');
+
+        $this->assertSame('tablerate_bestway', $this->checkoutComponent->shippingMethod);
+    }
+
     public function testUpdatedHookPersistsDirectMagewirePropertyUpdates(): void
     {
         $shippingAddressMock = $this->createAddressMock();

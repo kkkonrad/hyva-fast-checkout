@@ -85,12 +85,81 @@ define([
             return '';
         }
 
-        function syncShippingRates(rates) {
-            var currentRates,
-                ratesChanged = false,
-                i,
+        function numericEqual(a, b) {
+            var na = Number(a),
+                nb = Number(b);
+
+            if (isNaN(na) && isNaN(nb)) {
+                return true;
+            }
+
+            return Math.abs(na - nb) < 0.00001;
+        }
+
+        /**
+         * True when the rates list should be replaced in KO.
+         * Compare only what shoppers see (identity + price + labels). Ignore extension
+         * attribute noise — Magento recollects often attach different bags and that was
+         * reloading the whole shipping list on first method pick.
+         */
+        function shippingRatesChanged(currentRates, nextRates) {
+            var i,
                 cr,
-                nr;
+                nr,
+                currentMap = {},
+                nextMap = {},
+                code;
+
+            currentRates = Array.isArray(currentRates) ? currentRates : [];
+            nextRates = Array.isArray(nextRates) ? nextRates : [];
+
+            if (currentRates.length !== nextRates.length) {
+                return true;
+            }
+
+            if (!currentRates.length) {
+                return false;
+            }
+
+            for (i = 0; i < currentRates.length; i++) {
+                cr = currentRates[i] || {};
+                code = String(cr.carrier_code || '') + '_' + String(cr.method_code || '');
+                currentMap[code] = cr;
+            }
+
+            for (i = 0; i < nextRates.length; i++) {
+                nr = nextRates[i] || {};
+                code = String(nr.carrier_code || '') + '_' + String(nr.method_code || '');
+                nextMap[code] = nr;
+                cr = currentMap[code];
+                if (!cr) {
+                    return true;
+                }
+                if (
+                    !numericEqual(cr.amount, nr.amount) ||
+                    !numericEqual(cr.base_amount, nr.base_amount) ||
+                    !numericEqual(cr.price_excl_tax, nr.price_excl_tax) ||
+                    !numericEqual(cr.price_incl_tax, nr.price_incl_tax) ||
+                    Boolean(cr.available) !== Boolean(nr.available) ||
+                    String(cr.error_message || '') !== String(nr.error_message || '') ||
+                    String(cr.carrier_title || '') !== String(nr.carrier_title || '') ||
+                    String(cr.method_title || '') !== String(nr.method_title || '')
+                ) {
+                    return true;
+                }
+            }
+
+            for (code in currentMap) {
+                if (Object.prototype.hasOwnProperty.call(currentMap, code) && !nextMap[code]) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        function syncShippingRates(rates) {
+            var currentRates;
 
             if (!Array.isArray(rates)) {
                 return;
@@ -98,39 +167,17 @@ define([
 
             currentRates = shippingService.getShippingRates()();
 
-            if (currentRates.length !== rates.length) {
-                ratesChanged = true;
-            } else {
-                for (i = 0; i < currentRates.length; i++) {
-                    cr = currentRates[i];
-                    nr = rates[i];
-                    if (cr.carrier_code !== nr.carrier_code ||
-                        cr.method_code !== nr.method_code ||
-                        cr.amount !== nr.amount ||
-                        cr.base_amount !== nr.base_amount ||
-                        cr.price_excl_tax !== nr.price_excl_tax ||
-                        cr.price_incl_tax !== nr.price_incl_tax ||
-                        cr.available !== nr.available ||
-                        cr.error_message !== nr.error_message ||
-                        cr.carrier_title !== nr.carrier_title ||
-                        cr.method_title !== nr.method_title ||
-                        JSON.stringify(cr.extension_attributes || {}) !== JSON.stringify(nr.extension_attributes || {}) ||
-                        JSON.stringify(cr.extensionAttributes || {}) !== JSON.stringify(nr.extensionAttributes || {})) {
-                        ratesChanged = true;
-                        break;
-                    }
-                }
-            }
-
-            if (ratesChanged) {
+            if (shippingRatesChanged(currentRates, rates)) {
                 shippingService.setShippingRates(rates);
             }
         }
 
-        function applyPayload(payload) {
+        function applyPayload(payload, options) {
             var methodsJson,
                 selectedPaymentMethod,
                 selectedShippingMethod;
+
+            options = options || {};
 
             if (!payload || typeof payload !== 'object') {
                 call('syncQuoteTotalsFromDom');
@@ -154,7 +201,10 @@ define([
                 syncPaymentMethods();
             }
 
-            syncShippingRates(payload.shipping_rates);
+            // Method selection only needs totals/payment — never rebuild the rates list.
+            if (options.skipShippingRates !== true) {
+                syncShippingRates(payload.shipping_rates);
+            }
 
             selectedPaymentMethod = getStateSelectedPaymentMethod(payload);
             if (selectedPaymentMethod) {
@@ -259,6 +309,11 @@ define([
         }
 
         function refreshShippingRates() {
+            // Method selection must not flash the shipping list loader / rebuild rates.
+            if (window.fastcheckoutLockShippingRatesList || window.fastcheckoutSelectingShippingMethod) {
+                return Promise.resolve(null);
+            }
+
             if (shippingService && shippingService.isLoading && typeof shippingService.isLoading === 'function') {
                 shippingService.isLoading(true);
             }
