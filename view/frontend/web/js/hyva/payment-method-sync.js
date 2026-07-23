@@ -143,9 +143,22 @@ define([], function () {
                     var wire = getMagewireComponent();
 
                     syncTimer = null;
-                    if (wire && typeof wire.set === 'function') {
-                        wire.set('paymentMethod', '');
+                    if (!wire || typeof wire.set !== 'function') {
+                        return;
                     }
+
+                    // Same guard the non-empty branch below applies before calling
+                    // selectPaymentMethod. Without it, a shipping remap that clears a
+                    // no-longer-allowed payment (e.g. flatrate/banktransfer ->
+                    // tablerate/checkmo, whose mappings are disjoint) left this firing
+                    // $set('paymentMethod', '') on an already-empty property on every
+                    // message.processed — and each $set is itself a Livewire roundtrip
+                    // whose response re-enters here, looping forever.
+                    if (String(getProperty(wire, 'paymentMethod') || '') === '') {
+                        return;
+                    }
+
+                    wire.set('paymentMethod', '');
                 }, 50);
                 return;
             }
