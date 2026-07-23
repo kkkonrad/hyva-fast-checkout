@@ -1860,11 +1860,53 @@ define([
                     },
                     clearError: clearShippingFieldError,
                     validate: function () {
+                        var activeMethod = quote.shippingMethod();
+
+                        // ----------------------------------------------------------------
+                        // Phase 1: Run address/KO validators FIRST (shipping-compatibility-
+                        // bridge registers the standard Magento shipping view validator here,
+                        // which validates email + address fields and sets inline KO errors).
+                        // Running address validation before the shipping-method check ensures
+                        // that on a fresh/empty session the shopper sees address field errors,
+                        // not "Please select a shipping method." Additionally, when an address
+                        // validator already returns false it produces its own inline KO error
+                        // messages so we must NOT also call showShippingFieldError -- that
+                        // would create a second, duplicate error banner.
+                        // ----------------------------------------------------------------
+                        if (window.fastcheckoutCustomShippingValidators && window.fastcheckoutCustomShippingValidators.length > 0) {
+                            for (var j = 0; j < window.fastcheckoutCustomShippingValidators.length; j++) {
+                                var preValidator = window.fastcheckoutCustomShippingValidators[j];
+                                // Only run address-oriented validators first (flagged with
+                                // .fastcheckoutKoShippingView === true by shipping-compatibility-bridge).
+                                if (
+                                    preValidator &&
+                                    preValidator.fastcheckoutKoShippingView === true &&
+                                    typeof preValidator === 'function'
+                                ) {
+                                    try {
+                                        if (preValidator(activeMethod) === false) {
+                                            // Address validation failed. Do NOT show a shipping-method
+                                            // error on top -- the KO form fields already paint inline
+                                            // errors. Signal failure back to handleSubmit.
+                                            return false;
+                                        }
+                                    } catch (preErr) {
+                                        if (window.console && typeof window.console.error === 'function') {
+                                            window.console.error('Kkkonrad Fastcheckout: Address validator error:', preErr);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // ----------------------------------------------------------------
+                        // Phase 2: Validate shipping method selection + shipping-specific
+                        // rules (InPost locker, etc.).
+                        // ----------------------------------------------------------------
                         try {
                             clearShippingFieldError();
                             syncDomShippingAttributesToMagewire(getMagewireComponent(), true);
                             var checkedDomRadio = document.querySelector('input[name="shipping_method"]:checked:not(:disabled)');
-                            var activeMethod = quote.shippingMethod();
 
                             var carrierCode = '';
                             var methodCode = '';
@@ -1931,10 +1973,16 @@ define([
                             }
                         }
 
-                        // Run dynamic/custom shipping validators if registered
+                        // ----------------------------------------------------------------
+                        // Phase 3: Remaining (non-address) custom shipping validators.
+                        // ----------------------------------------------------------------
                         if (window.fastcheckoutCustomShippingValidators && window.fastcheckoutCustomShippingValidators.length > 0) {
                             for (var i = 0; i < window.fastcheckoutCustomShippingValidators.length; i++) {
                                 var validator = window.fastcheckoutCustomShippingValidators[i];
+                                // Skip address validators already executed in Phase 1.
+                                if (validator && validator.fastcheckoutKoShippingView === true) {
+                                    continue;
+                                }
                                 if (typeof validator === 'function') {
                                     try {
                                         if (!validator(activeMethod)) {

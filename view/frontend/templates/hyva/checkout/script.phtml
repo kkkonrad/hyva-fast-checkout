@@ -715,18 +715,67 @@ function initCheckout() {
                     );
                 }
 
-                // Missing shipping method: show a user-visible message immediately
-                // (do not rely only on console / late rAF focus logic).
+                // Missing shipping method banner — but only when validate() failed because of the
+                // method selection and NOT because of an address error. The KO address validator
+                // (Phase 1 of validate()) sets its own inline KO errors on the form fields; it does
+                // NOT set fastcheckoutLastShippingValidationError. When that variable is empty and
+                // no shipping radio is checked, validate() could have returned false due to either:
+                //   (a) address invalid  → KO fields are painted aria-invalid (check DOM in rAF)
+                //   (b) truly no shipping method available (empty address → no rates computed yet)
+                // We must NOT show "Please select a shipping method" for case (a).
+                // Use rAF so KO has time to paint aria-invalid attributes before we decide.
                 if (!shippingValid && !hasShippingMethodSelected) {
-                    this.clientOrderError =
-                        window.fastcheckoutLastShippingValidationError ||
-                        missingShippingMethodMessage;
-
-                    const shippingRoot = document.getElementById('fastcheckout-ko-shipping-root') ||
-                        document.querySelector('[name="shipping_method"]');
-                    if (shippingRoot && typeof shippingRoot.scrollIntoView === 'function') {
-                        shippingRoot.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    // If validate() explicitly recorded a shipping-method error message, show it now.
+                    if (window.fastcheckoutLastShippingValidationError) {
+                        this.clientOrderError = window.fastcheckoutLastShippingValidationError;
+                        const shippingRoot = document.getElementById('fastcheckout-ko-shipping-root') ||
+                            document.querySelector('[name="shipping_method"]');
+                        if (shippingRoot && typeof shippingRoot.scrollIntoView === 'function') {
+                            shippingRoot.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                        return;
                     }
+
+                    // Otherwise wait one frame for KO to paint field errors, then decide.
+                    window.requestAnimationFrame(() => {
+                        // Prefer focusing address field errors (Phase 1 of validate() already
+                        // triggered KO inline validation — email, name, city etc.).
+                        if (
+                            paymentBridge &&
+                            typeof paymentBridge.focusFirstInvalidField === 'function' &&
+                            paymentBridge.focusFirstInvalidField()
+                        ) {
+                            return;
+                        }
+
+                        const firstInvalid = document.querySelector(
+                            '#fastcheckout-checkout input[aria-invalid="true"], ' +
+                            '#fastcheckout-checkout select[aria-invalid="true"], ' +
+                            '#fastcheckout-checkout textarea[aria-invalid="true"], ' +
+                            '#co-checkout-form input[aria-invalid="true"], ' +
+                            '#co-checkout-form select[aria-invalid="true"], ' +
+                            '.fastcheckout-native-shipping-address input[aria-invalid="true"], ' +
+                            '.fastcheckout-native-shipping-address select[aria-invalid="true"]'
+                        );
+                        if (firstInvalid) {
+                            // Address errors are visible — scroll to the first one.
+                            firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            try {
+                                firstInvalid.focus({ preventScroll: true });
+                            } catch (e) {
+                                firstInvalid.focus();
+                            }
+                            return;
+                        }
+
+                        // No address errors painted — it really is a missing shipping method.
+                        this.clientOrderError = missingShippingMethodMessage;
+                        const shippingRoot = document.getElementById('fastcheckout-ko-shipping-root') ||
+                            document.querySelector('[name="shipping_method"]');
+                        if (shippingRoot && typeof shippingRoot.scrollIntoView === 'function') {
+                            shippingRoot.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                    });
                     return;
                 }
 
