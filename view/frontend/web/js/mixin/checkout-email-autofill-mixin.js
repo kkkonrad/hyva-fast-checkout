@@ -104,6 +104,16 @@ define([
                         '[data-role="email-with-possible-login"] input[name="username"]'
                     );
 
+                if (input && focused !== false) {
+                    input.removeAttribute('aria-invalid');
+                    input.removeAttribute('aria-describedby');
+                    input.classList.remove('mage-error', 'field-error');
+                    var wrapper = input.closest('label') || input.closest('.field, .admin__field');
+                    if (wrapper) {
+                        wrapper.classList.remove('field-error', '_error');
+                    }
+                }
+
                 if (focused === false && email) {
                     valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim());
 
@@ -111,6 +121,11 @@ define([
                         if (valid) {
                             input.removeAttribute('aria-invalid');
                             input.removeAttribute('aria-describedby');
+                            input.classList.remove('mage-error', 'field-error');
+                            var wrapperValid = input.closest('label') || input.closest('.field, .admin__field');
+                            if (wrapperValid) {
+                                wrapperValid.classList.remove('field-error', '_error');
+                            }
                         } else {
                             input.setAttribute('aria-invalid', 'true');
                         }
