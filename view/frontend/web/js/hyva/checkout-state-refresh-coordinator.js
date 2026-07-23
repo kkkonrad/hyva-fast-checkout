@@ -59,6 +59,18 @@ define([], function () {
     function requestPayload(wire, options) {
         var request;
 
+        // Magewire (1.13.x) never populates effects.returns — its Response only emits
+        // html/dirty/emits/listeners/dispatches/redirect — so wire.call() always resolves
+        // null. refreshCheckoutState's payload was therefore always discarded and refetched
+        // through fetchState anyway, making every refresh cost two round trips. The GET
+        // endpoint (Controller/Index/State -> CheckoutStateProvider::getState) runs the same
+        // rates/ensureTotalsCollected/saveQuoteIfChanged path and returns the same keys, so
+        // going straight to it drops a redundant quote save plus the component re-render
+        // whose morph re-entered the bridge's message.processed hooks.
+        if (typeof options.fetchState === 'function') {
+            return Promise.resolve(options.fetchState(wire));
+        }
+
         try {
             request = wire.call('refreshCheckoutState');
         } catch (error) {
