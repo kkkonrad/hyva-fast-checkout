@@ -76,6 +76,36 @@ define([
         return false;
     }
 
+    /**
+     * Fields carriers price on. Street/company/name changes must not re-estimate.
+     */
+    function rateAffectingSignature(address) {
+        var read = function (key) {
+                var value = address ? address[key] : '';
+
+                if (typeof value === 'function') {
+                    value = value();
+                }
+
+                return value === null || typeof value === 'undefined' ? '' : String(value);
+            };
+
+        if (!address) {
+            return '';
+        }
+
+        return [
+            read('countryId') || read('country_id'),
+            read('regionId') || read('region_id'),
+            read('region'),
+            read('postcode'),
+            read('city')
+        ].join('|');
+    }
+
+    // Signature of the address the currently displayed rates were priced for.
+    var lastEstimatedSignature = null;
+
     return {
         /**
          * Route Magento KO shipping-rate processors through the Fastcheckout bridge.
@@ -120,14 +150,23 @@ define([
                     if (ratesListChanged(currentRates, cache)) {
                         shippingService.setShippingRates(cache);
                     }
+                    lastEstimatedSignature = rateAffectingSignature(address);
                     shippingService.isLoading(false);
                     return;
                 }
 
-                // No registry entry for this address object key, but rates are already
-                // on screen (common after Magento builds a new address object on method
-                // select). Keep the visible list instead of flashing a reload.
-                if (Array.isArray(currentRates) && currentRates.length) {
+                // No registry entry for this address object key, but rates are already on
+                // screen (common after Magento builds a new address object on method
+                // select). Keep the visible list instead of flashing a reload — but only
+                // when the fields carriers actually price on are unchanged. Keying purely
+                // off "something is on screen" also swallowed real address edits: the old
+                // rates were kept AND cached under the new address key, so once any rates
+                // were shown a country/postcode change never re-priced shipping again.
+                if (
+                    Array.isArray(currentRates) &&
+                    currentRates.length &&
+                    rateAffectingSignature(address) === lastEstimatedSignature
+                ) {
                     if (cacheKey) {
                         rateRegistry.set(cacheKey, currentRates);
                     }
@@ -143,6 +182,7 @@ define([
                         if (cacheKey) {
                             rateRegistry.set(cacheKey, rates);
                         }
+                        lastEstimatedSignature = rateAffectingSignature(address);
                         if (ratesListChanged(shippingService.getShippingRates()(), rates)) {
                             shippingService.setShippingRates(rates);
                         }

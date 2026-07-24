@@ -8,6 +8,11 @@ define([
 ], function (ko, Component, shippingService, selectShippingMethodAction, quote, priceUtils) {
     'use strict';
 
+    // How long after a trusted rate click the list ignores isLoading. Covers the
+    // redundant estimate Magento fires on the post-selection address re-notify
+    // (~2s here); address edits outside this window still show their spinner.
+    var SELECTION_LOADER_MUTE_MS = 3000;
+
     function isInPostModuleAvailable() {
         var context, paths, map;
 
@@ -211,7 +216,6 @@ define([
         },
 
         rates: shippingService.getShippingRates(),
-        isLoading: shippingService.isLoading,
 
         splitMethodCode: function (value) {
             var parts = String(value || '').split('_'),
@@ -255,6 +259,39 @@ define([
             this.bumpSelectionRevision = function () {
                 self.selectionRevision(self.selectionRevision() + 1);
             };
+
+            // Picking a rate never re-estimates carriers, so the list must not be veiled
+            // while it happens. Magento's shipping-rates-validator raises isLoading(true)
+            // on the address re-notify that follows a selection, which kept the overlay up
+            // until that (already redundant) estimate resolved ~2s later — read by shoppers
+            // as "the shipping list reloads when I pick a method". Only this list's overlay
+            // is suppressed; shippingService.isLoading itself is left alone so genuine
+            // address-driven estimates still show it, and payment methods refresh as before.
+            this.isLoading = ko.pureComputed(function () {
+                // Read first so Knockout always registers the dependency — an early
+                // return before this would leave the computed stale when it flips back.
+                var loading = shippingService.isLoading(),
+                    click = window.fastcheckoutLastTrustedShippingClick;
+
+                // Keep this recomputing when only the non-observable lock changed.
+                self.selectionRevision();
+
+                // Picking a rate never re-estimates carriers, so the list must not be
+                // veiled while it happens. Magento's shipping-rates-validator still
+                // raises isLoading(true) on the address re-notify that follows the
+                // selection, and that estimate resolves ~2s later — long after the
+                // locks drop — which read as "the list reloads when I pick a method".
+                // Address-driven estimates keep their spinner: that one is real feedback.
+                if (window.fastcheckoutLockShippingRatesList || window.fastcheckoutSelectingShippingMethod) {
+                    return false;
+                }
+
+                if (click && (Date.now() - click.at) < SELECTION_LOADER_MUTE_MS) {
+                    return false;
+                }
+
+                return loading;
+            });
 
             this.selectedMethodCode = ko.pureComputed({
                 read: function () {

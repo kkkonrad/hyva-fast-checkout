@@ -1,6 +1,9 @@
 <div class="grid gap-3 relative">
     <!-- ko if: isLoading -->
-    <div class="absolute inset-0 bg-white/70 backdrop-blur-[1px] z-20 rounded items-center justify-center transition-all duration-200">
+    <!-- pointer-events-none: the veil covers the whole list, so without it a click on a
+         rate during an in-flight estimate hit the overlay instead of the radio and the
+         trusted-click handler never ran. -->
+    <div class="absolute inset-0 bg-white/70 backdrop-blur-[1px] z-20 rounded items-center justify-center transition-all duration-200 pointer-events-none">
         <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center">
             <svg class="animate-spin h-8 w-8 text-primary" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
