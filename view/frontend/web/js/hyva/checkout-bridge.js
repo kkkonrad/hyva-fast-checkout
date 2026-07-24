@@ -3148,6 +3148,22 @@ define([
                         return false;
                     }
 
+                    // Fastcheckout has no billing-address UI: billing is supplied through
+                    // Magewire (same as shipping, or a separate address entered via Magewire)
+                    // and validated server-side on placeOrder. The billing form embedded in
+                    // each Magento payment renderer is vestigial and, on stores where its
+                    // isAddressSameAsShipping defaults to false, stays visible+empty. Left in
+                    // the validation set it painted "required field" errors across the payment
+                    // area on every Place Order click (visible reflow). Skip any such form the
+                    // shopper never actually touched — there is no way for them to, so this
+                    // only ever excludes the vestigial form, never a real user entry.
+                    if (
+                        component.fastcheckoutBillingValidation &&
+                        component.fastcheckoutBillingValidation.interacted !== true
+                    ) {
+                        return false;
+                    }
+
                     // Saved address selected without new-address form.
                     if (
                         typeof component.isAddressFormVisible === 'function' &&
