@@ -775,6 +775,35 @@ define([
                     };
                 }
 
+                /**
+                 * True when an address actually carries shopper-entered data. The billing
+                 * form embedded in Magento payment renderers exists but is never exposed by
+                 * Fastcheckout, so it stays an empty address object — which must not be read
+                 * as a real "separate billing address".
+                 */
+                function hasMeaningfulAddressData(addressData) {
+                    var street;
+
+                    if (!addressData) {
+                        return false;
+                    }
+
+                    street = addressData.street;
+                    if (Array.isArray(street)) {
+                        street = street.join('').trim();
+                    } else {
+                        street = street ? String(street).trim() : '';
+                    }
+
+                    return Boolean(
+                        String(addressData.firstname || '').trim() ||
+                        String(addressData.lastname || '').trim() ||
+                        String(addressData.postcode || '').trim() ||
+                        String(addressData.city || '').trim() ||
+                        street
+                    );
+                }
+
                 function getCurrentShippingAddressData(address) {
                     var normalized = normalizeKoAddressData(address);
 
@@ -1778,11 +1807,12 @@ define([
                             wire = getMagewireComponent();
 
                         if (!billingAddress) {
-                            return Promise.resolve(
-                                setMagewireValue(wire, 'billingSameAsShipping', false, true)
-                            ).then(function () {
-                                return false;
-                            });
+                            // KO cleared the billing address (e.g. the vestigial renderer form
+                            // reset). Fastcheckout exposes no billing UI, so "no billing" means
+                            // "use shipping" — never downgrade billingSameAsShipping to false
+                            // here, or the server saves the empty billing* props and the order
+                            // fails QuoteValidator with all billing fields required.
+                            return Promise.resolve(false);
                         }
 
                         persistAddressToCheckoutData(addressData, 'billing');
@@ -1800,7 +1830,12 @@ define([
                         shippingKey = currentShippingAddress && typeof currentShippingAddress.getCacheKey === 'function'
                             ? currentShippingAddress.getCacheKey()
                             : '';
-                        billingSameAsShipping = Boolean(
+                        // Only a billing address the shopper actually filled may set
+                        // billingSameAsShipping=false. The renderer's vestigial (empty) billing
+                        // form otherwise reports a distinct address object → distinct cache key
+                        // → false, which made the server save empty billing* props and reject
+                        // the order. Empty billing = same as shipping.
+                        billingSameAsShipping = !hasMeaningfulAddressData(addressData) || Boolean(
                             currentBillingAddress && currentShippingAddress &&
                             (
                                 currentBillingAddress === currentShippingAddress ||
