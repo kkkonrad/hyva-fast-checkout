@@ -23,11 +23,36 @@ define([], function () {
         }
 
         function getEmailFromDomOrConfig() {
-            var emailEl = document.getElementById('co-shipping-email') ||
-                document.querySelector('input[name="email"]') ||
-                document.querySelector('input[type="email"]') ||
-                document.querySelector('[data-wire-field="email"]'),
-                emailVal = emailEl ? emailEl.value : '';
+            var selectors = [
+                    '#customer-email',
+                    '#co-shipping-email',
+                    '[data-role="email-with-possible-login"] input[type="email"]',
+                    '[data-role="email-with-possible-login"] input[name="username"]',
+                    '[data-role="email-with-possible-login"] input[name="email"]',
+                    'input[name="username"]',
+                    'input[name="email"]',
+                    'input[type="email"]',
+                    '[data-wire-field="email"]'
+                ],
+                emailEl,
+                emailVal = '',
+                i;
+
+            for (i = 0; i < selectors.length; i++) {
+                emailEl = document.querySelector(selectors[i]);
+                if (emailEl && emailEl.value && String(emailEl.value).indexOf('@') !== -1) {
+                    emailVal = String(emailEl.value).trim();
+                    break;
+                }
+            }
+
+            if (!emailVal) {
+                try {
+                    emailVal = window.sessionStorage.getItem('fastcheckout_email') || '';
+                } catch (e) {
+                    emailVal = '';
+                }
+            }
 
             if (!emailVal && window.checkoutConfig && window.checkoutConfig.customerData) {
                 emailVal = window.checkoutConfig.customerData.email || '';
@@ -36,7 +61,7 @@ define([], function () {
                 emailVal = window.checkoutConfig.quoteData.customer_email || '';
             }
 
-            return emailVal;
+            return emailVal ? String(emailVal).trim() : '';
         }
 
         function sync() {

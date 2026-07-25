@@ -73,7 +73,6 @@ foreach ($layoutAssets['css'] as $cssAsset) {
 <div id="fastcheckout-ko-payment-root"
      class="fastcheckout-ko-payment-root mt-4"
      style="display: none !important;"
-     wire:ignore
      data-bind="scope: 'fastcheckoutHyvaPaymentRenderers'">
     <!-- ko foreach: getRegion('place-order-captcha') -->
         <!-- ko template: getTemplate() --><!-- /ko -->
@@ -211,20 +210,12 @@ foreach ($layoutAssets['css'] as $cssAsset) {
         });
     }
 
-    function startAfterMagewire() {
-        if (window.Magewire || window.Livewire) {
-            loadRequireJs();
-            return;
-        }
-
-        document.addEventListener('magewire:available', loadRequireJs, {once: true});
-        document.addEventListener('livewire:available', loadRequireJs, {once: true});
-        window.addEventListener('load', function () {
-            setTimeout(loadRequireJs, 0);
-        }, {once: true});
+    // Native KO pipeline — do not wait for Magewire/Livewire.
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', loadRequireJs, { once: true });
+    } else {
+        loadRequireJs();
     }
-
-    startAfterMagewire();
 })();
 </script>
 <?php $hyvaCsp->registerInlineScript() ?>

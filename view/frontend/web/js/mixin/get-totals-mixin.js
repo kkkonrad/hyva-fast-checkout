@@ -4,20 +4,11 @@ define([
 ], function (wrapper, isFastcheckoutActive) {
     'use strict';
 
+    /**
+     * Native Magento totals pipeline — do not replace with Magewire refresh.
+     */
     return function (getTotalsAction) {
         return wrapper.wrap(getTotalsAction, function (originalAction, callbacks, deferred) {
-            if (
-                isFastcheckoutActive() &&
-                window.fastcheckoutHyvaPayment &&
-                typeof window.fastcheckoutHyvaPayment.onGetTotalsAction === 'function'
-            ) {
-                return window.fastcheckoutHyvaPayment.onGetTotalsAction(
-                    callbacks,
-                    deferred,
-                    originalAction
-                );
-            }
-
             return originalAction(callbacks, deferred);
         });
     };

@@ -2037,16 +2037,15 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
         ).first().getAttribute('value');
         test.skip(!shippingMethodCode, 'The test store has no shipping method suitable for this fixture.');
         await page.evaluate(async (methodCode) => {
-            const element = document.querySelector('[wire\\:id]');
-            const livewire = window.Livewire || window.Magewire;
-            const wire = element && livewire && typeof livewire.find === 'function'
-                ? livewire.find(element.getAttribute('wire:id'))
-                : null;
-
-            if (!wire || typeof wire.call !== 'function') {
-                throw new Error('Magewire checkout component is unavailable.');
+            const radio = document.querySelector(
+                'input[name="shipping_method"][value="' + methodCode + '"]'
+            );
+            if (!radio) {
+                throw new Error('Shipping method radio not found: ' + methodCode);
             }
-            await wire.call('selectShippingMethod', methodCode);
+            radio.click();
+            // Allow native set-shipping-information to settle.
+            await new Promise((r) => setTimeout(r, 600));
         }, shippingMethodCode);
         await expect(page.locator('input[name="payment_method"]:not(:disabled)').first()).toBeVisible();
 
@@ -2660,16 +2659,14 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
         ).count();
         test.skip(!hasTableRate, 'The test store has no table-rate shipping method.');
         await page.evaluate(async () => {
-            const element = document.querySelector('[wire\\:id]');
-            const livewire = window.Livewire || window.Magewire;
-            const wire = element && livewire && typeof livewire.find === 'function'
-                ? livewire.find(element.getAttribute('wire:id'))
-                : null;
-
-            if (!wire || typeof wire.call !== 'function') {
-                throw new Error('Magewire checkout component is unavailable.');
+            const radio = document.querySelector(
+                'input[name="shipping_method"][value="tablerate_bestway"]'
+            );
+            if (!radio) {
+                throw new Error('tablerate_bestway radio not found');
             }
-            await wire.call('selectShippingMethod', 'tablerate_bestway');
+            radio.click();
+            await new Promise((r) => setTimeout(r, 600));
         });
         await expect(page.locator(
             'input[name="payment_method"][value="purchaseorder"]:visible'

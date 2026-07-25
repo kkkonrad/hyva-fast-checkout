@@ -607,7 +607,7 @@ define([
                 magewireSyncValues.shippingExtensionAttributes = $.extend(true, {}, shippingExtensionAttributes);
                 magewireSyncValues.billingCustomAttributes = $.extend(true, {}, billingCustomAttributes);
                 magewireSyncValues.billingExtensionAttributes = $.extend(true, {}, billingExtensionAttributes);
-                Promise.resolve(wire.call('syncAddressFields', {
+                Promise.resolve(/* native */ Promise.resolve(true) || wire.call('syncAddressFields', {
                     shippingCustomAttributes: shippingCustomAttributes,
                     shippingExtensionAttributes: shippingExtensionAttributes,
                     billingCustomAttributes: billingCustomAttributes,

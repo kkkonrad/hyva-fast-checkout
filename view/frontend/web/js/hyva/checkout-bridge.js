@@ -9,6 +9,7 @@ define([
     'Kkkonrad_Fastcheckout/js/hyva/shipping-compatibility-bridge',
     'Kkkonrad_Fastcheckout/js/hyva/checkout-compatibility',
     'Kkkonrad_Fastcheckout/js/hyva/checkout-data-persistence',
+    'Kkkonrad_Fastcheckout/js/hyva/guest-address-snapshot',
     'Kkkonrad_Fastcheckout/js/hyva/checkout-totals-sync',
     'Kkkonrad_Fastcheckout/js/hyva/checkout-layout-bridge',
     'Kkkonrad_Fastcheckout/js/hyva/address-data-builder',
@@ -24,7 +25,34 @@ define([
     'Kkkonrad_Fastcheckout/js/hyva/shipping-method-sync',
     'Kkkonrad_Fastcheckout/js/hyva/shipping-error-bridge',
     'Kkkonrad_Fastcheckout/js/hyva/step-navigator-bridge'
-], function ($, createRendererManager, createCheckoutProviderBridge, createAddressAttributesBridge, formDataCollector, createPaymentMessageBridge, createPaymentValidationRegistry, createShippingCompatibilityBridge, checkoutCompatibility, createCheckoutDataPersistence, createCheckoutTotalsSync, createCheckoutLayoutBridge, createAddressDataBuilder, createCheckoutStateBridge, createPaymentDomBridge, createPlaceOrderHooksBridge, createShippingAttributesSync, createCheckoutComponentFallbacks, magewireUtils, createPaymentMethodSync, createCustomerEmailSync, checkoutAgreementsFallback, createShippingMethodSync, createShippingErrorBridge, createStepNavigatorBridge) {
+], function (
+    $,
+    createRendererManager,
+    createCheckoutProviderBridge,
+    createAddressAttributesBridge,
+    formDataCollector,
+    createPaymentMessageBridge,
+    createPaymentValidationRegistry,
+    createShippingCompatibilityBridge,
+    checkoutCompatibility,
+    createCheckoutDataPersistence,
+    guestAddressSnapshot,
+    createCheckoutTotalsSync,
+    createCheckoutLayoutBridge,
+    createAddressDataBuilder,
+    createCheckoutStateBridge,
+    createPaymentDomBridge,
+    createPlaceOrderHooksBridge,
+    createShippingAttributesSync,
+    createCheckoutComponentFallbacks,
+    magewireUtils,
+    createPaymentMethodSync,
+    createCustomerEmailSync,
+    checkoutAgreementsFallback,
+    createShippingMethodSync,
+    createShippingErrorBridge,
+    createStepNavigatorBridge
+) {
     'use strict';
 
     return function (config) {
@@ -140,6 +168,123 @@ define([
                 registry: registry,
                 getPaymentMethods: function () {
                     return typeof getDomPaymentMethods === 'function' ? getDomPaymentMethods() : [];
+                }
+            });
+
+            /**
+             * Re-fill full shipping address from previous order snapshot into:
+             * checkout-data → quote → checkoutProvider → visible form fields.
+             *
+             * Important: Magento country <select> loads ~200 options asynchronously.
+             * Restoring (especially writing dictionaries / country_id) before that
+             * leaves the country field permanently empty. Wait until options exist.
+             */
+            function restorePreviousGuestShippingAddress(forceQuote) {
+                try {
+                    return guestAddressSnapshot.restore({
+                        quote: quote,
+                        checkoutData: checkoutData,
+                        selectShippingAddress: selectShippingAddressAction,
+                        selectBillingAddress: selectBillingAddressAction,
+                        addressConverter: addressConverter,
+                        syncProvider: function (formData, type) {
+                            if (checkoutProviderBridge &&
+                                typeof checkoutProviderBridge.syncAddressData === 'function') {
+                                checkoutProviderBridge.syncAddressData(formData, type);
+                            }
+                        },
+                        force: forceQuote === true
+                    });
+                } catch (restoreErr) {
+                    return false;
+                }
+            }
+
+            function countryFieldReady() {
+                try {
+                    var countryComp = registry && typeof registry.get === 'function'
+                        ? registry.get(
+                            'checkout.steps.shipping-step.shippingAddress.shipping-address-fieldset.country_id'
+                        )
+                        : null;
+                    var opts = countryComp && typeof countryComp.options === 'function'
+                        ? (countryComp.options() || [])
+                        : [];
+                    if (opts.length > 10) {
+                        return true;
+                    }
+                } catch (e) {
+                    // fall through to DOM check
+                }
+                var el = document.querySelector(
+                    '.fastcheckout-native-shipping-address select[name="country_id"], select[name="country_id"]'
+                );
+                return !!(el && el.options && el.options.length > 10);
+            }
+
+            function scheduleGuestAddressRestore() {
+                var attempts = 0,
+                    maxAttempts = 40, // ~20s
+                    timer;
+
+                function tick() {
+                    attempts += 1;
+                    // Always try to repair country option list if something wiped it.
+                    try {
+                        if (checkoutProviderBridge &&
+                            typeof checkoutProviderBridge.ensureCountryDictionary === 'function') {
+                            checkoutProviderBridge.ensureCountryDictionary();
+                        }
+                    } catch (repairErr) {
+                        // ignore
+                    }
+                    if (countryFieldReady()) {
+                        restorePreviousGuestShippingAddress(false);
+                        // One more pass after KO finishes re-rendering.
+                        window.setTimeout(function () {
+                            restorePreviousGuestShippingAddress(false);
+                            try {
+                                if (checkoutProviderBridge &&
+                                    typeof checkoutProviderBridge.ensureCountryDictionary === 'function') {
+                                    checkoutProviderBridge.ensureCountryDictionary();
+                                }
+                            } catch (e2) {
+                                // ignore
+                            }
+                        }, 400);
+                        return;
+                    }
+                    if (attempts < maxAttempts) {
+                        timer = window.setTimeout(tick, 500);
+                    } else {
+                        // Last resort: restore text fields even if country never loaded.
+                        restorePreviousGuestShippingAddress(false);
+                        try {
+                            if (checkoutProviderBridge &&
+                                typeof checkoutProviderBridge.ensureCountryDictionary === 'function') {
+                                checkoutProviderBridge.ensureCountryDictionary();
+                            }
+                        } catch (e3) {
+                            // ignore
+                        }
+                    }
+                }
+
+                // Do NOT restore immediately — wait for directory options.
+                if (registry && typeof registry.async === 'function') {
+                    registry.async(
+                        'checkout.steps.shipping-step.shippingAddress.shipping-address-fieldset.country_id'
+                    )(function () {
+                        window.setTimeout(tick, 50);
+                    });
+                }
+                window.setTimeout(tick, 300);
+            }
+
+            scheduleGuestAddressRestore();
+            window.addEventListener('fastcheckout:address-fields-ready', function () {
+                if (countryFieldReady()) {
+                    restorePreviousGuestShippingAddress(false);
                 }
             });
 
@@ -613,7 +758,86 @@ define([
                 syncPaymentMethods();
                 syncQuoteTotalsFromConfig();
                 syncQuoteTotalsFromDom();
-                checkoutStateBridge.applyInitialShippingRates();
+                // 1) SSR rates from Magento default destination (if Block collected them)
+                // 2) otherwise native estimate for checkoutConfig.defaultCountryId
+                // shipping-rate-service will re-estimate whenever quote.shippingAddress changes.
+                (function bootstrapShippingRatesFromDefaultDestination() {
+                    var hadSsrRates = checkoutStateBridge.applyInitialShippingRates();
+                    var seedCountry = (window.checkoutConfig && window.checkoutConfig.defaultCountryId) ||
+                        (window.fastcheckoutDefaultDestination && window.fastcheckoutDefaultDestination.countryId) ||
+                        '';
+                    var dest = window.fastcheckoutDefaultDestination || {};
+
+                    function seedQuoteShippingAddress(allowEstimate) {
+                        if (
+                            !seedCountry ||
+                            !quote ||
+                            typeof quote.shippingAddress !== 'function'
+                        ) {
+                            return;
+                        }
+                        // Already have a shopper address (restored snapshot or typed).
+                        // Require more than bare country so default-destination seed does not
+                        // block guest restore, and does not wipe a restored full address.
+                        var existing = quote.shippingAddress();
+                        if (
+                            existing &&
+                            (
+                                String(existing.firstname || '').trim() ||
+                                String(existing.postcode || '').trim() ||
+                                String(existing.city || '').trim() ||
+                                (existing.street && existing.street[0])
+                            )
+                        ) {
+                            return;
+                        }
+                        if (existing && existing.countryId && existing.firstname) {
+                            return;
+                        }
+                        require([
+                            'Magento_Checkout/js/model/address-converter',
+                            'Magento_Checkout/js/action/select-shipping-address'
+                        ], function (addressConverter, selectShippingAddressAction) {
+                            var quoteAddress = addressConverter.formAddressDataToQuoteAddress({
+                                country_id: seedCountry,
+                                postcode: dest.postcode || '',
+                                region_id: dest.regionId || '',
+                                city: dest.city || '',
+                                street: ['', '']
+                            });
+                            // When SSR already painted rates, lock the list so the seed
+                            // address write does not flash a re-estimate; later real
+                            // address edits re-estimate normally.
+                            if (!allowEstimate) {
+                                window.fastcheckoutLockShippingRatesList = true;
+                            }
+                            try {
+                                selectShippingAddressAction(quoteAddress);
+                            } finally {
+                                if (!allowEstimate) {
+                                    window.setTimeout(function () {
+                                        window.fastcheckoutLockShippingRatesList = false;
+                                    }, 100);
+                                }
+                            }
+                        });
+                    }
+
+                    if (hadSsrRates) {
+                        seedQuoteShippingAddress(false);
+                        return;
+                    }
+
+                    // No SSR rates — estimate immediately from Magento default destination.
+                    if (
+                        checkoutStateBridge.bootstrapDefaultDestinationRates &&
+                        typeof checkoutStateBridge.bootstrapDefaultDestinationRates === 'function'
+                    ) {
+                        checkoutStateBridge.bootstrapDefaultDestinationRates();
+                    } else {
+                        seedQuoteShippingAddress(true);
+                    }
+                })();
                 loadShippingRatesValidationComponents();
                 loadPaymentValidationComponents();
 
@@ -963,7 +1187,7 @@ define([
                             : Promise.resolve(true);
                     }
 
-                    return Promise.resolve(wire.call('syncAddressFields', payload)).then(function () {
+                    return Promise.resolve(/* native */ Promise.resolve(true) || wire.call('syncAddressFields', payload)).then(function () {
                         return true;
                     });
                 }
@@ -1024,7 +1248,7 @@ define([
                         // Deferred wire.set calls above are included in this one
                         // request; the method remains the server-side atomic
                         // boundary for shipping and billing address state.
-                        return Promise.resolve(wire.call('syncAddressFields', {})).then(function () {
+                        return Promise.resolve(/* native */ Promise.resolve(true) || wire.call('syncAddressFields', {})).then(function () {
                             return true;
                         });
                     });
@@ -1356,7 +1580,7 @@ define([
                             }
 
                             if (typeof wire.call === 'function') {
-                                return wire.call('selectShippingMethod', pending.selectedShippingRate);
+                                return Promise.resolve(true); // native KO owns shipping method
                             }
 
                             return setMagewireValue(wire, 'shippingMethod', pending.selectedShippingRate, false);
@@ -1366,7 +1590,7 @@ define([
                             }
 
                             if (typeof wire.call === 'function') {
-                                return wire.call('selectPaymentMethod', pending.selectedPaymentMethod);
+                                return Promise.resolve(true); // native KO owns payment method
                             }
 
                             setQuotePaymentMethodFromBridge({ method: pending.selectedPaymentMethod });
@@ -1612,9 +1836,12 @@ define([
                 var shippingRateEstimatePromise = null;
                 var lastShippingRateEstimateRates = [];
 
+                /**
+                 * Native Magento estimate-shipping-methods (REST) — no Magewire.
+                 * Used by processors / bridge callers that still hit onEstimateShippingRatesAction.
+                 */
                 function resolveShippingRatesEstimate(address) {
-                    var wire = getMagewireComponent(),
-                        addressData = getCurrentShippingAddressData(address),
+                    var addressData = getCurrentShippingAddressData(address),
                         estimateKey = JSON.stringify({
                             countryId: addressData.countryId || addressData.country_id || '',
                             regionId: addressData.regionId || addressData.region_id || '',
@@ -1623,8 +1850,7 @@ define([
                             city: addressData.city || '',
                             street: addressData.street || []
                         }),
-                        estimatePromise,
-                        addressChanged = false;
+                        estimatePromise;
 
                     if (!validateShippingRatesAddress(address, false)) {
                         if (shippingService && shippingService.isLoading && typeof shippingService.isLoading === 'function') {
@@ -1651,38 +1877,114 @@ define([
 
                     lastShippingRateEstimateKey = estimateKey;
 
-                    estimatePromise = writeKoAddressToMagewire(address, false)
-                        .then(function (changed) {
-                            addressChanged = !!changed;
-                            if (changed) {
-                                if (wire && typeof wire.call === 'function') {
-                                    return wire.call('saveShippingAddress', true, true, true)
-                                        .then(function () {
-                                            return refreshCheckoutStateFromMagewire(true);
-                                        })
-                                        .then(function (payload) {
-                                            payload = payload && typeof payload === 'object' ? payload : {};
-                                            return Array.isArray(payload.shipping_rates) ? payload.shipping_rates : [];
-                                        });
+                    // Direct Magento REST estimate (same contract as shipping-rate-processor/new-address).
+                    estimatePromise = new Promise(function (resolve, reject) {
+                        require([
+                            'jquery',
+                            'mage/storage',
+                            'mage/url',
+                            'Magento_Checkout/js/model/resource-url-manager',
+                            'Magento_Checkout/js/model/quote',
+                            'Magento_Checkout/js/model/shipping-rate-registry',
+                            'Magento_Checkout/js/model/shipping-service'
+                        ], function ($, storage, urlBuilder, resourceUrlManager, quoteModel, rateRegistry, shippingSvc) {
+                            var serviceUrl,
+                                payload,
+                                cacheKey,
+                                cache,
+                                settled = false;
+
+                            function done(rates) {
+                                if (settled) {
+                                    return;
                                 }
-                            }
-                            return shippingService.getShippingRates()().length
-                                ? shippingService.getShippingRates()()
-                                : lastShippingRateEstimateRates;
-                        })
-                        .then(function (rates) {
-                            rates = Array.isArray(rates) ? rates : [];
-                            if (addressChanged || rates.length) {
+                                settled = true;
+                                rates = Array.isArray(rates) ? rates : [];
                                 lastShippingRateEstimateRates = rates;
+                                if (shippingSvc && typeof shippingSvc.setShippingRates === 'function') {
+                                    shippingSvc.setShippingRates(rates);
+                                }
+                                if (shippingSvc && shippingSvc.isLoading) {
+                                    shippingSvc.isLoading(false);
+                                }
+                                resolve(rates);
                             }
 
-                            return rates;
-                        })
-                        .finally(function () {
-                            if (shippingRateEstimatePromise === estimatePromise) {
-                                shippingRateEstimatePromise = null;
+                            function fail(response) {
+                                if (settled) {
+                                    return;
+                                }
+                                settled = true;
+                                if (shippingSvc && typeof shippingSvc.setShippingRates === 'function') {
+                                    shippingSvc.setShippingRates([]);
+                                }
+                                if (shippingSvc && shippingSvc.isLoading) {
+                                    shippingSvc.isLoading(false);
+                                }
+                                reject(response || new Error('Could not estimate shipping rates.'));
                             }
+
+                            try {
+                                cacheKey = address && typeof address.getCacheKey === 'function'
+                                    ? address.getCacheKey()
+                                    : estimateKey;
+                                cache = cacheKey && rateRegistry ? rateRegistry.get(cacheKey) : false;
+                                if (cache) {
+                                    done(cache);
+                                    return;
+                                }
+
+                                if (shippingSvc && shippingSvc.isLoading) {
+                                    shippingSvc.isLoading(true);
+                                }
+
+                                serviceUrl = resourceUrlManager.getUrlForEstimationShippingMethodsForNewAddress(quoteModel);
+                                payload = JSON.stringify({
+                                    address: {
+                                        street: address.street || addressData.street || [],
+                                        city: address.city || addressData.city || '',
+                                        region_id: address.regionId || addressData.regionId || '',
+                                        region: address.region || addressData.region || '',
+                                        country_id: address.countryId || addressData.countryId || '',
+                                        postcode: address.postcode || addressData.postcode || '',
+                                        email: address.email || '',
+                                        customer_id: address.customerId || '',
+                                        firstname: address.firstname || '',
+                                        lastname: address.lastname || '',
+                                        middlename: address.middlename || '',
+                                        prefix: address.prefix || '',
+                                        suffix: address.suffix || '',
+                                        vat_id: address.vatId || '',
+                                        company: address.company || '',
+                                        telephone: address.telephone || '',
+                                        fax: address.fax || '',
+                                        custom_attributes: address.customAttributes || {},
+                                        save_in_address_book: address.saveInAddressBook || 0
+                                    }
+                                });
+
+                                storage.post(serviceUrl, payload, false, 'application/json')
+                                    .done(function (result) {
+                                        result = Array.isArray(result) ? result : [];
+                                        if (cacheKey && rateRegistry) {
+                                            rateRegistry.set(cacheKey, result);
+                                        }
+                                        done(result);
+                                    })
+                                    .fail(function (response) {
+                                        fail(response);
+                                    });
+                            } catch (e) {
+                                fail(e);
+                            }
+                        }, function (err) {
+                            reject(err || new Error('Shipping estimate modules unavailable'));
                         });
+                    }).finally(function () {
+                        if (shippingRateEstimatePromise === estimatePromise) {
+                            shippingRateEstimatePromise = null;
+                        }
+                    });
                     shippingRateEstimatePromise = estimatePromise;
 
                     return estimatePromise;
@@ -1748,6 +2050,14 @@ define([
                     syncShippingMethod: syncSelectedShippingMethodToKnockout,
                     syncShippingMethodToMagewire: syncShippingMethodToMagewire,
                     syncShippingMethodToMagewireNow: syncShippingMethodToMagewireNow,
+                    applyPaymentRemapForShipping: function (methodCode) {
+                        if (
+                            shippingMethodSync &&
+                            typeof shippingMethodSync.applyPaymentRemapForShipping === 'function'
+                        ) {
+                            return shippingMethodSync.applyPaymentRemapForShipping(methodCode);
+                        }
+                    },
                     rememberUserShippingSelection: rememberUserShippingSelection,
                     getShippingMethodCode: getShippingMethodCode,
                     getUserSelectedShippingMethod: function () {
@@ -3540,6 +3850,431 @@ define([
                 }
 
                 /**
+                 * Collect address fields from a form root (shipping or billing).
+                 * Magento UI uses name="firstname", street[0], region_id, etc.
+                 *
+                 * @param {Element|null} root
+                 * @returns {Object|null}
+                 */
+                function collectAddressFormDataFromRoot(root) {
+                    var data = {},
+                        street = {},
+                        map = {
+                            firstname: 'firstname',
+                            lastname: 'lastname',
+                            company: 'company',
+                            city: 'city',
+                            postcode: 'postcode',
+                            telephone: 'telephone',
+                            country_id: 'country_id',
+                            region_id: 'region_id',
+                            region: 'region'
+                        },
+                        key,
+                        el,
+                        street0,
+                        street1;
+
+                    if (!root || typeof root.querySelector !== 'function') {
+                        return null;
+                    }
+
+                    for (key in map) {
+                        if (!Object.prototype.hasOwnProperty.call(map, key)) {
+                            continue;
+                        }
+                        el = root.querySelector(
+                            'input[name="' + key + '"], select[name="' + key + '"], ' +
+                            'input[name="' + map[key] + '"], select[name="' + map[key] + '"], ' +
+                            // Magento UI component namespaced fields
+                            'input[name$=".' + key + '"], select[name$=".' + key + '"], ' +
+                            'input[name$="[' + key + ']"], select[name$="[' + key + ']"]'
+                        );
+                        if (el && String(el.value || '').trim() !== '') {
+                            data[key] = el.value;
+                        }
+                    }
+
+                    street0 = root.querySelector(
+                        'input[name="street[0]"], input[name="street.0"], ' +
+                        'input[name$=".street[0]"], input[name$=".street.0"], ' +
+                        'input[name*="street"][name$="[0]"]'
+                    );
+                    street1 = root.querySelector(
+                        'input[name="street[1]"], input[name="street.1"], ' +
+                        'input[name$=".street[1]"], input[name$=".street.1"], ' +
+                        'input[name*="street"][name$="[1]"]'
+                    );
+                    if (street0) {
+                        street[0] = street0.value || '';
+                    }
+                    if (street1) {
+                        street[1] = street1.value || '';
+                    }
+                    // Fallback: first visible street input if indexed names not found
+                    if (!street[0]) {
+                        el = root.querySelector(
+                            'input[name="street"], input[name*="street"]:not([type="hidden"])'
+                        );
+                        if (el && String(el.value || '').trim() !== '') {
+                            street[0] = el.value;
+                        }
+                    }
+                    if (Object.keys(street).length) {
+                        data.street = street;
+                    }
+
+                    if (
+                        !data.firstname &&
+                        !data.lastname &&
+                        !data.postcode &&
+                        !data.city &&
+                        !(street[0] && String(street[0]).trim())
+                    ) {
+                        return null;
+                    }
+
+                    return data;
+                }
+
+                function collectBillingFormDataFromDom() {
+                    var root = document.querySelector(
+                        '.payment-method._active .billing-address-form, ' +
+                        '.payment-method-billing-address .billing-address-form, ' +
+                        '.billing-address-form'
+                    );
+
+                    return collectAddressFormDataFromRoot(root);
+                }
+
+                function collectShippingFormDataFromDom() {
+                    var selectors = [
+                            '.fastcheckout-native-shipping-address',
+                            '#shipping',
+                            '.checkout-shipping-address',
+                            'form#co-shipping-form',
+                            '[id="shipping"]',
+                            '.opc-wrapper .shipping-address-item',
+                            // Magento UI scope host used by Fastcheckout
+                            '[data-bind*="shipping-step.shippingAddress"]'
+                        ],
+                        data = null,
+                        i,
+                        root,
+                        emailEl;
+
+                    for (i = 0; i < selectors.length; i++) {
+                        root = document.querySelector(selectors[i]);
+                        data = collectAddressFormDataFromRoot(root);
+                        if (data) {
+                            break;
+                        }
+                    }
+
+                    if (data) {
+                        emailEl = document.getElementById('customer-email') ||
+                            document.getElementById('co-shipping-email') ||
+                            document.querySelector(
+                                '.fastcheckout-native-shipping-address input[type="email"], ' +
+                                '#shipping input[type="email"], ' +
+                                'input[name="username"], input[name="email"]'
+                            );
+                        if (emailEl && emailEl.value) {
+                            data.email = emailEl.value;
+                        }
+                    }
+
+                    return data;
+                }
+
+                function collectShippingFormDataFromProvider() {
+                    var provider = getCheckoutProvider && getCheckoutProvider(),
+                        data,
+                        fromCheckoutData;
+
+                    if (provider && typeof provider.get === 'function') {
+                        data = provider.get('shippingAddress');
+                        if (data && typeof data === 'object' && hasMeaningfulAddressData(data)) {
+                            return $.extend(true, {}, data);
+                        }
+                    }
+
+                    try {
+                        if (checkoutData && typeof checkoutData.getShippingAddressFromData === 'function') {
+                            fromCheckoutData = checkoutData.getShippingAddressFromData();
+                            if (
+                                fromCheckoutData &&
+                                typeof fromCheckoutData === 'object' &&
+                                hasMeaningfulAddressData(fromCheckoutData)
+                            ) {
+                                return $.extend(true, {}, fromCheckoutData);
+                            }
+                        }
+                    } catch (e) {
+                        // ignore
+                    }
+
+                    return null;
+                }
+
+                /**
+                 * Merge address sources: form DOM / checkoutProvider win over sparse
+                 * quote defaults (country-only seed from Magento destination).
+                 *
+                 * @returns {Object|null} form-style address data
+                 */
+                function collectShippingAddressDataForPlaceOrder() {
+                    var quoteData = quote && typeof quote.shippingAddress === 'function'
+                            ? normalizeKoAddressData(quote.shippingAddress())
+                            : null,
+                        providerData = collectShippingFormDataFromProvider(),
+                        domData = collectShippingFormDataFromDom(),
+                        merged = {};
+
+                    // Start from quote so we keep country seed, then overlay real form data.
+                    if (quoteData && typeof quoteData === 'object') {
+                        $.extend(true, merged, quoteData);
+                    }
+                    if (providerData) {
+                        $.extend(true, merged, providerData);
+                    }
+                    if (domData) {
+                        $.extend(true, merged, domData);
+                    }
+
+                    // Normalize street to form-style object/array Magento converter accepts.
+                    if (merged.street && Array.isArray(merged.street)) {
+                        merged.street = {
+                            0: merged.street[0] || '',
+                            1: merged.street[1] || ''
+                        };
+                    }
+
+                    // country_id aliases
+                    if (merged.countryId && !merged.country_id) {
+                        merged.country_id = merged.countryId;
+                    }
+                    if (merged.regionId && !merged.region_id) {
+                        merged.region_id = merged.regionId;
+                    }
+
+                    if (!hasMeaningfulAddressData(merged)) {
+                        return null;
+                    }
+
+                    return merged;
+                }
+
+                /**
+                 * Push shopper shipping form into quote.shippingAddress before place-order.
+                 * Without this, Magento placeOrder validates an empty server shipping address
+                 * (only default country seed) and rejects firstname/lastname/street/etc.
+                 *
+                 * @returns {Boolean}
+                 */
+                function ensureQuoteShippingAddressForPlaceOrder() {
+                    var formData = collectShippingAddressDataForPlaceOrder(),
+                        newAddress,
+                        current;
+
+                    if (!formData) {
+                        return !!(
+                            quote &&
+                            typeof quote.shippingAddress === 'function' &&
+                            quote.shippingAddress() &&
+                            hasMeaningfulAddressData(normalizeKoAddressData(quote.shippingAddress()))
+                        );
+                    }
+
+                    try {
+                        newAddress = addressConverter.formAddressDataToQuoteAddress(
+                            $.extend(true, {}, formData)
+                        );
+                    } catch (e) {
+                        if (window.console && typeof window.console.warn === 'function') {
+                            window.console.warn(
+                                'Kkkonrad Fastcheckout: could not convert shipping form data.',
+                                e
+                            );
+                        }
+                        return false;
+                    }
+
+                    if (!newAddress) {
+                        return false;
+                    }
+
+                    current = quote && typeof quote.shippingAddress === 'function'
+                        ? quote.shippingAddress()
+                        : null;
+
+                    if (!addressesMatch(current, newAddress) && typeof selectShippingAddressAction === 'function') {
+                        selectShippingAddressAction(newAddress);
+                    }
+
+                    try {
+                        persistAddressToCheckoutData(formData, 'shipping');
+                        syncAddressDataToCheckoutProvider(normalizeKoAddressData(newAddress), 'shipping');
+                    } catch (persistErr) {
+                        // non-fatal
+                    }
+
+                    return !!(quote && quote.shippingAddress && quote.shippingAddress());
+                }
+
+                /**
+                 * Resolve shipping method for place-order from quote, locked user
+                 * selection, or checked DOM radio. Applies it to the quote when missing.
+                 *
+                 * @returns {Object|null} Magento rate-like object or null
+                 */
+                function ensureQuoteShippingMethodForPlaceOrder() {
+                    var method = quote && typeof quote.shippingMethod === 'function'
+                            ? quote.shippingMethod()
+                            : null,
+                        code = getShippingMethodCode(method),
+                        radio,
+                        rates,
+                        found = null,
+                        parts,
+                        carrier;
+
+                    if (!code) {
+                        code = window.fastcheckoutHyvaShipping &&
+                            typeof window.fastcheckoutHyvaShipping.getUserSelectedShippingMethod === 'function'
+                            ? window.fastcheckoutHyvaShipping.getUserSelectedShippingMethod()
+                            : '';
+                    }
+
+                    if (!code) {
+                        radio = document.querySelector(
+                            'input[name="shipping_method"]:checked, input[name="shipping_method"][checked]'
+                        );
+                        if (radio && radio.value) {
+                            code = String(radio.value);
+                        }
+                    }
+
+                    if (!code) {
+                        return method && (method.method_code || method.methodCode) ? method : null;
+                    }
+
+                    rates = shippingService && typeof shippingService.getShippingRates === 'function'
+                        ? (shippingService.getShippingRates()() || [])
+                        : [];
+                    rates.some(function (rate) {
+                        if (rate && (rate.carrier_code + '_' + rate.method_code) === code) {
+                            found = rate;
+                            return true;
+                        }
+                        return false;
+                    });
+
+                    if (!found && window.fastcheckoutInitialShippingRates) {
+                        (window.fastcheckoutInitialShippingRates || []).some(function (rate) {
+                            if (rate && (rate.carrier_code + '_' + rate.method_code) === code) {
+                                found = rate;
+                                return true;
+                            }
+                            return false;
+                        });
+                    }
+
+                    if (!found) {
+                        parts = code.split('_');
+                        carrier = parts.shift() || '';
+                        found = {
+                            carrier_code: carrier,
+                            method_code: parts.length ? parts.join('_') : carrier
+                        };
+                    }
+
+                    if (typeof selectShippingMethodAction === 'function') {
+                        try {
+                            selectShippingMethodAction(found);
+                        } catch (e) {
+                            // ignore
+                        }
+                    }
+
+                    if (
+                        window.fastcheckoutHyvaShipping &&
+                        typeof window.fastcheckoutHyvaShipping.rememberUserShippingSelection === 'function'
+                    ) {
+                        window.fastcheckoutHyvaShipping.rememberUserShippingSelection(code);
+                    }
+
+                    return quote && typeof quote.shippingMethod === 'function'
+                        ? quote.shippingMethod()
+                        : found;
+                }
+
+                /**
+                 * Persist shipping address + method on the server quote.
+                 * Place-order validates the server-side shipping address, not only the
+                 * client payload — so set-shipping-information must succeed first.
+                 *
+                 * @returns {Promise}
+                 */
+                function ensureShippingInformationForPlaceOrder() {
+                    var shipping,
+                        method;
+
+                    ensureQuoteShippingAddressForPlaceOrder();
+                    method = ensureQuoteShippingMethodForPlaceOrder();
+
+                    shipping = quote && typeof quote.shippingAddress === 'function'
+                        ? quote.shippingAddress()
+                        : null;
+
+                    if (!shipping || !hasMeaningfulAddressData(normalizeKoAddressData(shipping))) {
+                        return Promise.reject(new Error(
+                            translateFastcheckoutMessage(
+                                'Please check the shipping address and try again.'
+                            )
+                        ));
+                    }
+
+                    if (!method || !(method.method_code || method.methodCode)) {
+                        return Promise.reject(new Error(
+                            translateFastcheckoutMessage(
+                                'Please select a shipping method and try again.'
+                            )
+                        ));
+                    }
+
+                    // Billing must be present for set-shipping-information payload.
+                    ensureQuoteBillingAddressForPlaceOrder();
+
+                    return new Promise(function (resolve, reject) {
+                        var deferred;
+
+                        try {
+                            deferred = setShippingInformationAction();
+                        } catch (e) {
+                            reject(e);
+                            return;
+                        }
+
+                        if (deferred && typeof deferred.done === 'function') {
+                            deferred.done(function (result) {
+                                resolve(result);
+                            }).fail(function (response) {
+                                var msg = response && response.responseJSON && response.responseJSON.message
+                                    ? response.responseJSON.message
+                                    : translateFastcheckoutMessage(
+                                        'Please check the shipping address and try again.'
+                                    );
+                                reject(new Error(msg));
+                            });
+                            return;
+                        }
+
+                        Promise.resolve(deferred).then(resolve, reject);
+                    });
+                }
+
+                /**
                  * Ensure quote.billingAddress is set before Magento payment placeOrder.
                  * - same as shipping → select shipping as billing
                  * - separate form → use address already selected by updateAddress, or
@@ -3559,7 +4294,8 @@ define([
                         component,
                         addressData,
                         newAddress,
-                        i;
+                        i,
+                        domBilling;
 
                     if (sameAsShipping) {
                         if (shipping && typeof selectBillingAddressAction === 'function') {
@@ -3573,7 +4309,8 @@ define([
                         ? quote.billingAddress()
                         : null;
 
-                    if (billing) {
+                    // Separate billing already on quote with a country — good enough.
+                    if (billing && billing.countryId) {
                         allowPlaceOrderOnActivePayment();
                         return true;
                     }
@@ -3618,6 +4355,35 @@ define([
                     billing = quote && typeof quote.billingAddress === 'function'
                         ? quote.billingAddress()
                         : null;
+
+                    if (billing && billing.countryId) {
+                        allowPlaceOrderOnActivePayment();
+                        return true;
+                    }
+
+                    // Last resort: build billing from visible form DOM (separate address).
+                    domBilling = collectBillingFormDataFromDom();
+                    if (domBilling && typeof selectBillingAddressAction === 'function') {
+                        try {
+                            newAddress = addressConverter.formAddressDataToQuoteAddress(domBilling);
+                            if (newAddress) {
+                                selectBillingAddressAction(newAddress);
+                            }
+                        } catch (domErr) {
+                            // ignore
+                        }
+                    }
+
+                    billing = quote && typeof quote.billingAddress === 'function'
+                        ? quote.billingAddress()
+                        : null;
+
+                    // If separate form is incomplete, fall back to shipping so offline
+                    // methods can still place (Magento requires some billing address).
+                    if ((!billing || !billing.countryId) && shipping && typeof selectBillingAddressAction === 'function') {
+                        selectBillingAddressAction(shipping);
+                        billing = quote.billingAddress && quote.billingAddress();
+                    }
 
                     if (billing) {
                         allowPlaceOrderOnActivePayment();
@@ -3670,7 +4436,7 @@ define([
                     if (current === String(methodCode)) {
                         return Promise.resolve(true);
                     }
-                    return Promise.resolve(wire.call('selectPaymentMethod', methodCode));
+                    return Promise.resolve(/* native */ Promise.resolve(true) || wire.call('selectPaymentMethod', methodCode));
                 }
 
                 function isAsyncTokenizationInProgress(component, result) {
@@ -4166,7 +4932,7 @@ define([
                                                 ) {
                                                     methodChanged = true;
                                                     paymentMethodSync.markSynced(methodCode);
-                                                    return wire.call('selectPaymentMethod', methodCode);
+                                                    return /* native */ Promise.resolve(true) || wire.call('selectPaymentMethod', methodCode);
                                                 }
                                                 if (methodCode) {
                                                     paymentMethodSync.markSynced(methodCode);
@@ -4223,18 +4989,43 @@ define([
 
                             clearPaymentMessages();
 
-	                        if (!wire || typeof wire.call !== 'function') {
-                                var missingSessionError = new Error(translateFastcheckoutMessage('Checkout session is not ready. Please refresh the page and try again.'));
-                                handlePaymentError(missingSessionError, getBridgeMessageContainer());
-	                            return Promise.reject(missingSessionError);
-	                        }
+                            // wire is optional: native KO place-order path does not use Magewire.
+                            wire = wire && typeof wire.call === 'function' ? wire : null;
 
 	                        if (selectedMethod) {
 	                            setSelectedMethod(selectedMethod);
 	                        }
 
 	                        return ensureRendererForMethod(selectedMethod || getSelectedMethodCode()).then(function () {
-                                return prepareCheckoutState(wire);
+                                // Always push guest email into quote before REST place-order.
+                                try {
+                                    if (customerEmailSync && typeof customerEmailSync.sync === 'function') {
+                                        customerEmailSync.sync();
+                                    }
+                                } catch (emailSyncErr) {
+                                    // non-fatal
+                                }
+
+                                // Push shipping form → quote → server (set-shipping-information).
+                                // Magento placeOrder validates the server-side shipping address;
+                                // client-only KO address is not enough.
+                                return ensureShippingInformationForPlaceOrder().catch(function (shipErr) {
+                                    handlePaymentError(
+                                        shipErr,
+                                        getBridgeMessageContainer()
+                                    );
+                                    return Promise.reject(shipErr);
+                                }).then(function () {
+                                    try {
+                                        ensureQuoteBillingAddressForPlaceOrder();
+                                    } catch (billingSyncErr) {
+                                        // non-fatal
+                                    }
+                                    if (wire && typeof prepareCheckoutState === 'function') {
+                                        return prepareCheckoutState(wire);
+                                    }
+                                    return true;
+                                });
                             }).then(function () {
 		                            component = getActiveRenderer();
                                 if (component) {
@@ -4262,20 +5053,33 @@ define([
 		                                        handlePaymentError(validationError, getBridgeMessageContainer());
 		                                        return Promise.reject(validationError);
 	                                    }
-		                                return this.syncPaymentData(wire).then(function () {
-		                                    return wire.call('placeOrder', selectedMethod || (paymentData && paymentData.method) || getSelectedMethodCode());
-		                                }).then(function (result) {
-                                        if (result && typeof result === 'object' && result.success === false) {
-                                            throw new Error(result.message || result.error || translateFastcheckoutMessage('The order was not placed.'));
-                                        }
-                                        window.fastcheckoutLastPlaceOrderResult = result || {};
-                                        runPlaceOrderAfterRequestListeners();
-                                        return result;
-	                                }).catch(function (err) {
-                                        runPlaceOrderAfterRequestListeners();
-                                        handlePaymentError(err, getBridgeMessageContainer());
-                                        throw err;
-	                                });
+                                        // Native Magento place-order action (REST) — no Magewire.
+                                        return new Promise(function (resolve, reject) {
+                                            require([
+                                                'Magento_Checkout/js/action/place-order',
+                                                'Magento_Checkout/js/model/quote'
+                                            ], function (placeOrderAction, quoteModel) {
+                                                var pm = paymentData || { method: methodCode };
+                                                if (quoteModel && typeof quoteModel.paymentMethod === 'function') {
+                                                    quoteModel.paymentMethod(pm);
+                                                }
+                                                placeOrderAction(pm).done(function (orderResult) {
+                                                    window.fastcheckoutLastPlaceOrderResult = orderResult || {};
+                                                    runPlaceOrderAfterRequestListeners();
+                                                    resolve(orderResult);
+                                                }).fail(function (response) {
+                                                    var err = new Error(
+                                                        (response && response.responseJSON && response.responseJSON.message) ||
+                                                        translateFastcheckoutMessage('The order was not placed.')
+                                                    );
+                                                    runPlaceOrderAfterRequestListeners();
+                                                    handlePaymentError(err, getBridgeMessageContainer());
+                                                    reject(err);
+                                                });
+                                            }, function () {
+                                                reject(new Error(translateFastcheckoutMessage('Checkout session is not ready. Please refresh the page and try again.')));
+                                            });
+                                        });
 	                            }
 
 	                                if (methodCode === 'purchaseorder' && !validatePurchaseOrderWithNativeValidation()) {
@@ -4289,19 +5093,22 @@ define([
 	                                        return Promise.reject(poAdditionalValidationError);
 	                                    }
                                     if (methodCode === 'purchaseorder') {
-                                        return this.syncPaymentData(wire).then(function () {
-                                            return wire.call('placeOrder', methodCode);
-                                        }).then(function (result) {
-                                            if (result && typeof result === 'object' && result.success === false) {
-                                                throw new Error(result.message || result.error || translateFastcheckoutMessage('The order was not placed.'));
-                                            }
-                                            window.fastcheckoutLastPlaceOrderResult = result || {};
-                                            runPlaceOrderAfterRequestListeners();
-                                            return result;
-                                        }).catch(function (err) {
-                                            runPlaceOrderAfterRequestListeners();
-                                            handlePaymentError(err, component.messageContainer || getBridgeMessageContainer());
-                                            throw err;
+                                        return new Promise(function (resolve, reject) {
+                                            require(['Magento_Checkout/js/action/place-order'], function (placeOrderAction) {
+                                                placeOrderAction(paymentData || { method: methodCode }).done(function (orderResult) {
+                                                    window.fastcheckoutLastPlaceOrderResult = orderResult || {};
+                                                    runPlaceOrderAfterRequestListeners();
+                                                    resolve(orderResult);
+                                                }).fail(function (response) {
+                                                    var err = new Error(
+                                                        (response && response.responseJSON && response.responseJSON.message) ||
+                                                        translateFastcheckoutMessage('The order was not placed.')
+                                                    );
+                                                    runPlaceOrderAfterRequestListeners();
+                                                    handlePaymentError(err, component.messageContainer || getBridgeMessageContainer());
+                                                    reject(err);
+                                                });
+                                            }, reject);
                                         });
                                     }
 			                            if (methodCode !== 'purchaseorder' && !this.validate()) {
@@ -4343,13 +5150,61 @@ define([
                                     return Promise.reject(nativeActionNotReadyError);
                                 }
 
-                                return this.syncWirePaymentData(
-                                    wire,
-                                    paymentData,
-                                    buildPlaceOrderSyncPayload(paymentData)
-                                ).then(function () {
-                                    return selectPaymentMethodIfNeeded(wire, methodCode);
-                                }).then(function () {
+                                // Native KO/REST place-order (no Magewire). Drive Magento
+                                // place-order action and resolve this promise from its result —
+                                // do NOT wait for syncResolve that only the Magewire path sets.
+                                if (!wire) {
+                                    return new Promise(function (resolve, reject) {
+                                        require([
+                                            'Magento_Checkout/js/action/place-order',
+                                            'Magento_Checkout/js/model/quote',
+                                            'Magento_Checkout/js/action/redirect-on-success'
+                                        ], function (placeOrderAction, quoteModel, redirectOnSuccess) {
+                                            var pm = paymentData || { method: methodCode };
+
+                                            ensureQuoteBillingAddressForPlaceOrder();
+                                            allowPlaceOrderOnActivePayment();
+
+                                            if (quoteModel && typeof quoteModel.paymentMethod === 'function') {
+                                                quoteModel.paymentMethod(pm);
+                                            }
+
+                                            try {
+                                                placeOrderAction(pm)
+                                                    .done(function (orderResult) {
+                                                        window.fastcheckoutLastPlaceOrderResult = orderResult || {};
+                                                        runPlaceOrderAfterRequestListeners();
+                                                        try {
+                                                            if (redirectOnSuccess && typeof redirectOnSuccess.execute === 'function') {
+                                                                redirectOnSuccess.execute();
+                                                            } else if (window.checkoutConfig && window.checkoutConfig.defaultSuccessPageUrl) {
+                                                                window.location.replace(window.checkoutConfig.defaultSuccessPageUrl);
+                                                            }
+                                                        } catch (redirErr) {
+                                                            // order placed even if redirect helper fails
+                                                        }
+                                                        resolve(orderResult);
+                                                    })
+                                                    .fail(function (response) {
+                                                        var err = new Error(
+                                                            (response && response.responseJSON && response.responseJSON.message) ||
+                                                            translateFastcheckoutMessage('The order was not placed.')
+                                                        );
+                                                        runPlaceOrderAfterRequestListeners();
+                                                        handlePaymentError(err, component.messageContainer || getBridgeMessageContainer());
+                                                        reject(err);
+                                                    });
+                                            } catch (e) {
+                                                handlePaymentError(e, component.messageContainer || getBridgeMessageContainer());
+                                                reject(e);
+                                            }
+                                        }, function () {
+                                            reject(new Error(translateFastcheckoutMessage('Checkout session is not ready. Please refresh the page and try again.')));
+                                        });
+                                    });
+                                }
+
+                                return Promise.resolve(true).then(function () {
 		                            self.cleanupKoOrderState();
 		                            self.syncWire = wire;
 		                            self.koOrderActive = true;
@@ -4409,21 +5264,34 @@ define([
                             messageContainer = subscribePaymentMessageContainer(messageContainer) || getBridgeMessageContainer();
                             clearPaymentMessages();
 
-	                        if (this.koOrderActive && this.syncWire) {
+                            // Native pipeline: always run Magento place-order and surface result
+                            // to any deferred started by placeOrder() (syncResolve), even without Magewire.
+	                        if (this.koOrderActive) {
 	                            try {
 	                                if (this.koOrderTimeout) {
 	                                    window.clearTimeout(this.koOrderTimeout);
 	                                    this.koOrderTimeout = null;
 	                                }
 
-	                                this.syncWirePaymentData(
-	                                    this.syncWire,
-	                                    paymentData,
-	                                    runPlaceOrderRequestModifiers(paymentData, true, true),
-                                        false
-	                                )
+                                    ensureQuoteBillingAddressForPlaceOrder();
+                                    allowPlaceOrderOnActivePayment();
+
+                                    // Prefer Magento REST place-order; Magewire sync is optional.
+                                    Promise.resolve(
+                                        this.syncWire && typeof this.syncWirePaymentData === 'function'
+                                            ? this.syncWirePaymentData(
+                                                this.syncWire,
+                                                paymentData,
+                                                runPlaceOrderRequestModifiers(paymentData, true, true),
+                                                false
+                                            )
+                                            : true
+                                    )
 	                                    .then(function () {
-                                            return selectPaymentMethodIfNeeded(this.syncWire, methodCode);
+                                            if (this.syncWire) {
+                                                return selectPaymentMethodIfNeeded(this.syncWire, methodCode);
+                                            }
+                                            return true;
 	                                    }.bind(this))
                                         .then(function () {
                                             return originalAction(paymentData, messageContainer);
@@ -4468,6 +5336,8 @@ define([
                                     fallbackDeferred;
 
                                 if (!wire || typeof wire.call !== 'function') {
+                                    ensureQuoteBillingAddressForPlaceOrder();
+                                    allowPlaceOrderOnActivePayment();
                                     return originalAction(paymentData, messageContainer);
                                 }
 
@@ -4613,7 +5483,28 @@ define([
                     afterPlaceOrder: function () {
                         var component = getActiveRenderer(),
                             shouldRunRendererAfterPlaceOrder = !window.fastcheckoutKoSuccessRedirectInProgress;
-                        
+
+                        // Snapshot guest address for the next order, then clear cart cache only.
+                        // Do not wipe mage-cache-storage entirely — that left only email on re-order.
+                        try {
+                            guestAddressSnapshot.snapshot({
+                                quote: quote,
+                                checkoutData: checkoutData
+                            });
+                        } catch (snapErr) {
+                            // non-fatal
+                        }
+                        try {
+                            require(['Magento_Customer/js/customer-data'], function (customerDataModule) {
+                                try {
+                                    guestAddressSnapshot.clearCartBrowserCache(customerDataModule);
+                                } catch (cdErr) {
+                                    // non-fatal
+                                }
+                            });
+                        } catch (reqErr) {
+                            // ignore
+                        }
 
                         if (component) {
                             // Check if the component has custom post-place order data (like PayU)
@@ -4863,7 +5754,10 @@ define([
                  * active KO panel has been switched (avoids empty gap during shipping remap).
                  */
                 function applyPaymentOptionVisibility(rootEl) {
-                    var root = rootEl || document.querySelector('[wire\\:key="checkout-payment-methods-card"]'),
+                    var root = rootEl ||
+                            document.querySelector('[data-fastcheckout-payment-methods-card]') ||
+                            document.querySelector('[wire\\:key="checkout-payment-methods-card"]') ||
+                            document.querySelector('.fc-container-3 .card'),
                         hasAvailable = false,
                         emptyMessage,
                         grid;
@@ -4873,25 +5767,34 @@ define([
                     }
 
                     emptyMessage = root.querySelector('[data-fastcheckout-no-payment-methods]');
-                    grid = root.querySelector('[wire\\:key="checkout-payment-methods-grid"]') ||
+                    grid = root.querySelector('[data-fastcheckout-payment-methods-grid]') ||
+                        root.querySelector('[wire\\:key="checkout-payment-methods-grid"]') ||
                         root.querySelector('.grid');
 
                     Array.from(root.querySelectorAll('[data-fastcheckout-payment-option]')).forEach(function (option) {
-                        var allowed = option.getAttribute('data-fastcheckout-payment-allowed') === '1';
+                        var allowed = option.getAttribute('data-fastcheckout-payment-allowed') === '1',
+                            input = option.querySelector('input[name="payment_method"]');
 
                         if (allowed) {
                             option.style.display = '';
                             option.removeAttribute('aria-hidden');
+                            if (input) {
+                                input.disabled = false;
+                            }
                             hasAvailable = true;
                         } else {
                             option.style.display = 'none';
                             option.setAttribute('aria-hidden', 'true');
+                            if (input) {
+                                input.disabled = true;
+                            }
                         }
                     });
 
                     if (grid) {
                         if (hasAvailable) {
                             grid.classList.remove('hidden');
+                            grid.style.display = '';
                         } else {
                             grid.classList.add('hidden');
                         }
@@ -4911,6 +5814,10 @@ define([
 
                     return hasAvailable;
                 }
+
+                // Expose for shipping→payment remap after method pick.
+                window.fastcheckoutHyvaPayment = window.fastcheckoutHyvaPayment || {};
+                window.fastcheckoutHyvaPayment.applyPaymentOptionVisibility = applyPaymentOptionVisibility;
 
                 /**
                  * Park non-active KO renderers in the off-DOM root before a structural morph.

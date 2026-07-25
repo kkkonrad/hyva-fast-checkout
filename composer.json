@@ -22,7 +22,6 @@
   ],
   "require": {
     "hyva-themes/magento2-theme-module": "^1.4",
-    "magewirephp/magewire": "^1.13",
     "magento/framework": "103.*",
     "magento/module-catalog": "104.*",
     "magento/module-checkout": "100.*|101.*|102.*|103.*",

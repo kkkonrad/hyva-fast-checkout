@@ -219,9 +219,11 @@ define([], function () {
                     return;
                 }
 
+                // Native pipeline: quote.paymentMethod is the source of truth.
+                // Magento set-payment-information persists it; no Magewire write.
                 currentMethod = getProperty(wire, 'paymentMethod');
-                if (currentMethod !== methodCode) {
-                    wire.call('selectPaymentMethod', methodCode);
+                if (currentMethod !== methodCode && wire && typeof wire.set === 'function') {
+                    try { wire.set('paymentMethod', methodCode); } catch (e) { /* no Magewire */ }
                 }
             }, 50);
         }

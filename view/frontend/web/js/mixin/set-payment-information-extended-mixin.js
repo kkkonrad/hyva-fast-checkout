@@ -1,25 +1,11 @@
 define([
-    'mage/utils/wrapper',
-    'Kkkonrad_Fastcheckout/js/mixin/is-fastcheckout-active'
-], function (wrapper, isFastcheckoutActive) {
+    'mage/utils/wrapper'
+], function (wrapper) {
     'use strict';
 
     return function (setPaymentInformationExtendedAction) {
-        return wrapper.wrap(setPaymentInformationExtendedAction, function (originalAction, messageContainer, paymentData, skipBilling) {
-            if (
-                isFastcheckoutActive() &&
-                window.fastcheckoutHyvaPayment &&
-                typeof window.fastcheckoutHyvaPayment.onSetPaymentInformationAction === 'function'
-            ) {
-                return window.fastcheckoutHyvaPayment.onSetPaymentInformationAction(
-                    messageContainer,
-                    paymentData,
-                    skipBilling,
-                    originalAction
-                );
-            }
-
-            return originalAction(messageContainer, paymentData, skipBilling);
+        return wrapper.wrap(setPaymentInformationExtendedAction, function (originalAction) {
+            return originalAction.apply(this, Array.prototype.slice.call(arguments, 1));
         });
     };
 });

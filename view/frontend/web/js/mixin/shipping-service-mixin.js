@@ -35,7 +35,8 @@ define([
             return false;
         }
 
-        if (!currentRates.length) {
+        // Both empty → nothing to paint (equal). Non-empty compared below.
+        if (!currentRates.length && !nextRates.length) {
             return true;
         }
 

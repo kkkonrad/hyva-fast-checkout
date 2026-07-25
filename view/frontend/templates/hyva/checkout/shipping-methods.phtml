@@ -1,16 +1,15 @@
 <?php
 /**
- * Shipping methods container block.
- *
- * Rates list is owned by Knockout after first paint. Keep the whole card under
- * wire:ignore so selectShippingMethod (payment remap) never morphs/reloads it.
+ * Shipping methods — KO list owns rates after paint (no Magewire morph).
  *
  * @var \Kkkonrad\Fastcheckout\Block\Hyva\Checkout $block
  * @var \Magento\Framework\Escaper $escaper
- * @var \Kkkonrad\Fastcheckout\Magewire\Checkout $magewire
  * @var \Hyva\Theme\ViewModel\HyvaCsp $hyvaCsp
  */
-$shippingMethods = $magewire->getShippingMethods();
+// Collect rates with Magento default destination when quote has no country yet.
+$shippingMethods = $block->getShippingMethods();
+$selectedShipping = $block->getSelectedShippingMethodCode();
+$shippingAddress = $block->getQuote() ? $block->getQuote()->getShippingAddress() : null;
 
 $jsRates = [];
 foreach ($shippingMethods as $carrierCode => $rates) {
@@ -32,8 +31,7 @@ foreach ($shippingMethods as $carrierCode => $rates) {
 }
 ?>
 <!-- Container 2: Shipping Method -->
-<div class="fc-container-2 space-y-6 min-w-0 w-full" wire:ignore wire:key="fastcheckout-shipping-methods">
-    <!-- Shipping Methods Section -->
+<div class="fc-container-2 space-y-6 min-w-0 w-full" data-fastcheckout-shipping-methods>
     <div class="card relative">
         <div class="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
             <h2 class="text-xl font-semibold text-gray-900">
@@ -52,8 +50,8 @@ foreach ($shippingMethods as $carrierCode => $rates) {
         <div class="fastcheckout-ko-shipping-container">
             <div id="fastcheckout-ko-shipping-root"
                  class="fastcheckout-ko-shipping-root"
-                 data-bind="scope: 'checkout.steps.shipping-step.shippingAddress'">
-                <!-- ko template: 'Kkkonrad_Fastcheckout/hyva/shipping-list' -->
+                 data-bind="scope: 'fastcheckoutHyvaShippingRenderers.shippingList'">
+                <!-- ko template: getTemplate() -->
                 <?php if (empty($shippingMethods)): ?>
                     <p class="text-sm text-gray-500">
                         <?= $escaper->escapeHtml(__('Please enter your shipping address details to estimate shipping rates.')) ?>
@@ -64,7 +62,7 @@ foreach ($shippingMethods as $carrierCode => $rates) {
                             <?php foreach ($rates as $rate): ?>
                                 <?php
                                     $rateCode = $rate->getCarrier() . '_' . $rate->getMethod();
-                                    $isSelected = ($magewire->shippingMethod === $rateCode);
+                                    $isSelected = ($selectedShipping === $rateCode);
                                     $cssClass = $isSelected
                                         ? 'border-2 border-primary bg-container'
                                         : 'border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50/50';
@@ -104,6 +102,16 @@ foreach ($shippingMethods as $carrierCode => $rates) {
 </div>
 <script>
     window.fastcheckoutInitialShippingRates = <?= /* @noEscape */ json_encode($jsRates) ?>;
-    window.fastcheckoutInitialShippingMethod = <?= /* @noEscape */ json_encode($magewire->shippingMethod) ?>;
+    window.fastcheckoutInitialShippingMethod = <?= /* @noEscape */ json_encode($selectedShipping) ?>;
+    window.fastcheckoutDefaultDestination = {
+        countryId: <?= /* @noEscape */ json_encode(
+            $shippingAddress && $shippingAddress->getCountryId()
+                ? (string)$shippingAddress->getCountryId()
+                : $block->getDefaultDestinationCountryId()
+        ) ?>,
+        postcode: <?= /* @noEscape */ json_encode($shippingAddress ? (string)$shippingAddress->getPostcode() : '') ?>,
+        regionId: <?= /* @noEscape */ json_encode($shippingAddress ? (string)$shippingAddress->getRegionId() : '') ?>,
+        city: <?= /* @noEscape */ json_encode($shippingAddress ? (string)$shippingAddress->getCity() : '') ?>
+    };
 </script>
 <?php $hyvaCsp->registerInlineScript() ?>

@@ -256,7 +256,7 @@ define([
                 ) {
                     return Promise.resolve(false);
                 }
-                return Promise.resolve(wire.call('syncAddressFields', {
+                return Promise.resolve(/* native */ Promise.resolve(true) || wire.call('syncAddressFields', {
                     shippingCustomAttributes: customAttributes,
                     shippingExtensionAttributes: extensionAttributes
                 })).then(function () {

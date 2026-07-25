@@ -15,9 +15,11 @@ use Magento\Checkout\Api\AgreementsValidatorInterface;
 use Magento\Customer\Model\Session as CustomerSession;
 use Magento\Customer\Api\AddressRepositoryInterface;
 use Magento\Framework\Api\SearchCriteriaBuilder;
-use Magewirephp\Magewire\Component;
-
-class Checkout extends Component
+/**
+ * Legacy domain service formerly hosted as a Magewire component.
+ * Quote ownership is now Magento KO/REST; this class remains for unit coverage of domain helpers.
+ */
+class Checkout extends ComponentStub
 {
     private const GENERIC_PAYMENT_METHOD_PREFIX = 'generic-';
     private const INTERNAL_PAYMENT_PAYLOAD_KEYS = [

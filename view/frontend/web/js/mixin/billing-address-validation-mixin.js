@@ -16,12 +16,20 @@ define([
     'uiRegistry',
     'Magento_Checkout/js/model/quote',
     'Magento_Checkout/js/model/address-converter',
+    'Magento_Checkout/js/action/select-billing-address',
     'Magento_Checkout/js/checkout-data',
     'Kkkonrad_Fastcheckout/js/mixin/is-fastcheckout-active'
-], function ($, registry, quote, addressConverter, checkoutData, isFastcheckoutActive) {
+], function ($, registry, quote, addressConverter, selectBillingAddress, checkoutData, isFastcheckoutActive) {
     'use strict';
 
     var documentGuardRegistered = false;
+
+    /**
+     * Shared across every payment-method billing-address component instance.
+     * Per-instance flags fail: unchecking on checkmo still lets banktransfer's
+     * quote.billingAddress subscriber re-apply same-as-shipping.
+     */
+    var userChoseSeparateBilling = false;
 
     function isBillingFormElement(element) {
         return Boolean(
@@ -269,9 +277,34 @@ define([
     return function (BillingAddress) {
         return BillingAddress.extend({
             /**
+             * Magento core defaults isAddressSameAsShipping to false and flips it
+             * off whenever billingAddress is null. Fastcheckout always starts with
+             * "billing same as shipping" checked; shoppers may still uncheck later.
+             *
+             * @returns {Object}
+             */
+            initObservable: function () {
+                this._super();
+
+                if (
+                    isFastcheckoutActive() &&
+                    quote &&
+                    !quote.isVirtual() &&
+                    !userChoseSeparateBilling &&
+                    this.isAddressSameAsShipping
+                ) {
+                    this.isAddressSameAsShipping(true);
+                }
+
+                return this;
+            },
+
+            /**
              * @returns {Object}
              */
             initialize: function () {
+                var self = this;
+
                 this._super();
 
                 if (!isFastcheckoutActive()) {
@@ -284,51 +317,293 @@ define([
                     interacted: false,
                     fieldGuards: {}
                 };
+                this._fastcheckoutSyncingSameAsShipping = false;
 
                 this._fastcheckoutRegisterBillingDocumentGuard();
+                // Honor a prior intentional uncheck (e.g. payment method swap remounts this component).
+                if (userChoseSeparateBilling) {
+                    if (this.isAddressSameAsShipping) {
+                        this.isAddressSameAsShipping(false);
+                    }
+                    if (this.isAddressDetailsVisible) {
+                        this.isAddressDetailsVisible(false);
+                    }
+                } else {
+                    this._fastcheckoutApplySameAsShippingDefault();
+                }
 
                 if (this.isAddressSameAsShipping && typeof this.isAddressSameAsShipping.subscribe === 'function') {
                     this.isAddressSameAsShipping.subscribe(function (sameAsShipping) {
+                        // Ignore intermediate flips while we re-sync shipping → billing.
+                        if (self._fastcheckoutSyncingSameAsShipping) {
+                            return;
+                        }
+
+                        // Shopper opted into a separate billing address — never re-check
+                        // for them, and undo accidental true from Magento cache-key sync.
+                        if (userChoseSeparateBilling) {
+                            if (sameAsShipping) {
+                                self._fastcheckoutSyncingSameAsShipping = true;
+                                try {
+                                    self.isAddressSameAsShipping(false);
+                                    if (self.isAddressDetailsVisible) {
+                                        self.isAddressDetailsVisible(false);
+                                    }
+                                } finally {
+                                    self._fastcheckoutSyncingSameAsShipping = false;
+                                }
+                            } else {
+                                self._fastcheckoutBeginBillingValidationSuppress();
+                            }
+                            return;
+                        }
+
                         if (!sameAsShipping) {
-                            this._fastcheckoutBeginBillingValidationSuppress();
-                        } else {
-                            this._fastcheckoutEndBillingValidationSuppress();
+                            // Magento core may set false because billing cache key still
+                            // points at a placeholder while shipping was updated. Re-assert
+                            // default asynchronously after Magento's billingAddress.subscribe.
+                            window.setTimeout(function () {
+                                if (!userChoseSeparateBilling) {
+                                    self._fastcheckoutApplySameAsShippingDefault();
+                                }
+                            }, 0);
                         }
                     }, this);
                 }
 
                 if (this.isAddressDetailsVisible && typeof this.isAddressDetailsVisible.subscribe === 'function') {
                     this.isAddressDetailsVisible.subscribe(function (detailsVisible) {
-                        if (!detailsVisible) {
+                        var billing;
+
+                        // Magento always sets detailsVisible=true in billingAddress.subscribe,
+                        // including when billing was nulled for separate entry. While there is
+                        // no selected billing address yet, keep the entry form open.
+                        // After the shopper saves a separate billing address, details may show.
+                        if (userChoseSeparateBilling && detailsVisible) {
+                            billing = quote && typeof quote.billingAddress === 'function'
+                                ? quote.billingAddress()
+                                : null;
+                            if (!billing) {
+                                self._fastcheckoutSyncingSameAsShipping = true;
+                                try {
+                                    self.isAddressDetailsVisible(false);
+                                } finally {
+                                    self._fastcheckoutSyncingSameAsShipping = false;
+                                }
+                                return;
+                            }
+                        }
+                        if (!detailsVisible && userChoseSeparateBilling) {
                             this._fastcheckoutBeginBillingValidationSuppress();
                         }
                     }, this);
+                }
+
+                // Magento sets isAddressSameAsShipping from cache-key equality:
+                // billing placeholder key ≠ real shipping key → checkbox unchecked.
+                // Keep billing mirrored to shipping unless the shopper opted out.
+                if (quote && typeof quote.billingAddress === 'function' &&
+                    typeof quote.billingAddress.subscribe === 'function') {
+                    quote.billingAddress.subscribe(function (newAddress) {
+                        if (self._fastcheckoutSyncingSameAsShipping) {
+                            return;
+                        }
+                        if (!userChoseSeparateBilling) {
+                            self._fastcheckoutApplySameAsShippingDefault();
+                            return;
+                        }
+                        // Core may flip same-as-shipping from cache keys / set detailsVisible.
+                        // Keep checkbox unchecked while the shopper wants a separate address.
+                        // Only force the form open when billing was nulled (entry mode).
+                        window.setTimeout(function () {
+                            if (!userChoseSeparateBilling) {
+                                return;
+                            }
+                            if (self.isAddressSameAsShipping && self.isAddressSameAsShipping()) {
+                                self._fastcheckoutSyncingSameAsShipping = true;
+                                try {
+                                    self.isAddressSameAsShipping(false);
+                                } finally {
+                                    self._fastcheckoutSyncingSameAsShipping = false;
+                                }
+                            }
+                            if (
+                                !newAddress &&
+                                self.isAddressDetailsVisible &&
+                                self.isAddressDetailsVisible()
+                            ) {
+                                self.isAddressDetailsVisible(false);
+                            }
+                        }, 0);
+                    });
+                }
+
+                if (quote && typeof quote.shippingAddress === 'function' &&
+                    typeof quote.shippingAddress.subscribe === 'function') {
+                    quote.shippingAddress.subscribe(function () {
+                        if (self._fastcheckoutSyncingSameAsShipping) {
+                            return;
+                        }
+                        if (!userChoseSeparateBilling) {
+                            self._fastcheckoutApplySameAsShippingDefault();
+                        }
+                    });
+                }
+
+                // Payment renderer re-resolve often re-runs Magento resolver after method pick.
+                if (quote && typeof quote.paymentMethod === 'function' &&
+                    typeof quote.paymentMethod.subscribe === 'function') {
+                    quote.paymentMethod.subscribe(function () {
+                        if (!userChoseSeparateBilling) {
+                            window.setTimeout(function () {
+                                if (!userChoseSeparateBilling) {
+                                    self._fastcheckoutApplySameAsShippingDefault();
+                                }
+                            }, 0);
+                        }
+                    });
                 }
 
                 return this;
             },
 
             /**
+             * True when quote billing is already the shipping address (same cache key
+             * or same object). Placeholder keys never match real Magento address keys.
+             */
+            _fastcheckoutBillingMatchesShipping: function (billing, shipping) {
+                if (!billing || !shipping) {
+                    return false;
+                }
+                if (billing === shipping) {
+                    return true;
+                }
+                if (
+                    typeof billing.getCacheKey === 'function' &&
+                    typeof shipping.getCacheKey === 'function'
+                ) {
+                    return billing.getCacheKey() === shipping.getCacheKey();
+                }
+                return false;
+            },
+
+            /**
+             * Force same-as-shipping checked and billing = shipping.
+             * Re-run after shipping updates / payment select — Magento core compares
+             * getCacheKey() and unchecks the box when billing is still a placeholder.
+             */
+            _fastcheckoutApplySameAsShippingDefault: function () {
+                var shipping,
+                    billing;
+
+                if (!isFastcheckoutActive() || !quote || quote.isVirtual()) {
+                    return;
+                }
+                if (userChoseSeparateBilling) {
+                    return;
+                }
+                if (this._fastcheckoutSyncingSameAsShipping) {
+                    return;
+                }
+
+                shipping = typeof quote.shippingAddress === 'function'
+                    ? quote.shippingAddress()
+                    : null;
+                billing = typeof quote.billingAddress === 'function'
+                    ? quote.billingAddress()
+                    : null;
+
+                this._fastcheckoutSyncingSameAsShipping = true;
+                try {
+                    if (this.isAddressSameAsShipping) {
+                        this.isAddressSameAsShipping(true);
+                    }
+
+                    if (
+                        shipping &&
+                        typeof selectBillingAddress === 'function' &&
+                        !this._fastcheckoutBillingMatchesShipping(billing, shipping)
+                    ) {
+                        try {
+                            selectBillingAddress(shipping);
+                        } catch (e) {
+                            // ignore — shipping may still be incomplete
+                        }
+                    }
+
+                    if (this.isAddressDetailsVisible) {
+                        this.isAddressDetailsVisible(true);
+                    }
+                } finally {
+                    this._fastcheckoutSyncingSameAsShipping = false;
+                }
+            },
+
+            /**
+             * Magento binds checked + click. Knockout's checked handler runs first and
+             * updates the observable to the NEW value before click:useShippingAddress.
+             * Magento core therefore branches on the post-toggle state:
+             *   true  → shopper just checked same-as-shipping
+             *   false → shopper just unchecked (wants separate billing)
+             *
              * @returns {Boolean}
              */
             useShippingAddress: function () {
-                var result = this._super();
+                var isSame = !!(this.isAddressSameAsShipping && this.isAddressSameAsShipping()),
+                    result,
+                    self = this;
 
                 if (!isFastcheckoutActive()) {
-                    return result;
+                    return this._super();
                 }
 
-                if (this.isAddressSameAsShipping && !this.isAddressSameAsShipping()) {
-                    // Prefill form from shipping before suppress/normalize so street
-                    // lines are visible (provider needs object street.0 / street.1).
+                if (!isSame) {
+                    // Shopper just unchecked — mark shared intent BEFORE Magento nulls
+                    // billing so other payment components' subscribers do not re-apply.
+                    userChoseSeparateBilling = true;
+                    result = this._super();
+                    this._fastcheckoutSyncingSameAsShipping = true;
+                    try {
+                        if (this.isAddressSameAsShipping) {
+                            this.isAddressSameAsShipping(false);
+                        }
+                        if (this.isAddressDetailsVisible) {
+                            this.isAddressDetailsVisible(false);
+                        }
+                    } finally {
+                        this._fastcheckoutSyncingSameAsShipping = false;
+                    }
+                    // Prefill form from shipping so street lines are visible.
                     this._fastcheckoutCopyShippingAddressToBillingForm();
                     this._fastcheckoutBeginBillingValidationSuppress();
                     this._fastcheckoutNormalizeBillingStreetLines();
                     this._fastcheckoutGuardBillingFields();
-                } else {
-                    this._fastcheckoutEndBillingValidationSuppress();
+                    // Magento billingAddress.subscribe always sets detailsVisible=true after
+                    // nulling billing — re-assert form open on the next tick.
+                    window.setTimeout(function () {
+                        if (!userChoseSeparateBilling) {
+                            return;
+                        }
+                        self._fastcheckoutSyncingSameAsShipping = true;
+                        try {
+                            if (self.isAddressSameAsShipping && self.isAddressSameAsShipping()) {
+                                self.isAddressSameAsShipping(false);
+                            }
+                            if (self.isAddressDetailsVisible && self.isAddressDetailsVisible()) {
+                                self.isAddressDetailsVisible(false);
+                            }
+                        } finally {
+                            self._fastcheckoutSyncingSameAsShipping = false;
+                        }
+                    }, 0);
+                    return result;
                 }
 
+                // Shopper re-checks same-as-shipping.
+                userChoseSeparateBilling = false;
+                result = this._super();
+                this._fastcheckoutEndBillingValidationSuppress();
+                this._fastcheckoutApplySameAsShippingDefault();
                 return result;
             },
 
