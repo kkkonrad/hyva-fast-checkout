@@ -633,16 +633,6 @@ define([
                             component: 'uiComponent',
                             children: checkoutLayoutBridge.paymentRegionChildren
                         },
-                        'fastcheckoutHyvaShippingRenderers': {
-                            component: 'uiComponent',
-                            children: {
-                                shippingList: {
-                                    component: 'Kkkonrad_Fastcheckout/js/hyva/shipping-list',
-                                    displayArea: 'shipping-methods-list',
-                                    children: checkoutLayoutBridge.shippingListChildren
-                                }
-                            }
-                        },
                         'checkout': {
                             component: 'uiComponent',
                             children: {
@@ -655,11 +645,24 @@ define([
                                                 'step-config': {
                                                     component: 'uiComponent'
                                                 },
+                                                // shippingListChildren (before-shipping-method-form,
+                                                // shippingAdditional) belong to this component in
+                                                // stock Magento — core's shipping.html renders those
+                                                // regions itself. Fastcheckout renders the same
+                                                // regions from Kkkonrad_Fastcheckout/hyva/shipping-list,
+                                                // bound to this very instance, so they must live here.
                                                 shippingAddress: $.extend(
                                                     true,
                                                     {},
                                                     checkoutLayoutBridge.shippingAddress,
-                                                    {children: checkoutLayoutBridge.shippingAddressChildren}
+                                                    {
+                                                        children: $.extend(
+                                                            true,
+                                                            {},
+                                                            checkoutLayoutBridge.shippingAddressChildren,
+                                                            checkoutLayoutBridge.shippingListChildren
+                                                        )
+                                                    }
                                                 )
                                             }
                                         }
@@ -1818,6 +1821,17 @@ define([
                         persistAddressToCheckoutData(addressData, 'billing');
                         syncAddressDataToCheckoutProvider(addressData, 'billing');
                         syncCheckoutProviderAddressAttributes();
+
+                        // Selecting a shipping method remaps the allowed payment methods, and every
+                        // Magento payment renderer calls checkoutDataResolver.resolveBillingAddress()
+                        // on init — which re-selects the (unchanged) billing address. Pushing that
+                        // back to Magewire costs an extra round trip per rate switch and re-writes
+                        // billing* props the server derives from shipping anyway. KO/checkoutData are
+                        // still updated above; only the redundant server push is skipped.
+                        if (window.fastcheckoutSelectingShippingMethod || window.fastcheckoutLockShippingRatesList) {
+                            return Promise.resolve(false);
+                        }
+
                         currentBillingAddress = quote && typeof quote.billingAddress === 'function'
                             ? quote.billingAddress()
                             : null;

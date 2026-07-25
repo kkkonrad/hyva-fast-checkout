@@ -80,6 +80,10 @@ var config = {
             'Magento_Checkout/js/view/billing-address': {
                 'Kkkonrad_Fastcheckout/js/mixin/billing-address-validation-mixin': true
             },
+            // Shipping-method list presentation (selection lock, Tailwind helpers, InPost).
+            'Magento_Checkout/js/view/shipping': {
+                'Kkkonrad_Fastcheckout/js/mixin/shipping-view-mixin': true
+            },
             // Empty optional fields (street line 2+) stay undefined in provider data;
             // stock max_text_length treats that as invalid ("255 symbols").
             'Magento_Ui/js/lib/validation/rules': {

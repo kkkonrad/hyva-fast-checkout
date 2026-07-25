@@ -8,7 +8,7 @@ define([], function () {
 
         function getListComponent() {
             return window.fastcheckoutHyvaShippingListInstance ||
-                (typeof registry !== 'undefined' && registry.get('fastcheckoutHyvaShippingRenderers.shippingList')) ||
+                (typeof registry !== 'undefined' && registry.get('checkout.steps.shipping-step.shippingAddress')) ||
                 null;
         }
 

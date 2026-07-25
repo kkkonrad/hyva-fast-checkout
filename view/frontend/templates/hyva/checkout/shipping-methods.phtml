@@ -52,8 +52,8 @@ foreach ($shippingMethods as $carrierCode => $rates) {
         <div class="fastcheckout-ko-shipping-container">
             <div id="fastcheckout-ko-shipping-root"
                  class="fastcheckout-ko-shipping-root"
-                 data-bind="scope: 'fastcheckoutHyvaShippingRenderers.shippingList'">
-                <!-- ko template: getTemplate() -->
+                 data-bind="scope: 'checkout.steps.shipping-step.shippingAddress'">
+                <!-- ko template: 'Kkkonrad_Fastcheckout/hyva/shipping-list' -->
                 <?php if (empty($shippingMethods)): ?>
                     <p class="text-sm text-gray-500">
                         <?= $escaper->escapeHtml(__('Please enter your shipping address details to estimate shipping rates.')) ?>

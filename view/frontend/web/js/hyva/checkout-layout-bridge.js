@@ -90,11 +90,10 @@ define([
         }
 
         function aliasStandardShippingRegistryPaths() {
-            aliasConfiguredComponentTree(
-                shippingListChildren,
-                'fastcheckoutHyvaShippingRenderers.shippingList',
-                'checkout.steps.shipping-step.shippingAddress'
-            );
+            // shippingListChildren used to be registered under a Fastcheckout-only parent and
+            // needed aliasing onto the standard path so third-party modules could find them.
+            // They are now children of checkout.steps.shipping-step.shippingAddress directly
+            // (the stock location), so no aliasing is required for them anymore.
             aliasAdditionalCheckoutStepRegistryPaths();
         }
 
