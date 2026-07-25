@@ -144,6 +144,15 @@ $hyvaCsp = $block->getHyvaCsp();
     });
 
     // Coupon apply/cancel via Magento guest/customer coupon REST when available.
+    // Messages are rendered server-side so Magento i18n (pl_PL etc.) applies.
+    var couponMessages = {
+        enterCode: <?= /* @noEscape */ json_encode((string)__('Please enter a discount code.')) ?>,
+        applied: <?= /* @noEscape */ json_encode((string)__('Coupon applied.')) ?>,
+        removed: <?= /* @noEscape */ json_encode((string)__('Coupon removed.')) ?>,
+        applyFailed: <?= /* @noEscape */ json_encode((string)__('Could not apply coupon.')) ?>,
+        moduleMissing: <?= /* @noEscape */ json_encode((string)__('Coupon module is not available.')) ?>
+    };
+
     function applyCoupon(remove) {
         var input = document.querySelector('[data-fastcheckout-coupon-input]');
         var messageEl = document.querySelector('[data-fastcheckout-coupon-message]');
@@ -151,7 +160,7 @@ $hyvaCsp = $block->getHyvaCsp();
 
         if (!remove && !code) {
             if (messageEl) {
-                messageEl.textContent = 'Please enter a discount code.';
+                messageEl.textContent = couponMessages.enterCode;
                 messageEl.classList.remove('hidden', 'text-green-700');
                 messageEl.classList.add('text-red-700');
             }
@@ -169,7 +178,7 @@ $hyvaCsp = $block->getHyvaCsp();
             var action = remove ? cancelCoupon() : setCoupon(code);
             Promise.resolve(action).then(function () {
                 if (messageEl) {
-                    messageEl.textContent = remove ? 'Coupon removed.' : 'Coupon applied.';
+                    messageEl.textContent = remove ? couponMessages.removed : couponMessages.applied;
                     messageEl.classList.remove('hidden', 'text-red-700');
                     messageEl.classList.add('text-green-700');
                 }
@@ -178,14 +187,14 @@ $hyvaCsp = $block->getHyvaCsp();
                 }, 400);
             }).catch(function (error) {
                 if (messageEl) {
-                    messageEl.textContent = (error && error.message) ? error.message : 'Could not apply coupon.';
+                    messageEl.textContent = (error && error.message) ? error.message : couponMessages.applyFailed;
                     messageEl.classList.remove('hidden', 'text-green-700');
                     messageEl.classList.add('text-red-700');
                 }
             });
         }, function () {
             if (messageEl) {
-                messageEl.textContent = 'Coupon module is not available.';
+                messageEl.textContent = couponMessages.moduleMissing;
                 messageEl.classList.remove('hidden');
             }
         });

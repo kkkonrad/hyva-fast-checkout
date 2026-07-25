@@ -355,3 +355,8 @@
 "Please enter more or equal than {0} symbols.","Podaj co najmniej {0} symboli."
 "Optional comment for this order","Opcjonalny komentarz do zamówienia"
 "Sign Up for Our Newsletter","Zapisz się do naszego newslettera"
+"Please enter a discount code.","Wpisz kod rabatowy."
+"Coupon applied.","Kod rabatowy został zastosowany."
+"Coupon removed.","Kod rabatowy został usunięty."
+"Could not apply coupon.","Nie udało się zastosować kodu rabatowego."
+"Coupon module is not available.","Moduł kodów rabatowych jest niedostępny."

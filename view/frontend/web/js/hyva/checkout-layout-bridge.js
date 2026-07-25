@@ -94,6 +94,13 @@ define([
             // needed aliasing onto the standard path so third-party modules could find them.
             // They are now children of checkout.steps.shipping-step.shippingAddress directly
             // (the stock location), so no aliasing is required for them anymore.
+            //
+            // shipping-methods.phtml historically bound scope to this Fastcheckout-only name.
+            // Alias the real Magento shipping view so any leftover scope lookup still works.
+            aliasRegistryComponent(
+                'checkout.steps.shipping-step.shippingAddress',
+                'fastcheckoutHyvaShippingRenderers.shippingList'
+            );
             aliasAdditionalCheckoutStepRegistryPaths();
         }
 
