@@ -225,9 +225,21 @@ define([
             function scheduleGuestAddressRestore() {
                 var attempts = 0,
                     maxAttempts = 40, // ~20s
-                    timer;
+                    timer,
+                    finished = false;
+
+                function userStoppedRestore() {
+                    return !!(
+                        guestAddressSnapshot &&
+                        typeof guestAddressSnapshot.hasUserTouchedDestination === 'function' &&
+                        guestAddressSnapshot.hasUserTouchedDestination()
+                    );
+                }
 
                 function tick() {
+                    if (finished || userStoppedRestore()) {
+                        return;
+                    }
                     attempts += 1;
                     // Always try to repair country option list if something wiped it.
                     try {
@@ -239,9 +251,16 @@ define([
                         // ignore
                     }
                     if (countryFieldReady()) {
+                        if (userStoppedRestore()) {
+                            return;
+                        }
                         restorePreviousGuestShippingAddress(false);
-                        // One more pass after KO finishes re-rendering.
+                        // One more pass after KO finishes re-rendering — cancelled if
+                        // the shopper changes country before this timer fires.
                         window.setTimeout(function () {
+                            if (userStoppedRestore()) {
+                                return;
+                            }
                             restorePreviousGuestShippingAddress(false);
                             try {
                                 if (checkoutProviderBridge &&
@@ -252,13 +271,16 @@ define([
                                 // ignore
                             }
                         }, 400);
+                        finished = true;
                         return;
                     }
                     if (attempts < maxAttempts) {
                         timer = window.setTimeout(tick, 500);
                     } else {
                         // Last resort: restore text fields even if country never loaded.
-                        restorePreviousGuestShippingAddress(false);
+                        if (!userStoppedRestore()) {
+                            restorePreviousGuestShippingAddress(false);
+                        }
                         try {
                             if (checkoutProviderBridge &&
                                 typeof checkoutProviderBridge.ensureCountryDictionary === 'function') {
@@ -267,7 +289,16 @@ define([
                         } catch (e3) {
                             // ignore
                         }
+                        finished = true;
                     }
+                }
+
+                // Listen for country/region/postcode edits before delayed restore runs.
+                if (
+                    guestAddressSnapshot &&
+                    typeof guestAddressSnapshot.bindDestinationTouchGuard === 'function'
+                ) {
+                    guestAddressSnapshot.bindDestinationTouchGuard();
                 }
 
                 // Do NOT restore immediately — wait for directory options.
@@ -283,6 +314,13 @@ define([
 
             scheduleGuestAddressRestore();
             window.addEventListener('fastcheckout:address-fields-ready', function () {
+                if (
+                    guestAddressSnapshot &&
+                    typeof guestAddressSnapshot.hasUserTouchedDestination === 'function' &&
+                    guestAddressSnapshot.hasUserTouchedDestination()
+                ) {
+                    return;
+                }
                 if (countryFieldReady()) {
                     restorePreviousGuestShippingAddress(false);
                 }

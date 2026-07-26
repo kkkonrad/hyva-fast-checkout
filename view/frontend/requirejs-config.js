@@ -88,6 +88,10 @@ var config = {
             // stock max_text_length treats that as invalid ("255 symbols").
             'Magento_Ui/js/lib/validation/rules': {
                 'Kkkonrad_Fastcheckout/js/mixin/ui-validation-rules-mixin': true
+            },
+            // Country change must clear region_id / free-text region (stock Magento does not).
+            'Magento_Ui/js/form/element/region': {
+                'Kkkonrad_Fastcheckout/js/mixin/region-field-mixin': true
             }
         }
     }

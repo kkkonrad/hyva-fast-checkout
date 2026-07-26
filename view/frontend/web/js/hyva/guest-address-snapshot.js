@@ -11,6 +11,122 @@ define([], function () {
     var EMAIL_KEY = 'fastcheckout_email';
     var MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
+    /**
+     * Delayed snapshot restore (country options arrive async) used to re-force the
+     * previous country for up to ~7s. That fought the first shopper country change:
+     * select DE → delayed restore writes PL back → only the second change sticks.
+     * Bump this generation (and set the touch flag) on any destination field edit.
+     */
+    var restoreGeneration = 0,
+        userTouchedDestination = false,
+        destinationTouchBound = false,
+        // True while forceUiSelectComponents is writing snapshot values (ignore those).
+        restoreWriteInProgress = false,
+        lastRestoredCountryId = '',
+        countryWatchBound = false;
+
+    function markUserTouchedDestination() {
+        if (restoreWriteInProgress) {
+            return;
+        }
+        userTouchedDestination = true;
+        restoreGeneration += 1;
+    }
+
+    function hasUserTouchedDestination() {
+        return userTouchedDestination === true;
+    }
+
+    function bindDestinationTouchGuard() {
+        if (destinationTouchBound || typeof document === 'undefined') {
+            return;
+        }
+        destinationTouchBound = true;
+
+        document.addEventListener('change', function (event) {
+            var target = event && event.target,
+                name;
+
+            // Ignore programmatic restores (dispatchEvent / jQuery.trigger → isTrusted false).
+            // Real shopper gestures set isTrusted=true.
+            if (!event || event.isTrusted === false) {
+                return;
+            }
+            if (!target || !target.getAttribute) {
+                return;
+            }
+            name = String(target.getAttribute('name') || target.name || '');
+            if (
+                name !== 'country_id' &&
+                name !== 'region_id' &&
+                name !== 'region' &&
+                name !== 'postcode'
+            ) {
+                return;
+            }
+            // Only shipping form — not billing embedded in payment methods.
+            if (
+                target.closest &&
+                target.closest(
+                    '.payment-method-billing-address, [data-form="billing-new-address"]'
+                )
+            ) {
+                return;
+            }
+            markUserTouchedDestination();
+        }, true);
+    }
+
+    /**
+     * Magento UI country select sometimes updates the KO observable without a trusted
+     * DOM change (or Playwright tests set values programmatically). Treat a value that
+     * diverges from the last restored snapshot country as a shopper edit.
+     */
+    function bindCountryValueWatch(snapshotCountryId) {
+        if (countryWatchBound || typeof require !== 'function') {
+            return;
+        }
+        countryWatchBound = true;
+        lastRestoredCountryId = snapshotCountryId ? String(snapshotCountryId) : '';
+
+        require(['uiRegistry'], function (registry) {
+            var name =
+                    'checkout.steps.shipping-step.shippingAddress.shipping-address-fieldset.country_id',
+                field;
+
+            function attach(comp) {
+                if (!comp || typeof comp.value !== 'function' || !comp.value.subscribe) {
+                    return;
+                }
+                comp.value.subscribe(function (newVal) {
+                    var next = newVal == null ? '' : String(newVal);
+
+                    if (restoreWriteInProgress || hasUserTouchedDestination()) {
+                        return;
+                    }
+                    // Ignore empty / still-on-snapshot values during initial paint.
+                    if (!next || (lastRestoredCountryId && next === lastRestoredCountryId)) {
+                        return;
+                    }
+                    markUserTouchedDestination();
+                });
+            }
+
+            try {
+                field = registry.get(name);
+            } catch (e) {
+                field = null;
+            }
+            if (field) {
+                attach(field);
+                return;
+            }
+            if (registry && typeof registry.async === 'function') {
+                registry.async(name)(attach);
+            }
+        });
+    }
+
     function readJson(key) {
         try {
             var raw = window.sessionStorage.getItem(key);
@@ -326,9 +442,17 @@ define([], function () {
             shipping,
             depsSafe = deps || {},
             quoteAlreadyFilled = false,
-            applied = false;
+            applied = false,
+            generation;
+
+        bindDestinationTouchGuard();
 
         if (!values) {
+            return false;
+        }
+
+        // Shopper already changed country/region/postcode — never re-force snapshot dest.
+        if (hasUserTouchedDestination() && !depsSafe.force) {
             return false;
         }
 
@@ -336,6 +460,10 @@ define([], function () {
         if (!formData) {
             return false;
         }
+
+        generation = restoreGeneration;
+        lastRestoredCountryId = values.countryId ? String(values.countryId) : '';
+        bindCountryValueWatch(lastRestoredCountryId);
 
         // Don't replace a shopper-edited quote address unless force.
         if (!depsSafe.force && depsSafe.quote && typeof depsSafe.quote.shippingAddress === 'function') {
@@ -417,7 +545,7 @@ define([], function () {
                 // ignore
             }
             // Full address including country once Magento country field has options.
-            scheduleCountryAwareProviderSync(depsSafe, formData, values);
+            scheduleCountryAwareProviderSync(depsSafe, formData, values, generation);
         }
 
         // Always paint text inputs when empty (UI may lag quote).
@@ -430,7 +558,7 @@ define([], function () {
         }
 
         try {
-            forceUiSelectComponents(values);
+            forceUiSelectComponents(values, generation);
         } catch (e5) {
             // ignore
         }
@@ -450,9 +578,17 @@ define([], function () {
         return copy;
     }
 
-    function scheduleCountryAwareProviderSync(depsSafe, formData, values) {
+    function scheduleCountryAwareProviderSync(depsSafe, formData, values, generation) {
         function trySync() {
             var ready = false;
+
+            // Cancelled: newer restore scheduled, or shopper edited destination.
+            if (
+                (typeof generation === 'number' && generation !== restoreGeneration) ||
+                hasUserTouchedDestination()
+            ) {
+                return true;
+            }
 
             try {
                 if (typeof require === 'function' && require.defined && require.defined('uiRegistry')) {
@@ -480,15 +616,23 @@ define([], function () {
 
             try {
                 if (typeof depsSafe.syncProvider === 'function') {
-                    depsSafe.syncProvider(formData, 'shipping');
-                    depsSafe.syncProvider(formData, 'billing');
+                    // If the shopper already changed country, only push non-destination fields.
+                    if (hasUserTouchedDestination()) {
+                        depsSafe.syncProvider(formDataWithoutCountry(formData), 'shipping');
+                        depsSafe.syncProvider(formDataWithoutCountry(formData), 'billing');
+                    } else {
+                        depsSafe.syncProvider(formData, 'shipping');
+                        depsSafe.syncProvider(formData, 'billing');
+                    }
                 }
             } catch (e2) {
                 // ignore
             }
 
             try {
-                forceUiSelectComponents(values);
+                if (!hasUserTouchedDestination()) {
+                    forceUiSelectComponents(values, generation);
+                }
                 fillEmptyDomFields(values);
             } catch (e3) {
                 // ignore
@@ -508,8 +652,12 @@ define([], function () {
         });
     }
 
-    function forceUiSelectComponents(values) {
+    function forceUiSelectComponents(values, generation) {
         if (!values || typeof require !== 'function') {
+            return;
+        }
+
+        if (hasUserTouchedDestination()) {
             return;
         }
 
@@ -522,6 +670,16 @@ define([], function () {
                     'checkout.steps.shipping-step.shippingAddress.shipping-address-fieldset.country_id',
                 shippingRegionName =
                     'checkout.steps.shipping-step.shippingAddress.shipping-address-fieldset.region_id';
+
+            function isRestoreStillActive() {
+                if (hasUserTouchedDestination()) {
+                    return false;
+                }
+                if (typeof generation === 'number' && generation !== restoreGeneration) {
+                    return false;
+                }
+                return true;
+            }
 
             function componentOptions(component) {
                 var opts;
@@ -612,53 +770,76 @@ define([], function () {
             }
 
             function apply() {
-                var countryComp = findShippingField('country_id'),
-                    regionComp = findShippingField('region_id'),
+                var countryComp,
+                    regionComp,
                     countryOk = false,
-                    regionOk = false,
                     countryEl,
                     regionEl;
 
-                countryOk = setComponentValue(countryComp, values.countryId);
-                // Region only after country is set / options ready.
-                regionOk = setComponentValue(regionComp, values.regionId);
-
-                // Sync native <select> once component has options (KO may lag one tick).
-                countryEl = document.querySelector(
-                    '.fastcheckout-native-shipping-address select[name="country_id"], ' +
-                    'select[name="country_id"]'
-                );
-                regionEl = document.querySelector(
-                    '.fastcheckout-native-shipping-address select[name="region_id"], ' +
-                    'select[name="region_id"]'
-                );
-
-                if (countryEl && values.countryId && countryEl.options && countryEl.options.length > 1) {
-                    if (String(countryEl.value || '') !== String(values.countryId)) {
-                        countryEl.value = String(values.countryId);
-                        countryEl.dispatchEvent(new Event('change', { bubbles: true }));
-                        if (window.jQuery) {
-                            try {
-                                window.jQuery(countryEl).val(String(values.countryId)).trigger('change');
-                            } catch (e) {
-                                // ignore
-                            }
-                        }
-                    }
+                if (!isRestoreStillActive()) {
+                    return false;
                 }
 
-                if (regionEl && values.regionId && regionEl.options && regionEl.options.length > 1) {
-                    if (String(regionEl.value || '') !== String(values.regionId)) {
-                        regionEl.value = String(values.regionId);
-                        regionEl.dispatchEvent(new Event('change', { bubbles: true }));
-                        if (window.jQuery) {
-                            try {
-                                window.jQuery(regionEl).val(String(values.regionId)).trigger('change');
-                            } catch (e2) {
-                                // ignore
+                restoreWriteInProgress = true;
+                try {
+                    countryComp = findShippingField('country_id');
+                    regionComp = findShippingField('region_id');
+
+                    countryOk = setComponentValue(countryComp, values.countryId);
+                    // Region only after country is set / options ready.
+                    setComponentValue(regionComp, values.regionId);
+
+                    // Sync native <select> once component has options (KO may lag one tick).
+                    countryEl = document.querySelector(
+                        '.fastcheckout-native-shipping-address select[name="country_id"], ' +
+                        'select[name="country_id"]'
+                    );
+                    regionEl = document.querySelector(
+                        '.fastcheckout-native-shipping-address select[name="region_id"], ' +
+                        'select[name="region_id"]'
+                    );
+
+                    if (
+                        isRestoreStillActive() &&
+                        countryEl &&
+                        values.countryId &&
+                        countryEl.options &&
+                        countryEl.options.length > 1
+                    ) {
+                        if (String(countryEl.value || '') !== String(values.countryId)) {
+                            countryEl.value = String(values.countryId);
+                            countryEl.dispatchEvent(new Event('change', { bubbles: true }));
+                            if (window.jQuery) {
+                                try {
+                                    window.jQuery(countryEl).val(String(values.countryId)).trigger('change');
+                                } catch (e) {
+                                    // ignore
+                                }
                             }
                         }
                     }
+
+                    if (
+                        isRestoreStillActive() &&
+                        regionEl &&
+                        values.regionId &&
+                        regionEl.options &&
+                        regionEl.options.length > 1
+                    ) {
+                        if (String(regionEl.value || '') !== String(values.regionId)) {
+                            regionEl.value = String(values.regionId);
+                            regionEl.dispatchEvent(new Event('change', { bubbles: true }));
+                            if (window.jQuery) {
+                                try {
+                                    window.jQuery(regionEl).val(String(values.regionId)).trigger('change');
+                                } catch (e2) {
+                                    // ignore
+                                }
+                            }
+                        }
+                    }
+                } finally {
+                    restoreWriteInProgress = false;
                 }
 
                 return countryOk;
@@ -878,6 +1059,9 @@ define([], function () {
         restore: restore,
         toFormAddressData: toFormAddressData,
         clearCartBrowserCache: clearCartBrowserCache,
+        hasUserTouchedDestination: hasUserTouchedDestination,
+        markUserTouchedDestination: markUserTouchedDestination,
+        bindDestinationTouchGuard: bindDestinationTouchGuard,
         STORAGE_KEY: STORAGE_KEY
     };
 });
