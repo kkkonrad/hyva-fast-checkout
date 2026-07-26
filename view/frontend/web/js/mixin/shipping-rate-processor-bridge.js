@@ -2,8 +2,9 @@ define([
     'mage/utils/wrapper',
     'Kkkonrad_Fastcheckout/js/mixin/is-fastcheckout-active',
     'Magento_Checkout/js/model/shipping-service',
-    'Magento_Checkout/js/model/shipping-rate-registry'
-], function (wrapper, isFastcheckoutActive, shippingService, rateRegistry) {
+    'Magento_Checkout/js/model/shipping-rate-registry',
+    'Kkkonrad_Fastcheckout/js/hyva/region-country-guard'
+], function (wrapper, isFastcheckoutActive, shippingService, rateRegistry, regionCountryGuard) {
     'use strict';
 
     /**
@@ -79,6 +80,11 @@ define([
                 if (!isFastcheckoutActive()) {
                     return originalGetRates(address);
                 }
+
+                // The estimate fires straight off the country change, before the bridge gets a
+                // chance to sanitise the quote address, so this is the earliest point where the
+                // outgoing payload can still carry the previous country's region_id.
+                regionCountryGuard.dropRegionFromOtherCountry(address);
 
                 // Method selection must not re-estimate carriers — payment/totals only.
                 if (window.fastcheckoutLockShippingRatesList || window.fastcheckoutSelectingShippingMethod) {

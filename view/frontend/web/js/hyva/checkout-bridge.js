@@ -1,5 +1,6 @@
 define([
     'jquery',
+    'Kkkonrad_Fastcheckout/js/hyva/region-country-guard',
     'Kkkonrad_Fastcheckout/js/hyva/renderer-manager',
     'Kkkonrad_Fastcheckout/js/hyva/checkout-provider-bridge',
     'Kkkonrad_Fastcheckout/js/hyva/address-attributes-bridge',
@@ -27,6 +28,7 @@ define([
     'Kkkonrad_Fastcheckout/js/hyva/step-navigator-bridge'
 ], function (
     $,
+    regionCountryGuard,
     createRendererManager,
     createCheckoutProviderBridge,
     createAddressAttributesBridge,
@@ -2130,10 +2132,20 @@ define([
                         return shippingCompatibilityBridge.getShippingInformationComponent();
                     },
                     onSelectShippingAddressAction: function (shippingAddress) {
-                        var addressData = normalizeKoAddressData(shippingAddress),
+                        var addressData,
                             currentShippingAddress,
                             wire = getMagewireComponent(),
                             billingSameAsShipping;
+
+                        // The quote address object survives a country change, so it can still
+                        // carry the previous country's region_id. Everything downstream is built
+                        // from it — checkout-data, the provider and, crucially, the REST payloads
+                        // for estimate-shipping-methods / shipping-information. Sanitise it in
+                        // place (this is the same object selectShippingAddressAction just stored
+                        // on the quote) so no request goes out with a region from another country.
+                        regionCountryGuard.dropRegionFromOtherCountry(shippingAddress);
+
+                        addressData = normalizeKoAddressData(shippingAddress);
 
                         persistAddressToCheckoutData(addressData, 'shipping');
                         syncAddressDataToCheckoutProvider(addressData, 'shipping');

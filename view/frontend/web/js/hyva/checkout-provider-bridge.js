@@ -1,6 +1,7 @@
 define([
-    'jquery'
-], function ($) {
+    'jquery',
+    'Kkkonrad_Fastcheckout/js/hyva/region-country-guard'
+], function ($, regionCountryGuard) {
     'use strict';
 
     return function (options) {
@@ -428,7 +429,7 @@ define([
             // Repair country list first so later country_id writes have options.
             ensureCountryDictionary(provider);
 
-            dataToSet = $.extend(true, {}, addressData);
+            dataToSet = regionCountryGuard.dropRegionFromOtherCountry($.extend(true, {}, addressData));
             dataToSet.street = normalizeStreetForUiProvider(dataToSet.street);
 
             if (type === 'billing') {
