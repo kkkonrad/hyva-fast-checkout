@@ -488,6 +488,73 @@ define([
             },
 
             /**
+             * Content-level comparison of the fields that identify an address. Cache keys are
+             * useless here: unchecking same-as-shipping prefills the billing form from shipping,
+             * producing an address with identical content but a brand-new (or placeholder) key.
+             */
+            _fastcheckoutBillingSameContentAsShipping: function (billing, shipping) {
+                var flat = function (address) {
+                        var street = address ? address.street : null;
+
+                        if (Array.isArray(street)) {
+                            street = street.join('|');
+                        } else if (street && typeof street === 'object') {
+                            street = Object.keys(street).map(function (k) {
+                                return street[k];
+                            }).join('|');
+                        } else {
+                            street = street || '';
+                        }
+
+                        return [
+                            address && address.firstname, address && address.lastname,
+                            address && address.city, address && address.postcode,
+                            address && (address.regionId || address.region_id), street
+                        ].map(function (v) {
+                            return String(v == null ? '' : v).trim().toLowerCase();
+                        }).join('~');
+                    };
+
+                if (!billing || !shipping) {
+                    return false;
+                }
+
+                return flat(billing) === flat(shipping);
+            },
+
+            /**
+             * True when the quote billing address carries shopper-entered data rather than
+             * being unset or the placeholder installed by checkout-compatibility. Tells
+             * "no billing yet" (safe to default to shipping) from "a real billing address".
+             */
+            _fastcheckoutBillingHasOwnData: function (billing) {
+                var street;
+
+                if (!billing) {
+                    return false;
+                }
+
+                street = billing.street;
+                if (Array.isArray(street)) {
+                    street = street.join('').trim();
+                } else if (street && typeof street === 'object') {
+                    street = Object.keys(street).map(function (k) {
+                        return street[k];
+                    }).join('').trim();
+                } else {
+                    street = street ? String(street).trim() : '';
+                }
+
+                return Boolean(
+                    String(billing.firstname || '').trim() ||
+                    String(billing.lastname || '').trim() ||
+                    String(billing.postcode || '').trim() ||
+                    String(billing.city || '').trim() ||
+                    street
+                );
+            },
+
+            /**
              * Force same-as-shipping checked and billing = shipping.
              * Re-run after shipping updates / payment select — Magento core compares
              * getCacheKey() and unchecks the box when billing is still a placeholder.
@@ -512,6 +579,21 @@ define([
                 billing = typeof quote.billingAddress === 'function'
                     ? quote.billingAddress()
                     : null;
+
+                // userChoseSeparateBilling only flips when the shopper unchecks the box in the
+                // UI. A separate billing address applied any other way — REST/programmatic
+                // select, a restored guest snapshot, a payment renderer supplying its own
+                // billing — left it false, so this default overwrote a real, different billing
+                // address with the shipping one. The order still placed, silently carrying the
+                // wrong billing address. Compare content, not cache keys: unchecking prefills
+                // billing from shipping, which is content-equal (so the default must still run
+                // and open the form) but has a different key.
+                if (
+                    this._fastcheckoutBillingHasOwnData(billing) &&
+                    !this._fastcheckoutBillingSameContentAsShipping(billing, shipping)
+                ) {
+                    return;
+                }
 
                 this._fastcheckoutSyncingSameAsShipping = true;
                 try {
