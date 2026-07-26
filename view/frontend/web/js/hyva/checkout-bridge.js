@@ -55,6 +55,15 @@ define([
 ) {
     'use strict';
 
+    // Third-party payment modules are written for Luma, where jQuery is a page global and
+    // both `jQuery` and `$` are available to inline scripts and widget callbacks. Under
+    // RequireJS jQuery registers as an AMD module and sets `window.jQuery` but not `window.$`,
+    // so gateway snippets using the `$` shorthand break on Hyvä. Alias it once, without
+    // clobbering anything a theme or another library may already own.
+    if (typeof window.$ === 'undefined' && typeof window.jQuery !== 'undefined') {
+        window.$ = window.jQuery;
+    }
+
     return function (config) {
         if (window.fastcheckoutKoCheckoutBridgeInitialized || window.fastcheckoutKoPaymentBridgeInitialized) {
             return;
