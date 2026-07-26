@@ -23,6 +23,7 @@ class RequireJsAssets
         'Kkkonrad_Fastcheckout/js/mixin/set-billing-address-mixin',
         'Kkkonrad_Fastcheckout/js/mixin/place-order-mixin',
         'Kkkonrad_Fastcheckout/js/mixin/shipping-view-mixin',
+        'Kkkonrad_Fastcheckout/js/mixin/region-field-mixin',
     ];
 
     /**
