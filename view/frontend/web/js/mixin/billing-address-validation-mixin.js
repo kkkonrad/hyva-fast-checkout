@@ -523,9 +523,14 @@ define([
             },
 
             /**
-             * True when the quote billing address carries shopper-entered data rather than
-             * being unset or the placeholder installed by checkout-compatibility. Tells
-             * "no billing yet" (safe to default to shipping) from "a real billing address".
+             * True when the quote billing address identifies a payer, i.e. it is a real
+             * billing address rather than "no billing yet".
+             *
+             * Deliberately keyed on identity fields (name / street) and NOT on city+postcode:
+             * checkout starts with a synthetic destination address used only to pre-estimate
+             * rates (cache key "fc-dest-rate:…"), which carries a city and postcode but no
+             * name. Counting those as a real billing address made the same-as-shipping
+             * default bail out, leaving the checkbox unchecked on first render.
              */
             _fastcheckoutBillingHasOwnData: function (billing) {
                 var street;
@@ -548,8 +553,6 @@ define([
                 return Boolean(
                     String(billing.firstname || '').trim() ||
                     String(billing.lastname || '').trim() ||
-                    String(billing.postcode || '').trim() ||
-                    String(billing.city || '').trim() ||
                     street
                 );
             },
