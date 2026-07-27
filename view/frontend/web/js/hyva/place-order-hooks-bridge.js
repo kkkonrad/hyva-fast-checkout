@@ -166,7 +166,7 @@ define([
             }
 
             if (deferUpdate !== true && typeof wire.call === 'function') {
-                return Promise.resolve(wire.call('$set', field, value)).then(function () {
+                return Promise.resolve(/* native: no Magewire $set */ true).then(function () {
                     return true;
                 });
             }

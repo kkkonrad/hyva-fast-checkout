@@ -12,6 +12,8 @@ use Magento\Downloadable\Model\Link\PurchasedFactory;
 use Magento\Framework\Event\Observer;
 use Magento\Framework\Event\ObserverInterface;
 use Magento\Framework\Exception\NoSuchEntityException;
+use Magento\Framework\App\ObjectManager;
+use Magento\Newsletter\Model\SubscriberFactory;
 use Magento\Sales\Api\OrderRepositoryInterface;
 use Magento\Sales\Model\Order;
 use Magento\Sales\Model\Order\Status\HistoryFactory;
@@ -21,6 +23,7 @@ use Psr\Log\LoggerInterface;
  * After successful quote submit:
  * - optionally attach guest order to existing customer matched by email (website scope);
  * - persist Fastcheckout order comment from checkout session;
+ * - subscribe guest/customer to newsletter when Fastcheckout checkbox was checked;
  * - re-point downloadable purchased links to that customer when assignment happened.
  *
  * Does not re-run Magento Downloadable place-order observers (would duplicate links).
@@ -49,6 +52,9 @@ class QuoteSubmitSuccess implements ObserverInterface
     /** @var PurchasedFactory|null */
     private $downloadLinkFactory;
 
+    /** @var SubscriberFactory|null */
+    private $subscriberFactory;
+
     public function __construct(
         Helper $helper,
         CheckoutSession $checkoutSession,
@@ -56,7 +62,8 @@ class QuoteSubmitSuccess implements ObserverInterface
         LoggerInterface $logger,
         CustomerRepositoryInterface $customerRepository,
         OrderRepositoryInterface $orderRepository,
-        ?PurchasedFactory $downloadLinkFactory = null
+        ?PurchasedFactory $downloadLinkFactory = null,
+        ?SubscriberFactory $subscriberFactory = null
     ) {
         $this->helper = $helper;
         $this->checkoutSession = $checkoutSession;
@@ -65,6 +72,9 @@ class QuoteSubmitSuccess implements ObserverInterface
         $this->customerRepository = $customerRepository;
         $this->orderRepository = $orderRepository;
         $this->downloadLinkFactory = $downloadLinkFactory;
+        // Optional arg: resolve via OM when DI config is stale after deploy.
+        $this->subscriberFactory = $subscriberFactory
+            ?: ObjectManager::getInstance()->get(SubscriberFactory::class);
     }
 
     /**
@@ -79,6 +89,7 @@ class QuoteSubmitSuccess implements ObserverInterface
 
         $this->assignOrderToExistingCustomerByEmail($order);
         $this->saveComment($order);
+        $this->subscribeToNewsletter($order);
 
         return $this;
     }
@@ -213,6 +224,55 @@ class QuoteSubmitSuccess implements ObserverInterface
                 'order_id' => $order->getEntityId(),
                 'exception' => $exception,
             ]);
+        }
+    }
+
+    /**
+     * Subscribe using flag captured by PlaceOrderExtrasPlugin (native KO place-order).
+     */
+    private function subscribeToNewsletter(Order $order): void
+    {
+        if (!$this->helper->isShowSubscribe()) {
+            $this->clearSubscribeFlag();
+            return;
+        }
+
+        $flag = $this->checkoutSession->getFastcheckoutSubscribe();
+        if ($flag === null || (int)$flag !== 1) {
+            $this->clearSubscribeFlag();
+            return;
+        }
+
+        $email = trim((string)$order->getCustomerEmail());
+        if ($email === '' || $this->subscriberFactory === null) {
+            $this->clearSubscribeFlag();
+            return;
+        }
+
+        try {
+            $this->subscriberFactory->create()->subscribe($email);
+        } catch (\Throwable $exception) {
+            // Never block order success on newsletter failures.
+            $this->logger->warning('Fastcheckout newsletter subscribe failed.', [
+                'order_id' => $order->getEntityId(),
+                'email' => $email,
+                'exception' => $exception,
+            ]);
+        }
+
+        $this->clearSubscribeFlag();
+    }
+
+    private function clearSubscribeFlag(): void
+    {
+        try {
+            if (method_exists($this->checkoutSession, 'unsFastcheckoutSubscribe')) {
+                $this->checkoutSession->unsFastcheckoutSubscribe();
+            } else {
+                $this->checkoutSession->setFastcheckoutSubscribe(null);
+            }
+        } catch (\Throwable $exception) {
+            // ignore session cleanup errors
         }
     }
 }

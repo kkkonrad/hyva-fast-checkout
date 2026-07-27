@@ -19,6 +19,9 @@ use Magento\Framework\View\Element\Template;
 use Magento\Framework\View\Element\Template\Context;
 use Magento\Quote\Model\Quote;
 use Magento\Quote\Model\Quote\Item;
+use Magento\Quote\Api\PaymentMethodManagementInterface;
+use Magento\Payment\Helper\Data as PaymentHelper;
+use Magento\Payment\Model\MethodInterface;
 use Kkkonrad\Fastcheckout\Helper\Data as Helper;
 use Kkkonrad\Fastcheckout\Model\Hyva\RequireJsAssets;
 use Magento\Customer\Helper\Address as AddressHelper;
@@ -185,6 +188,17 @@ class Checkout extends Template
     /** @var DirectoryDataProcessor|null */
     private $checkoutDirectoryDataProcessor;
 
+    /** @var PaymentMethodManagementInterface|null */
+    private $paymentMethodManagement;
+
+    /** @var PaymentHelper|null */
+    private $paymentHelper;
+
+    /** @var array|null */
+    private $paymentMethodsCache;
+
+    /** @var array|null */
+    private $shippingMethodsCache;
 
     /**
      * @param Context $context
@@ -216,7 +230,9 @@ class Checkout extends Template
         AddressHelper $addressHelper = null,
         TaxHelper $taxHelper = null,
         LayoutProcessor $checkoutLayoutProcessor = null,
-        DirectoryDataProcessor $checkoutDirectoryDataProcessor = null
+        DirectoryDataProcessor $checkoutDirectoryDataProcessor = null,
+        PaymentMethodManagementInterface $paymentMethodManagement = null,
+        PaymentHelper $paymentHelper = null
     ) {
         $this->checkoutSession = $checkoutSession;
         $this->pricingHelper = $pricingHelper;
@@ -233,6 +249,8 @@ class Checkout extends Template
         $this->taxHelper = $taxHelper;
         $this->checkoutLayoutProcessor = $checkoutLayoutProcessor;
         $this->checkoutDirectoryDataProcessor = $checkoutDirectoryDataProcessor;
+        $this->paymentMethodManagement = $paymentMethodManagement;
+        $this->paymentHelper = $paymentHelper;
 
         parent::__construct($context, $data);
     }
@@ -243,6 +261,299 @@ class Checkout extends Template
     public function isShowComment(): bool
     {
         return $this->helper->isShowComment();
+    }
+
+    /**
+     * @return bool
+     */
+    public function isShowDiscount(): bool
+    {
+        return $this->helper->isShowDiscount();
+    }
+
+    /**
+     * @return bool
+     */
+    public function isShowSubscribe(): bool
+    {
+        return $this->helper->isShowSubscribe();
+    }
+
+    /**
+     * Available payment methods for the current quote (no Magewire).
+     *
+     * @return array
+     */
+    public function getAvailablePaymentMethods(?array $configuredMethods = null): array
+    {
+        if ($this->paymentMethodsCache !== null) {
+            return $this->paymentMethodsCache;
+        }
+
+        $this->paymentMethodsCache = [];
+        $quote = $this->getQuote();
+        if (!$quote || !$quote->getId()) {
+            return $this->paymentMethodsCache;
+        }
+
+        $paymentMethodManagement = $this->paymentMethodManagement
+            ?: $this->resolveObject(\Magento\Quote\Api\PaymentMethodManagementInterface::class);
+        $paymentHelper = $this->paymentHelper
+            ?: $this->resolveObject(\Magento\Payment\Helper\Data::class);
+
+        // Reuse CompositeConfigProvider results when checkout config was already
+        // resolved for the page. An empty configured list is meaningful here:
+        // it normally means no shipping method is selected yet, so go directly
+        // to the active-store fallback instead of repeating the quote API call.
+        if ($configuredMethods !== null) {
+            $this->paymentMethodsCache = array_values($configuredMethods);
+        } elseif ($paymentMethodManagement) {
+            try {
+                $methods = $paymentMethodManagement->getList($quote->getId());
+                $this->paymentMethodsCache = is_array($methods) ? array_values($methods) : [];
+            } catch (\Throwable $exception) {
+                $this->paymentMethodsCache = [];
+            }
+        }
+
+        // Fallback: active store payment methods so the DOM has option rows
+        //    before shipping is selected; JS remap shows the mapped ones after pick.
+        if ($this->paymentMethodsCache === [] && $paymentHelper) {
+            try {
+                $storeMethods = $paymentHelper->getStoreMethods(null, $quote);
+                if (is_array($storeMethods)) {
+                    $this->paymentMethodsCache = array_values(array_filter(
+                        $storeMethods,
+                        static function ($method) {
+                            return $method instanceof MethodInterface
+                                && (string)$method->getCode() !== '';
+                        }
+                    ));
+                }
+            } catch (\Throwable $exception) {
+                // keep empty
+            }
+        }
+
+        // Normalize to objects with getCode()/getTitle() for the template.
+        $this->paymentMethodsCache = array_map(function ($method) {
+            if ($method instanceof MethodInterface) {
+                return new class ($method) {
+                    private $method;
+                    public function __construct(MethodInterface $method)
+                    {
+                        $this->method = $method;
+                    }
+                    public function getCode(): string
+                    {
+                        return (string)$this->method->getCode();
+                    }
+                    public function getTitle(): string
+                    {
+                        return (string)$this->method->getTitle();
+                    }
+                };
+            }
+            return $method;
+        }, $this->paymentMethodsCache);
+
+        return $this->paymentMethodsCache;
+    }
+
+    /**
+     * Payment codes allowed for the currently selected shipping method (mapping).
+     *
+     * @return string[]
+     */
+    public function getAllowedPaymentMethodCodes(): array
+    {
+        $quote = $this->getQuote();
+        $shippingMethod = '';
+        if ($quote && $quote->getShippingAddress()) {
+            $shippingMethod = (string)$quote->getShippingAddress()->getShippingMethod();
+        }
+
+        if (!$this->helper->hasShippingPaymentMapping()) {
+            return [];
+        }
+
+        // No shipping picked yet → no mapped payments (JS shows "select shipping first").
+        if ($shippingMethod === '') {
+            return [];
+        }
+
+        return $this->helper->getMappedPaymentMethodsForShipping($shippingMethod);
+    }
+
+    public function isPaymentMethodAvailable(string $paymentMethodCode, array $allowedCodes = null): bool
+    {
+        $allowedCodes = $allowedCodes !== null ? $allowedCodes : $this->getAllowedPaymentMethodCodes();
+        if (!$this->helper->hasShippingPaymentMapping()) {
+            // No mapping configured → all payment methods allowed.
+            return true;
+        }
+        if (empty($allowedCodes)) {
+            // Mapping exists but no shipping selected (or no rules match) → hide until pick.
+            return false;
+        }
+
+        return $this->helper->isPaymentMethodCodeAllowedByRules($paymentMethodCode, $allowedCodes);
+    }
+
+    public function isPaymentMethodSelected(string $paymentMethodCode): bool
+    {
+        $quote = $this->getQuote();
+        $payment = $quote ? $quote->getPayment() : null;
+        $selected = $payment ? (string)$payment->getMethod() : '';
+
+        return $selected !== '' && $selected === $paymentMethodCode;
+    }
+
+    /**
+     * Magento store default country (general/country/default), then shipping origin.
+     */
+    public function getDefaultDestinationCountryId(): string
+    {
+        $country = (string)$this->_scopeConfig->getValue(
+            \Magento\Directory\Helper\Data::XML_PATH_DEFAULT_COUNTRY,
+            \Magento\Store\Model\ScopeInterface::SCOPE_STORE
+        );
+        if ($country !== '') {
+            return $country;
+        }
+
+        return (string)$this->_scopeConfig->getValue(
+            'shipping/origin/country_id',
+            \Magento\Store\Model\ScopeInterface::SCOPE_STORE
+        );
+    }
+
+    /**
+     * Apply Magento default destination (country / optional origin postcode+region)
+     * so rates can be collected before the shopper types an address.
+     */
+    public function ensureDefaultShippingDestination(): void
+    {
+        $quote = $this->getQuote();
+        if (!$quote || $quote->isVirtual()) {
+            return;
+        }
+
+        $shippingAddress = $quote->getShippingAddress();
+        if (!$shippingAddress) {
+            return;
+        }
+
+        if (!(string)$shippingAddress->getCountryId()) {
+            $country = $this->getDefaultDestinationCountryId();
+            if ($country !== '') {
+                $shippingAddress->setCountryId($country);
+            }
+        }
+
+        if (!(string)$shippingAddress->getPostcode()) {
+            $postcode = (string)$this->_scopeConfig->getValue(
+                'shipping/origin/postcode',
+                \Magento\Store\Model\ScopeInterface::SCOPE_STORE
+            );
+            if ($postcode !== '') {
+                $shippingAddress->setPostcode($postcode);
+            }
+        }
+
+        if (!(int)$shippingAddress->getRegionId()) {
+            $regionId = (int)$this->_scopeConfig->getValue(
+                'shipping/origin/region_id',
+                \Magento\Store\Model\ScopeInterface::SCOPE_STORE
+            );
+            if ($regionId > 0) {
+                $shippingAddress->setRegionId($regionId);
+            }
+        }
+
+        if (!(string)$shippingAddress->getCity()) {
+            $city = (string)$this->_scopeConfig->getValue(
+                'shipping/origin/city',
+                \Magento\Store\Model\ScopeInterface::SCOPE_STORE
+            );
+            if ($city !== '') {
+                $shippingAddress->setCity($city);
+            }
+        }
+    }
+
+    /**
+     * Reuse grouped shipping rates that are already present on the quote.
+     *
+     * Carrier collection can perform remote calls and must not delay the HTML
+     * response. When no rates are cached, the native KO rate processor estimates
+     * them asynchronously after the shipping form has painted.
+     *
+     * @return array
+     */
+    public function getShippingMethods(): array
+    {
+        if ($this->shippingMethodsCache !== null) {
+            return $this->shippingMethodsCache;
+        }
+
+        $this->shippingMethodsCache = [];
+        $quote = $this->getQuote();
+        if (!$quote || $quote->isVirtual()) {
+            return $this->shippingMethodsCache;
+        }
+
+        $this->ensureDefaultShippingDestination();
+        $shippingAddress = $quote->getShippingAddress();
+        if (!$shippingAddress || !$shippingAddress->getCountryId()) {
+            return $this->shippingMethodsCache;
+        }
+
+        try {
+            $rates = $shippingAddress->getGroupedAllShippingRates();
+            $this->shippingMethodsCache = is_array($rates) ? $rates : [];
+        } catch (\Throwable $exception) {
+            $this->shippingMethodsCache = [];
+        }
+
+        return $this->shippingMethodsCache;
+    }
+
+    public function getSelectedShippingMethodCode(): string
+    {
+        $quote = $this->getQuote();
+        if (!$quote || !$quote->getShippingAddress()) {
+            return '';
+        }
+
+        return (string)$quote->getShippingAddress()->getShippingMethod();
+    }
+
+    public function getCouponCode(): string
+    {
+        $quote = $this->getQuote();
+        return $quote ? (string)$quote->getCouponCode() : '';
+    }
+
+    public function getHelper(): Helper
+    {
+        return $this->helper;
+    }
+
+    /**
+     * Resolve a dependency when compiled DI omitted an optional constructor arg.
+     *
+     * @template T
+     * @param class-string<T> $type
+     * @return T|null
+     */
+    private function resolveObject(string $type)
+    {
+        try {
+            return \Magento\Framework\App\ObjectManager::getInstance()->get($type);
+        } catch (\Throwable $exception) {
+            return null;
+        }
     }
 
     /**

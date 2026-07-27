@@ -12,11 +12,7 @@
             <block class="Kkkonrad\Fastcheckout\Block\Hyva\Checkout"
                    name="kkkonrad.fastcheckout.hyva.checkout"
                    template="Kkkonrad_Fastcheckout::hyva/checkout.phtml"
-                   cacheable="false">
-                <arguments>
-                    <argument name="magewire" xsi:type="object">Kkkonrad\Fastcheckout\Magewire\Checkout</argument>
-                </arguments>
-            </block>
+                   cacheable="false"/>
             <block class="Kkkonrad\Fastcheckout\Block\Hyva\Checkout"
                    name="kkkonrad.fastcheckout.hyva.checkout.ko_checkout_bridge"
                    as="ko_checkout_bridge"

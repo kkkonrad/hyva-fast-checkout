@@ -3,113 +3,71 @@ define([
     'Kkkonrad_Fastcheckout/js/mixin/is-fastcheckout-active',
     'Magento_Checkout/js/model/shipping-service',
     'Magento_Checkout/js/model/shipping-rate-registry',
-    'Magento_Checkout/js/model/error-processor'
-], function (wrapper, isFastcheckoutActive, shippingService, rateRegistry, errorProcessor) {
+    'Kkkonrad_Fastcheckout/js/hyva/region-country-guard'
+], function (wrapper, isFastcheckoutActive, shippingService, rateRegistry, regionCountryGuard) {
     'use strict';
 
-    function getAddressKey(address, resolver) {
-        if (typeof resolver === 'function') {
-            return resolver(address);
-        }
-
-        if (address && typeof address.getCacheKey === 'function') {
-            return address.getCacheKey();
-        }
-
-        if (address && typeof address.getKey === 'function') {
-            return address.getKey();
-        }
-
-        return null;
-    }
-
-    function processError(response) {
-        response = response || {};
-        if (typeof response.responseText === 'undefined') {
-            response.responseText = JSON.stringify({
-                message: response.message || 'Could not estimate shipping rates.'
-            });
-        }
-        errorProcessor.process(response);
-    }
-
-    function numericEqual(a, b) {
-        var na = Number(a),
-            nb = Number(b);
-
-        if (isNaN(na) && isNaN(nb)) {
-            return true;
-        }
-
-        return Math.abs(na - nb) < 0.00001;
-    }
-
     /**
-     * Avoid KO list re-renders when Magento re-notifies the same estimated rates.
+     * Magento new-customer-address getCacheKey() is unique per object instance, so
+     * rateRegistry never hits and every field debounce / dual selectShippingAddress
+     * re-POSTs estimate-shipping-methods for the same destination.
+     *
+     * For rate lookup only we temporarily use a destination-based key (restored after
+     * the request settles) so concurrent/identical estimates collapse.
      */
-    function ratesListChanged(currentRates, nextRates) {
-        var i,
-            cr,
-            nr;
+    var pendingByDestination = {};
 
-        currentRates = Array.isArray(currentRates) ? currentRates : [];
-        nextRates = Array.isArray(nextRates) ? nextRates : [];
-
-        if (currentRates.length !== nextRates.length) {
-            return true;
+    function streetKey(street) {
+        if (Array.isArray(street)) {
+            return street.map(function (line) {
+                return String(line || '').trim();
+            }).join('|');
+        }
+        if (street && typeof street === 'object') {
+            return [street[0] || street['0'] || '', street[1] || street['1'] || ''].join('|');
         }
 
-        for (i = 0; i < currentRates.length; i++) {
-            cr = currentRates[i] || {};
-            nr = nextRates[i] || {};
-            if (
-                String(cr.carrier_code || '') !== String(nr.carrier_code || '') ||
-                String(cr.method_code || '') !== String(nr.method_code || '') ||
-                !numericEqual(cr.amount, nr.amount) ||
-                String(cr.method_title || '') !== String(nr.method_title || '') ||
-                String(cr.carrier_title || '') !== String(nr.carrier_title || '')
-            ) {
-                return true;
-            }
-        }
-
-        return false;
+        return street ? String(street) : '';
     }
 
-    /**
-     * Fields carriers price on. Street/company/name changes must not re-estimate.
-     */
-    function rateAffectingSignature(address) {
-        var read = function (key) {
-                var value = address ? address[key] : '';
-
-                if (typeof value === 'function') {
-                    value = value();
-                }
-
-                return value === null || typeof value === 'undefined' ? '' : String(value);
-            };
-
+    function destinationKey(address) {
         if (!address) {
             return '';
         }
 
         return [
-            read('countryId') || read('country_id'),
-            read('regionId') || read('region_id'),
-            read('region'),
-            read('postcode'),
-            read('city')
-        ].join('|');
+            String(address.countryId || address.country_id || ''),
+            String(address.regionId || address.region_id || ''),
+            String(address.region || ''),
+            String(address.postcode || ''),
+            String(address.city || ''),
+            streetKey(address.street)
+        ].join('~');
     }
 
-    // Signature of the address the currently displayed rates were priced for.
-    var lastEstimatedSignature = null;
+    function registryKey(address) {
+        return 'fc-dest-rate:' + destinationKey(address);
+    }
+
+    function stopLoading() {
+        if (
+            shippingService &&
+            shippingService.isLoading &&
+            typeof shippingService.isLoading === 'function'
+        ) {
+            shippingService.isLoading(false);
+        }
+    }
+
+    function finishPending(dest, address, originalGetCacheKey) {
+        pendingByDestination[dest] = false;
+        if (address && originalGetCacheKey) {
+            address.getCacheKey = originalGetCacheKey;
+        }
+    }
 
     return {
         /**
-         * Route Magento KO shipping-rate processors through the Fastcheckout bridge.
-         *
          * @param {Object} processor
          * @param {Object=} options
          * @returns {Object}
@@ -122,78 +80,97 @@ define([
             }
 
             processor.getRates = wrapper.wrap(processor.getRates, function (originalGetRates, address) {
-                var cacheKey,
-                    cache,
-                    currentRates;
+                var dest,
+                    regKey,
+                    cached,
+                    originalGetCacheKey = null,
+                    loadingSub = null,
+                    settled = false;
 
-                if (
-                    !isFastcheckoutActive() ||
-                    !window.fastcheckoutHyvaShipping ||
-                    typeof window.fastcheckoutHyvaShipping.onEstimateShippingRatesAction !== 'function'
-                ) {
+                if (!isFastcheckoutActive()) {
                     return originalGetRates(address);
                 }
 
-                // Method selection must not re-estimate carriers — payment list updates only.
+                // The estimate fires straight off the country change, before the bridge gets a
+                // chance to sanitise the quote address, so this is the earliest point where the
+                // outgoing payload can still carry the previous country's region_id.
+                regionCountryGuard.dropRegionFromOtherCountry(address);
+
+                // KO can select both a temporary country-only address and a restored
+                // full address while the fieldset is still mounting. Rate estimation
+                // is restarted after address-fields-ready; no XHR should compete with
+                // the first paint regardless of how complete this early address is.
+                if (!window.fastcheckoutAddressFieldsReady) {
+                    stopLoading();
+                    return;
+                }
+
+                // Method selection must not re-estimate carriers — payment/totals only.
                 if (window.fastcheckoutLockShippingRatesList || window.fastcheckoutSelectingShippingMethod) {
-                    shippingService.isLoading(false);
+                    stopLoading();
                     return;
                 }
 
-                cacheKey = getAddressKey(address, options.cacheKeyResolver);
-                cache = cacheKey ? rateRegistry.get(cacheKey) : false;
-                currentRates = shippingService.getShippingRates()();
+                dest = destinationKey(address);
+                if (!dest) {
+                    return originalGetRates(address);
+                }
 
-                if (cache) {
-                    // Cache hit: only replace KO rates when the list actually changed.
-                    // Re-setting the same rates on every address re-notify reloads the list UI.
-                    if (ratesListChanged(currentRates, cache)) {
-                        shippingService.setShippingRates(cache);
+                regKey = registryKey(address);
+
+                // Identical destination already in flight — first call will set rates.
+                if (pendingByDestination[dest]) {
+                    if (shippingService && shippingService.isLoading && typeof shippingService.isLoading === 'function') {
+                        shippingService.isLoading(true);
                     }
-                    lastEstimatedSignature = rateAffectingSignature(address);
-                    shippingService.isLoading(false);
                     return;
                 }
 
-                // No registry entry for this address object key, but rates are already on
-                // screen (common after Magento builds a new address object on method
-                // select). Keep the visible list instead of flashing a reload — but only
-                // when the fields carriers actually price on are unchanged. Keying purely
-                // off "something is on screen" also swallowed real address edits: the old
-                // rates were kept AND cached under the new address key, so once any rates
-                // were shown a country/postcode change never re-priced shipping again.
-                if (
-                    Array.isArray(currentRates) &&
-                    currentRates.length &&
-                    rateAffectingSignature(address) === lastEstimatedSignature
-                ) {
-                    if (cacheKey) {
-                        rateRegistry.set(cacheKey, currentRates);
+                cached = rateRegistry && typeof rateRegistry.get === 'function'
+                    ? rateRegistry.get(regKey)
+                    : false;
+
+                if (cached) {
+                    if (shippingService && typeof shippingService.setShippingRates === 'function') {
+                        shippingService.setShippingRates(cached);
                     }
-                    shippingService.isLoading(false);
+                    stopLoading();
                     return;
                 }
 
-                shippingService.isLoading(true);
+                if (address && typeof address.getCacheKey === 'function') {
+                    originalGetCacheKey = address.getCacheKey.bind(address);
+                    address.getCacheKey = function () {
+                        return regKey;
+                    };
+                }
 
-                window.fastcheckoutHyvaShipping.onEstimateShippingRatesAction(address)
-                    .then(function (rates) {
-                        rates = Array.isArray(rates) ? rates : [];
-                        if (cacheKey) {
-                            rateRegistry.set(cacheKey, rates);
+                pendingByDestination[dest] = true;
+
+                function settle() {
+                    if (settled) {
+                        return;
+                    }
+                    settled = true;
+                    if (loadingSub && typeof loadingSub.dispose === 'function') {
+                        loadingSub.dispose();
+                    }
+                    finishPending(dest, address, originalGetCacheKey);
+                }
+
+                // When Magento finishes (success or fail) isLoading goes false.
+                if (shippingService && shippingService.isLoading && typeof shippingService.isLoading.subscribe === 'function') {
+                    loadingSub = shippingService.isLoading.subscribe(function (loading) {
+                        if (!loading) {
+                            settle();
                         }
-                        lastEstimatedSignature = rateAffectingSignature(address);
-                        if (ratesListChanged(shippingService.getShippingRates()(), rates)) {
-                            shippingService.setShippingRates(rates);
-                        }
-                    })
-                    .catch(function (response) {
-                        shippingService.setShippingRates([]);
-                        processError(response);
-                    })
-                    .then(function () {
-                        shippingService.isLoading(false);
                     });
+                }
+
+                // Safety net if isLoading never flips.
+                window.setTimeout(settle, 8000);
+
+                return originalGetRates(address);
             });
             processor.fastcheckoutWrappedRates = true;
 

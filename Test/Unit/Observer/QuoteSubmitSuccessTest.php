@@ -48,18 +48,31 @@ class QuoteSubmitSuccessTest extends TestCase
     /** @var PurchasedFactory&MockObject */
     private $downloadLinkFactory;
 
+    /** @var \Magento\Newsletter\Model\SubscriberFactory&MockObject */
+    private $subscriberFactory;
+
     protected function setUp(): void
     {
         $this->helper = $this->createMock(Helper::class);
         $this->checkoutSession = $this->getMockBuilder(CheckoutSession::class)
             ->disableOriginalConstructor()
-            ->addMethods(['getFastcheckoutComment', 'unsFastcheckoutComment'])
+            ->addMethods([
+                'getFastcheckoutComment',
+                'unsFastcheckoutComment',
+                'getFastcheckoutSubscribe',
+                'unsFastcheckoutSubscribe',
+                'setFastcheckoutSubscribe',
+            ])
             ->getMock();
         $this->historyFactory = $this->createMock(HistoryFactory::class);
         $this->logger = $this->createMock(LoggerInterface::class);
         $this->customerRepository = $this->createMock(CustomerRepositoryInterface::class);
         $this->orderRepository = $this->createMock(OrderRepositoryInterface::class);
         $this->downloadLinkFactory = $this->createMock(PurchasedFactory::class);
+        $this->subscriberFactory = $this->getMockBuilder(\Magento\Newsletter\Model\SubscriberFactory::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['create'])
+            ->getMock();
     }
 
     public function testGuestOrderIsNotAssignedWhenConfigDisabled(): void
@@ -276,6 +289,30 @@ class QuoteSubmitSuccessTest extends TestCase
         $this->createObserver()->execute($this->eventFor($order));
     }
 
+    public function testNewsletterSubscribeWhenFlagSet(): void
+    {
+        $order = $this->createOrderMock(['getCustomerEmail', 'getEntityId']);
+        $order->method('getCustomerId')->willReturn(null);
+        $order->method('getCustomerEmail')->willReturn('guest@example.com');
+        $order->method('getEntityId')->willReturn(55);
+
+        $this->helper->method('isEnable')->willReturn(true);
+        $this->helper->method('isAssignOrderToCustomer')->willReturn(false);
+        $this->helper->method('isShowComment')->willReturn(false);
+        $this->helper->method('isShowSubscribe')->willReturn(true);
+        $this->checkoutSession->method('getFastcheckoutSubscribe')->willReturn(1);
+
+        $subscriber = $this->getMockBuilder(\Magento\Newsletter\Model\Subscriber::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['subscribe'])
+            ->getMock();
+        $subscriber->expects($this->once())->method('subscribe')->with('guest@example.com');
+        $this->subscriberFactory->expects($this->once())->method('create')->willReturn($subscriber);
+        $this->checkoutSession->expects($this->once())->method('unsFastcheckoutSubscribe');
+
+        $this->createObserver()->execute($this->eventFor($order));
+    }
+
     private function createObserver(): QuoteSubmitSuccess
     {
         return new QuoteSubmitSuccess(
@@ -285,7 +322,8 @@ class QuoteSubmitSuccessTest extends TestCase
             $this->logger,
             $this->customerRepository,
             $this->orderRepository,
-            $this->downloadLinkFactory
+            $this->downloadLinkFactory,
+            $this->subscriberFactory
         );
     }
 

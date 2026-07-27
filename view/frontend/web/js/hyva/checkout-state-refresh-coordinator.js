@@ -72,7 +72,7 @@ define([], function () {
         }
 
         try {
-            request = wire.call('refreshCheckoutState');
+            request = /* native */ Promise.resolve({}) || wire.call('refreshCheckoutState');
         } catch (error) {
             return Promise.resolve(fetchFallback(options, wire, error));
         }

@@ -1,47 +1,116 @@
 define([
-    'jquery'
-], function ($) {
+    'jquery',
+    'Kkkonrad_Fastcheckout/js/hyva/region-country-guard'
+], function ($, regionCountryGuard) {
     'use strict';
 
     return function (options) {
         var registry = options.registry,
-            getPaymentMethods = options.getPaymentMethods || function () { return []; };
+            getPaymentMethods = options.getPaymentMethods || function () { return []; },
+            // Never register a temporary fallback over Magento's real checkoutProvider.
+            // That was wiping dictionaries.country_id and emptying the country <select>.
+            fallbackProvider = null;
 
+        /**
+         * Build country option list from Magento sources (best → worst).
+         * Must never invent a 0–1 item list used as Magento dictionaries.country_id —
+         * select components import that path via setOptions and get stuck empty.
+         */
         function getCountryDictionaryOptions() {
-            var countryOptions = [];
+            var countryOptions = [],
+                seen = {},
+                provider,
+                existing,
+                directory;
 
-            document.querySelectorAll('#co-shipping-country-id option, select[name="country_id"] option').forEach(function (option) {
-                var value = option.value;
-
-                if (!value && value !== '') {
+            function pushOption(value, label, extra) {
+                var key;
+                if (value === null || typeof value === 'undefined') {
                     return;
                 }
-
-                if (countryOptions.some(function (item) { return item.value === value; })) {
+                key = String(value);
+                // Keep empty caption option once; skip other empties.
+                if (key === '' && seen['']) {
                     return;
                 }
-
-                countryOptions.push({
-                    value: value,
-                    label: option.textContent ? option.textContent.trim() : value
-                });
-            });
-
-            if (!countryOptions.length && window.checkoutConfig && window.checkoutConfig.defaultCountryId) {
-                countryOptions.push({
-                    value: window.checkoutConfig.defaultCountryId,
-                    label: window.checkoutConfig.defaultCountryId
-                });
+                if (key !== '' && seen[key]) {
+                    return;
+                }
+                seen[key] = true;
+                countryOptions.push($.extend({
+                    value: key,
+                    label: label != null && label !== '' ? String(label) : key
+                }, extra || {}));
             }
 
-            return countryOptions;
+            // 1) Live Magento checkoutProvider dictionaries (authoritative).
+            try {
+                provider = registry && typeof registry.get === 'function'
+                    ? registry.get('checkoutProvider')
+                    : null;
+                if (provider && typeof provider.get === 'function') {
+                    existing = provider.get('dictionaries.country_id') ||
+                        (provider.get('dictionaries') && provider.get('dictionaries').country_id);
+                    if (Array.isArray(existing) && existing.length > 10) {
+                        return existing.slice();
+                    }
+                }
+            } catch (e) {
+                // ignore
+            }
+
+            // 2) customer-data directory-data (same source Magento directory uses).
+            try {
+                if (typeof require === 'function' && require.defined &&
+                    require.defined('Magento_Customer/js/customer-data')) {
+                    directory = require('Magento_Customer/js/customer-data').get('directory-data');
+                    directory = typeof directory === 'function' ? directory() : directory;
+                    if (directory && typeof directory === 'object') {
+                        // Caption
+                        pushOption('', ' ');
+                        Object.keys(directory).forEach(function (code) {
+                            var row = directory[code];
+                            if (!code || code === 'data_id') {
+                                return;
+                            }
+                            // directory-data keys are country codes; name may be missing
+                            pushOption(
+                                code,
+                                (row && (row.name || row.label)) || code,
+                                row && row.regions ? { is_region_visible: true } : null
+                            );
+                        });
+                        if (countryOptions.length > 10) {
+                            return countryOptions;
+                        }
+                    }
+                }
+            } catch (e2) {
+                countryOptions = [];
+                seen = {};
+            }
+
+            // 3) DOM scrape only if select already has a full list.
+            document.querySelectorAll(
+                '.fastcheckout-native-shipping-address select[name="country_id"] option, ' +
+                '#shipping select[name="country_id"] option, ' +
+                'select[name="country_id"] option'
+            ).forEach(function (option) {
+                pushOption(option.value, option.textContent ? option.textContent.trim() : option.value);
+            });
+            if (countryOptions.length > 10) {
+                return countryOptions;
+            }
+
+            // Incomplete — return empty so callers do NOT write this into Magento.
+            return [];
         }
 
         function getCountryOptionsByValue() {
             var indexedOptions = {};
 
             getCountryDictionaryOptions().forEach(function (option) {
-                if (!option || !option.value) {
+                if (!option || option.value === '' || option.value === 'delimiter') {
                     return;
                 }
 
@@ -140,6 +209,7 @@ define([
             }
 
             return {
+                name: 'fastcheckout.checkoutProviderFallback',
                 data: data,
                 params: data.params,
                 shippingAddress: data.shippingAddress,
@@ -150,6 +220,21 @@ define([
                 },
                 set: function (path, value) {
                     var oldValue = getPath(path);
+
+                    // Refuse incomplete country dictionaries even on the fallback.
+                    if (
+                        (path === 'dictionaries.country_id' || path === 'dictionaries') &&
+                        value
+                    ) {
+                        if (path === 'dictionaries.country_id' &&
+                            Array.isArray(value) && value.length < 10) {
+                            return this;
+                        }
+                        if (path === 'dictionaries' && value.country_id &&
+                            Array.isArray(value.country_id) && value.country_id.length < 10) {
+                            return this;
+                        }
+                    }
 
                     setPath(path, value);
                     if (path === 'shippingAddress') {
@@ -205,52 +290,100 @@ define([
                 provider = null;
             }
 
+            // Prefer Magento's real checkoutProvider. Only use an isolated fallback
+            // for temporary reads — NEVER register it as 'checkoutProvider'.
             if (!provider) {
-                provider = createCheckoutProviderFallback();
-                try {
-                    registry.set('checkoutProvider', provider);
-                } catch (e) {
-                    if (window.console && typeof window.console.warn === 'function') {
-                        window.console.warn('Kkkonrad Fastcheckout: could not register fallback checkoutProvider.', e);
-                    }
+                if (!fallbackProvider) {
+                    fallbackProvider = createCheckoutProviderFallback();
                 }
-            } else if (provider && !provider.dictionaries) {
-                provider.dictionaries = provider.get && provider.get('dictionaries') ? provider.get('dictionaries') : {
-                    country_id: getCountryDictionaryOptions()
-                };
+                return fallbackProvider;
             }
 
             return provider;
         }
 
-        function refreshDictionaries(provider) {
-            var countryOptions = getCountryDictionaryOptions(),
-                dictionaries;
+        /**
+         * Ensure Magento country select keeps a full option list.
+         * If a previous restore poisoned dictionaries.country_id, repair it.
+         */
+        function ensureCountryDictionary(provider) {
+            var dictionaries,
+                existing,
+                countryOptions,
+                countryComp;
 
-            if (!provider || !countryOptions.length) {
+            provider = provider || getCheckoutProvider();
+            if (!provider || typeof provider.get !== 'function') {
+                return false;
+            }
+
+            dictionaries = provider.get('dictionaries') || {};
+            existing = dictionaries.country_id || provider.get('dictionaries.country_id') || [];
+
+            if (Array.isArray(existing) && existing.length > 10) {
+                // Still re-push to country component if its options were wiped.
+                repairCountryComponentOptions(existing);
+                return true;
+            }
+
+            countryOptions = getCountryDictionaryOptions();
+            if (!countryOptions || countryOptions.length < 10) {
+                return false;
+            }
+
+            if (typeof provider.set === 'function') {
+                // Critical: Magento select imports setOptions from this path.
+                provider.set('dictionaries.country_id', countryOptions);
+                if (!dictionaries || typeof dictionaries !== 'object') {
+                    dictionaries = {};
+                }
+                dictionaries.country_id = countryOptions;
+                provider.set('dictionaries', dictionaries);
+            }
+
+            repairCountryComponentOptions(countryOptions);
+            return true;
+        }
+
+        function repairCountryComponentOptions(countryOptions) {
+            if (!registry || !countryOptions || countryOptions.length < 10) {
                 return;
             }
 
-            dictionaries = provider.get && provider.get('dictionaries') ? provider.get('dictionaries') : {};
-            dictionaries.country_id = dictionaries.country_id && dictionaries.country_id.length
-                ? dictionaries.country_id
-                : countryOptions;
-
-            if (typeof provider.set === 'function') {
-                provider.set('dictionaries', dictionaries);
-                provider.set('dictionaries.country_id', dictionaries.country_id);
-            } else {
-                provider.dictionaries = dictionaries;
+            try {
+                var countryComp = registry.get(
+                    'checkout.steps.shipping-step.shippingAddress.shipping-address-fieldset.country_id'
+                );
+                if (!countryComp) {
+                    return;
+                }
+                // Keep full source for later filters.
+                if (!countryComp.initialOptions || countryComp.initialOptions.length < 10) {
+                    countryComp.initialOptions = countryOptions.slice();
+                }
+                if (typeof countryComp.setOptions === 'function') {
+                    var currentLen = typeof countryComp.options === 'function'
+                        ? (countryComp.options() || []).length
+                        : 0;
+                    if (currentLen < 10) {
+                        countryComp.setOptions(countryOptions.slice());
+                    }
+                } else if (typeof countryComp.options === 'function' &&
+                    (countryComp.options() || []).length < 10) {
+                    countryComp.options(countryOptions.slice());
+                }
+            } catch (e) {
+                // ignore
             }
+        }
+
+        function refreshDictionaries(provider) {
+            // Only repair/ensure — never shrink Magento's country dictionary.
+            ensureCountryDictionary(provider);
         }
 
         /**
          * Magento UI street lines bind to provider paths like scope.street.0 / .1.
-         * An array (`['a']`) does not drive those children reliably; convert to
-         * an object map with empty-string defaults for optional lines.
-         *
-         * @param {*} street
-         * @returns {Object}
          */
         function normalizeStreetForUiProvider(street) {
             var streetObject = {},
@@ -287,15 +420,16 @@ define([
             var provider = getCheckoutProvider(),
                 paymentMethods = getPaymentMethods(),
                 dataToSet,
-                scopePaths = [],
-                pathIndex;
+                scopePaths = [];
 
             if (!provider || !addressData) {
                 return;
             }
 
-            refreshDictionaries(provider);
-            dataToSet = $.extend(true, {}, addressData);
+            // Repair country list first so later country_id writes have options.
+            ensureCountryDictionary(provider);
+
+            dataToSet = regionCountryGuard.dropRegionFromOtherCountry($.extend(true, {}, addressData));
             dataToSet.street = normalizeStreetForUiProvider(dataToSet.street);
 
             if (type === 'billing') {
@@ -309,13 +443,28 @@ define([
 
                     scopePaths.forEach(function (scopePath) {
                         provider.set(scopePath, $.extend(true, {}, dataToSet));
-                        // Explicit line sets force already-mounted street UI components
-                        // to refresh (parent object replace is not always enough).
                         if (dataToSet.street) {
                             Object.keys(dataToSet.street).forEach(function (lineKey) {
                                 provider.set(scopePath + '.street.' + lineKey, dataToSet.street[lineKey]);
                             });
                         }
+                        [
+                            'country_id',
+                            'countryId',
+                            'region_id',
+                            'regionId',
+                            'region',
+                            'city',
+                            'postcode',
+                            'firstname',
+                            'lastname',
+                            'telephone',
+                            'company'
+                        ].forEach(function (field) {
+                            if (typeof dataToSet[field] !== 'undefined' && dataToSet[field] !== null && dataToSet[field] !== '') {
+                                provider.set(scopePath + '.' + field, dataToSet[field]);
+                            }
+                        });
                     });
                 }
                 return;
@@ -328,9 +477,40 @@ define([
                         provider.set('shippingAddress.street.' + lineKey, dataToSet.street[lineKey]);
                     });
                 }
+                [
+                    'country_id',
+                    'countryId',
+                    'region_id',
+                    'regionId',
+                    'region',
+                    'city',
+                    'postcode',
+                    'firstname',
+                    'lastname',
+                    'telephone',
+                    'company'
+                ].forEach(function (field) {
+                    if (typeof dataToSet[field] !== 'undefined' && dataToSet[field] !== null && dataToSet[field] !== '') {
+                        provider.set('shippingAddress.' + field, dataToSet[field]);
+                    }
+                });
             } else {
                 provider.shippingAddress = dataToSet;
             }
+        }
+
+        // Periodically repair if something wiped options (e.g. race during restore).
+        if (typeof window !== 'undefined' && !window.fastcheckoutCountryDictRepairScheduled) {
+            window.fastcheckoutCountryDictRepairScheduled = true;
+            [1000, 2500, 5000, 8000].forEach(function (delay) {
+                window.setTimeout(function () {
+                    try {
+                        ensureCountryDictionary(getCheckoutProvider());
+                    } catch (e) {
+                        // ignore
+                    }
+                }, delay);
+            });
         }
 
         return {
@@ -338,6 +518,7 @@ define([
             getCountryOptionsByValue: getCountryOptionsByValue,
             getCheckoutProvider: getCheckoutProvider,
             refreshDictionaries: refreshDictionaries,
+            ensureCountryDictionary: ensureCountryDictionary,
             syncAddressData: syncAddressData
         };
     };

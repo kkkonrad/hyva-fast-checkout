@@ -1,6 +1,7 @@
 <?php
 /**
- * Native Hyva checkout implementation.
+ * Fastcheckout layout — Tailwind cards + RequireJS/Knockout ownership of quote.
+ * No Magewire component / Alpine quote orchestrator.
  */
 
 use Hyva\Theme\ViewModel\HyvaCsp;
@@ -9,18 +10,18 @@ use Magento\Framework\Escaper;
 
 /** @var Checkout $block */
 /** @var Escaper $escaper */
-/** @var \Kkkonrad\Fastcheckout\Magewire\Checkout $magewire */
 /** @var HyvaCsp $hyvaCsp */
 $hyvaCsp = $block->getHyvaCsp();
 
 $items = $block->getVisibleItems();
-$countries = $magewire->getCountries();
-$shippingMethods = $magewire->getShippingMethods();
-$paymentMethods = $magewire->getPaymentMethods();
-$allowedPaymentMethodCodes = $magewire->getAllowedPaymentMethodCodes();
+$checkoutConfig = $block->getCheckoutConfig();
+$configuredPaymentMethods = $checkoutConfig['paymentMethods'] ?? null;
+$paymentMethods = $block->getAvailablePaymentMethods(
+    is_array($configuredPaymentMethods) ? $configuredPaymentMethods : null
+);
+$allowedPaymentMethodCodes = $block->getAllowedPaymentMethodCodes();
 ?>
 <section class="space-y-8 max-w-7xl mx-auto px-0 py-4 pb-24 md:p-6 md:pb-6 overflow-x-hidden" id="fastcheckout-checkout">
-    <!-- Header -->
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-gray-200 pb-6 px-4 md:px-0">
         <div>
             <h1 class="text-3xl font-semibold text-gray-900">
@@ -36,7 +37,6 @@ $allowedPaymentMethodCodes = $magewire->getAllowedPaymentMethodCodes();
         </a>
     </div>
 
-    <!-- Empty State -->
     <?php if (!$items): ?>
         <div class="card text-center py-16">
             <h2 class="text-2xl font-semibold text-gray-900">
@@ -52,14 +52,11 @@ $allowedPaymentMethodCodes = $magewire->getAllowedPaymentMethodCodes();
         </div>
     <?php else: ?>
     <form id="co-checkout-form"
-          x-data="initCheckout"
-          @submit.prevent="handleSubmit"
           novalidate
-          class="contents">
+          class="contents"
+          data-fastcheckout-native-form="1">
 
-        <!-- Responsive Grid Layout (1 column on mobile, 2 columns on desktop) -->
         <div class="fc-grid grid gap-6 grid-cols-1 items-start w-full">
-            
             <div class="fc-left-wrapper flex flex-col gap-6">
                 <?php // phpcs:ignore Magento2.Security.IncludeFile.FoundIncludeFile -- trusted module template. ?>
                 <?php include $block->getTemplateFile('Kkkonrad_Fastcheckout::hyva/checkout/shipping-address.phtml'); ?>
@@ -73,17 +70,15 @@ $allowedPaymentMethodCodes = $magewire->getAllowedPaymentMethodCodes();
                 <?php // phpcs:ignore Magento2.Security.IncludeFile.FoundIncludeFile -- trusted module template. ?>
                 <?php include $block->getTemplateFile('Kkkonrad_Fastcheckout::hyva/checkout/summary.phtml'); ?>
             </div>
-
         </div>
 
-        <!-- Sticky Place Order Bar on Mobile (Moved inside form & Alpine scope for correct spinner reactivity) -->
         <div class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 p-4 mb-0 shadow-2xl flex flex-col gap-3 transition-all duration-200"
              style="margin-bottom: 0 !important;"
-             wire:key="mobile-sticky-order-bar">
+             data-fastcheckout-mobile-sticky>
             <div class="flex items-center justify-between">
                 <div class="min-w-0">
                     <span class="block text-xs text-gray-500 uppercase tracking-wider font-semibold"><?= $escaper->escapeHtml(__('Grand Total')) ?></span>
-                    <span class="block text-xl font-bold text-gray-950">
+                    <span class="block text-xl font-bold text-gray-950" data-fastcheckout-mobile-grand-total>
                         <?= /* @noEscape */ $block->formatPrice($block->getQuote()->getGrandTotal()) ?>
                     </span>
                 </div>
@@ -94,21 +89,24 @@ $allowedPaymentMethodCodes = $magewire->getAllowedPaymentMethodCodes();
                     <span><?= $escaper->escapeHtml(__('Secure SSL Checkout')) ?></span>
                 </div>
             </div>
-            <button class="btn btn-primary w-full py-3 flex items-center justify-center gap-2 transition-all duration-200" 
-                    type="submit" 
-                    :class="isProcessing ? 'pointer-events-none' : ''">
-                <span class="place-order-spinner" x-show="isProcessing" x-cloak>
+            <button class="btn btn-primary w-full py-3 flex items-center justify-center gap-2 transition-all duration-200"
+                    type="submit"
+                    data-fastcheckout-place-order-mobile>
+                <span class="place-order-spinner hidden" data-fastcheckout-place-order-spinner aria-hidden="true">
                     <svg class="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
                 </span>
-                <span><?= $escaper->escapeHtml(__('Place Order')) ?></span>
+                <span data-fastcheckout-place-order-label
+                      data-fastcheckout-ready-text="<?= $escaper->escapeHtmlAttr(__('Place Order')) ?>"
+                      data-fastcheckout-processing-text="<?= $escaper->escapeHtmlAttr(__('Please wait...')) ?>">
+                    <?= $escaper->escapeHtml(__('Place Order')) ?>
+                </span>
             </button>
-            <p class="text-sm text-red-600 font-medium text-center"
-               x-show="clientOrderError || $wire.orderError"
-               x-text="clientOrderError || $wire.orderError"
-               x-cloak></p>
+            <p class="text-sm text-red-600 font-medium text-center hidden"
+               data-fastcheckout-client-order-error
+               role="alert"></p>
         </div>
     </form>
     <?php endif; ?>

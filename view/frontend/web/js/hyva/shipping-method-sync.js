@@ -1,25 +1,29 @@
-define([], function () {
+define([
+    'jquery',
+    'Magento_Checkout/js/model/quote',
+    'Magento_Checkout/js/action/set-shipping-information',
+    'Magento_Checkout/js/model/shipping-rate-registry'
+], function ($, quote, setShippingInformationAction, rateRegistry) {
     'use strict';
 
+    /**
+     * Shipping method ownership: Magento KO quote + native set-shipping-information.
+     * No Magewire selectShippingMethod — payment remap is client-side only.
+     */
     return function (deps) {
         deps = deps || {};
 
-        var quote = deps.quote,
-            shippingService = deps.shippingService,
+        var shippingService = deps.shippingService,
             selectShippingMethodAction = deps.selectShippingMethodAction,
-            getMagewireComponent = typeof deps.getMagewireComponent === 'function' ? deps.getMagewireComponent : function () { return null; },
-            persistShippingMethod = typeof deps.persistShippingMethod === 'function' ? deps.persistShippingMethod : function () {},
-            applyCheckoutState = typeof deps.applyCheckoutState === 'function' ? deps.applyCheckoutState : null,
-            lastMagewireShippingMethodCode = '',
-            lastMagewireShippingPushedAt = 0,
-            // Hard lock: once the shopper picks a rate, only another shopper pick
-            // (or disappearance of that rate) may change it. No time-based unlock —
-            // timed windows still allowed out-of-order Magewire responses to bounce UI.
+            persistShippingMethod = typeof deps.persistShippingMethod === 'function'
+                ? deps.persistShippingMethod
+                : function () {},
+            lastPushedCode = '',
+            lastPushedAt = 0,
             lockedUserShippingMethodCode = '',
             shippingLockGeneration = 0,
-            syncTimer = null,
-            magewirePushInFlight = false,
-            magewirePushGeneration = 0;
+            pushInFlight = false,
+            syncTimer = null;
 
         function getCode(shippingMethod) {
             if (!shippingMethod) {
@@ -37,7 +41,6 @@ define([], function () {
             if (shippingMethod.method) {
                 return shippingMethod.method;
             }
-
             return '';
         }
 
@@ -91,7 +94,6 @@ define([], function () {
         }
 
         function isUserShippingSelectionFresh() {
-            // Lock has no TTL — it stays until the next user pick (or rate disappears).
             return !!lockedUserShippingMethodCode;
         }
 
@@ -99,9 +101,6 @@ define([], function () {
             lockedUserShippingMethodCode = '';
         }
 
-        /**
-         * True when applying methodCode would fight the locked shopper choice.
-         */
         function shouldIgnoreKnockoutApply(methodCode) {
             var locked = lockedUserShippingMethodCode;
 
@@ -111,11 +110,9 @@ define([], function () {
             if (String(methodCode) === locked) {
                 return false;
             }
-            // If the locked rate vanished from the list, allow Magento/server to pick.
             if (!rateExists(locked)) {
                 return false;
             }
-
             return true;
         }
 
@@ -167,7 +164,6 @@ define([], function () {
                 active;
 
             if (shouldIgnoreKnockoutApply(code)) {
-                // Re-assert the locked rate instead of applying the stale one.
                 code = lockedUserShippingMethodCode;
             }
 
@@ -196,59 +192,161 @@ define([], function () {
             }
 
             applyRateToQuote(found);
-
-            if (code === lockedUserShippingMethodCode) {
-                lastMagewireShippingMethodCode = code;
-            }
-
             return true;
         }
 
-        function getWireShippingMethod(wire) {
-            if (!wire) {
-                return '';
-            }
+        /**
+         * Apply payment visibility from shipping↔payment mapping in checkoutConfig.
+         * Does not rebuild shipping rates.
+         */
+        /**
+         * Admin mapping is often stored as an object keyed by row ids, not a plain array.
+         */
+        function normalizeShippingPaymentMapping(raw) {
+            var list = [];
 
-            if (typeof wire.get === 'function') {
-                try {
-                    var fromGet = wire.get('shippingMethod');
-                    if (fromGet !== undefined && fromGet !== null && String(fromGet) !== '') {
-                        return String(fromGet);
+            if (!raw) {
+                return list;
+            }
+            if (Array.isArray(raw)) {
+                return raw.filter(function (rule) {
+                    return rule && typeof rule === 'object';
+                });
+            }
+            if (typeof raw === 'object') {
+                Object.keys(raw).forEach(function (key) {
+                    if (raw[key] && typeof raw[key] === 'object') {
+                        list.push(raw[key]);
                     }
-                } catch (e) {
-                    // fall through
-                }
+                });
             }
-
-            if (wire.shippingMethod !== undefined && wire.shippingMethod !== null && String(wire.shippingMethod) !== '') {
-                return String(wire.shippingMethod);
-            }
-
-            if (wire.data && wire.data.shippingMethod !== undefined && wire.data.shippingMethod !== null) {
-                return String(wire.data.shippingMethod || '');
-            }
-
-            if (wire.serverMemo && wire.serverMemo.data && wire.serverMemo.data.shippingMethod) {
-                return String(wire.serverMemo.data.shippingMethod);
-            }
-            if (
-                wire.__instance &&
-                wire.__instance.serverMemo &&
-                wire.__instance.serverMemo.data &&
-                wire.__instance.serverMemo.data.shippingMethod
-            ) {
-                return String(wire.__instance.serverMemo.data.shippingMethod);
-            }
-
-            return '';
+            return list;
         }
 
-        function pushToMagewire(methodCode) {
-            var wire = getMagewireComponent(),
-                current,
-                pushGen;
+        function applyPaymentRemapForShipping(methodCode) {
+            var settings = (window.checkoutConfig && window.checkoutConfig.fastcheckoutSettings) || {},
+                mapping = normalizeShippingPaymentMapping(settings.shippingPaymentMapping),
+                hasMapping = mapping.length > 0,
+                codes = [],
+                grid,
+                emptyMessage;
 
-            if (!methodCode || !wire || typeof wire.call !== 'function') {
+            methodCode = methodCode ? String(methodCode) : '';
+
+            if (!hasMapping) {
+                // No mapping rules: all payment options stay allowed.
+                document.querySelectorAll('[data-fastcheckout-payment-option]').forEach(function (el) {
+                    el.setAttribute('data-fastcheckout-payment-allowed', '1');
+                    el.style.display = '';
+                    el.removeAttribute('aria-hidden');
+                    var input = el.querySelector('input[name="payment_method"]');
+                    if (input) {
+                        input.disabled = false;
+                    }
+                });
+            } else if (!methodCode) {
+                // Mapping configured but no shipping yet — hide all payment options.
+                document.querySelectorAll('[data-fastcheckout-payment-option]').forEach(function (el) {
+                    el.setAttribute('data-fastcheckout-payment-allowed', '0');
+                    el.style.display = 'none';
+                    el.setAttribute('aria-hidden', 'true');
+                    var input = el.querySelector('input[name="payment_method"]');
+                    if (input) {
+                        input.disabled = true;
+                        input.checked = false;
+                    }
+                });
+            } else {
+                mapping.forEach(function (rule) {
+                    var ruleShip, rulePay, carrier, prefix;
+
+                    if (!rule || typeof rule !== 'object') {
+                        return;
+                    }
+                    ruleShip = String(rule.shipping_method || '').trim();
+                    rulePay = String(rule.payment_method || '').trim();
+                    if (!ruleShip || !rulePay) {
+                        return;
+                    }
+                    if (ruleShip === '*' || ruleShip === methodCode) {
+                        codes.push(rulePay);
+                        return;
+                    }
+                    carrier = methodCode.split('_')[0] || '';
+                    if (ruleShip === carrier) {
+                        codes.push(rulePay);
+                        return;
+                    }
+                    if (ruleShip.slice(-1) === '*') {
+                        prefix = ruleShip.slice(0, -1).replace(/_+$/, '');
+                        if (prefix && methodCode.indexOf(prefix + '_') === 0) {
+                            codes.push(rulePay);
+                        }
+                    }
+                });
+
+                document.querySelectorAll('[data-fastcheckout-payment-option]').forEach(function (el) {
+                    var code = el.getAttribute('data-fastcheckout-payment-option') || '',
+                        ok = codes.indexOf(code) !== -1,
+                        input = el.querySelector('input[name="payment_method"]');
+
+                    el.setAttribute('data-fastcheckout-payment-allowed', ok ? '1' : '0');
+                    if (ok) {
+                        el.style.display = '';
+                        el.removeAttribute('aria-hidden');
+                        if (input) {
+                            input.disabled = false;
+                        }
+                    } else {
+                        el.style.display = 'none';
+                        el.setAttribute('aria-hidden', 'true');
+                        if (input) {
+                            input.disabled = true;
+                            input.checked = false;
+                        }
+                    }
+                });
+            }
+
+            // Always refresh grid / empty message visibility (data-* selectors, not wire:key).
+            if (window.fastcheckoutHyvaPayment && typeof window.fastcheckoutHyvaPayment.applyPaymentOptionVisibility === 'function') {
+                window.fastcheckoutHyvaPayment.applyPaymentOptionVisibility();
+            } else {
+                grid = document.querySelector('[data-fastcheckout-payment-methods-grid]');
+                emptyMessage = document.querySelector('[data-fastcheckout-no-payment-methods]');
+                var anyAllowed = !!document.querySelector(
+                    '[data-fastcheckout-payment-option][data-fastcheckout-payment-allowed="1"]'
+                );
+                if (grid) {
+                    if (anyAllowed) {
+                        grid.classList.remove('hidden');
+                        grid.style.display = '';
+                    } else {
+                        grid.classList.add('hidden');
+                    }
+                }
+                if (emptyMessage) {
+                    if (anyAllowed) {
+                        emptyMessage.classList.add('hidden');
+                        emptyMessage.style.display = 'none';
+                    } else {
+                        emptyMessage.classList.remove('hidden');
+                        emptyMessage.style.display = '';
+                    }
+                }
+            }
+        }
+
+        /**
+         * Persist selected rate on the quote via Magento set-shipping-information.
+         * Single request path — no Magewire morph / dual refresh.
+         */
+        function pushNativeShippingSelection(methodCode) {
+            var found,
+                address,
+                deferred;
+
+            if (!methodCode) {
                 return Promise.resolve(false);
             }
 
@@ -256,119 +354,101 @@ define([], function () {
                 return Promise.resolve(false);
             }
 
-            current = getWireShippingMethod(wire);
-            if (current === methodCode) {
-                lastMagewireShippingMethodCode = methodCode;
-                lastMagewireShippingPushedAt = Date.now();
+            if (pushInFlight && lastPushedCode === methodCode) {
                 return Promise.resolve(false);
             }
 
-            // Coalesce in-flight / very recent pushes of the same code.
-            if (
-                magewirePushInFlight &&
-                lastMagewireShippingMethodCode === methodCode
-            ) {
-                return Promise.resolve(false);
-            }
-            if (
-                lastMagewireShippingMethodCode === methodCode &&
-                (Date.now() - lastMagewireShippingPushedAt) < 1200
-            ) {
+            if (lastPushedCode === methodCode && (Date.now() - lastPushedAt) < 800) {
                 return Promise.resolve(false);
             }
 
-            lastMagewireShippingMethodCode = methodCode;
-            lastMagewireShippingPushedAt = Date.now();
-            magewirePushInFlight = true;
-            pushGen = shippingLockGeneration;
-            magewirePushGeneration = pushGen;
+            lastPushedCode = methodCode;
+            lastPushedAt = Date.now();
+            pushInFlight = true;
 
-            // Block shipping-service setShippingRates / getRates rebuilds while the
-            // method call only remaps payment methods + totals.
+            // Keep shipping list stable while totals/payment update.
             window.fastcheckoutLockShippingRatesList = true;
             window.fastcheckoutSelectingShippingMethod = true;
 
-            return Promise.resolve(wire.call('selectShippingMethod', methodCode)).then(function (result) {
-                // Ignore completion of an outdated push after a newer user pick.
-                if (pushGen === shippingLockGeneration) {
-                    magewirePushInFlight = false;
-                    lastMagewireShippingPushedAt = Date.now();
+            found = findRate(methodCode);
+            if (found) {
+                applyRateToQuote(found);
+            }
 
-                    // Apply totals/payment from the method response, but never rebuild the
-                    // rates list — the shopper already sees the estimated methods.
-                    if (
-                        result &&
-                        typeof result === 'object' &&
-                        typeof applyCheckoutState === 'function'
-                    ) {
-                        try {
-                            applyCheckoutState(result, { skipShippingRates: true });
-                        } catch (e) {
-                            // Totals can still refresh from DOM morph; ignore apply errors.
-                        }
-                    }
-                } else if (magewirePushGeneration === pushGen) {
-                    magewirePushInFlight = false;
-                }
+            applyPaymentRemapForShipping(methodCode);
+            persistShippingMethod(methodCode);
+
+            address = quote.shippingAddress && quote.shippingAddress();
+            // If quote address is only a stub (country only), try not to block UI —
+            // set-shipping-information may 400 without firstname/street; still keep
+            // KO selection + payment remap so the shopper can finish the form.
+            if (!address || !quote.shippingMethod || !quote.shippingMethod()) {
+                pushInFlight = false;
+                window.setTimeout(function () {
+                    window.fastcheckoutLockShippingRatesList = false;
+                    window.fastcheckoutSelectingShippingMethod = false;
+                }, 250);
+                return Promise.resolve(true);
+            }
+
+            // Native Magento: shipping-information persists method + refreshes totals.
+            try {
+                deferred = setShippingInformationAction();
+            } catch (e) {
+                pushInFlight = false;
+                window.fastcheckoutLockShippingRatesList = false;
+                window.fastcheckoutSelectingShippingMethod = false;
+                applyPaymentRemapForShipping(methodCode);
+                return Promise.resolve(true);
+            }
+
+            return Promise.resolve(deferred).then(function (result) {
+                pushInFlight = false;
+                lastPushedAt = Date.now();
+                // Re-apply payment remap after shipping-information settles (mapping may
+                // depend on server-side payment list, but DOM rows are already seeded).
+                applyPaymentRemapForShipping(methodCode);
                 return result;
             }, function (error) {
-                if (pushGen === shippingLockGeneration) {
-                    magewirePushInFlight = false;
-                    if (lastMagewireShippingMethodCode === methodCode) {
-                        lastMagewireShippingMethodCode = '';
-                        lastMagewireShippingPushedAt = 0;
-                    }
-                } else if (magewirePushGeneration === pushGen) {
-                    magewirePushInFlight = false;
+                pushInFlight = false;
+                if (lastPushedCode === methodCode) {
+                    lastPushedCode = '';
+                    lastPushedAt = 0;
                 }
+                // Still show mapped payments even if set-shipping-information fails
+                // (e.g. incomplete address) so the shopper can proceed with UI.
+                applyPaymentRemapForShipping(methodCode);
                 return Promise.reject(error);
-            }).finally(function () {
-                // Keep the lock through Livewire message.processed (same tick + rAF).
+            }).then(function (result) {
                 window.setTimeout(function () {
-                    if (pushGen === shippingLockGeneration) {
-                        window.fastcheckoutLockShippingRatesList = false;
-                        window.fastcheckoutSelectingShippingMethod = false;
-                    }
-                }, 300);
+                    window.fastcheckoutLockShippingRatesList = false;
+                    window.fastcheckoutSelectingShippingMethod = false;
+                }, 250);
+                return result;
+            }, function (error) {
+                window.setTimeout(function () {
+                    window.fastcheckoutLockShippingRatesList = false;
+                    window.fastcheckoutSelectingShippingMethod = false;
+                }, 250);
+                return Promise.reject(error);
             });
         }
 
-        /**
-         * After Livewire message.processed: if a lagging response left wire on the wrong
-         * rate, re-assert the locked user rate once. Safe with hard lock (no remember poison).
-         */
         function reassertLockedMethodToMagewireIfNeeded() {
-            var wire,
-                current,
-                locked = lockedUserShippingMethodCode;
-
-            if (!locked) {
-                return Promise.resolve(false);
-            }
-
-            wire = getMagewireComponent();
-            current = getWireShippingMethod(wire);
-            if (current === locked) {
-                return Promise.resolve(false);
-            }
-
-            return pushToMagewire(locked);
+            // No Magewire to reassert against.
+            return Promise.resolve(false);
         }
 
         function syncToMagewireNow(methodCode) {
             persistShippingMethod(methodCode);
-
             if (syncTimer) {
                 window.clearTimeout(syncTimer);
                 syncTimer = null;
             }
-
             if (!methodCode) {
                 return Promise.resolve(false);
             }
-
-            // Do NOT remember here — only trusted user clicks lock intent.
-            return pushToMagewire(methodCode);
+            return pushNativeShippingSelection(methodCode);
         }
 
         function syncToMagewire(methodCode) {
@@ -378,11 +458,7 @@ define([], function () {
 
             persistShippingMethod(methodCode);
 
-            if (!methodCode) {
-                return;
-            }
-
-            if (isStaleShippingSelection(methodCode)) {
+            if (!methodCode || isStaleShippingSelection(methodCode)) {
                 return;
             }
 
@@ -390,17 +466,12 @@ define([], function () {
                 window.clearTimeout(syncTimer);
             }
 
-            // Debounce to collapse selectAction + quote.subscribe + list write into one call.
             syncTimer = window.setTimeout(function () {
                 syncTimer = null;
-                pushToMagewire(methodCode);
+                pushNativeShippingSelection(methodCode);
             }, 50);
         }
 
-        /**
-         * Enforce lock at the quote observable level so direct quote.shippingMethod(rate)
-         * writes (storage, resolvers, rate processors) cannot bounce the radio.
-         */
         function installQuoteGuard() {
             var underlying,
                 guarded;
@@ -410,7 +481,6 @@ define([], function () {
             }
 
             underlying = quote.shippingMethod;
-
             if (typeof underlying.subscribe !== 'function') {
                 return;
             }
@@ -421,7 +491,6 @@ define([], function () {
                 if (arguments.length) {
                     code = getCode(value);
                     if (code && shouldIgnoreKnockoutApply(code)) {
-                        // Reject stale write; keep current selection.
                         return underlying();
                     }
                     return underlying(value);
@@ -438,7 +507,6 @@ define([], function () {
                 guarded.dispose = underlying.dispose.bind(underlying);
             }
             guarded.fastcheckoutGuarded = true;
-            // Preserve KO observable brand for mixins that check it.
             if (underlying.extend) {
                 guarded.extend = underlying.extend.bind(underlying);
             }
@@ -461,7 +529,9 @@ define([], function () {
             clearUserShippingSelection: clearUserShippingSelection,
             reassertLockedMethodToMagewireIfNeeded: reassertLockedMethodToMagewireIfNeeded,
             getShippingLockGeneration: getShippingLockGeneration,
-            installQuoteGuard: installQuoteGuard
+            installQuoteGuard: installQuoteGuard,
+            applyPaymentRemapForShipping: applyPaymentRemapForShipping,
+            pushNativeShippingSelection: pushNativeShippingSelection
         };
     };
 });

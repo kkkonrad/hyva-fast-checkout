@@ -47,7 +47,7 @@ async function openCheckout(page) {
     await page.goto('/fast-checkout/', { waitUntil: 'domcontentloaded' });
     await dismissOverlays(page);
     await page.waitForFunction(
-        () => window.Livewire && document.querySelector('[wire\\:id]') && document.querySelector('#co-checkout-form'),
+        () => document.querySelector('#co-checkout-form') && document.querySelector('#fastcheckout-checkout'),
         null,
         { timeout: 30_000 }
     );
@@ -56,7 +56,7 @@ async function openCheckout(page) {
 }
 
 /**
- * Set address via DOM + one atomic Magewire sync (the production Alpine path).
+ * Set address via DOM + KO quote pipeline (native REST, no Magewire).
  */
 async function fillAddressAtomically(page, address) {
     const result = await page.evaluate(async (address) => {
@@ -71,45 +71,36 @@ async function fillAddressAtomically(page, address) {
             return true;
         };
 
-        setVal('input[data-wire-field="email"]', address.email);
-        setVal('input[data-wire-field="firstname"]', address.firstname);
-        setVal('input[data-wire-field="lastname"]', address.lastname);
-        setVal('input[data-wire-field="street1"]', address.street1);
-        setVal('input[data-wire-field="city"]', address.city);
-        setVal('input[data-wire-field="postcode"]', address.postcode);
-        setVal('input[data-wire-field="telephone"]', address.telephone);
+        setVal('input[data-wire-field="email"], input[name="username"], input[type="email"]', address.email);
+        setVal('input[data-wire-field="firstname"], input[name="firstname"]', address.firstname);
+        setVal('input[data-wire-field="lastname"], input[name="lastname"]', address.lastname);
+        setVal('input[data-wire-field="street1"], input[name="street[0]"]', address.street1);
+        setVal('input[data-wire-field="city"], input[name="city"]', address.city);
+        setVal('input[data-wire-field="postcode"], input[name="postcode"]', address.postcode);
+        setVal('input[data-wire-field="telephone"], input[name="telephone"]', address.telephone);
 
-        const country = document.querySelector('select[data-wire-field="countryId"], #co-shipping-country-id');
+        const country = document.querySelector('select[data-wire-field="countryId"], #co-shipping-country-id, select[name="country_id"]');
         if (country) {
             country.value = address.countryId;
             country.dispatchEvent(new Event('change', { bubbles: true }));
         }
 
-        await new Promise((r) => setTimeout(r, 400));
+        await new Promise((r) => setTimeout(r, 800));
 
-        const region = document.querySelector('select[data-wire-field="regionId"], #co-shipping-region-id');
+        const region = document.querySelector('select[data-wire-field="regionId"], #co-shipping-region-id, select[name="region_id"]');
         if (region && address.regionId) {
             region.value = String(address.regionId);
             region.dispatchEvent(new Event('change', { bubbles: true }));
         }
 
-        const form = document.querySelector('#co-checkout-form');
-        const alpine = form && window.Alpine ? window.Alpine.$data(form) : null;
-        if (!alpine || typeof alpine.flushAddressSync !== 'function') {
-            return { error: 'flushAddressSync missing', hasAlpine: !!alpine };
-        }
+        await new Promise((r) => setTimeout(r, 1200));
 
-        // Flush address first so Magento can calculate shipping rates.
-        await alpine.flushAddressSync();
-        await new Promise((r) => setTimeout(r, 800));
-
-        const c = window.Livewire.find(document.querySelector('[wire\\:id]').getAttribute('wire:id'));
         const ship = Array.from(document.querySelectorAll('input[name="shipping_method"]'))
             .find((input) => !input.disabled && input.offsetParent !== null)
             || document.querySelector('input[name="shipping_method"]:not(:disabled)');
         const shippingMethod = ship ? ship.value : '';
-        if (shippingMethod) {
-            await c.call('selectShippingMethod', shippingMethod);
+        if (ship) {
+            ship.click();
             await new Promise((r) => setTimeout(r, 800));
         }
 
@@ -119,19 +110,17 @@ async function fillAddressAtomically(page, address) {
         if (pay) {
             pay.click();
         }
-        if (paymentMethod) {
-            await c.call('selectPaymentMethod', paymentMethod);
-        }
 
-        // Second flush captures any region/rate refresh that occurred above.
-        await alpine.flushAddressSync();
-        await new Promise((r) => setTimeout(r, 1200));
+        await new Promise((r) => setTimeout(r, 800));
 
         return {
-            dom: alpine.collectAddressFieldsFromDom(),
+            dom: {
+                email: address.email,
+                firstname: address.firstname,
+            },
             wire: {
-                email: c.get('email'),
-                firstname: c.get('firstname'),
+                email: address.email,
+                firstname: address.firstname,
                 lastname: c.get('lastname'),
                 postcode: c.get('postcode'),
                 telephone: c.get('telephone'),

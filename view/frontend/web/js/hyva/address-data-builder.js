@@ -11,17 +11,42 @@ define([], function () {
                 : function (attributes) { return attributes || []; };
 
         function getEmailForQuote() {
-            var emailEl = document.getElementById('co-shipping-email') ||
-                document.querySelector('input[name="email"]') ||
-                document.querySelector('input[type="email"]') ||
-                document.querySelector('[data-wire-field="email"]');
+            var selectors = [
+                    '#customer-email',
+                    '#co-shipping-email',
+                    '[data-role="email-with-possible-login"] input[type="email"]',
+                    '[data-role="email-with-possible-login"] input[name="username"]',
+                    '[data-role="email-with-possible-login"] input[name="email"]',
+                    'input[name="username"]',
+                    'input[name="email"]',
+                    'input[type="email"]',
+                    '[data-wire-field="email"]'
+                ],
+                emailEl,
+                i,
+                value = '';
 
-            if (emailEl && emailEl.value) {
-                return emailEl.value;
+            for (i = 0; i < selectors.length; i++) {
+                emailEl = document.querySelector(selectors[i]);
+                if (emailEl && emailEl.value && String(emailEl.value).indexOf('@') !== -1) {
+                    return String(emailEl.value).trim();
+                }
             }
 
             if (quote && quote.guestEmail) {
-                return typeof quote.guestEmail === 'function' ? quote.guestEmail() : quote.guestEmail;
+                value = typeof quote.guestEmail === 'function' ? quote.guestEmail() : quote.guestEmail;
+                if (value && String(value).indexOf('@') !== -1) {
+                    return String(value).trim();
+                }
+            }
+
+            try {
+                value = window.sessionStorage.getItem('fastcheckout_email') || '';
+                if (value && value.indexOf('@') !== -1) {
+                    return String(value).trim();
+                }
+            } catch (e) {
+                // ignore
             }
 
             if (window.checkoutConfig && window.checkoutConfig.customerData && window.checkoutConfig.customerData.email) {

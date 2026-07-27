@@ -1,17 +1,20 @@
 <?php
 /**
- * Order summary, coupon code, and final submit container block.
+ * Order summary, coupon, place order — no Magewire.
  *
  * @var \Kkkonrad\Fastcheckout\Block\Hyva\Checkout $block
  * @var \Magento\Framework\Escaper $escaper
- * @var \Kkkonrad\Fastcheckout\Magewire\Checkout $magewire
  * @var array $items
  */
+$couponCode = $block->getCouponCode();
+$showDiscount = $block->isShowDiscount();
+$showComment = $block->isShowComment();
+$showSubscribe = $block->isShowSubscribe();
 ?>
 <!-- Container 4: Order Summary, Coupon & Place Order -->
 <div class="fc-container-4 space-y-6 min-w-0 w-full">
-    <!-- Discount/Coupon Form -->
-    <div class="card relative">
+    <?php if ($showDiscount): ?>
+    <div class="card relative" data-fastcheckout-coupon-card>
         <h2 class="text-xl font-semibold text-gray-900 border-b border-gray-200 pb-4 mb-4">
             <?= $escaper->escapeHtml(__('Apply Discount Code')) ?>
         </h2>
@@ -19,57 +22,32 @@
         <div class="flex flex-col sm:flex-row gap-2">
             <input class="form-input w-full sm:flex-1"
                    type="text"
-                   wire:model.defer="couponCode"
+                   id="fastcheckout-coupon-code"
+                   data-fastcheckout-coupon-input
+                   value="<?= $escaper->escapeHtmlAttr($couponCode) ?>"
                    placeholder="<?= $escaper->escapeHtmlAttr(__('Enter discount code')) ?>"/>
 
             <div class="flex gap-2 w-full sm:w-auto">
-                <button class="btn btn-primary flex-1 sm:flex-initial" type="button" wire:click="applyCoupon">
+                <button class="btn btn-primary flex-1 sm:flex-initial"
+                        type="button"
+                        data-fastcheckout-coupon-apply>
                     <?= $escaper->escapeHtml(__('Apply')) ?>
                 </button>
-
-                <?php if ($magewire->couponCode): ?>
-                    <button class="btn btn-secondary text-red-600 border-red-200 hover:bg-red-50 flex-1 sm:flex-initial" type="button" wire:click="cancelCoupon">
+                <?php if ($couponCode !== ''): ?>
+                    <button class="btn btn-secondary text-red-600 border-red-200 hover:bg-red-50 flex-1 sm:flex-initial"
+                            type="button"
+                            data-fastcheckout-coupon-cancel>
                         <?= $escaper->escapeHtml(__('Cancel')) ?>
                     </button>
                 <?php endif; ?>
             </div>
         </div>
-
-        <?php if ($magewire->couponSuccess): ?>
-            <div class="mt-3 flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
-                <svg class="h-4 w-4 shrink-0 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                </svg>
-                <span><?= $escaper->escapeHtml($magewire->couponSuccess) ?></span>
-            </div>
-        <?php endif; ?>
-        <?php if ($magewire->couponError): ?>
-            <div class="mt-3 flex items-center gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                <svg class="h-4 w-4 shrink-0 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-                <span><?= $escaper->escapeHtml($magewire->couponError) ?></span>
-            </div>
-        <?php endif; ?>
+        <div class="mt-3 hidden text-sm" data-fastcheckout-coupon-message role="status"></div>
     </div>
-    <!-- Order Summary Sidebar -->
-    <div class="card sticky top-6 space-y-6"
-         wire:key="checkout-totals-card">
+    <?php endif; ?>
 
-         <!-- Products & Totals Container with scoped Loader Overlay -->
-         <div class="relative space-y-6">
-             <!-- Loader Overlay for Order Summary -->
-             <div wire:loading.flex
-                  wire:target="countryId,regionId,region,postcode,city,street1,street2,fillFromSavedAddress,selectShippingMethod,applyCoupon,cancelCoupon"
-                  class="absolute inset-0 bg-white/80 backdrop-blur-[1px] z-20 rounded items-center justify-center transition-all duration-200"
-                  style="display: none;">
-                  <svg class="animate-spin h-8 w-8 text-primary" fill="none" viewBox="0 0 24 24">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-             </div>
-
-            <!-- Order Items list -->
+    <div class="card sticky top-6 space-y-6" data-fastcheckout-totals-card>
+        <div class="relative space-y-6">
             <div>
                 <div class="flex items-center justify-between border-b border-gray-200 pb-3 mb-4">
                     <h2 class="text-xl font-semibold text-gray-900">
@@ -98,139 +76,85 @@
                                     <div class="mt-1 space-y-0.5">
                                         <?php foreach ($options as $option): ?>
                                             <div class="text-[11px] text-gray-500">
-                                                <span class="font-medium"><?= $escaper->escapeHtml($option['label']) ?>:</span>
-                                                <span><?= $escaper->escapeHtml($option['value']) ?></span>
+                                                <?= $escaper->escapeHtml($option['label'] ?? '') ?>:
+                                                <?= $escaper->escapeHtml(is_array($option['value'] ?? null) ? implode(', ', $option['value']) : ($option['value'] ?? '')) ?>
                                             </div>
                                         <?php endforeach; ?>
                                     </div>
                                 <?php endif; ?>
-                                <div class="flex justify-between items-center mt-1.5 text-xs text-gray-500">
-                                    <span><?= $escaper->escapeHtml(__('Qty: %1', $item->getQty() * 1)) ?></span>
-                                    <div class="text-right">
-                                        <?php if ($block->displayCartBothPrices()): ?>
-                                            <span class="block font-semibold text-gray-900"><?= /* @noEscape */ $block->formatPrice($item->getRowTotalInclTax()) ?> <span class="text-[10px] text-gray-500 font-normal"><?= $escaper->escapeHtml(__('Incl. Tax')) ?></span></span>
-                                            <span class="block text-gray-500 text-[11px]"><?= /* @noEscape */ $block->formatPrice($item->getRowTotal()) ?> <span class="text-[10px] font-normal"><?= $escaper->escapeHtml(__('Excl. Tax')) ?></span></span>
-                                        <?php else: ?>
-                                            <span class="font-semibold text-gray-900"><?= /* @noEscape */ $block->formatPrice($block->getItemRowTotal($item)) ?></span>
-                                        <?php endif; ?>
-                                    </div>
+                                <div class="mt-1 text-xs text-gray-500">
+                                    × <?= (float)$item->getQty() ?>
                                 </div>
+                            </div>
+                            <div class="text-sm font-semibold text-gray-900 shrink-0">
+                                <?= /* @noEscape */ $block->formatPrice($block->getItemRowTotal($item)) ?>
                             </div>
                         </li>
                     <?php endforeach; ?>
                 </ul>
             </div>
 
-            <!-- Summary Totals -->
-            <dl class="space-y-3 border-t border-gray-200 pt-4"
-                data-fastcheckout-summary-totals>
+            <div class="border-t border-gray-200 pt-4 space-y-2" data-fastcheckout-summary-totals>
                 <?php foreach ($block->getSummaryTotals() as $total): ?>
-                    <div class="<?= $total['strong'] ? 'border-t border-gray-200 pt-4 text-lg font-bold text-gray-950' : 'text-sm text-gray-600' ?> flex items-center justify-between gap-4"
-                         data-fastcheckout-total-row
-                         data-code="<?= $escaper->escapeHtmlAttr($total['code']) ?>"
-                         data-label="<?= $escaper->escapeHtmlAttr($total['label']) ?>"
-                         data-value="<?= $escaper->escapeHtmlAttr((string)$total['value']) ?>">
-                        <dt><?= $escaper->escapeHtml($total['label']) ?></dt>
-                        <dd class="<?= $total['strong'] ? 'text-xl' : 'font-semibold text-gray-900' ?>">
+                    <div class="flex justify-between text-sm <?= !empty($total['strong']) ? 'font-bold text-base pt-2 border-t border-gray-100' : 'text-gray-700' ?>"
+                         data-fastcheckout-total-row="<?= $escaper->escapeHtmlAttr($total['code']) ?>">
+                        <span><?= $escaper->escapeHtml($total['label']) ?></span>
+                        <span data-fastcheckout-total-value="<?= $escaper->escapeHtmlAttr($total['code']) ?>">
                             <?= /* @noEscape */ $block->formatPrice($total['value']) ?>
-                        </dd>
+                        </span>
                     </div>
                 <?php endforeach; ?>
-            </dl>
-         </div>
+            </div>
 
-        <!-- Newsletter Subscription choice -->
-        <label class="field choice pt-2">
-            <input type="checkbox" class="form-checkbox" wire:model.defer="subscribe"/>
-            <span><?= $escaper->escapeHtml(__('Sign Up For Newsletter')) ?></span>
-        </label>
+            <?php if ($showComment): ?>
+                <div class="border-t border-gray-200 pt-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1" for="fastcheckout-comment">
+                        <?= $escaper->escapeHtml(__('Order Comment')) ?>
+                    </label>
+                    <textarea id="fastcheckout-comment"
+                              name="fastcheckout_comment"
+                              data-fastcheckout-comment
+                              class="form-input w-full"
+                              rows="2"
+                              placeholder="<?= $escaper->escapeHtmlAttr(__('Optional comment for this order')) ?>"></textarea>
+                </div>
+            <?php endif; ?>
 
-        <!-- Gift Message -->
-        <?php if ($block->isShowGiftMessage()): ?>
-        <div class="pt-2 border-t border-gray-100 mt-2" x-data="{ showGiftForm: $wire.hasGiftMessage }">
-            <label class="field choice">
-                <input type="checkbox"
-                       class="form-checkbox"
-                       wire:model.defer="hasGiftMessage"
-                       @change="showGiftForm = $event.target.checked"/>
-                <span><?= $escaper->escapeHtml(__('Gift Message')) ?></span>
-            </label>
-
-            <div x-show="showGiftForm" class="mt-3 space-y-3 pl-7" x-transition style="display: none;">
-                <div>
-                    <label class="field">
-                        <span><?= $escaper->escapeHtml(__('Sender Name')) ?></span>
-                        <input type="text"
-                               class="form-input w-full"
-                               wire:model.defer="giftSender"
-                               placeholder="<?= $escaper->escapeHtmlAttr(__('Sender')) ?>"/>
+            <?php if ($showSubscribe): ?>
+                <div class="border-t border-gray-200 pt-4">
+                    <label class="flex items-center gap-2 text-sm text-gray-700 mb-0 cursor-pointer">
+                        <input type="checkbox"
+                               id="fastcheckout-subscribe"
+                               name="fastcheckout_subscribe"
+                               data-fastcheckout-subscribe
+                               class="form-checkbox"
+                               value="1"
+                            <?= $block->getHelper()->isSubscribeByDefault() ? 'checked' : '' ?> />
+                        <span><?= $escaper->escapeHtml(__('Sign Up for Our Newsletter')) ?></span>
                     </label>
                 </div>
-                <div>
-                    <label class="field">
-                        <span><?= $escaper->escapeHtml(__('Recipient Name')) ?></span>
-                        <input type="text"
-                               class="form-input w-full"
-                               wire:model.defer="giftRecipient"
-                               placeholder="<?= $escaper->escapeHtmlAttr(__('Recipient')) ?>"/>
-                    </label>
-                </div>
-                <div>
-                    <label class="field">
-                        <span><?= $escaper->escapeHtml(__('Gift Message Text')) ?></span>
-                        <textarea
-                            class="form-textarea w-full"
-                            rows="3"
-                            wire:model.defer="giftMessage"
-                            placeholder="<?= $escaper->escapeHtmlAttr(__('Message')) ?>"></textarea>
-                    </label>
-                </div>
+            <?php endif; ?>
+
+            <div class="hidden md:block pt-2">
+                <button class="btn btn-primary w-full py-3 flex items-center justify-center gap-2"
+                        type="submit"
+                        data-fastcheckout-place-order>
+                    <span class="place-order-spinner hidden" data-fastcheckout-place-order-spinner aria-hidden="true">
+                        <svg class="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </span>
+                    <span data-fastcheckout-place-order-label
+                          data-fastcheckout-ready-text="<?= $escaper->escapeHtmlAttr(__('Place Order')) ?>"
+                          data-fastcheckout-processing-text="<?= $escaper->escapeHtmlAttr(__('Please wait...')) ?>">
+                        <?= $escaper->escapeHtml(__('Place Order')) ?>
+                    </span>
+                </button>
+                <p class="text-sm text-red-600 font-medium text-center mt-2 hidden"
+                   data-fastcheckout-client-order-error
+                   role="alert"></p>
             </div>
         </div>
-        <?php endif; ?>
-
-        <!-- Order Comment -->
-        <?php if ($block->isShowComment()): ?>
-        <div class="pt-2">
-            <label class="field">
-                <span><?= $escaper->escapeHtml(__('Order Comment')) ?></span>
-                <textarea
-                    class="form-textarea w-full"
-                    rows="3"
-                    wire:model.defer="comment"
-                    placeholder="<?= $escaper->escapeHtmlAttr(__('Any special instructions or notes for your order...')) ?>"></textarea>
-            </label>
-        </div>
-        <?php endif; ?>
-
-        <!-- Place Order Button -->
-        <div class="hidden pt-2 md:block">
-            <button class="btn btn-primary w-full py-3 flex items-center justify-center gap-2 transition-all duration-200"
-                    type="submit"
-                    :class="isProcessing ? 'pointer-events-none' : ''">
-                <span class="place-order-spinner" x-show="isProcessing" x-cloak>
-                    <svg class="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                </span>
-                <span><?= $escaper->escapeHtml(__('Place Order')) ?></span>
-            </button>
-            <?php if ($magewire->orderError): ?>
-                <p class="mt-3 text-sm text-red-600 font-medium text-center"><?= $escaper->escapeHtml($magewire->orderError) ?></p>
-            <?php endif; ?>
-            <template x-if="clientOrderError">
-                <p class="mt-3 text-sm text-red-600 font-medium text-center" x-text="clientOrderError"></p>
-            </template>
-        </div>
-
-        <div class="hidden mt-6 border-t border-gray-100 pt-4 text-xs text-gray-500 md:flex md:items-center md:justify-center md:gap-2">
-                <svg class="h-4 w-4 text-green-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-                </svg>
-                <span><?= $escaper->escapeHtml(__('Secure SSL 256-bit encrypted checkout')) ?></span>
-        </div>
-
     </div>
-
 </div>

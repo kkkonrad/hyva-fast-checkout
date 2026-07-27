@@ -43,7 +43,6 @@ if (
 }
 
 $mageInitConfig = [
-    'checkoutConfig' => $checkoutConfig,
     'paymentMethods' => $paymentMethods,
     'rendererComponents' => $rendererComponents,
     'rendererComponentMap' => $rendererComponentMap,
@@ -73,7 +72,6 @@ foreach ($layoutAssets['css'] as $cssAsset) {
 <div id="fastcheckout-ko-payment-root"
      class="fastcheckout-ko-payment-root mt-4"
      style="display: none !important;"
-     wire:ignore
      data-bind="scope: 'fastcheckoutHyvaPaymentRenderers'">
     <!-- ko foreach: getRegion('place-order-captcha') -->
         <!-- ko template: getTemplate() --><!-- /ko -->
@@ -143,6 +141,9 @@ foreach ($layoutAssets['css'] as $cssAsset) {
     window.checkoutConfig = actualConfig;
 
     var config = <?= /* @noEscape */ \Laminas\Json\Json::encode($mageInitConfig) ?>;
+    // Keep a single serialized checkoutConfig in the HTML. The bridge receives
+    // the same object by reference instead of embedding the large payload twice.
+    config.checkoutConfig = window.checkoutConfig;
     var requireJsUrl = '<?= $escaper->escapeJs($block->getViewFileUrl('requirejs/require.js')) ?>';
     var requireJsConfigUrl = '<?= $escaper->escapeJs($block->getViewFileUrl('requirejs-config.js')) ?>';
     var mixinsUrl = '<?= $escaper->escapeJs($block->getViewFileUrl('mage/requirejs/mixins.js')) ?>';
@@ -166,28 +167,76 @@ foreach ($layoutAssets['css'] as $cssAsset) {
         document.head.appendChild(script);
     }
 
+    function initFullCheckoutBridge() {
+        if (
+            window.fastcheckoutKoCheckoutRenderersStarted ||
+            window.fastcheckoutKoCheckoutBridgeStarted ||
+            typeof window.require !== 'function'
+        ) {
+            return;
+        }
+
+        window.fastcheckoutKoCheckoutRenderersStarted = true;
+        window.fastcheckoutKoCheckoutBridgeStarted = true;
+        window.fastcheckoutKoPaymentRenderersStarted = true;
+
+        window.require(['Kkkonrad_Fastcheckout/js/hyva/checkout-renderers'], function (init) {
+            init(config);
+        });
+    }
+
     function initCheckoutBridge() {
         if (
             started ||
-            window.fastcheckoutKoCheckoutRenderersStarted ||
-            window.fastcheckoutKoCheckoutBridgeStarted ||
-            window.fastcheckoutKoPaymentRenderersStarted ||
+            window.fastcheckoutShippingBootstrapRequested ||
             typeof window.require !== 'function'
         ) {
             return;
         }
 
         started = true;
-        window.fastcheckoutKoCheckoutRenderersStarted = true;
-        window.fastcheckoutKoCheckoutBridgeStarted = true;
-        window.fastcheckoutKoPaymentRenderersStarted = true;
+        window.fastcheckoutShippingBootstrapRequested = true;
         window.require.config({
             baseUrl: staticBaseUrl
         });
 
-        window.require(['Kkkonrad_Fastcheckout/js/hyva/checkout-renderers'], function (init) {
-            init(config);
-        });
+        window.require(
+            ['Kkkonrad_Fastcheckout/js/hyva/shipping-address-bootstrap'],
+            function (initShippingAddress) {
+                var fallbackTimer,
+                    fullBridgeQueued = false;
+
+                function startFullBridge() {
+                    if (fullBridgeQueued) {
+                        return;
+                    }
+                    fullBridgeQueued = true;
+                    // A separate task lets the browser paint the shipping form before
+                    // the full payment/module graph starts downloading.
+                    window.setTimeout(function () {
+                        initFullCheckoutBridge();
+                        if (fallbackTimer) {
+                            window.clearTimeout(fallbackTimer);
+                        }
+                    }, 0);
+                }
+
+                window.addEventListener(
+                    'fastcheckout:address-fields-ready',
+                    startFullBridge,
+                    { once: true }
+                );
+                initShippingAddress(config);
+
+                if (window.fastcheckoutAddressFieldsReady) {
+                    startFullBridge();
+                    return;
+                }
+                // Preserve checkout functionality if a third-party field component
+                // prevents the readiness event. The normal path starts much earlier.
+                fallbackTimer = window.setTimeout(startFullBridge, 10000);
+            }
+        );
     }
 
     function loadRequireJs() {
@@ -211,20 +260,12 @@ foreach ($layoutAssets['css'] as $cssAsset) {
         });
     }
 
-    function startAfterMagewire() {
-        if (window.Magewire || window.Livewire) {
-            loadRequireJs();
-            return;
-        }
-
-        document.addEventListener('magewire:available', loadRequireJs, {once: true});
-        document.addEventListener('livewire:available', loadRequireJs, {once: true});
-        window.addEventListener('load', function () {
-            setTimeout(loadRequireJs, 0);
-        }, {once: true});
+    // Native KO pipeline — do not wait for Magewire/Livewire.
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', loadRequireJs, { once: true });
+    } else {
+        loadRequireJs();
     }
-
-    startAfterMagewire();
 })();
 </script>
 <?php $hyvaCsp->registerInlineScript() ?>

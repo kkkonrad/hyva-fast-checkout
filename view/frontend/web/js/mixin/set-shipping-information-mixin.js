@@ -4,16 +4,11 @@ define([
 ], function (wrapper, isFastcheckoutActive) {
     'use strict';
 
+    /**
+     * Native Magento set-shipping-information (REST). No Magewire dual-write.
+     */
     return function (setShippingInformationAction) {
         return wrapper.wrap(setShippingInformationAction, function (originalAction) {
-            if (
-                isFastcheckoutActive() &&
-                window.fastcheckoutHyvaShipping &&
-                typeof window.fastcheckoutHyvaShipping.onSetShippingInformationAction === 'function'
-            ) {
-                return window.fastcheckoutHyvaShipping.onSetShippingInformationAction(originalAction);
-            }
-
             return originalAction();
         });
     };

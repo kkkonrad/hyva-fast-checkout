@@ -384,31 +384,132 @@ define([
 
         function applyInitialShippingRates() {
             var activeCode,
-                found = null;
+                found = null,
+                initial = window.fastcheckoutInitialShippingRates;
 
-            if (!window.fastcheckoutInitialShippingRates || !Array.isArray(window.fastcheckoutInitialShippingRates)) {
-                return;
-            }
-
-            shippingService.setShippingRates(window.fastcheckoutInitialShippingRates);
-            activeCode = window.fastcheckoutInitialShippingMethod;
-            if (!activeCode) {
-                return;
-            }
-
-            window.fastcheckoutInitialShippingRates.forEach(function (rate) {
-                if (rate.carrier_code + '_' + rate.method_code === activeCode) {
-                    found = rate;
+            if (Array.isArray(initial) && initial.length) {
+                shippingService.setShippingRates(initial);
+                activeCode = window.fastcheckoutInitialShippingMethod;
+                if (activeCode) {
+                    initial.forEach(function (rate) {
+                        if (rate.carrier_code + '_' + rate.method_code === activeCode) {
+                            found = rate;
+                        }
+                    });
+                    if (found) {
+                        try {
+                            window.fastcheckoutSuppressShippingSync = true;
+                            selectShippingMethodAction(found);
+                        } finally {
+                            window.fastcheckoutSuppressShippingSync = false;
+                        }
+                    }
                 }
-            });
-            if (found) {
-                try {
-                    window.fastcheckoutSuppressShippingSync = true;
-                    selectShippingMethodAction(found);
-                } finally {
-                    window.fastcheckoutSuppressShippingSync = false;
-                }
+                return true;
             }
+
+            return false;
+        }
+
+        /**
+         * When SSR rates are empty, seed quote shipping address from Magento default
+         * country (checkoutConfig.defaultCountryId) so native rate processors fire.
+         * shipping-rate-service subscribes to quote.shippingAddress and re-estimates
+         * again whenever the shopper changes destination fields.
+         */
+        function bootstrapDefaultDestinationRates() {
+            var existing,
+                countryId,
+                postcode,
+                regionId,
+                city,
+                formData,
+                address;
+
+            try {
+                existing = shippingService.getShippingRates()() || [];
+            } catch (e) {
+                existing = [];
+            }
+
+            if (existing.length) {
+                return Promise.resolve(existing);
+            }
+
+            countryId = (window.checkoutConfig && window.checkoutConfig.defaultCountryId) || '';
+            postcode = (window.checkoutConfig && window.checkoutConfig.defaultPostcode) || '';
+            regionId = (window.checkoutConfig && window.checkoutConfig.defaultRegionId) || '';
+            city = (window.checkoutConfig && window.checkoutConfig.defaultCity) || '';
+
+            // Optional SSR seed of destination used for initial collectTotals.
+            if (window.fastcheckoutDefaultDestination) {
+                countryId = window.fastcheckoutDefaultDestination.countryId || countryId;
+                postcode = window.fastcheckoutDefaultDestination.postcode || postcode;
+                regionId = window.fastcheckoutDefaultDestination.regionId || regionId;
+                city = window.fastcheckoutDefaultDestination.city || city;
+            }
+
+            if (!countryId) {
+                return Promise.resolve([]);
+            }
+
+            formData = {
+                country_id: countryId,
+                countryId: countryId,
+                postcode: postcode || '',
+                region_id: regionId || '',
+                regionId: regionId || '',
+                city: city || '',
+                street: ['', '']
+            };
+
+            // Prefer bridge estimate (native REST estimate-shipping-methods).
+            if (
+                window.fastcheckoutHyvaShipping &&
+                typeof window.fastcheckoutHyvaShipping.onEstimateShippingRatesAction === 'function'
+            ) {
+                return new Promise(function (resolve) {
+                    require([
+                        'Magento_Checkout/js/model/address-converter',
+                        'Magento_Checkout/js/action/select-shipping-address'
+                    ], function (addressConverter, selectShippingAddressAction) {
+                        var quoteAddress;
+
+                        try {
+                            quoteAddress = addressConverter.formAddressDataToQuoteAddress(formData);
+                            // Setting quote address triggers shipping-rate-service → native getRates.
+                            selectShippingAddressAction(quoteAddress);
+                        } catch (e) {
+                            // fall through to direct estimate
+                        }
+
+                        Promise.resolve(
+                            window.fastcheckoutHyvaShipping.onEstimateShippingRatesAction(
+                                quoteAddress || formData
+                            )
+                        ).then(function (rates) {
+                            rates = Array.isArray(rates) ? rates : [];
+                            if (rates.length && shippingService && typeof shippingService.setShippingRates === 'function') {
+                                shippingService.setShippingRates(rates);
+                            }
+                            resolve(rates);
+                        }, function () {
+                            resolve([]);
+                        });
+                    }, function () {
+                        // Modules unavailable — try estimate with plain form data.
+                        Promise.resolve(
+                            window.fastcheckoutHyvaShipping.onEstimateShippingRatesAction(formData)
+                        ).then(function (rates) {
+                            resolve(Array.isArray(rates) ? rates : []);
+                        }, function () {
+                            resolve([]);
+                        });
+                    });
+                });
+            }
+
+            return Promise.resolve([]);
         }
 
         return {
@@ -418,7 +519,8 @@ define([
             resolveRefresh: resolveRefresh,
             refreshShippingRates: refreshShippingRates,
             syncPaymentMethods: syncPaymentMethods,
-            applyInitialShippingRates: applyInitialShippingRates
+            applyInitialShippingRates: applyInitialShippingRates,
+            bootstrapDefaultDestinationRates: bootstrapDefaultDestinationRates
         };
     };
 });

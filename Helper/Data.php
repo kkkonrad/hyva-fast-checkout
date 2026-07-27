@@ -365,8 +365,9 @@ class Data extends AbstractHelper
             return $this->canUseHyvaNativeCheckoutCache = false;
         }
 
-        if (!class_exists(\Hyva\Theme\ViewModel\HyvaCsp::class)
-            || !class_exists(\Magewirephp\Magewire\Component::class)) {
+        // Hyvä CSP is required for the Fastcheckout shell. Magewire is intentionally
+        // not required — quote pipeline is Magento KO/REST.
+        if (!class_exists(\Hyva\Theme\ViewModel\HyvaCsp::class)) {
             return $this->canUseHyvaNativeCheckoutCache = false;
         }
 
