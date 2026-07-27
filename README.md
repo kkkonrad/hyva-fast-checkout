@@ -1,35 +1,38 @@
 # Kkkonrad Fastcheckout
 
-Fastcheckout is a Magento 2 checkout for Hyvä themes. It renders Magento's standard
-Knockout address and payment components inside a Hyvä layout and keeps Magento's
-native quote and REST actions as the single source of truth.
+Fastcheckout to moduł procesu zamówienia Magento 2 przeznaczony dla motywów Hyvä.
+Renderuje standardowe komponenty Knockout Magento odpowiedzialne za adresy i
+płatności wewnątrz układu Hyvä. Natywny koszyk Magento oraz operacje REST pozostają
+jedynym źródłem danych.
 
-The module does not require Magewire and does not maintain a second checkout state.
+Moduł nie wymaga Magewire i nie utrzymuje dodatkowego stanu procesu zamówienia.
 
-## Preview
+## Podgląd
 
-![Kkkonrad Fastcheckout checkout](docs/images/checkout.png)
+![Widok procesu zamówienia Kkkonrad Fastcheckout](docs/images/checkout.png)
 
-## Features
+## Funkcje
 
-- responsive Hyvä checkout layout;
-- standard Magento shipping and billing address forms with native validation;
-- compatibility bridge for RequireJS/Knockout payment renderers;
-- shipping-to-payment method mapping;
-- guest address persistence across reloads;
-- support for order comments, newsletter choice and gift messages;
-- InPost locker extension-attribute preservation;
-- optional assignment of a guest order to an existing customer with the same email.
+- responsywny układ procesu zamówienia zgodny z Hyvä;
+- standardowe formularze adresu wysyłki i adresu rozliczeniowego Magento wraz z
+  natywną walidacją;
+- warstwa zgodności dla rendererów płatności RequireJS/Knockout;
+- mapowanie metod płatności do metod dostawy;
+- zachowanie adresu gościa po odświeżeniu strony;
+- obsługa komentarzy do zamówienia, zapisu do newslettera i wiadomości prezentowych;
+- zachowanie atrybutu rozszerzającego automatu paczkowego InPost;
+- opcjonalne przypisanie zamówienia gościa do istniejącego klienta o tym samym
+  adresie e-mail.
 
-## Requirements
+## Wymagania
 
 - Magento 2.4 (`magento/framework` 103.x);
 - PHP 8.1–8.4;
-- Hyvä Theme Module 1.4 or newer.
+- Hyvä Theme Module 1.4 lub nowszy.
 
-## Installation
+## Instalacja
 
-Install with Composer:
+Instalacja za pomocą Composera:
 
 ```bash
 composer require kkkonrad/fastcheckout
@@ -38,54 +41,61 @@ php bin/magento setup:upgrade
 php bin/magento cache:clean
 ```
 
-For a production deployment also compile DI and deploy static content:
+W środowisku produkcyjnym należy dodatkowo skompilować DI i wdrożyć pliki
+statyczne:
 
 ```bash
 php bin/magento setup:di:compile
 php bin/magento setup:static-content:deploy -f pl_PL en_US
 ```
 
-The module registers its templates with Hyvä's Tailwind configuration. Rebuild the
-active theme's CSS after installation or after changing checkout templates.
+Moduł rejestruje swoje szablony w konfiguracji Tailwind Hyvä. Po instalacji lub
+zmianie szablonów procesu zamówienia należy ponownie zbudować CSS aktywnego motywu.
 
-## Configuration
+## Konfiguracja
 
-Configuration is available under:
+Konfiguracja jest dostępna w panelu administracyjnym:
 
 `Stores > Configuration > Kkkonrad > Checkout`
 
-The main settings enable the checkout, select default shipping/payment methods,
-control extended fields and define shipping-to-payment mappings.
+Ustawienia pozwalają włączyć moduł, wybrać domyślne metody dostawy i płatności,
+zarządzać polami dodatkowymi oraz zdefiniować mapowanie metod płatności do metod
+dostawy.
 
-The checkout route is `/fast-checkout/`. When the module and compatible Hyvä theme
-are active, the standard checkout entry redirects to this route.
+Proces zamówienia jest dostępny pod ścieżką `/fast-checkout/`. Gdy moduł oraz zgodny
+motyw Hyvä są aktywne, standardowa strona zamówienia przekierowuje pod ten adres.
 
-## Architecture
+## Architektura
 
-- `Block/Hyva/Checkout.php` prepares server-rendered checkout configuration.
-- `view/frontend/templates/hyva/knockout/checkout-bridge.phtml` starts RequireJS/KO.
-- `view/frontend/web/js/hyva/checkout-bridge.js` mounts Magento checkout components.
-- Magento `quote`, `checkout-data` and REST actions own addresses, methods and totals.
-- Small RequireJS mixins add persistence and third-party payment compatibility.
+- `Block/Hyva/Checkout.php` przygotowuje konfigurację procesu zamówienia po stronie
+  serwera.
+- `view/frontend/templates/hyva/knockout/checkout-bridge.phtml` uruchamia RequireJS
+  i Knockout.
+- `view/frontend/web/js/hyva/checkout-bridge.js` montuje komponenty procesu
+  zamówienia Magento.
+- Obiekty Magento `quote`, `checkout-data` oraz operacje REST zarządzają adresami,
+  metodami i podsumowaniem.
+- Niewielkie mixiny RequireJS zapewniają trwałość danych i zgodność z zewnętrznymi
+  modułami płatności.
 
-There is no Magewire component, Livewire DOM morphing or Alpine checkout state
-orchestrator.
+Moduł nie zawiera komponentu Magewire, mechanizmu modyfikowania DOM przez Livewire
+ani orkiestratora stanu opartego na Alpine.
 
-## Tests
+## Testy
 
-Run PHP unit tests from the Magento root:
+Uruchomienie testów jednostkowych PHP z katalogu głównego Magento:
 
 ```bash
 vendor/bin/phpunit -c app/code/Kkkonrad/Fastcheckout/phpunit.xml.dist
 ```
 
-Run JavaScript unit tests:
+Uruchomienie testów jednostkowych JavaScript:
 
 ```bash
 node --test app/code/Kkkonrad/Fastcheckout/Test/Unit/Js/*.test.js
 ```
 
-Run Playwright tests:
+Uruchomienie testów Playwright:
 
 ```bash
 cd app/code/Kkkonrad/Fastcheckout/Test/E2e
