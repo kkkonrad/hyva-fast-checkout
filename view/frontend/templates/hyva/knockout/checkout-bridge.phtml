@@ -165,28 +165,76 @@ foreach ($layoutAssets['css'] as $cssAsset) {
         document.head.appendChild(script);
     }
 
+    function initFullCheckoutBridge() {
+        if (
+            window.fastcheckoutKoCheckoutRenderersStarted ||
+            window.fastcheckoutKoCheckoutBridgeStarted ||
+            typeof window.require !== 'function'
+        ) {
+            return;
+        }
+
+        window.fastcheckoutKoCheckoutRenderersStarted = true;
+        window.fastcheckoutKoCheckoutBridgeStarted = true;
+        window.fastcheckoutKoPaymentRenderersStarted = true;
+
+        window.require(['Kkkonrad_Fastcheckout/js/hyva/checkout-renderers'], function (init) {
+            init(config);
+        });
+    }
+
     function initCheckoutBridge() {
         if (
             started ||
-            window.fastcheckoutKoCheckoutRenderersStarted ||
-            window.fastcheckoutKoCheckoutBridgeStarted ||
-            window.fastcheckoutKoPaymentRenderersStarted ||
+            window.fastcheckoutShippingBootstrapRequested ||
             typeof window.require !== 'function'
         ) {
             return;
         }
 
         started = true;
-        window.fastcheckoutKoCheckoutRenderersStarted = true;
-        window.fastcheckoutKoCheckoutBridgeStarted = true;
-        window.fastcheckoutKoPaymentRenderersStarted = true;
+        window.fastcheckoutShippingBootstrapRequested = true;
         window.require.config({
             baseUrl: staticBaseUrl
         });
 
-        window.require(['Kkkonrad_Fastcheckout/js/hyva/checkout-renderers'], function (init) {
-            init(config);
-        });
+        window.require(
+            ['Kkkonrad_Fastcheckout/js/hyva/shipping-address-bootstrap'],
+            function (initShippingAddress) {
+                var fallbackTimer,
+                    fullBridgeQueued = false;
+
+                function startFullBridge() {
+                    if (fullBridgeQueued) {
+                        return;
+                    }
+                    fullBridgeQueued = true;
+                    // A separate task lets the browser paint the shipping form before
+                    // the full payment/module graph starts downloading.
+                    window.setTimeout(function () {
+                        initFullCheckoutBridge();
+                        if (fallbackTimer) {
+                            window.clearTimeout(fallbackTimer);
+                        }
+                    }, 0);
+                }
+
+                window.addEventListener(
+                    'fastcheckout:address-fields-ready',
+                    startFullBridge,
+                    { once: true }
+                );
+                initShippingAddress(config);
+
+                if (window.fastcheckoutAddressFieldsReady) {
+                    startFullBridge();
+                    return;
+                }
+                // Preserve checkout functionality if a third-party field component
+                // prevents the readiness event. The normal path starts much earlier.
+                fallbackTimer = window.setTimeout(startFullBridge, 10000);
+            }
+        );
     }
 
     function loadRequireJs() {

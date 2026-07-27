@@ -19,6 +19,7 @@ test('measures shipping form startup after a full reload', async ({ page }) => {
             root: null,
             firstInput: null,
             addressReady: null,
+            paymentUiStarted: null,
             requireJs: null,
             checkoutConfig: null,
             longTasks: []
@@ -41,6 +42,12 @@ test('measures shipping form startup after a full reload', async ({ page }) => {
             }
             if (marks.addressReady === null && window.fastcheckoutAddressFieldsReady) {
                 marks.addressReady = performance.now();
+            }
+            if (
+                marks.paymentUiStarted === null &&
+                window.fastcheckoutDeferredPaymentComponentsStarted
+            ) {
+                marks.paymentUiStarted = performance.now();
             }
             if (marks.requireJs === null && typeof window.require === 'function') {
                 marks.requireJs = performance.now();
@@ -167,6 +174,9 @@ test('measures shipping form startup after a full reload', async ({ page }) => {
     await expect.poll(() => page.evaluate(
         () => Boolean(window.fastcheckoutAddressFieldsReady)
     )).toBe(true);
+    await expect.poll(() => page.evaluate(
+        () => Boolean(window.fastcheckoutDeferredPaymentComponentsStarted)
+    )).toBe(true);
 
     const browser = await page.evaluate(() => {
         const marks = window.fastcheckoutStartupMarks;
@@ -175,6 +185,7 @@ test('measures shipping form startup after a full reload', async ({ page }) => {
             marks.requireJs !== null &&
             marks.firstInput !== null &&
             entry.startTime >= marks.requireJs &&
+            entry.startTime <= marks.firstInput &&
             entry.responseEnd <= marks.firstInput
         ));
 
@@ -219,11 +230,15 @@ test('measures shipping form startup after a full reload', async ({ page }) => {
         lastResponsesBeforeInput: network
             .filter((entry) => (
                 entry.event === 'response' &&
-                entry.at <= firstInputElapsed
+                entry.at <= browser.marks.firstInput
             ))
             .sort((left, right) => right.at - left.at)
             .slice(0, 20)
     }, null, 2));
 
     expect(browser.marks.firstInput).not.toBeNull();
+    expect(browser.marks.paymentUiStarted).not.toBeNull();
+    expect(browser.marks.paymentUiStarted).toBeGreaterThanOrEqual(
+        browser.marks.firstInput
+    );
 });

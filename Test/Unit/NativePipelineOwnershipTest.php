@@ -125,4 +125,54 @@ class NativePipelineOwnershipTest extends TestCase
             $js
         );
     }
+
+    public function testPaymentUiStartsAfterShippingAddressFieldsAreReady(): void
+    {
+        $js = file_get_contents(
+            $this->moduleRoot() . '/view/frontend/web/js/hyva/checkout-bridge.js'
+        );
+        $this->assertNotFalse($js);
+        $this->assertStringContainsString('function scheduleDeferredPaymentComponents()', $js);
+        $this->assertStringContainsString(
+            "window.addEventListener(\n" .
+            "                        'fastcheckout:address-fields-ready',\n" .
+            '                        queueAfterShippingPaint,',
+            $js
+        );
+        $this->assertStringContainsString(
+            'window.fastcheckoutDeferredPaymentComponentsStarted = true;',
+            $js
+        );
+    }
+
+    public function testShippingBootstrapLoadsBeforeTheFullCheckoutBridge(): void
+    {
+        $template = file_get_contents(
+            $this->moduleRoot() . '/view/frontend/templates/hyva/knockout/checkout-bridge.phtml'
+        );
+        $bootstrap = file_get_contents(
+            $this->moduleRoot() . '/view/frontend/web/js/hyva/shipping-address-bootstrap.js'
+        );
+        $this->assertNotFalse($template);
+        $this->assertNotFalse($bootstrap);
+
+        $this->assertStringContainsString(
+            "['Kkkonrad_Fastcheckout/js/hyva/shipping-address-bootstrap']",
+            $template
+        );
+        $this->assertStringContainsString(
+            "['Kkkonrad_Fastcheckout/js/hyva/checkout-renderers']",
+            $template
+        );
+        $this->assertStringContainsString('initShippingAddress(config);', $template);
+        $this->assertStringContainsString(
+            "'fastcheckout:address-fields-ready',\n" .
+            '                    startFullBridge,',
+            $template
+        );
+        $this->assertStringContainsString(
+            'window.fastcheckoutShippingComponentsStarted = true;',
+            $bootstrap
+        );
+    }
 }

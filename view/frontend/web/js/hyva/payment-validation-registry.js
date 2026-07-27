@@ -98,26 +98,40 @@ define([], function () {
             });
         }
 
-        function loadConfiguredComponents(flagName, componentNamesName, components, warningMessage) {
+        function loadConfiguredComponents(
+            flagName,
+            componentNamesName,
+            components,
+            warningMessage,
+            onLoaded
+        ) {
             if (window[flagName] || !components.length) {
+                if (typeof onLoaded === 'function') {
+                    onLoaded();
+                }
                 return;
             }
 
             window[flagName] = true;
             window[componentNamesName] = components.slice(0);
-            require(components, function () {}, function (error) {
+            require(components, function () {
+                if (typeof onLoaded === 'function') {
+                    onLoaded();
+                }
+            }, function (error) {
                 if (window.console && typeof window.console.warn === 'function') {
                     window.console.warn(warningMessage, error);
                 }
             });
         }
 
-        function loadShippingRatesValidationComponents() {
+        function loadShippingRatesValidationComponents(onLoaded) {
             loadConfiguredComponents(
                 'fastcheckoutShippingRatesValidationComponentsLoaded',
                 'fastcheckoutShippingRatesValidationComponentNames',
                 config.shippingRatesValidationComponents || [],
-                'Kkkonrad Fastcheckout: shipping rates validation components could not be loaded.'
+                'Kkkonrad Fastcheckout: shipping rates validation components could not be loaded.',
+                onLoaded
             );
         }
 

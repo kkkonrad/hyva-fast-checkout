@@ -630,8 +630,8 @@ define([
                     paymentValidationRegistry.loadOptionalValidationComponents();
                 }
 
-                function loadShippingRatesValidationComponents() {
-                    paymentValidationRegistry.loadShippingRatesValidationComponents();
+                function loadShippingRatesValidationComponents(onLoaded) {
+                    paymentValidationRegistry.loadShippingRatesValidationComponents(onLoaded);
                 }
 
                 function loadPaymentValidationComponents() {
@@ -914,9 +914,7 @@ define([
                                 window.clearTimeout(fallbackTimer);
                             }
 
-                            window.requestAnimationFrame(function () {
-                                window.setTimeout(startAfterAddressRender, 0);
-                            });
+                            window.setTimeout(startAfterAddressRender, 0);
                         }
 
                         window.addEventListener(
@@ -927,67 +925,146 @@ define([
                         fallbackTimer = window.setTimeout(queueAfterPaint, 1500);
                     };
                 })();
-                loadShippingRatesValidationComponents();
-                loadPaymentValidationComponents();
+                loadShippingRatesValidationComponents(function () {
+                    // In the two-phase bootstrap the shipping component can initialize
+                    // before carrier validator modules register their observable fields.
+                    // Re-running initFields after registration binds country/region/city
+                    // changes while the validator's shared timers still coalesce requests.
+                    shippingRatesValidator.initFields(
+                        'checkout.steps.shipping-step.shippingAddress.shipping-address-fieldset'
+                    );
+                });
 
-                // Register before app() because some cached KO layouts can render
-                // synchronously and dispatch address-fields-ready from the first pass.
-                scheduleShippingRatesBootstrap();
-                app({
-                    components: {
-                        'checkoutProvider': $.extend(
-                            true,
-                            {
-                                component: 'uiComponent',
-                                shippingAddress: {
-                                    street: ['', '']
-                                }
-                            },
-                            checkoutLayoutBridge.checkoutProvider
-                        ),
-                        [scope]: {
-                            component: 'uiComponent',
-                            children: checkoutLayoutBridge.paymentRegionChildren
-                        },
-                        'checkout': {
-                            component: 'uiComponent',
-                            children: {
-                                steps: {
+                /**
+                 * The standard Magento UI layout can start hundreds of AMD modules and
+                 * text! template requests. Mounting payment, CAPTCHA and discount
+                 * components together with shipping makes their requests compete with
+                 * the address field templates, especially over HTTP/1.1.
+                 *
+                 * Give the shipping fieldset one paint of its own. Payment components
+                 * still start automatically as soon as the address inputs exist, so no
+                 * user interaction is required and the payment area is ready while the
+                 * shopper fills the form.
+                 */
+                function scheduleDeferredPaymentComponents() {
+                    var queued = false,
+                        startedAt = Date.now(),
+                        readinessTimer;
+
+                    function startPaymentComponents() {
+                        if (window.fastcheckoutDeferredPaymentComponentsStarted) {
+                            return;
+                        }
+
+                        window.fastcheckoutDeferredPaymentComponentsStarted = true;
+                        loadPaymentValidationComponents();
+                        app({
+                            components: {
+                                [scope]: {
                                     component: 'uiComponent',
-                                    children: $.extend(true, {}, checkoutLayoutBridge.checkoutStepChildren, {
-                                        'shipping-step': {
-                                            component: 'uiComponent',
-                                            children: {
-                                                'step-config': {
-                                                    component: 'uiComponent'
-                                                },
-                                                // shippingListChildren (before-shipping-method-form,
-                                                // shippingAdditional) belong to this component in
-                                                // stock Magento — core's shipping.html renders those
-                                                // regions itself. Fastcheckout renders the same
-                                                // regions from Kkkonrad_Fastcheckout/hyva/shipping-list,
-                                                // bound to this very instance, so they must live here.
-                                                shippingAddress: $.extend(
-                                                    true,
-                                                    {},
-                                                    checkoutLayoutBridge.shippingAddress,
-                                                    {
-                                                        children: $.extend(
-                                                            true,
-                                                            {},
-                                                            checkoutLayoutBridge.shippingAddressChildren,
-                                                            checkoutLayoutBridge.shippingListChildren
-                                                        )
-                                                    }
-                                                )
+                                    children: checkoutLayoutBridge.paymentRegionChildren
+                                }
+                            }
+                        });
+                        window.dispatchEvent(
+                            new CustomEvent('fastcheckout:payment-components-started')
+                        );
+                    }
+
+                    function queueAfterShippingPaint() {
+                        if (queued) {
+                            return;
+                        }
+                        queued = true;
+                        if (readinessTimer) {
+                            window.clearTimeout(readinessTimer);
+                        }
+
+                        window.setTimeout(startPaymentComponents, 0);
+                    }
+
+                    function pollShippingReadiness() {
+                        var hasShippingInput = !!document.querySelector(
+                            '.fastcheckout-native-shipping-address input[name="firstname"]'
+                        );
+
+                        if (
+                            window.fastcheckoutAddressFieldsReady ||
+                            hasShippingInput ||
+                            Date.now() - startedAt >= 10000
+                        ) {
+                            queueAfterShippingPaint();
+                            return;
+                        }
+                        readinessTimer = window.setTimeout(pollShippingReadiness, 250);
+                    }
+
+                    window.addEventListener(
+                        'fastcheckout:address-fields-ready',
+                        queueAfterShippingPaint,
+                        { once: true }
+                    );
+                    readinessTimer = window.setTimeout(pollShippingReadiness, 250);
+                }
+
+                // Register both schedulers before app() because a cached KO layout can
+                // render synchronously and dispatch address-fields-ready immediately.
+                scheduleShippingRatesBootstrap();
+                scheduleDeferredPaymentComponents();
+                if (!window.fastcheckoutShippingComponentsStarted) {
+                    window.fastcheckoutShippingComponentsStarted = true;
+                    app({
+                        components: {
+                            'checkoutProvider': $.extend(
+                                true,
+                                {
+                                    component: 'uiComponent',
+                                    shippingAddress: {
+                                        street: ['', '']
+                                    }
+                                },
+                                checkoutLayoutBridge.checkoutProvider
+                            ),
+                            'checkout': {
+                                component: 'uiComponent',
+                                children: {
+                                    steps: {
+                                        component: 'uiComponent',
+                                        children: $.extend(true, {}, checkoutLayoutBridge.checkoutStepChildren, {
+                                            'shipping-step': {
+                                                component: 'uiComponent',
+                                                children: {
+                                                    'step-config': {
+                                                        component: 'uiComponent'
+                                                    },
+                                                    // shippingListChildren (before-shipping-method-form,
+                                                    // shippingAdditional) belong to this component in
+                                                    // stock Magento — core's shipping.html renders those
+                                                    // regions itself. Fastcheckout renders the same
+                                                    // regions from Kkkonrad_Fastcheckout/hyva/shipping-list,
+                                                    // bound to this very instance, so they must live here.
+                                                    shippingAddress: $.extend(
+                                                        true,
+                                                        {},
+                                                        checkoutLayoutBridge.shippingAddress,
+                                                        {
+                                                            children: $.extend(
+                                                                true,
+                                                                {},
+                                                                checkoutLayoutBridge.shippingAddressChildren,
+                                                                checkoutLayoutBridge.shippingListChildren
+                                                            )
+                                                        }
+                                                    )
+                                                }
                                             }
-                                        }
-                                    })
+                                        })
+                                    }
                                 }
                             }
                         }
-                    }
-                });
+                    });
+                }
 
                 [0, 50, 250, 750, 1500, 3000].forEach(function (delay) {
                     window.setTimeout(checkoutLayoutBridge.aliasStandardShippingRegistryPaths, delay);
