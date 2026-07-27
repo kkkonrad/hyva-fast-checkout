@@ -115,6 +115,9 @@ define([
 
         document.addEventListener('click', function captureTrustedShippingChoice(event) {
             var target = event.target,
+                option,
+                radio,
+                interactive,
                 code,
                 shipping,
                 rates,
@@ -123,12 +126,35 @@ define([
                 parts,
                 carrier;
 
-            if (
-                !event.isTrusted ||
-                !target ||
-                target.name !== 'shipping_method' ||
-                !target.value
-            ) {
+            if (!event.isTrusted || !target) {
+                return;
+            }
+
+            // The visual shipping method is a card, while the native label only covers
+            // its content row. Treat the card padding and empty area as part of the
+            // radio target. Do not intercept controls injected by carrier widgets.
+            if (target.name !== 'shipping_method') {
+                if (typeof target.closest !== 'function') {
+                    return;
+                }
+
+                option = target.closest('.fastcheckout-shipping-method-option');
+                if (!option) {
+                    return;
+                }
+
+                radio = option.querySelector('input[name="shipping_method"]');
+                interactive = target.closest(
+                    'a, button, input, select, textarea, [role="button"]'
+                );
+                if (interactive && interactive !== radio) {
+                    return;
+                }
+
+                target = radio;
+            }
+
+            if (!target || !target.value) {
                 return;
             }
 

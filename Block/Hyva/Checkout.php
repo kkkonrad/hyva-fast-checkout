@@ -15,6 +15,7 @@ use Magento\Framework\Component\ComponentRegistrarInterface;
 use Magento\Framework\Locale\ResolverInterface;
 use Magento\Framework\Module\ModuleListInterface;
 use Magento\Framework\Pricing\Helper\Data as PricingHelper;
+use Magento\Framework\RequireJs\Config as RequireJsConfig;
 use Magento\Framework\View\Element\Template;
 use Magento\Framework\View\Element\Template\Context;
 use Magento\Quote\Model\Quote;
@@ -580,6 +581,18 @@ class Checkout extends Template
         } catch (\Throwable $exception) {
             return false;
         }
+    }
+
+    public function getRequireJsMinResolverUrl(): string
+    {
+        if (
+            $this->requireJsAssets === null
+            || !$this->requireJsAssets->isJsMinificationEnabled()
+        ) {
+            return '';
+        }
+
+        return $this->getViewFileUrl(RequireJsConfig::MIN_RESOLVER_FILENAME);
     }
 
     /**

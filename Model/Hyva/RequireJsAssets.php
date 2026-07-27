@@ -8,6 +8,7 @@ use Magento\Framework\App\Filesystem\DirectoryList;
 use Magento\Framework\App\View\Asset\Publisher;
 use Magento\Framework\Filesystem;
 use Magento\Framework\RequireJs\Config as RequireJsConfig;
+use Magento\Framework\View\Asset\Minification;
 use Magento\Framework\View\Asset\Repository as AssetRepository;
 use Magento\RequireJs\Model\FileManager;
 use Psr\Log\LoggerInterface;
@@ -57,6 +58,11 @@ class RequireJsAssets
     private $logger;
 
     /**
+     * @var Minification
+     */
+    private $minification;
+
+    /**
      * @var bool
      */
     private $wasChecked = false;
@@ -67,7 +73,8 @@ class RequireJsAssets
         AssetRepository $assetRepository,
         Filesystem $filesystem,
         RequireJsConfig $requireJsConfig,
-        LoggerInterface $logger
+        LoggerInterface $logger,
+        Minification $minification
     ) {
         $this->fileManager = $fileManager;
         $this->assetPublisher = $assetPublisher;
@@ -75,6 +82,7 @@ class RequireJsAssets
         $this->filesystem = $filesystem;
         $this->requireJsConfig = $requireJsConfig;
         $this->logger = $logger;
+        $this->minification = $minification;
     }
 
     /**
@@ -100,6 +108,14 @@ class RequireJsAssets
                 $generated = true;
             }
 
+            if (
+                $this->isJsMinificationEnabled()
+                && !$staticDir->isExist($this->requireJsConfig->getMinResolverRelativePath())
+            ) {
+                $this->fileManager->createMinResolverAsset();
+                $generated = true;
+            }
+
             if (!$this->isRequireJsConfigCurrent($staticDir)) {
                 if ($staticDir->isExist($this->requireJsConfig->getConfigFileRelativePath())) {
                     $staticDir->delete($this->requireJsConfig->getConfigFileRelativePath());
@@ -117,6 +133,11 @@ class RequireJsAssets
         }
 
         return false;
+    }
+
+    public function isJsMinificationEnabled(): bool
+    {
+        return $this->minification->isEnabled('js');
     }
 
     private function isRequireJsConfigCurrent(\Magento\Framework\Filesystem\Directory\WriteInterface $staticDir): bool

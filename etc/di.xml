@@ -22,6 +22,12 @@
         <plugin name="fastcheckout_quote_customermanagement" type="Kkkonrad\Fastcheckout\Plugin\Quote\CustomerManagementPlugin"/>
     </type>
 
+    <!-- Keep Hyvä's CSS protection, but allow Magento to minify the KO/RequireJS graph. -->
+    <type name="Magento\Framework\View\Asset\PreProcessor\Minify">
+        <plugin name="hyva_theme"
+                type="Kkkonrad\Fastcheckout\Plugin\Theme\AllowJsMinifierForHyvaPlugin"/>
+    </type>
+
     <type name="Tpay\Magento2\Model\ApiFacade\TpayConfig\ConfigOpen">
         <plugin name="fastcheckout_tpay_config_open" type="Kkkonrad\Fastcheckout\Plugin\Tpay\PatchTpayChannelsScript"/>
     </type>

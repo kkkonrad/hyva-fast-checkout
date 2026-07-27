@@ -17,7 +17,7 @@
     <!-- /ko -->
     <!-- ko foreach: { data: rates(), as: 'method' } -->
         <!-- selectionRevision forces border/css recompute when user lock changes -->
-        <div class="rounded p-4 transition-all duration-200"
+        <div class="fastcheckout-shipping-method-option rounded p-4 transition-all duration-200 cursor-pointer"
              data-bind="css: $parent.getMethodCss(method), attr: { 'data-shipping-selected': $parent.methodMatchesCode(method, $parent.getPreferredSelectedCode()) ? '1' : '0' }">
             <label class="flex items-center justify-between cursor-pointer mb-0 w-full">
                 <div class="flex items-center min-w-0">

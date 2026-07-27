@@ -157,6 +157,7 @@ foreach ($layoutAssets['css'] as $cssAsset) {
     // the same object by reference instead of embedding the large payload twice.
     config.checkoutConfig = window.checkoutConfig;
     var requireJsUrl = '<?= $escaper->escapeJs($block->getViewFileUrl('requirejs/require.js')) ?>';
+    var minResolverUrl = '<?= $escaper->escapeJs($block->getRequireJsMinResolverUrl()) ?>';
     var requireJsConfigUrl = '<?= $escaper->escapeJs($block->getViewFileUrl('requirejs-config.js')) ?>';
     var mixinsUrl = '<?= $escaper->escapeJs($block->getViewFileUrl('mage/requirejs/mixins.js')) ?>';
     var staticBaseUrl = '<?= $escaper->escapeJs($block->getViewFileUrl('/')) ?>';
@@ -256,7 +257,14 @@ foreach ($layoutAssets['css'] as $cssAsset) {
             window.require.config({
                 baseUrl: staticBaseUrl
             });
-            initCheckoutBridge();
+            if (minResolverUrl && !window.fastcheckoutRequireJsMinResolverLoaded) {
+                loadScript(minResolverUrl, function () {
+                    window.fastcheckoutRequireJsMinResolverLoaded = true;
+                    initCheckoutBridge();
+                });
+            } else {
+                initCheckoutBridge();
+            }
             return;
         }
 
@@ -266,9 +274,21 @@ foreach ($layoutAssets['css'] as $cssAsset) {
                     baseUrl: staticBaseUrl
                 });
             }
-            loadScript(requireJsConfigUrl, function () {
-                loadScript(mixinsUrl, initCheckoutBridge);
-            });
+
+            function loadConfigAndMixins() {
+                loadScript(requireJsConfigUrl, function () {
+                    loadScript(mixinsUrl, initCheckoutBridge);
+                });
+            }
+
+            if (minResolverUrl) {
+                loadScript(minResolverUrl, function () {
+                    window.fastcheckoutRequireJsMinResolverLoaded = true;
+                    loadConfigAndMixins();
+                });
+            } else {
+                loadConfigAndMixins();
+            }
         });
     }
 
