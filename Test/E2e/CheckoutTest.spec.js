@@ -3786,22 +3786,77 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
         )).toBe(true);
     });
 
-    test('should restore and clear sessionStorage fields correctly', async ({ page }) => {
+    test('should restore a shipping address after page reload', async ({ page }) => {
         const checkout = new CheckoutPage(page);
         await checkout.goto();
 
-        // Fill one field
-        await page.locator(selectors.firstname).fill('SessionStorageTest');
-        await page.locator(selectors.firstname).blur();
-        await page.waitForTimeout(1000);
+        const shippingRoot = page.locator('.fastcheckout-native-shipping-address');
+        const values = {
+            email: 'reload-address@example.com',
+            firstname: 'Reload',
+            lastname: 'Address',
+            street1: 'Odswiezona 15',
+            city: 'Warszawa',
+            postcode: '00-015',
+            telephone: '500600701'
+        };
+        const readCheckoutAddress = () => page.evaluate(() => new Promise((resolve) => {
+            window.require(['Magento_Checkout/js/checkout-data'], (checkoutData) => {
+                resolve(checkoutData.getShippingAddressFromData() || {});
+            }, () => resolve({}));
+        }));
 
-        // Reload page
+        await checkout.fillShippingAddress(values);
+        const region = shippingRoot.locator('select[name="region_id"]');
+        if (await region.isVisible()) {
+            await region.selectOption({ index: 1 });
+        }
+
+        await expect.poll(() => page.evaluate(() => {
+            const payload = JSON.parse(
+                window.sessionStorage.getItem('fastcheckout_last_guest_address') || 'null'
+            );
+
+            return payload && payload.values ? payload.values : {};
+        })).toMatchObject({
+            email: values.email,
+            firstname: values.firstname,
+            lastname: values.lastname,
+            street1: values.street1,
+            city: values.city,
+            postcode: values.postcode,
+            telephone: values.telephone
+        });
+
+        await expect.poll(readCheckoutAddress).toMatchObject({
+            firstname: values.firstname,
+            lastname: values.lastname,
+            city: values.city,
+            postcode: values.postcode,
+            telephone: values.telephone
+        });
+
+        // A change made immediately before refresh must be flushed by pagehide,
+        // without waiting for the normal debounce.
+        values.firstname = 'ReloadImmediate';
+        await page.locator(selectors.firstname).fill(values.firstname);
         await page.reload();
         await page.waitForLoadState('domcontentloaded');
 
-        // Check if value restored from sessionStorage (give brief delay for restore timeout)
-        await page.waitForTimeout(1000);
-        await expect(page.locator(selectors.firstname)).toHaveValue('SessionStorageTest');
+        await expect(page.locator(selectors.email)).toHaveValue(values.email);
+        await expect(page.locator(selectors.firstname)).toHaveValue(values.firstname);
+        await expect(page.locator(selectors.lastname)).toHaveValue(values.lastname);
+        await expect(page.locator(selectors.street1)).toHaveValue(values.street1);
+        await expect(page.locator(selectors.city)).toHaveValue(values.city);
+        await expect(page.locator(selectors.postcode)).toHaveValue(values.postcode);
+        await expect(page.locator(selectors.telephone)).toHaveValue(values.telephone);
+        await expect.poll(readCheckoutAddress).toMatchObject({
+            firstname: values.firstname,
+            lastname: values.lastname,
+            city: values.city,
+            postcode: values.postcode,
+            telephone: values.telephone
+        });
     });
 
     test('should clear checkout persistence and ignore stale address writes after order placed', async ({ page }) => {
@@ -3941,22 +3996,24 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
         await expect(page.locator(selectors.postcode)).toHaveValue('00-002');
         await expect(page.locator(selectors.telephone)).toHaveValue(/500\s?600\s?700/);
 
-        const readRestoredWireState = () => page.evaluate(() => {
-            const wireEl = document.querySelector('[wire\\:id]');
-            const wire = wireEl && window.Livewire ? window.Livewire.find(wireEl.getAttribute('wire:id')) : null;
+        const readRestoredCheckoutData = () => page.evaluate(() => new Promise((resolve) => {
+            window.require(['Magento_Checkout/js/checkout-data'], (checkoutData) => {
+                const address = checkoutData.getShippingAddressFromData() || {};
+                const street = Array.isArray(address.street)
+                    ? address.street
+                    : (address.street || {});
 
-            return wire && typeof wire.get === 'function'
-                ? {
-                    firstname: wire.get('firstname'),
-                    street1: wire.get('street1'),
-                    city: wire.get('city'),
-                    postcode: wire.get('postcode'),
-                    telephone: wire.get('telephone')
-                }
-                : {};
-        });
+                resolve({
+                    firstname: address.firstname,
+                    street1: street[0] || street['0'] || '',
+                    city: address.city,
+                    postcode: address.postcode,
+                    telephone: address.telephone
+                });
+            }, () => resolve({}));
+        }));
 
-        await expect.poll(readRestoredWireState, {
+        await expect.poll(readRestoredCheckoutData, {
             timeout: 10000
         }).toMatchObject({
             firstname: 'RecentGuest',
@@ -3964,12 +4021,12 @@ test.describe('Kkkonrad Fastcheckout E2E Tests', () => {
             city: 'Warsaw',
             postcode: '00-002'
         });
-        const restoredWireState = await readRestoredWireState();
+        const restoredCheckoutData = await readRestoredCheckoutData();
 
-        expect(restoredWireState.firstname, JSON.stringify(restoredWireState, null, 2)).toBe('RecentGuest');
-        expect(restoredWireState.street1, JSON.stringify(restoredWireState, null, 2)).toBe('Recent Street 10');
-        expect(restoredWireState.city, JSON.stringify(restoredWireState, null, 2)).toBe('Warsaw');
-        expect(restoredWireState.postcode, JSON.stringify(restoredWireState, null, 2)).toBe('00-002');
+        expect(restoredCheckoutData.firstname, JSON.stringify(restoredCheckoutData, null, 2)).toBe('RecentGuest');
+        expect(restoredCheckoutData.street1, JSON.stringify(restoredCheckoutData, null, 2)).toBe('Recent Street 10');
+        expect(restoredCheckoutData.city, JSON.stringify(restoredCheckoutData, null, 2)).toBe('Warsaw');
+        expect(restoredCheckoutData.postcode, JSON.stringify(restoredCheckoutData, null, 2)).toBe('00-002');
 
         await page.waitForTimeout(2000);
         await page.evaluate(() => {

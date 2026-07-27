@@ -488,73 +488,16 @@ define([
             },
 
             /**
-             * Content-level comparison of the fields that identify an address. Cache keys are
-             * useless here: unchecking same-as-shipping prefills the billing form from shipping,
-             * producing an address with identical content but a brand-new (or placeholder) key.
-             */
-            _fastcheckoutBillingSameContentAsShipping: function (billing, shipping) {
-                var flat = function (address) {
-                        var street = address ? address.street : null;
-
-                        if (Array.isArray(street)) {
-                            street = street.join('|');
-                        } else if (street && typeof street === 'object') {
-                            street = Object.keys(street).map(function (k) {
-                                return street[k];
-                            }).join('|');
-                        } else {
-                            street = street || '';
-                        }
-
-                        return [
-                            address && address.firstname, address && address.lastname,
-                            address && address.city, address && address.postcode,
-                            address && (address.regionId || address.region_id), street
-                        ].map(function (v) {
-                            return String(v == null ? '' : v).trim().toLowerCase();
-                        }).join('~');
-                    };
-
-                if (!billing || !shipping) {
-                    return false;
-                }
-
-                return flat(billing) === flat(shipping);
-            },
-
-            /**
-             * True when the quote billing address identifies a payer, i.e. it is a real
-             * billing address rather than "no billing yet".
+             * Expose the shared shopper intent to the checkout bridge.
              *
-             * Deliberately keyed on identity fields (name / street) and NOT on city+postcode:
-             * checkout starts with a synthetic destination address used only to pre-estimate
-             * rates (cache key "fc-dest-rate:…"), which carries a city and postcode but no
-             * name. Counting those as a real billing address made the same-as-shipping
-             * default bail out, leaving the checkbox unchecked on first render.
+             * Magento creates one billing component per payment renderer. Their observables
+             * can temporarily flip to false while checkout-data is restored, so the observable
+             * alone cannot tell an intentional separate billing address from a renderer race.
+             *
+             * @returns {Boolean}
              */
-            _fastcheckoutBillingHasOwnData: function (billing) {
-                var street;
-
-                if (!billing) {
-                    return false;
-                }
-
-                street = billing.street;
-                if (Array.isArray(street)) {
-                    street = street.join('').trim();
-                } else if (street && typeof street === 'object') {
-                    street = Object.keys(street).map(function (k) {
-                        return street[k];
-                    }).join('').trim();
-                } else {
-                    street = street ? String(street).trim() : '';
-                }
-
-                return Boolean(
-                    String(billing.firstname || '').trim() ||
-                    String(billing.lastname || '').trim() ||
-                    street
-                );
+            _fastcheckoutHasExplicitSeparateBilling: function () {
+                return userChoseSeparateBilling;
             },
 
             /**
@@ -582,21 +525,6 @@ define([
                 billing = typeof quote.billingAddress === 'function'
                     ? quote.billingAddress()
                     : null;
-
-                // userChoseSeparateBilling only flips when the shopper unchecks the box in the
-                // UI. A separate billing address applied any other way — REST/programmatic
-                // select, a restored guest snapshot, a payment renderer supplying its own
-                // billing — left it false, so this default overwrote a real, different billing
-                // address with the shipping one. The order still placed, silently carrying the
-                // wrong billing address. Compare content, not cache keys: unchecking prefills
-                // billing from shipping, which is content-equal (so the default must still run
-                // and open the form) but has a different key.
-                if (
-                    this._fastcheckoutBillingHasOwnData(billing) &&
-                    !this._fastcheckoutBillingSameContentAsShipping(billing, shipping)
-                ) {
-                    return;
-                }
 
                 this._fastcheckoutSyncingSameAsShipping = true;
                 try {

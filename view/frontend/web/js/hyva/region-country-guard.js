@@ -52,7 +52,17 @@ define([
             countryId = String(address.country_id || address.countryId || '').trim();
             regionId = String(address.region_id || address.regionId || '').trim();
 
-            if (!countryId || !regionId) {
+            // AddressInterface::setRegionId() accepts an integer. JSON.stringify omits
+            // undefined properties, while an empty string reaches the REST input
+            // processor and causes a type error before rate estimation can run.
+            if (!regionId) {
+                address.region_id = undefined;
+                address.regionId = undefined;
+
+                return address;
+            }
+
+            if (!countryId) {
                 return address;
             }
 
@@ -71,8 +81,8 @@ define([
             }
 
             if (String(match.country_id) !== countryId) {
-                address.region_id = '';
-                address.regionId = '';
+                address.region_id = undefined;
+                address.regionId = undefined;
                 address.region = '';
             }
 

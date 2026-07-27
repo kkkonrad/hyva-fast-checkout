@@ -187,6 +187,11 @@ const isFastcheckoutActive = function () {
 // Register mock modules
 modules['mage/utils/wrapper'] = wrapper;
 modules['Kkkonrad_Fastcheckout/js/mixin/is-fastcheckout-active'] = isFastcheckoutActive;
+modules['Kkkonrad_Fastcheckout/js/hyva/region-country-guard'] = {
+    dropRegionFromOtherCountry: function (address) {
+        return address;
+    }
+};
 modules['Magento_Checkout/js/model/shipping-service'] = shippingService;
 modules['Magento_Checkout/js/model/shipping-rate-registry'] = rateRegistry;
 modules['Magento_Checkout/js/model/error-processor'] = { process: function () {} };
@@ -257,6 +262,11 @@ vm.runInNewContext(bridgeSrc, {
 // re-inject deps into modules map for factory
 modules['mage/utils/wrapper'] = wrapper;
 modules['Kkkonrad_Fastcheckout/js/mixin/is-fastcheckout-active'] = isFastcheckoutActive;
+modules['Kkkonrad_Fastcheckout/js/hyva/region-country-guard'] = {
+    dropRegionFromOtherCountry: function (address) {
+        return address;
+    }
+};
 modules['Magento_Checkout/js/model/shipping-service'] = shippingService;
 requireLocal(['Kkkonrad_Fastcheckout/js/mixin/shipping-rate-processor-bridge'], function () {});
 const bridge = modules['Kkkonrad_Fastcheckout/js/mixin/shipping-rate-processor-bridge'];
@@ -327,6 +337,7 @@ vm.runInNewContext(syncSrc, {
     console: console,
     window: global.window,
     document: {
+        querySelector: function () { return null; },
         querySelectorAll: function () { return []; }
     }
 });
@@ -355,7 +366,10 @@ const syncFactoryModule = (function () {
         window: global.window,
         setTimeout: setTimeout,
         clearTimeout: clearTimeout,
-        document: { querySelectorAll: function () { return []; } }
+        document: {
+            querySelector: function () { return null; },
+            querySelectorAll: function () { return []; }
+        }
     });
     return result;
 })();

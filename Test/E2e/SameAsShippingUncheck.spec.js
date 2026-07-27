@@ -109,6 +109,23 @@ test('intentional uncheck of same-as-shipping sticks across payment components',
                 return out;
             }
 
+            // Regression for a restored/stale quote billing address. A different address in
+            // checkout-data is not shopper intent: until the checkbox is explicitly clicked,
+            // Fastcheckout must recover the default and use the current shipping address.
+            const staleBilling = conv.formAddressDataToQuoteAddress({
+                firstname: 'Cached',
+                lastname: 'Billing',
+                street: { 0: 'Stara 99', 1: '' },
+                city: 'Kraków',
+                postcode: '30-001',
+                country_id: 'PL',
+                region_id: '1026',
+                region: 'małopolskie',
+                telephone: '500111222'
+            });
+            selectBill(staleBilling);
+            target.isAddressSameAsShipping(false);
+
             if (typeof target._fastcheckoutApplySameAsShippingDefault === 'function') {
                 target._fastcheckoutApplySameAsShippingDefault();
             } else {
@@ -116,10 +133,13 @@ test('intentional uncheck of same-as-shipping sticks across payment components',
             }
             await new Promise((r) => setTimeout(r, 100));
 
+            const recoveredBilling = quote.billingAddress && quote.billingAddress();
             out.before = {
                 same: !!target.isAddressSameAsShipping(),
                 details: !!(target.isAddressDetailsVisible && target.isAddressDetailsVisible()),
-                billing: !!(quote.billingAddress && quote.billingAddress())
+                billing: !!recoveredBilling,
+                billingFirstname: recoveredBilling && recoveredBilling.firstname,
+                billingRegionId: recoveredBilling && (recoveredBilling.regionId || recoveredBilling.region_id)
             };
 
             // Magento KO: checked binding updates observable first, then click handler.
@@ -156,6 +176,8 @@ test('intentional uncheck of same-as-shipping sticks across payment components',
 
     expect(result.error, JSON.stringify(result)).toBeNull();
     expect(result.before.same, JSON.stringify(result)).toBe(true);
+    expect(result.before.billingFirstname, JSON.stringify(result)).toBe('Jan');
+    expect(String(result.before.billingRegionId), JSON.stringify(result)).toBe('1024');
     expect(result.afterImmediate.same, JSON.stringify(result)).toBe(false);
     expect(result.afterImmediate.details, JSON.stringify(result)).toBe(false);
     expect(result.afterSettle.same, JSON.stringify(result)).toBe(false);

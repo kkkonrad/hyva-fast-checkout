@@ -67,6 +67,23 @@ $hyvaCsp = $block->getHyvaCsp();
             return Promise.reject(new Error(payMsg));
         }
 
+        // Run the same native Magento/KO field validation as the payment
+        // renderer before starting shipping synchronisation or showing the
+        // checkout processing state. Invalid fields (for example an empty
+        // Purchase Order Number) must behave like shipping address fields:
+        // render their inline error immediately and send no REST request.
+        if (
+            paymentBridge &&
+            typeof paymentBridge.validate === 'function' &&
+            !paymentBridge.validate()
+        ) {
+            if (typeof paymentBridge.focusFirstInvalidField === 'function') {
+                paymentBridge.focusFirstInvalidField();
+            }
+
+            return Promise.reject(new Error('Please check the selected payment method and try again.'));
+        }
+
         setProcessing(true);
 
         // Prefer payment bridge placeOrder (KO renderer path). No Magewire.
@@ -140,7 +157,10 @@ $hyvaCsp = $block->getHyvaCsp();
 
     form.addEventListener('submit', function (event) {
         event.preventDefault();
-        placeOrderViaKo();
+        // Validation and request failures are already rendered by showError() and the
+        // Magento message container. Consume the promise here so an expected invalid
+        // submit does not become an unhandled browser error.
+        placeOrderViaKo().catch(function () {});
     });
 
     // Coupon apply/cancel via Magento guest/customer coupon REST when available.

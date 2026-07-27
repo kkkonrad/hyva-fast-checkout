@@ -1,8 +1,9 @@
 /**
- * Snapshot / restore guest shipping address across successful place-order.
+ * Snapshot / restore guest shipping address across reloads and successful place-order.
  *
- * Magento clears checkout-data (shippingAddressFromData) after place-order.
- * Fastcheckout keeps a session snapshot so the next checkout can re-fill the form.
+ * Magento customer-data initialization can replace the client-side checkout-data section
+ * before the shipping component consumes it. Fastcheckout keeps an independent session
+ * snapshot so a reload (and the next checkout after place-order) can re-fill the form.
  */
 define([], function () {
     'use strict';
@@ -20,6 +21,8 @@ define([], function () {
     var restoreGeneration = 0,
         userTouchedDestination = false,
         destinationTouchBound = false,
+        autoSnapshotBound = false,
+        autoSnapshotTimer = null,
         // True while forceUiSelectComponents is writing snapshot values (ignore those).
         restoreWriteInProgress = false,
         lastRestoredCountryId = '',
@@ -141,6 +144,21 @@ define([], function () {
             window.sessionStorage.setItem(key, JSON.stringify(value));
         } catch (e) {
             // ignore quota / private mode
+        }
+    }
+
+    function removeSnapshot() {
+        try {
+            window.sessionStorage.removeItem(STORAGE_KEY);
+            [
+                'email', 'firstname', 'lastname', 'company',
+                'street1', 'street2', 'city', 'postcode',
+                'countryId', 'regionId', 'region', 'telephone'
+            ].forEach(function (field) {
+                window.sessionStorage.removeItem('fastcheckout_' + field);
+            });
+        } catch (e) {
+            // ignore storage failures
         }
     }
 
@@ -298,6 +316,49 @@ define([], function () {
         return null;
     }
 
+    function persistSnapshotValues(values) {
+        var normalized = normalizeValues(values);
+
+        if (!normalized) {
+            return null;
+        }
+
+        writeJson(STORAGE_KEY, {
+            createdAt: Date.now(),
+            values: normalized
+        });
+
+        if (normalized.email) {
+            try {
+                window.sessionStorage.setItem(EMAIL_KEY, normalized.email);
+            } catch (e) {
+                // ignore
+            }
+        }
+
+        // Also mirror Magento-style fields for older restore paths.
+        try {
+            [
+                'email', 'firstname', 'lastname', 'company',
+                'street1', 'street2', 'city', 'postcode',
+                'countryId', 'regionId', 'region', 'telephone'
+            ].forEach(function (field) {
+                if (normalized[field]) {
+                    window.sessionStorage.setItem(
+                        'fastcheckout_' + field,
+                        String(normalized[field])
+                    );
+                } else {
+                    window.sessionStorage.removeItem('fastcheckout_' + field);
+                }
+            });
+        } catch (e2) {
+            // ignore
+        }
+
+        return normalized;
+    }
+
     /**
      * Build and persist snapshot. Prefer richest source (quote > checkout-data > DOM).
      *
@@ -312,9 +373,7 @@ define([], function () {
             fromCheckoutData = collectFromCheckoutData(depsSafe.checkoutData),
             fromDom = collectFromDom(),
             merged = {},
-            sources = [fromCheckoutData, fromDom, fromQuote],
-            i,
-            key;
+            sources = [fromCheckoutData, fromDom, fromQuote];
 
         sources.forEach(function (src) {
             if (!src) {
@@ -341,35 +400,110 @@ define([], function () {
             return null;
         }
 
-        writeJson(STORAGE_KEY, {
-            createdAt: Date.now(),
-            values: merged
+        return persistSnapshotValues(merged);
+    }
+
+    /**
+     * Persist the live guest form without merging stale quote/provider values.
+     * Empty fields must stay empty: otherwise clearing a field and reloading would
+     * resurrect its previous quote value.
+     *
+     * @returns {Object|null}
+     */
+    function snapshotCurrentForm() {
+        var values;
+
+        if (
+            restoreWriteInProgress ||
+            window.fastcheckoutOrderPlaced
+        ) {
+            return null;
+        }
+
+        values = collectFromDom();
+        if (!values) {
+            removeSnapshot();
+            return null;
+        }
+
+        return persistSnapshotValues(values);
+    }
+
+    function isShippingFormField(target) {
+        var name;
+
+        if (
+            !target ||
+            !target.getAttribute ||
+            !target.closest ||
+            !target.closest('.fastcheckout-native-shipping-address')
+        ) {
+            return false;
+        }
+
+        name = String(target.getAttribute('name') || target.id || '');
+
+        return Boolean(
+            name === 'customer-email' ||
+            name === 'email' ||
+            name === 'username' ||
+            name === 'firstname' ||
+            name === 'lastname' ||
+            name === 'company' ||
+            name === 'city' ||
+            name === 'postcode' ||
+            name === 'country_id' ||
+            name === 'region_id' ||
+            name === 'region' ||
+            name === 'telephone' ||
+            name.indexOf('street') === 0
+        );
+    }
+
+    function scheduleAutoSnapshot() {
+        if (autoSnapshotTimer) {
+            window.clearTimeout(autoSnapshotTimer);
+        }
+
+        autoSnapshotTimer = window.setTimeout(function () {
+            autoSnapshotTimer = null;
+            snapshotCurrentForm();
+        }, 250);
+    }
+
+    /**
+     * Keep a reload-safe guest snapshot while the standard Magento form is edited.
+     */
+    function bindAutoSnapshot() {
+        if (
+            autoSnapshotBound ||
+            typeof document === 'undefined'
+        ) {
+            return;
+        }
+
+        autoSnapshotBound = true;
+
+        ['input', 'change'].forEach(function (eventName) {
+            document.addEventListener(eventName, function (event) {
+                // KO/provider restore dispatches synthetic events. Persist only browser/user
+                // edits so an empty initialization pass cannot erase a valid snapshot.
+                if (!event || event.isTrusted === false) {
+                    return;
+                }
+                if (isShippingFormField(event && event.target)) {
+                    scheduleAutoSnapshot();
+                }
+            }, true);
         });
 
-        if (merged.email) {
-            try {
-                window.sessionStorage.setItem(EMAIL_KEY, merged.email);
-            } catch (e2) {
-                // ignore
+        window.addEventListener('pagehide', function () {
+            if (autoSnapshotTimer) {
+                window.clearTimeout(autoSnapshotTimer);
+                autoSnapshotTimer = null;
+                snapshotCurrentForm();
             }
-        }
-
-        // Also mirror Magento-style fields for older restore paths
-        try {
-            [
-                'email', 'firstname', 'lastname', 'company',
-                'street1', 'street2', 'city', 'postcode',
-                'countryId', 'regionId', 'region', 'telephone'
-            ].forEach(function (field) {
-                if (merged[field]) {
-                    window.sessionStorage.setItem('fastcheckout_' + field, String(merged[field]));
-                }
-            });
-        } catch (e3) {
-            // ignore
-        }
-
-        return merged;
+        });
     }
 
     function load() {
@@ -1055,6 +1189,8 @@ define([], function () {
 
     return {
         snapshot: snapshot,
+        snapshotCurrentForm: snapshotCurrentForm,
+        bindAutoSnapshot: bindAutoSnapshot,
         load: load,
         restore: restore,
         toFormAddressData: toFormAddressData,
