@@ -422,6 +422,18 @@ body.checkout-submitting .place-order-spinner {
 body.checkout-submitting .btn-primary {
     pointer-events: none !important;
 }
+body.checkout-submitting [data-fastcheckout-processing="true"] {
+    background-color: var(--fastcheckout-place-order-background) !important;
+    border-color: var(--fastcheckout-place-order-border) !important;
+    color: var(--fastcheckout-place-order-color) !important;
+    cursor: wait !important;
+    filter: none !important;
+    opacity: 1 !important;
+}
+body.checkout-submitting [data-fastcheckout-processing="true"] .place-order-spinner {
+    color: currentColor !important;
+    flex: 0 0 auto;
+}
 
 /* Place-order scroll freeze (body position:fixed applied from Alpine). */
 body.fastcheckout-scroll-locked {

@@ -218,6 +218,125 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
         expect(orderRequests).toBe(0);
     });
 
+    test('place order keeps the primary loader through success navigation', async ({ page }) => {
+        let releaseRequest;
+        let requestBlocked = false;
+
+        await openCheckoutWithProduct(page);
+        await fillPolishShippingAddress(page);
+
+        const shippingMethod = page.locator(
+            'input[name="shipping_method"][value="tablerate_bestway"]:not(:disabled)'
+        );
+        await expect(shippingMethod).toBeVisible({ timeout: 30_000 });
+        await shippingMethod.evaluate((input) => input.click());
+
+        const purchaseOrder = page.locator(
+            'input[name="payment_method"][value="purchaseorder"]:not(:disabled)'
+        );
+        await expect(purchaseOrder).toBeVisible({ timeout: 30_000 });
+        await purchaseOrder.evaluate((input) => input.click());
+
+        const target = page.locator(
+            '[data-fastcheckout-payment-method-ko-target="purchaseorder"]'
+        );
+        await target.locator('input[name="payment[po_number]"]').fill(
+            'FC-LOADER-' + Date.now()
+        );
+        await page.locator(
+            '.checkout-agreement input[type="checkbox"], input[name*="agreement"]'
+        ).evaluateAll((checkboxes) => {
+            checkboxes.forEach((checkbox) => {
+                if (!checkbox.checked) {
+                    checkbox.click();
+                }
+            });
+        });
+
+        await page.route(
+            /\/V1\/guest-carts\/[^/]+\/(?:shipping-information|payment-information)(?:\?|$)/,
+            async (route) => {
+                requestBlocked = true;
+                await new Promise((resolve) => {
+                    releaseRequest = resolve;
+                });
+                await route.abort('failed');
+            }
+        );
+
+        const button = page.locator('[data-fastcheckout-place-order]');
+        await expect(button).toBeVisible();
+        const readyBackground = await button.evaluate(
+            (element) => getComputedStyle(element).backgroundColor
+        );
+
+        await button.evaluate((element) => element.click());
+        await expect.poll(() => requestBlocked).toBe(true);
+
+        await expect(button).toBeDisabled();
+        await expect(button).toHaveAttribute('aria-busy', 'true');
+        await expect(button.locator('[data-fastcheckout-place-order-spinner]')).toBeVisible();
+        await expect(button.locator('[data-fastcheckout-place-order-label]')).toHaveText(
+            'Prosimy czekać...'
+        );
+        expect(await button.evaluate(
+            (element) => getComputedStyle(element).backgroundColor
+        )).toBe(readyBackground);
+        expect(await button.evaluate(
+            (element) => getComputedStyle(element).opacity
+        )).toBe('1');
+
+        await page.setViewportSize({ width: 390, height: 844 });
+        const mobileButton = page.locator('[data-fastcheckout-place-order-mobile]');
+        await expect(mobileButton).toBeVisible();
+        await expect(mobileButton).toBeDisabled();
+        await expect(mobileButton).toHaveAttribute('aria-busy', 'true');
+        await expect(
+            mobileButton.locator('[data-fastcheckout-place-order-spinner]')
+        ).toBeVisible();
+        await expect(
+            mobileButton.locator('[data-fastcheckout-place-order-label]')
+        ).toHaveText('Prosimy czekać...');
+        expect(await mobileButton.evaluate(
+            (element) => getComputedStyle(element).opacity
+        )).toBe('1');
+
+        releaseRequest();
+        await expect(mobileButton).toBeEnabled();
+        await expect(mobileButton).not.toHaveAttribute('aria-busy', 'true');
+        await expect(
+            mobileButton.locator('[data-fastcheckout-place-order-spinner]')
+        ).toBeHidden();
+        await expect(mobileButton.locator('[data-fastcheckout-place-order-label]')).toHaveText(
+            'Złóż zamówienie'
+        );
+
+        // Resolve the bridge successfully but deliberately delay navigation.
+        // The loader must not flash back to the ready state in that interval.
+        await page.evaluate(() => {
+            window.fastcheckoutTestAfterPlaceOrder = false;
+            window.fastcheckoutHyvaPayment.placeOrder = function () {
+                return Promise.resolve({ testOrderResult: true });
+            };
+            window.fastcheckoutHyvaPayment.afterPlaceOrder = function () {
+                window.fastcheckoutTestAfterPlaceOrder = true;
+            };
+        });
+
+        await mobileButton.evaluate((element) => element.click());
+        await expect.poll(() => page.evaluate(
+            () => window.fastcheckoutTestAfterPlaceOrder
+        )).toBe(true);
+        await expect(mobileButton).toBeDisabled();
+        await expect(mobileButton).toHaveAttribute('aria-busy', 'true');
+        await expect(
+            mobileButton.locator('[data-fastcheckout-place-order-spinner]')
+        ).toBeVisible();
+        await expect(mobileButton.locator('[data-fastcheckout-place-order-label]')).toHaveText(
+            'Prosimy czekać...'
+        );
+    });
+
     test('valid purchase order number reaches Magento and places an order', async ({ page }) => {
         test.skip(
             process.env.FC_PLACE_REAL_ORDER !== '1',

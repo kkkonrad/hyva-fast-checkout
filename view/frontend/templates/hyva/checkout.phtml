@@ -95,7 +95,11 @@ $shippingMethods = $block->getShippingMethods();
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
                 </span>
-                <span><?= $escaper->escapeHtml(__('Place Order')) ?></span>
+                <span data-fastcheckout-place-order-label
+                      data-fastcheckout-ready-text="<?= $escaper->escapeHtmlAttr(__('Place Order')) ?>"
+                      data-fastcheckout-processing-text="<?= $escaper->escapeHtmlAttr(__('Please wait...')) ?>">
+                    <?= $escaper->escapeHtml(__('Place Order')) ?>
+                </span>
             </button>
             <p class="text-sm text-red-600 font-medium text-center hidden"
                data-fastcheckout-client-order-error

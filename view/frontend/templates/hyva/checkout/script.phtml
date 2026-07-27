@@ -23,10 +23,37 @@ $hyvaCsp = $block->getHyvaCsp();
         document.body.classList.toggle('checkout-submitting', !!isProcessing);
         form.querySelectorAll('[data-fastcheckout-place-order-spinner]').forEach(function (el) {
             el.classList.toggle('hidden', !isProcessing);
+            el.setAttribute('aria-hidden', isProcessing ? 'false' : 'true');
         });
         form.querySelectorAll('[data-fastcheckout-place-order], [data-fastcheckout-place-order-mobile]').forEach(function (btn) {
+            var label = btn.querySelector('[data-fastcheckout-place-order-label]');
+
+            if (isProcessing) {
+                var buttonStyle = window.getComputedStyle(btn);
+
+                // Preserve the active Hyvä primary-button palette. The global
+                // disabled style normally lowers opacity and changes the color.
+                btn.style.setProperty('--fastcheckout-place-order-background', buttonStyle.backgroundColor);
+                btn.style.setProperty('--fastcheckout-place-order-color', buttonStyle.color);
+                btn.style.setProperty('--fastcheckout-place-order-border', buttonStyle.borderColor);
+                btn.setAttribute('data-fastcheckout-processing', 'true');
+                btn.setAttribute('aria-busy', 'true');
+            } else {
+                btn.removeAttribute('data-fastcheckout-processing');
+                btn.removeAttribute('aria-busy');
+                btn.style.removeProperty('--fastcheckout-place-order-background');
+                btn.style.removeProperty('--fastcheckout-place-order-color');
+                btn.style.removeProperty('--fastcheckout-place-order-border');
+            }
+
             btn.disabled = !!isProcessing;
             btn.classList.toggle('pointer-events-none', !!isProcessing);
+
+            if (label) {
+                label.textContent = isProcessing
+                    ? label.getAttribute('data-fastcheckout-processing-text')
+                    : label.getAttribute('data-fastcheckout-ready-text');
+            }
         });
     }
 
@@ -90,7 +117,9 @@ $hyvaCsp = $block->getHyvaCsp();
         if (paymentBridge && typeof paymentBridge.placeOrder === 'function') {
             return Promise.resolve(paymentBridge.placeOrder(null, selectedMethod))
                 .then(function (result) {
-                    setProcessing(false);
+                    // A successful order starts Magento's redirect flow. Keep the
+                    // button busy until the current document is replaced so there
+                    // is no idle-button flash between REST success and navigation.
                     if (result && result.redirectUrl) {
                         window.location.replace(result.redirectUrl);
                         return result;
@@ -129,7 +158,7 @@ $hyvaCsp = $block->getHyvaCsp();
                 fullScreenLoader.startLoader();
                 placeOrderAction(payment).done(function (result) {
                     fullScreenLoader.stopLoader();
-                    setProcessing(false);
+                    // Preserve the button loader through the success-page redirect.
                     if (window.checkoutConfig && window.checkoutConfig.defaultSuccessPageUrl) {
                         window.location.replace(window.checkoutConfig.defaultSuccessPageUrl);
                     } else {
@@ -246,6 +275,14 @@ $hyvaCsp = $block->getHyvaCsp();
         var message = event && event.detail && event.detail.message ? event.detail.message : '';
         if (message) {
             showError(message);
+            setProcessing(false);
+        }
+    });
+
+    // If the browser restores this checkout document from its back-forward cache,
+    // it did not create a new DOM and would otherwise restore the busy button.
+    window.addEventListener('pageshow', function (event) {
+        if (event.persisted) {
             setProcessing(false);
         }
     });
