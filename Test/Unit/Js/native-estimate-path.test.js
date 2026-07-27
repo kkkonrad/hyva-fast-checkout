@@ -274,6 +274,15 @@ const bridge = modules['Kkkonrad_Fastcheckout/js/mixin/shipping-rate-processor-b
 const wrapped = bridge.wrap(nativeProcessor);
 assert(typeof wrapped.getRates === 'function', 'wrapped getRates');
 
+// A country-only bootstrap address must wait until KO paints the address form.
+wrapped.getRates({
+    countryId: 'PL',
+    getType: function () { return 'new-customer-address'; },
+    getCacheKey: function () { return 'startup-country-only'; }
+});
+assert(originalGetRatesCalls === 0, 'country-only estimate skipped before address fields are ready');
+global.window.fastcheckoutAddressFieldsReady = true;
+
 // Address A estimate
 const addressA = {
     countryId: 'PL',

@@ -49,6 +49,16 @@ define([
         return 'fc-dest-rate:' + destinationKey(address);
     }
 
+    function stopLoading() {
+        if (
+            shippingService &&
+            shippingService.isLoading &&
+            typeof shippingService.isLoading === 'function'
+        ) {
+            shippingService.isLoading(false);
+        }
+    }
+
     function finishPending(dest, address, originalGetCacheKey) {
         pendingByDestination[dest] = false;
         if (address && originalGetCacheKey) {
@@ -86,11 +96,18 @@ define([
                 // outgoing payload can still carry the previous country's region_id.
                 regionCountryGuard.dropRegionFromOtherCountry(address);
 
+                // KO can select both a temporary country-only address and a restored
+                // full address while the fieldset is still mounting. Rate estimation
+                // is restarted after address-fields-ready; no XHR should compete with
+                // the first paint regardless of how complete this early address is.
+                if (!window.fastcheckoutAddressFieldsReady) {
+                    stopLoading();
+                    return;
+                }
+
                 // Method selection must not re-estimate carriers — payment/totals only.
                 if (window.fastcheckoutLockShippingRatesList || window.fastcheckoutSelectingShippingMethod) {
-                    if (shippingService && shippingService.isLoading && typeof shippingService.isLoading === 'function') {
-                        shippingService.isLoading(false);
-                    }
+                    stopLoading();
                     return;
                 }
 
@@ -117,9 +134,7 @@ define([
                     if (shippingService && typeof shippingService.setShippingRates === 'function') {
                         shippingService.setShippingRates(cached);
                     }
-                    if (shippingService && shippingService.isLoading && typeof shippingService.isLoading === 'function') {
-                        shippingService.isLoading(false);
-                    }
+                    stopLoading();
                     return;
                 }
 

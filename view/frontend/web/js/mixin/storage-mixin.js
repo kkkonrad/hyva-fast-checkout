@@ -174,6 +174,15 @@ define([
 
             if (isFastcheckoutActive()) {
                 data = injectGuestEmail(url, data);
+
+                // Magento intentionally makes rate estimation synchronous for
+                // persistent quotes. During checkout bootstrap that blocks the
+                // main thread, so KO cannot paint the shipping-address form until
+                // the REST response returns. Fastcheckout has its own rate-state
+                // coordination and can always use the non-blocking request mode.
+                if (url && url.indexOf('/estimate-shipping-methods') !== -1) {
+                    async = true;
+                }
             }
 
             return originalPost(url, data, global, contentType, headers, async);

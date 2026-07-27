@@ -46,6 +46,87 @@ async function fillPolishShippingAddress(page) {
 }
 
 test.describe('Fastcheckout country and payment validation regressions', () => {
+    test('slow initial rate estimate does not block the restored shipping form', async ({ page }) => {
+        await openCheckoutWithProduct(page);
+        await fillPolishShippingAddress(page);
+
+        await expect.poll(() => page.evaluate(() => new Promise((resolve) => {
+            window.require(['Magento_Checkout/js/checkout-data'], (checkoutData) => {
+                const address = checkoutData.getShippingAddressFromData() || {};
+
+                resolve(address.lastname || '');
+            }, () => resolve(''));
+        }))).toBe('Testowy');
+
+        let releaseEstimate;
+        let estimateBlocked = false;
+        const estimatePayloads = [];
+
+        page.on('request', (request) => {
+            if (
+                request.method() === 'POST' &&
+                request.url().includes('/estimate-shipping-methods')
+            ) {
+                estimatePayloads.push(request.postDataJSON());
+            }
+        });
+
+        await page.addInitScript(() => {
+            const originalOpen = XMLHttpRequest.prototype.open;
+
+            window.fastcheckoutEstimateXhrModes = [];
+            window.fastcheckoutEstimateFormStates = [];
+            XMLHttpRequest.prototype.open = function (method, url, async) {
+                if (String(url || '').includes('/estimate-shipping-methods')) {
+                    window.fastcheckoutEstimateXhrModes.push(
+                        arguments.length < 3 ? true : async !== false
+                    );
+                    window.fastcheckoutEstimateFormStates.push(Boolean(
+                        document.querySelector(
+                            '.fastcheckout-native-shipping-address input[name="lastname"]'
+                        )
+                    ));
+                }
+
+                return originalOpen.apply(this, arguments);
+            };
+        });
+        await page.route('**/estimate-shipping-methods', async (route) => {
+            if (estimateBlocked) {
+                await route.continue();
+                return;
+            }
+            estimateBlocked = true;
+            await new Promise((resolve) => {
+                releaseEstimate = resolve;
+            });
+            await route.continue();
+        });
+
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        await expect.poll(() => estimateBlocked, { timeout: 30_000 }).toBe(true);
+
+        const shipping = page.locator('.fastcheckout-native-shipping-address');
+        await expect(shipping.getByLabel('Nazwisko')).toBeVisible();
+        await expect(shipping.getByLabel('Nazwisko')).toHaveValue('Testowy');
+        expect(
+            (await page.evaluate(() => window.fastcheckoutEstimateXhrModes)).every(Boolean),
+            JSON.stringify(estimatePayloads, null, 2)
+        ).toBe(true);
+        expect(
+            (await page.evaluate(() => window.fastcheckoutEstimateFormStates)).every(Boolean),
+            JSON.stringify(estimatePayloads, null, 2)
+        ).toBe(true);
+        expect(estimatePayloads, JSON.stringify(estimatePayloads, null, 2)).toHaveLength(1);
+
+        releaseEstimate();
+        await expect.poll(() => page.evaluate(() => new Promise((resolve) => {
+            window.require(['Magento_Checkout/js/model/shipping-service'], (service) => {
+                resolve(!service.isLoading());
+            }, () => resolve(false));
+        }))).toBe(true);
+    });
+
     test('country change never sends an empty string as region_id', async ({ page }) => {
         await openCheckoutWithProduct(page);
         await fillPolishShippingAddress(page);

@@ -779,6 +779,7 @@ define([
                     });
 
                     if (document.querySelector('.fastcheckout-native-shipping-address [data-wire-field="firstname"]')) {
+                        window.fastcheckoutAddressFieldsReady = true;
                         window.dispatchEvent(new CustomEvent('fastcheckout:address-fields-ready'));
                     }
                 }
@@ -814,10 +815,10 @@ define([
                 syncPaymentMethods();
                 syncQuoteTotalsFromConfig();
                 syncQuoteTotalsFromDom();
-                // 1) SSR rates from Magento default destination (if Block collected them)
-                // 2) otherwise native estimate for checkoutConfig.defaultCountryId
-                // shipping-rate-service will re-estimate whenever quote.shippingAddress changes.
-                (function bootstrapShippingRatesFromDefaultDestination() {
+                // 1) Apply SSR rates immediately (no network).
+                // 2) Defer any native estimate until KO has painted address fields.
+                // shipping-rate-service re-estimates whenever quote.shippingAddress changes.
+                var scheduleShippingRatesBootstrap = (function createShippingRatesBootstrap() {
                     var hadSsrRates = checkoutStateBridge.applyInitialShippingRates();
                     var seedCountry = (window.checkoutConfig && window.checkoutConfig.defaultCountryId) ||
                         (window.fastcheckoutDefaultDestination && window.fastcheckoutDefaultDestination.countryId) ||
@@ -845,6 +846,15 @@ define([
                                 (existing.street && existing.street[0])
                             )
                         ) {
+                            if (
+                                allowEstimate &&
+                                typeof quote.shippingAddress.valueHasMutated === 'function'
+                            ) {
+                                // An early restored address estimate was intentionally
+                                // suppressed until the KO form painted. Re-notify the
+                                // native rate service now with the complete address.
+                                quote.shippingAddress.valueHasMutated();
+                            }
                             return;
                         }
                         if (existing && existing.countryId && existing.firstname) {
@@ -879,24 +889,50 @@ define([
                         });
                     }
 
-                    if (hadSsrRates) {
-                        seedQuoteShippingAddress(false);
-                        return;
-                    }
+                    function startAfterAddressRender() {
+                        if (hadSsrRates) {
+                            seedQuoteShippingAddress(false);
+                            return;
+                        }
 
-                    // No SSR rates — estimate immediately from Magento default destination.
-                    if (
-                        checkoutStateBridge.bootstrapDefaultDestinationRates &&
-                        typeof checkoutStateBridge.bootstrapDefaultDestinationRates === 'function'
-                    ) {
-                        checkoutStateBridge.bootstrapDefaultDestinationRates();
-                    } else {
+                        // A restored shopper address is selected by the address-ready
+                        // handler and already triggers the native rate processor. Only
+                        // seed the default destination when no full address exists.
                         seedQuoteShippingAddress(true);
                     }
+
+                    return function schedule() {
+                        var queued = false,
+                            fallbackTimer;
+
+                        function queueAfterPaint() {
+                            if (queued) {
+                                return;
+                            }
+                            queued = true;
+                            if (fallbackTimer) {
+                                window.clearTimeout(fallbackTimer);
+                            }
+
+                            window.requestAnimationFrame(function () {
+                                window.setTimeout(startAfterAddressRender, 0);
+                            });
+                        }
+
+                        window.addEventListener(
+                            'fastcheckout:address-fields-ready',
+                            queueAfterPaint,
+                            { once: true }
+                        );
+                        fallbackTimer = window.setTimeout(queueAfterPaint, 1500);
+                    };
                 })();
                 loadShippingRatesValidationComponents();
                 loadPaymentValidationComponents();
 
+                // Register before app() because some cached KO layouts can render
+                // synchronously and dispatch address-fields-ready from the first pass.
+                scheduleShippingRatesBootstrap();
                 app({
                     components: {
                         'checkoutProvider': $.extend(
