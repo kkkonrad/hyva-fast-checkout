@@ -9,12 +9,25 @@
  */
 $paymentMethodAvailability = [];
 $hasAvailablePaymentMethods = false;
+$normalizedPaymentMethods = [];
 
 foreach ($paymentMethods as $paymentMethod) {
-    $paymentMethodCode = (string)$paymentMethod->getCode();
+    $paymentMethodCode = is_array($paymentMethod)
+        ? (string)($paymentMethod['code'] ?? $paymentMethod['method'] ?? '')
+        : (string)$paymentMethod->getCode();
+    if ($paymentMethodCode === '') {
+        continue;
+    }
+    $paymentMethodTitle = is_array($paymentMethod)
+        ? (string)($paymentMethod['title'] ?? $paymentMethodCode)
+        : (string)$paymentMethod->getTitle();
     $isAvailable = $block->isPaymentMethodAvailable($paymentMethodCode, $allowedPaymentMethodCodes);
     $paymentMethodAvailability[$paymentMethodCode] = $isAvailable;
     $hasAvailablePaymentMethods = $hasAvailablePaymentMethods || $isAvailable;
+    $normalizedPaymentMethods[] = [
+        'code' => $paymentMethodCode,
+        'title' => $paymentMethodTitle,
+    ];
 }
 ?>
 <!-- Container 3: Payment Method -->
@@ -33,7 +46,7 @@ foreach ($paymentMethods as $paymentMethod) {
         <?= $escaper->escapeHtml(__('No payment methods available.')) ?>
     </p>
 
-    <?php if (!empty($paymentMethods)): ?>
+    <?php if (!empty($normalizedPaymentMethods)): ?>
         <div class="grid gap-3 relative min-h-[50px]<?= $hasAvailablePaymentMethods ? '' : ' hidden' ?>"
              data-fastcheckout-payment-methods-grid>
             <div data-fastcheckout-payment-loading
@@ -43,9 +56,9 @@ foreach ($paymentMethods as $paymentMethod) {
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
             </div>
-            <?php foreach ($paymentMethods as $method): ?>
+            <?php foreach ($normalizedPaymentMethods as $method): ?>
                 <?php
-                $methodCode = $method->getCode();
+                $methodCode = $method['code'];
                 $isPaymentMethodAllowed = $paymentMethodAvailability[(string)$methodCode] ?? false;
                 $isSelectedPayment = $isPaymentMethodAllowed && $block->isPaymentMethodSelected((string)$methodCode);
                 ?>
@@ -62,7 +75,7 @@ foreach ($paymentMethods as $paymentMethod) {
                                <?= $isSelectedPayment ? 'checked' : '' ?>
                                 <?= $isPaymentMethodAllowed ? '' : 'disabled' ?>
                                required/>
-                        <span class="font-medium text-sm text-gray-800"><?= $escaper->escapeHtml($method->getTitle()) ?></span>
+                        <span class="font-medium text-sm text-gray-800"><?= $escaper->escapeHtml($method['title']) ?></span>
                     </label>
 
                     <div class="fastcheckout-payment-method-ko-container border-t border-gray-100 hidden"

@@ -43,7 +43,6 @@ if (
 }
 
 $mageInitConfig = [
-    'checkoutConfig' => $checkoutConfig,
     'paymentMethods' => $paymentMethods,
     'rendererComponents' => $rendererComponents,
     'rendererComponentMap' => $rendererComponentMap,
@@ -142,6 +141,9 @@ foreach ($layoutAssets['css'] as $cssAsset) {
     window.checkoutConfig = actualConfig;
 
     var config = <?= /* @noEscape */ \Laminas\Json\Json::encode($mageInitConfig) ?>;
+    // Keep a single serialized checkoutConfig in the HTML. The bridge receives
+    // the same object by reference instead of embedding the large payload twice.
+    config.checkoutConfig = window.checkoutConfig;
     var requireJsUrl = '<?= $escaper->escapeJs($block->getViewFileUrl('requirejs/require.js')) ?>';
     var requireJsConfigUrl = '<?= $escaper->escapeJs($block->getViewFileUrl('requirejs-config.js')) ?>';
     var mixinsUrl = '<?= $escaper->escapeJs($block->getViewFileUrl('mage/requirejs/mixins.js')) ?>';

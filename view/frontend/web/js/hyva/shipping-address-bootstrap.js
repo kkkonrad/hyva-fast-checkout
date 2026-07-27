@@ -23,6 +23,22 @@ define([
             readinessTimer,
             attempts = 0;
 
+        function hideStartupLoader() {
+            var loader = document.querySelector('[data-fastcheckout-startup-loader]');
+
+            if (!loader || loader.fastcheckoutHidden) {
+                return;
+            }
+            loader.fastcheckoutHidden = true;
+            loader.style.pointerEvents = 'none';
+            loader.style.opacity = '0';
+            loader.setAttribute('aria-hidden', 'true');
+            window.setTimeout(function () {
+                loader.hidden = true;
+                loader.style.display = 'none';
+            }, 180);
+        }
+
         function announceAddressFieldsReady() {
             var firstName = document.querySelector(
                 '.fastcheckout-native-shipping-address input[name="firstname"]'
@@ -32,6 +48,7 @@ define([
                 return !!firstName;
             }
 
+            hideStartupLoader();
             window.fastcheckoutAddressFieldsReady = true;
             window.dispatchEvent(new CustomEvent('fastcheckout:address-fields-ready'));
 

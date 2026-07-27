@@ -175,4 +175,59 @@ class NativePipelineOwnershipTest extends TestCase
             $bootstrap
         );
     }
+
+    public function testCheckoutConfigIsSerializedOnlyOnce(): void
+    {
+        $template = file_get_contents(
+            $this->moduleRoot() . '/view/frontend/templates/hyva/knockout/checkout-bridge.phtml'
+        );
+        $this->assertNotFalse($template);
+        $this->assertStringNotContainsString("'checkoutConfig' => \$checkoutConfig", $template);
+        $this->assertStringContainsString(
+            'config.checkoutConfig = window.checkoutConfig;',
+            $template
+        );
+    }
+
+    public function testCheckoutReusesConfiguredPaymentMethodsForInitialRender(): void
+    {
+        $template = file_get_contents(
+            $this->moduleRoot() . '/view/frontend/templates/hyva/checkout.phtml'
+        );
+        $this->assertNotFalse($template);
+        $this->assertStringContainsString(
+            'getAvailablePaymentMethods(',
+            $template
+        );
+        $this->assertStringContainsString(
+            'is_array($configuredPaymentMethods) ? $configuredPaymentMethods : null',
+            $template
+        );
+        $this->assertStringNotContainsString('getShippingMethods()', $template);
+        $this->assertStringContainsString(
+            "\$checkoutConfig['paymentMethods']",
+            $template
+        );
+    }
+
+    public function testStartupLoaderCoversOnlyTheNativeKoFormBootstrap(): void
+    {
+        $template = file_get_contents(
+            $this->moduleRoot() . '/view/frontend/templates/hyva/checkout/shipping-address.phtml'
+        );
+        $bootstrap = file_get_contents(
+            $this->moduleRoot() . '/view/frontend/web/js/hyva/shipping-address-bootstrap.js'
+        );
+        $this->assertNotFalse($template);
+        $this->assertNotFalse($bootstrap);
+        $this->assertStringContainsString('data-fastcheckout-startup-loader', $template);
+        $this->assertStringContainsString(
+            'class="fastcheckout-native-shipping-address"',
+            $template
+        );
+        $this->assertStringNotContainsString('data-fastcheckout-ssr-shipping', $template);
+        $this->assertStringNotContainsString('data-fastcheckout-ssr-target', $template);
+        $this->assertStringContainsString('function hideStartupLoader()', $bootstrap);
+        $this->assertStringContainsString('hideStartupLoader();', $bootstrap);
+    }
 }

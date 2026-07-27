@@ -95,8 +95,12 @@ test('measures shipping form startup after a full reload', async ({ page }) => {
         timeout: 60_000
     });
     const initialDomContentLoadedElapsed = Date.now() - initialCheckoutStartedAt;
+    const startupLoader = page.locator('[data-fastcheckout-startup-loader]');
     const shipping = page.locator('.fastcheckout-native-shipping-address');
+    await expect(startupLoader).toBeVisible();
+    await expect(startupLoader).toContainText('Ładowanie procesu zamówienia...');
     await expect(shipping.getByLabel('Nazwisko')).toBeVisible({ timeout: 30_000 });
+    await expect(startupLoader).toBeHidden();
     const initialFirstInputElapsed = Date.now() - initialCheckoutStartedAt;
     const initialBrowser = await page.evaluate(() => ({
         marks: window.fastcheckoutStartupMarks,
@@ -167,7 +171,10 @@ test('measures shipping form startup after a full reload', async ({ page }) => {
     reloadStartedAt = Date.now();
     await page.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 });
     const domContentLoadedElapsed = Date.now() - reloadStartedAt;
+    await expect(startupLoader).toBeVisible();
+    await expect(startupLoader).toContainText('Ładowanie procesu zamówienia...');
     await expect(shipping.getByLabel('Nazwisko')).toBeVisible({ timeout: 30_000 });
+    await expect(startupLoader).toBeHidden();
     const firstInputElapsed = Date.now() - reloadStartedAt;
     await expect(shipping.getByLabel('Nazwisko')).toHaveValue('Timing');
 

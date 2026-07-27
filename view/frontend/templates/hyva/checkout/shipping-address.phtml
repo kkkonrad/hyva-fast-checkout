@@ -6,6 +6,33 @@
  * @var \Magento\Framework\Escaper $escaper
  */
 ?>
+<div data-fastcheckout-startup-loader
+     role="status"
+     aria-live="polite"
+     aria-label="<?= $escaper->escapeHtmlAttr(__('Loading checkout...')) ?>"
+     style="position: fixed; inset: 0; z-index: 9999; display: flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, 0.97); opacity: 1; transition: opacity 160ms ease;">
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem; padding: 1.5rem; text-align: center;">
+        <svg class="animate-spin text-primary"
+             style="width: 3rem; height: 3rem;"
+             fill="none"
+             viewBox="0 0 24 24"
+             aria-hidden="true">
+            <circle class="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    stroke-width="4"></circle>
+            <path class="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <p style="margin: 0; color: #374151; font-size: 1rem; font-weight: 600;">
+            <?= $escaper->escapeHtml(__('Loading checkout...')) ?>
+        </p>
+    </div>
+</div>
+
 <div class="fc-container-1 min-w-0 w-full">
     <div class="card relative">
         <div class="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">

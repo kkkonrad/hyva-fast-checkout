@@ -20,8 +20,8 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Shipping methods must seed Magento default destination and collect rates
- * before the shopper types a full address.
+ * The server may reuse already collected rates, but must not synchronously
+ * collect carrier rates while rendering the checkout response.
  */
 class DefaultDestinationRatesTest extends TestCase
 {
@@ -73,7 +73,7 @@ class DefaultDestinationRatesTest extends TestCase
         $block->ensureDefaultShippingDestination();
     }
 
-    public function testGetShippingMethodsCollectsRatesWhenCountryMissingUsesDefault(): void
+    public function testGetShippingMethodsReusesRatesWithoutCollectingTotals(): void
     {
         $scopeConfig = $this->createMock(ScopeConfigInterface::class);
         $scopeConfig->method('getValue')->willReturnCallback(function ($path) {
@@ -115,13 +115,13 @@ class DefaultDestinationRatesTest extends TestCase
         $shippingAddress->method('getRegionId')->willReturn(0);
         $shippingAddress->method('getCity')->willReturn('');
         $shippingAddress->method('getCollectShippingRates')->willReturn(true);
-        $shippingAddress->expects($this->atLeastOnce())->method('setCollectShippingRates')->with(true);
+        $shippingAddress->expects($this->never())->method('setCollectShippingRates');
         $shippingAddress->method('getGroupedAllShippingRates')->willReturn(['flatrate' => [$rate]]);
 
         $quote = $this->createMock(Quote::class);
         $quote->method('isVirtual')->willReturn(false);
         $quote->method('getShippingAddress')->willReturn($shippingAddress);
-        $quote->expects($this->once())->method('collectTotals');
+        $quote->expects($this->never())->method('collectTotals');
 
         $block = $this->createPartialBlock($scopeConfig, $quote);
         $methods = $block->getShippingMethods();

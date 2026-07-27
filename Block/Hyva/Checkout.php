@@ -284,7 +284,7 @@ class Checkout extends Template
      *
      * @return array
      */
-    public function getAvailablePaymentMethods(): array
+    public function getAvailablePaymentMethods(?array $configuredMethods = null): array
     {
         if ($this->paymentMethodsCache !== null) {
             return $this->paymentMethodsCache;
@@ -301,8 +301,13 @@ class Checkout extends Template
         $paymentHelper = $this->paymentHelper
             ?: $this->resolveObject(\Magento\Payment\Helper\Data::class);
 
-        // 1) Quote API list (may be empty until shipping method is set).
-        if ($paymentMethodManagement) {
+        // Reuse CompositeConfigProvider results when checkout config was already
+        // resolved for the page. An empty configured list is meaningful here:
+        // it normally means no shipping method is selected yet, so go directly
+        // to the active-store fallback instead of repeating the quote API call.
+        if ($configuredMethods !== null) {
+            $this->paymentMethodsCache = array_values($configuredMethods);
+        } elseif ($paymentMethodManagement) {
             try {
                 $methods = $paymentMethodManagement->getList($quote->getId());
                 $this->paymentMethodsCache = is_array($methods) ? array_values($methods) : [];
@@ -311,7 +316,7 @@ class Checkout extends Template
             }
         }
 
-        // 2) Fallback: active store payment methods so the DOM has option rows
+        // Fallback: active store payment methods so the DOM has option rows
         //    before shipping is selected; JS remap shows the mapped ones after pick.
         if ($this->paymentMethodsCache === [] && $paymentHelper) {
             try {
@@ -478,8 +483,11 @@ class Checkout extends Template
     }
 
     /**
-     * Grouped shipping rates for initial paint / KO seed (no Magewire).
-     * Seeds Magento default destination when the quote has no country yet.
+     * Reuse grouped shipping rates that are already present on the quote.
+     *
+     * Carrier collection can perform remote calls and must not delay the HTML
+     * response. When no rates are cached, the native KO rate processor estimates
+     * them asynchronously after the shipping form has painted.
      *
      * @return array
      */
@@ -503,11 +511,6 @@ class Checkout extends Template
 
         try {
             $rates = $shippingAddress->getGroupedAllShippingRates();
-            if (($shippingAddress->getCollectShippingRates() || empty($rates))) {
-                $shippingAddress->setCollectShippingRates(true);
-                $quote->collectTotals();
-                $rates = $shippingAddress->getGroupedAllShippingRates();
-            }
             $this->shippingMethodsCache = is_array($rates) ? $rates : [];
         } catch (\Throwable $exception) {
             $this->shippingMethodsCache = [];

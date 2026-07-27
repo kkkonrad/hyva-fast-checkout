@@ -300,8 +300,11 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
     });
 
     test('place order keeps the primary loader through success navigation', async ({ page }) => {
-        let releaseRequest;
         let requestBlocked = false;
+        let releaseRequest;
+        const requestGate = new Promise((resolve) => {
+            releaseRequest = resolve;
+        });
 
         await openCheckoutWithProduct(page);
         await fillPolishShippingAddress(page);
@@ -338,9 +341,7 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
             /\/V1\/guest-carts\/[^/]+\/(?:shipping-information|payment-information)(?:\?|$)/,
             async (route) => {
                 requestBlocked = true;
-                await new Promise((resolve) => {
-                    releaseRequest = resolve;
-                });
+                await requestGate;
                 await route.abort('failed');
             }
         );
