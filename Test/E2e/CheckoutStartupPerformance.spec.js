@@ -90,7 +90,7 @@ test('measures shipping form startup after a full reload', async ({ page }) => {
 
     await addProduct(page);
     const initialCheckoutStartedAt = Date.now();
-    await page.goto(BASE + 'fast-checkout/?startup-seed=' + Date.now(), {
+    await page.goto(BASE + 'checkout/?startup-seed=' + Date.now(), {
         waitUntil: 'domcontentloaded',
         timeout: 60_000
     });

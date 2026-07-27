@@ -9,7 +9,7 @@ async function openCheckoutWithProduct(page) {
     });
     await page.locator('#product-addtocart-button').click();
     await page.waitForTimeout(1500);
-    await page.goto(BASE + 'fast-checkout/?validation=' + Date.now(), {
+    await page.goto(BASE + 'checkout/?validation=' + Date.now(), {
         waitUntil: 'domcontentloaded',
         timeout: 60_000
     });

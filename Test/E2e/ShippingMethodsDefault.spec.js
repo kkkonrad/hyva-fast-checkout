@@ -90,13 +90,13 @@ async function ensureCartHasItem(page) {
 }
 
 async function openFastCheckout(page) {
-  await page.goto(BASE + 'fast-checkout/', { waitUntil: 'domcontentloaded', timeout: 60_000 });
+  await page.goto(BASE + 'checkout/', { waitUntil: 'domcontentloaded', timeout: 60_000 });
   await dismissOverlays(page);
   // Empty cart redirects away — fail clearly
   await page.waitForTimeout(2000);
   const url = page.url();
   if (url.includes('checkout/cart') || url.includes('customer/account')) {
-    throw new Error('Redirected away from fast-checkout (likely empty cart): ' + url);
+    throw new Error('Redirected away from checkout (likely empty cart): ' + url);
   }
   await page.waitForSelector('#fastcheckout-checkout, #co-checkout-form', { timeout: 45_000 });
   // KO bridge bootstrap

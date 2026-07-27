@@ -62,8 +62,10 @@ Ustawienia pozwalają włączyć moduł, wybrać domyślne metody dostawy i pła
 zarządzać polami dodatkowymi oraz zdefiniować mapowanie metod płatności do metod
 dostawy.
 
-Proces zamówienia jest dostępny pod ścieżką `/fast-checkout/`. Gdy moduł oraz zgodny
-motyw Hyvä są aktywne, standardowa strona zamówienia przekierowuje pod ten adres.
+Proces zamówienia jest dostępny pod standardową ścieżką `/checkout/`. Gdy moduł oraz
+zgodny motyw Hyvä są aktywne, Fastcheckout zastępuje zawartość tej strony bez
+dodatkowego przekierowania. Dotychczasowa ścieżka `/fast-checkout/` pozostaje
+dostępna jako alias zapewniający zgodność wsteczną.
 
 ## Architektura
 

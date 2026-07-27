@@ -21,7 +21,7 @@ class Link
     public function afterGetCheckoutUrl($subject, $result)
     {
         if ($this->helper->canUseHyvaNativeCheckout()) {
-            $result = $this->url->getUrl('fast-checkout', ['_secure' => true]);
+            $result = $this->url->getUrl('checkout', ['_secure' => true]);
         }
 
         return $result;
