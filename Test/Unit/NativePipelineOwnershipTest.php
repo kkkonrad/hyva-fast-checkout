@@ -81,12 +81,10 @@ class NativePipelineOwnershipTest extends TestCase
         $this->assertStringContainsString("Magento_Checkout/js/action/place-order", $js);
     }
 
-    public function testMagewireCheckoutNoLongerExtendsMagewireComponent(): void
+    public function testLegacyMagewireComponentWasRemoved(): void
     {
-        $php = file_get_contents($this->moduleRoot() . '/Magewire/Checkout.php');
-        $this->assertNotFalse($php);
-        $this->assertStringNotContainsString('Magewirephp\\Magewire\\Component', $php);
-        $this->assertStringContainsString('extends ComponentStub', $php);
+        $this->assertFileDoesNotExist($this->moduleRoot() . '/Magewire/Checkout.php');
+        $this->assertFileDoesNotExist($this->moduleRoot() . '/Magewire/ComponentStub.php');
     }
 
     public function testHelperGateDoesNotRequireMagewireClass(): void

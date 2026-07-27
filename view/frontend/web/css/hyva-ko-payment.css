@@ -435,7 +435,7 @@ body.checkout-submitting [data-fastcheckout-processing="true"] .place-order-spin
     flex: 0 0 auto;
 }
 
-/* Place-order scroll freeze (body position:fixed applied from Alpine). */
+/* Place-order scroll freeze (body position:fixed while the request is active). */
 body.fastcheckout-scroll-locked {
     overscroll-behavior: none;
     touch-action: none;

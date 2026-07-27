@@ -5,7 +5,7 @@ define([
     'use strict';
 
     /**
-     * Native Magento set-shipping-information (REST). No Magewire dual-write.
+     * Native Magento set-shipping-information (REST).
      */
     return function (setShippingInformationAction) {
         return wrapper.wrap(setShippingInformationAction, function (originalAction) {

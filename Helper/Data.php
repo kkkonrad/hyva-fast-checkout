@@ -6,17 +6,11 @@ namespace Kkkonrad\Fastcheckout\Helper;
 
 use Magento\Framework\App\Helper\Context;
 use Magento\Store\Model\StoreManagerInterface;
-use Magento\Framework\Message\Session as Session;
-
-use Magento\Customer\Model\Session as CustomerSession;
 use Magento\Framework\Json\Helper\Data as JsonHelper;
 use Magento\Framework\App\Helper\AbstractHelper;
 use Magento\Framework\UrlInterface;
 
 use Magento\Store\Model\ScopeInterface;
-use Magento\Checkout\Model\Cart;
-use Magento\Quote\Model\QuoteFactory;
-use Magento\Directory\Model\ResourceModel\Region\CollectionFactory;
 use Magento\Framework\View\DesignInterface;
 use Magento\Theme\Model\ThemeFactory;
 
@@ -42,16 +36,7 @@ class Data extends AbstractHelper
     const XML_PATH_ASSIGN_ORDER_TO_CUSTOMER = 'fastcheckout/extended/assign_order_to_customer';
 
     public $storeManager;
-    public $session;
-    public $customerSession;
-    public $response = null;
     public $jsonHelper;
-    public $request;
-
-
-    protected $cart;
-    protected $quoteFactory;
-    protected $regionCollectionFactory;
     protected $design;
     protected $themeFactory;
 
@@ -65,23 +50,13 @@ class Data extends AbstractHelper
     public function __construct(
         Context $context,
         StoreManagerInterface $storeManager,
-        CustomerSession $customerSession,
-        Session $session,
         JsonHelper $jsonHelper,
-        Cart $cart,
-        QuoteFactory $quoteFactory,
-        CollectionFactory $regionCollectionFactory,
         DesignInterface $design,
         ThemeFactory $themeFactory
     ) {
         parent::__construct($context);
         $this->storeManager = $storeManager;
-        $this->session = $session;
-        $this->customerSession = $customerSession;
         $this->jsonHelper = $jsonHelper;
-        $this->cart = $cart;
-        $this->quoteFactory = $quoteFactory;
-        $this->regionCollectionFactory = $regionCollectionFactory;
         $this->design = $design;
         $this->themeFactory = $themeFactory;
     }
@@ -89,13 +64,6 @@ class Data extends AbstractHelper
     public function isEnable()
     {
         return (bool)$this->scopeConfig->getValue(self::XML_PATH_ENABLE, ScopeInterface::SCOPE_STORE);
-    }
-
-    public function isCheckoutPage()
-    {
-        return $this->_getRequest()->getModuleName() === 'onepage'
-            && $this->isEnable()
-            && $this->isModuleOutputEnabled('Kkkonrad_Fastcheckout');
     }
 
     public function isCurrentlySecure()
@@ -311,21 +279,6 @@ class Data extends AbstractHelper
         return (bool)$this->scopeConfig->getValue(self::XML_PATH_GIFT_MESSAGE_VISIBILITY, ScopeInterface::SCOPE_STORE);
     }
 
-    public function isShowLoginButton()
-    {
-        return true;
-    }
-
-    public function isSuccessPageAccountCreationEnabled()
-    {
-        return true;
-    }
-
-    public function isShowSuccessPage()
-    {
-        return true;
-    }
-
     public function isShowSubscribe()
     {
         $moduleStatus = $this->isModuleOutputEnabled('Magento_Newsletter');
@@ -365,8 +318,7 @@ class Data extends AbstractHelper
             return $this->canUseHyvaNativeCheckoutCache = false;
         }
 
-        // Hyvä CSP is required for the Fastcheckout shell. Magewire is intentionally
-        // not required — quote pipeline is Magento KO/REST.
+        // Hyvä CSP is required for the Fastcheckout shell.
         if (!class_exists(\Hyva\Theme\ViewModel\HyvaCsp::class)) {
             return $this->canUseHyvaNativeCheckoutCache = false;
         }
@@ -396,11 +348,6 @@ class Data extends AbstractHelper
         }
 
         return $this->canUseHyvaNativeCheckoutCache = $this->isHyvaThemePath($themePath);
-    }
-
-    public function isHyvaNativePaymentMethodSupported($methodCode)
-    {
-        return true;
     }
 
     private function isHyvaThemePath($themePath)
@@ -435,43 +382,4 @@ class Data extends AbstractHelper
         return (bool)$this->scopeConfig->getValue(self::XML_PATH_DISPLAY_ALL_METHODS, ScopeInterface::SCOPE_STORE);
     }
 
-    public function getDefaultShipping()
-    {
-        $quote = $this->cart->getQuote();
-        $shippingMethod = $this->scopeConfig->getValue(self::XML_PATH_DEFAULT_SHIPPING_METHOD, ScopeInterface::SCOPE_STORE);
-
-        if($quote->getShippingAddress() && $quote->getShippingAddress()->getShippingMethod()) {
-            $shippingMethod = $quote->getShippingAddress()->getShippingMethod();
-        }
-
-        return $shippingMethod;
-    }
-
-    public function getDefaultPayment()
-    {
-        return $this->scopeConfig->getValue(self::XML_PATH_DEFAULT_PAYMENT_METHOD, ScopeInterface::SCOPE_STORE);
-    }
-
-    public function getPreSelectedBillingAddressId()
-    {
-        try {
-            $quote = $this->cart->getQuote();
-            if ($quote && $quote->getBillingAddress()) {
-                return $quote->getBillingAddress()->getCustomerAddressId();
-            }
-            return '';
-        } catch (\Exception $e) {
-            return '';
-        }
-    }
-
-    public function getRegionCollection() {
-        $collection = $this->regionCollectionFactory->create();
-
-        if($collection->toArray()) {
-            return $collection->toArray()['items'];
-        }
-
-        return [];
-    }
 }

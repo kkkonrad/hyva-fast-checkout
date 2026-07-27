@@ -24,7 +24,6 @@ use Magento\Payment\Helper\Data as PaymentHelper;
 use Magento\Payment\Model\MethodInterface;
 use Kkkonrad\Fastcheckout\Helper\Data as Helper;
 use Kkkonrad\Fastcheckout\Model\Hyva\RequireJsAssets;
-use Magento\Customer\Helper\Address as AddressHelper;
 use Magento\Tax\Helper\Data as TaxHelper;
 
 
@@ -176,9 +175,6 @@ class Checkout extends Template
     /** @var RequireJsAssets|null */
     private $requireJsAssets;
 
-    /** @var AddressHelper|null */
-    private $addressHelper;
-
     /** @var TaxHelper|null */
     private $taxHelper;
 
@@ -227,7 +223,6 @@ class Checkout extends Template
         ResolverInterface $localeResolver = null,
         array $data = [],
         RequireJsAssets $requireJsAssets = null,
-        AddressHelper $addressHelper = null,
         TaxHelper $taxHelper = null,
         LayoutProcessor $checkoutLayoutProcessor = null,
         DirectoryDataProcessor $checkoutDirectoryDataProcessor = null,
@@ -245,7 +240,6 @@ class Checkout extends Template
         $this->componentRegistrar = $componentRegistrar;
         $this->localeResolver = $localeResolver;
         $this->requireJsAssets = $requireJsAssets;
-        $this->addressHelper = $addressHelper;
         $this->taxHelper = $taxHelper;
         $this->checkoutLayoutProcessor = $checkoutLayoutProcessor;
         $this->checkoutDirectoryDataProcessor = $checkoutDirectoryDataProcessor;
@@ -280,7 +274,7 @@ class Checkout extends Template
     }
 
     /**
-     * Available payment methods for the current quote (no Magewire).
+     * Available payment methods for the current quote.
      *
      * @return array
      */
@@ -1095,7 +1089,7 @@ class Checkout extends Template
      * Return additional direct children declared under the standard Magento checkout steps component.
      *
      * The shipping-step and billing-step are handled by dedicated Fastcheckout bridges because their
-     * core regions are mapped into the custom Hyva/Magewire UI. Other step children, such as MSI
+     * core regions are mapped into the custom Hyvä/KO UI. Other step children, such as MSI
      * Store Pickup, are kept as native KO components so their registry entries and side effects stay
      * compatible with standard checkout modules.
      *
@@ -2198,99 +2192,11 @@ class Checkout extends Template
     }
 
     /**
-     * @return \Magento\Customer\Helper\Address
-     */
-    public function getAddressHelper()
-    {
-        return $this->addressHelper;
-    }
-
-    /**
-     * @return int
-     */
-    public function getStreetLines(): int
-    {
-        return (int)$this->getAddressHelper()->getStreetLines();
-    }
-
-    /**
-     * @param string $attributeCode
-     * @return bool
-     */
-    public function isAttributeVisible(string $attributeCode): bool
-    {
-        if ($attributeCode === 'vat_id') {
-            $taxvatShow = $this->_scopeConfig->getValue(
-                'customer/address/taxvat_show',
-                \Magento\Store\Model\ScopeInterface::SCOPE_STORE
-            );
-            if ($taxvatShow === 'req' || $taxvatShow === 'opt') {
-                return true;
-            }
-            return (bool)$this->getAddressHelper()->isVatAttributeVisible();
-        }
-        return $this->getAddressHelper()->isAttributeVisible($attributeCode);
-    }
-
-    /**
-     * @param string $attributeCode
-     * @return bool
-     */
-    public function isAttributeRequired(string $attributeCode): bool
-    {
-        if ($attributeCode === 'vat_id') {
-            $taxvatShow = $this->_scopeConfig->getValue(
-                'customer/address/taxvat_show',
-                \Magento\Store\Model\ScopeInterface::SCOPE_STORE
-            );
-            if ($taxvatShow === 'req') {
-                return true;
-            }
-        }
-        $validationClass = $this->getAddressHelper()->getAttributeValidationClass($attributeCode);
-        return strpos((string)$validationClass, 'required-entry') !== false;
-    }
-
-    /**
-     * @param string $attributeCode
-     * @return array|null
-     */
-    public function getOptions(string $attributeCode): ?array
-    {
-        $optionsStr = $this->_scopeConfig->getValue(
-            'customer/address/' . $attributeCode . '_options',
-            \Magento\Store\Model\ScopeInterface::SCOPE_STORE
-        );
-        if (empty($optionsStr)) {
-            return null;
-        }
-        $options = [];
-        foreach (explode(';', $optionsStr) as $option) {
-            $option = trim($option);
-            if ($option !== '') {
-                $options[] = [
-                    'value' => $option,
-                    'label' => __($option)
-                ];
-            }
-        }
-        return $options;
-    }
-
-    /**
      * @return \Magento\Tax\Helper\Data
      */
     public function getTaxHelper()
     {
         return $this->taxHelper;
-    }
-
-    /**
-     * @return bool
-     */
-    public function displayCartBothPrices(): bool
-    {
-        return (bool)$this->getTaxHelper()->displayCartBothPrices();
     }
 
     /**

@@ -8,7 +8,7 @@ define([
     /**
      * Fastcheckout uses Magento KO/REST quote pipeline natively.
      * This mixin keeps guest-email injection for place-order payloads —
-     * it must not route REST through Magewire (that dual-write caused XHR loops).
+     * the native REST payload remains the only write path.
      */
     function getEmailFromDomOrQuote() {
         var emailEl,
@@ -24,7 +24,7 @@ define([
                 'input[name="username"]',
                 'input[name="email"]',
                 'input[type="email"]',
-                '[data-wire-field="email"]'
+                '[data-fastcheckout-field="email"]'
             ],
             i,
             value = '',

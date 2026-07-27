@@ -1,8 +1,6 @@
 define([
-    'jquery',
-    'Kkkonrad_Fastcheckout/js/mixin/is-fastcheckout-active',
     'Magento_Customer/js/customer-data'
-], function ($, isFastcheckoutActive, customerData) {
+], function (customerData) {
     'use strict';
 
     return function (checkoutData) {
@@ -92,24 +90,6 @@ define([
             saveData(data);
         };
 
-        var dispatchCheckoutDataUpdate = function (method, value) {
-            if (
-                !isFastcheckoutActive() ||
-                window.fastcheckoutOrderPlaced ||
-                window.fastcheckoutSuppressCheckoutDataBridge ||
-                !window.fastcheckoutCheckoutDataBufferReady
-            ) {
-                return;
-            }
-
-            window.dispatchEvent(new CustomEvent('fastcheckout:checkout-data-set', {
-                detail: {
-                    method: method,
-                    value: value
-                }
-            }));
-        };
-
         var wrapSetter = function (method) {
             var originalMethod;
 
@@ -131,7 +111,6 @@ define([
 
                 if (!isStorageReady) {
                     saveSetterFallback(method, value);
-                    dispatchCheckoutDataUpdate(method, value);
                     return;
                 }
 
@@ -147,8 +126,6 @@ define([
                         );
                     }
                 }
-
-                dispatchCheckoutDataUpdate(method, value);
 
                 return result;
             };
@@ -173,7 +150,6 @@ define([
                 var obj = getData();
                 obj.shippingInPostPointData = data;
                 saveData(obj);
-                dispatchCheckoutDataUpdate('setShippingInPostPoint', data);
             };
         }
 
@@ -189,7 +165,6 @@ define([
                 var obj = getData();
                 obj.shippingInPostModeData = data;
                 saveData(obj);
-                dispatchCheckoutDataUpdate('setShippingInPostMode', data);
             };
         }
 

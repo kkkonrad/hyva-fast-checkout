@@ -17,7 +17,6 @@
             <argument name="componentRegistrar" xsi:type="object">Magento\Framework\Component\ComponentRegistrarInterface</argument>
             <argument name="localeResolver" xsi:type="object">Magento\Framework\Locale\ResolverInterface</argument>
             <argument name="requireJsAssets" xsi:type="object">Kkkonrad\Fastcheckout\Model\Hyva\RequireJsAssets</argument>
-            <argument name="addressHelper" xsi:type="object">Magento\Customer\Helper\Address</argument>
             <argument name="taxHelper" xsi:type="object">Magento\Tax\Helper\Data</argument>
             <argument name="paymentMethodManagement" xsi:type="object">Magento\Quote\Api\PaymentMethodManagementInterface</argument>
             <argument name="paymentHelper" xsi:type="object">Magento\Payment\Helper\Data</argument>

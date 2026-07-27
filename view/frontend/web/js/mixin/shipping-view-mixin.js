@@ -4,7 +4,7 @@
  * The core component already owns the rate pipeline (rate processors -> shippingService ->
  * rates()/isLoading), so this mixin adds only what Fastcheckout needs on top of it:
  *
- *  - a selection lock, because Magewire round-trips race with Knockout's `checked` rebinds.
+ *  - a selection lock, because asynchronous Knockout callbacks can race with `checked` rebinds.
  *    Core's own `isSelected` is a plain read of checkoutData/quote with no lock, which is
  *    exactly what made the radio bounce back and spin up XHR loops;
  *  - a loading-overlay mute while a selection is in flight (picking a rate never re-estimates
@@ -133,7 +133,7 @@ define([
             }
 
             // Radio fires click then change — only handle once per gesture.
-            // Headless analysis: dual listeners caused 2x remember + 2x Magewire push per click.
+            // Headless analysis: dual listeners caused duplicate persistence requests per click.
             if (event.type === 'change') {
                 return;
             }
@@ -156,7 +156,7 @@ define([
             shipping = window.fastcheckoutHyvaShipping;
 
             // Headless analysis: if we only lock here, KO pureComputed read() already
-            // returns the new lock and write() never runs — quote/Magewire stay on the
+            // returns the new lock and write() never runs — the quote stays on the
             // previous rate. Apply selection immediately from the trusted click path.
             if (shipping && typeof shipping.rememberUserShippingSelection === 'function') {
                 shipping.rememberUserShippingSelection(code);
@@ -198,7 +198,7 @@ define([
             }
 
             // Suppress bridge onSelect side-effects from this intentional apply; we sync below.
-            // Also lock the rates list so Magewire payment remap cannot flash a reload.
+            // Also lock the rates list so payment remap cannot flash a reload.
             window.fastcheckoutSuppressShippingSync = true;
             window.fastcheckoutLockShippingRatesList = true;
             window.fastcheckoutSelectingShippingMethod = true;
@@ -208,13 +208,13 @@ define([
                 window.fastcheckoutSuppressShippingSync = false;
             }
 
-            if (shipping && typeof shipping.syncShippingMethodToMagewireNow === 'function') {
-                shipping.syncShippingMethodToMagewireNow(code);
-            } else if (shipping && typeof shipping.syncShippingMethodToMagewire === 'function') {
-                shipping.syncShippingMethodToMagewire(code);
+            if (shipping && typeof shipping.persistShippingMethodNow === 'function') {
+                shipping.persistShippingMethodNow(code);
+            } else if (shipping && typeof shipping.persistShippingMethod === 'function') {
+                shipping.persistShippingMethod(code);
             }
 
-            // Mark write path as already handled for this click (avoid double Magewire push).
+            // Mark write path as already handled for this click.
             window.fastcheckoutLastTrustedShippingApplied = {
                 code: code,
                 at: Date.now()
@@ -361,7 +361,7 @@ define([
                             return;
                         }
 
-                        // Trusted click handler already applied quote + Magewire — skip double push.
+                        // Trusted click handler already applied the quote selection — skip a duplicate update.
                         if (appliedRecently) {
                             return;
                         }
@@ -427,17 +427,17 @@ define([
 
                         if (
                             shipping &&
-                            typeof shipping.syncShippingMethodToMagewireNow === 'function'
+                            typeof shipping.persistShippingMethodNow === 'function'
                         ) {
-                            shipping.syncShippingMethodToMagewireNow(value);
+                            shipping.persistShippingMethodNow(value);
                             return;
                         }
 
                         if (
                             shipping &&
-                            typeof shipping.syncShippingMethodToMagewire === 'function'
+                            typeof shipping.persistShippingMethod === 'function'
                         ) {
-                            shipping.syncShippingMethodToMagewire(value);
+                            shipping.persistShippingMethod(value);
                         }
                     }
                 }, this);

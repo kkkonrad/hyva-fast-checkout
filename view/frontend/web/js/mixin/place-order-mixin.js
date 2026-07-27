@@ -42,7 +42,7 @@ define([
             'input[name="username"]',
             'input[name="email"]',
             'input[type="email"]',
-            '[data-wire-field="email"]'
+            '[data-fastcheckout-field="email"]'
         ];
 
         for (i = 0; i < selectors.length; i++) {

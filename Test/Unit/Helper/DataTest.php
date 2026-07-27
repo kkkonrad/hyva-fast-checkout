@@ -5,15 +5,10 @@ declare(strict_types=1);
 namespace Kkkonrad\Fastcheckout\Test\Unit\Helper;
 
 use Kkkonrad\Fastcheckout\Helper\Data;
-use Magento\Checkout\Model\Cart;
-use Magento\Customer\Model\Session as CustomerSession;
-use Magento\Directory\Model\ResourceModel\Region\CollectionFactory;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\Helper\Context;
 use Magento\Framework\Json\Helper\Data as JsonHelper;
-use Magento\Framework\Message\Session as MessageSession;
 use Magento\Framework\View\DesignInterface;
-use Magento\Quote\Model\QuoteFactory;
 use Magento\Store\Model\StoreManagerInterface;
 use Magento\Theme\Model\ThemeFactory;
 use PHPUnit\Framework\TestCase;
@@ -206,12 +201,7 @@ class DataTest extends TestCase
         $helper = new Data(
             $context,
             $this->createMock(StoreManagerInterface::class),
-            $this->createMock(CustomerSession::class),
-            $this->createMock(MessageSession::class),
             $this->createMock(JsonHelper::class),
-            $this->createMock(Cart::class),
-            $this->createMock(QuoteFactory::class),
-            $this->createMock(CollectionFactory::class),
             $this->createMock(DesignInterface::class),
             $this->createMock(ThemeFactory::class)
         );
@@ -237,12 +227,7 @@ class DataTest extends TestCase
         return new Data(
             $context,
             $this->createMock(StoreManagerInterface::class),
-            $this->createMock(CustomerSession::class),
-            $this->createMock(MessageSession::class),
             $jsonHelper,
-            $this->createMock(Cart::class),
-            $this->createMock(QuoteFactory::class),
-            $this->createMock(CollectionFactory::class),
             $this->createMock(DesignInterface::class),
             $this->createMock(ThemeFactory::class)
         );

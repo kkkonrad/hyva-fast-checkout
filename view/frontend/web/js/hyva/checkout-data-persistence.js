@@ -59,7 +59,6 @@ define([], function () {
 
             if (checkoutData && typeof checkoutData[methodName] === 'function') {
                 try {
-                    window.fastcheckoutSuppressCheckoutDataBridge = true;
                     checkoutData[methodName](value);
                     return;
                 } catch (e) {
@@ -70,8 +69,6 @@ define([], function () {
                             e
                         );
                     }
-                } finally {
-                    window.fastcheckoutSuppressCheckoutDataBridge = false;
                 }
             }
 

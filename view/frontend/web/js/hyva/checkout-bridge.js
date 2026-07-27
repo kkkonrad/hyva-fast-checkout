@@ -13,13 +13,11 @@ define([
     'Kkkonrad_Fastcheckout/js/hyva/guest-address-snapshot',
     'Kkkonrad_Fastcheckout/js/hyva/checkout-totals-sync',
     'Kkkonrad_Fastcheckout/js/hyva/checkout-layout-bridge',
-    'Kkkonrad_Fastcheckout/js/hyva/address-data-builder',
     'Kkkonrad_Fastcheckout/js/hyva/checkout-state-bridge',
     'Kkkonrad_Fastcheckout/js/hyva/payment-dom-bridge',
     'Kkkonrad_Fastcheckout/js/hyva/place-order-hooks-bridge',
     'Kkkonrad_Fastcheckout/js/hyva/shipping-attributes-sync',
     'Kkkonrad_Fastcheckout/js/hyva/checkout-component-fallbacks',
-    'Kkkonrad_Fastcheckout/js/hyva/magewire-utils',
     'Kkkonrad_Fastcheckout/js/hyva/payment-method-sync',
     'Kkkonrad_Fastcheckout/js/hyva/customer-email-sync',
     'Kkkonrad_Fastcheckout/js/hyva/checkout-agreements-fallback',
@@ -41,13 +39,11 @@ define([
     guestAddressSnapshot,
     createCheckoutTotalsSync,
     createCheckoutLayoutBridge,
-    createAddressDataBuilder,
     createCheckoutStateBridge,
     createPaymentDomBridge,
     createPlaceOrderHooksBridge,
     createShippingAttributesSync,
     createCheckoutComponentFallbacks,
-    magewireUtils,
     createPaymentMethodSync,
     createCustomerEmailSync,
     checkoutAgreementsFallback,
@@ -490,11 +486,6 @@ define([
                     layout: uiLayout,
                     scope: scope
                 });
-                var addressDataBuilder = createAddressDataBuilder({
-                    quote: quote,
-                    getProperty: getProperty,
-                    normalizeCustomAttributes: normalizeAddressCustomAttributes
-                });
                 var paymentDomBridge = createPaymentDomBridge({
                     compareMethodCodes: paymentMethodCodesEqual
                 });
@@ -503,9 +494,7 @@ define([
                     paymentService: paymentService,
                     methodConverter: methodConverter,
                     quote: quote,
-                    checkoutTotals: checkoutTotals,
                     shippingService: shippingService,
-                    selectPaymentMethodAction: selectPaymentMethodAction,
                     selectShippingMethodAction: selectShippingMethodAction,
                     callbacks: {
                         syncQuoteTotals: syncQuoteTotals,
@@ -517,20 +506,11 @@ define([
                         hidePaymentPlaceholders: hidePaymentPlaceholders,
                         syncKoPaymentRenderers: syncKoPaymentRenderers,
                         setQuotePaymentMethodFromBridge: setQuotePaymentMethodFromBridge,
-                        persistEmailToCheckoutData: persistEmailToCheckoutData,
-                        syncSelectedShippingMethodToKnockout: syncSelectedShippingMethodToKnockout,
-                        setQuoteGuestEmail: setQuoteGuestEmail,
-                        getShippingMethodCode: getShippingMethodCode,
-                        getMagewireComponent: getMagewireComponent,
-                        getProperty: getProperty,
-                        handlePaymentError: handlePaymentError,
-                        getBridgeMessageContainer: getBridgeMessageContainer
+                        persistEmailToCheckoutData: persistEmailToCheckoutData
                     }
                 });
                 var placeOrderHooksBridge = createPlaceOrderHooksBridge({
-                    quote: quote,
-                    placeOrderHooks: placeOrderHooks,
-                    getEmailForQuote: getEmailForQuote
+                    placeOrderHooks: placeOrderHooks
                 });
                 var shippingAttributesSync = createShippingAttributesSync({
                     checkoutData: checkoutData,
@@ -541,15 +521,10 @@ define([
                     getCheckoutProvider: getCheckoutProvider,
                     normalizeAddressAttributeMap: normalizeAddressAttributeMap,
                     getAddressAttributes: getAddressAttributes,
-                    updateQuoteAddressAttributes: updateQuoteAddressAttributes,
-                    getMagewireComponent: getMagewireComponent,
-                    getProperty: getProperty,
-                    setMagewireValue: setMagewireValue
+                    updateQuoteAddressAttributes: updateQuoteAddressAttributes
                 });
                 var paymentMethodSync = createPaymentMethodSync({
                     quote: quote,
-                    getMagewireComponent: getMagewireComponent,
-                    getProperty: getProperty,
                     persistPaymentMethod: persistPaymentMethodToCheckoutData
                 });
                 var customerEmailSync = createCustomerEmailSync({
@@ -560,18 +535,7 @@ define([
                     quote: quote,
                     shippingService: shippingService,
                     selectShippingMethodAction: selectShippingMethodAction,
-                    getMagewireComponent: getMagewireComponent,
-                    getProperty: getProperty,
-                    persistShippingMethod: persistShippingMethodToCheckoutData,
-                    applyCheckoutState: function (payload, options) {
-                        if (
-                            checkoutStateBridge &&
-                            typeof checkoutStateBridge.applyPayload === 'function'
-                        ) {
-                            return checkoutStateBridge.applyPayload(payload, options);
-                        }
-                        return false;
-                    }
+                    persistShippingMethod: persistShippingMethodToCheckoutData
                 });
                 var shippingErrorBridge = createShippingErrorBridge({
                     registry: registry
@@ -651,7 +615,7 @@ define([
                 }
 
                 // After a successful panel open, briefly refuse blank hide-all calls.
-                // Delayed Magewire/KO callbacks were closing the just-opened method
+                // Delayed KO callbacks can close the just-opened method
                 // (checkmo → empty → checkmo thrash after shipping remap).
                 var paymentPanelHoldCode = '';
                 var paymentPanelHoldUntil = 0;
@@ -764,7 +728,7 @@ define([
                                 field = streetPrefix + (parseInt(streetMatch[1], 10) + 1);
                             }
                             if (field) {
-                                input.setAttribute('data-wire-field', field);
+                                input.setAttribute('data-fastcheckout-field', field);
                             }
                         });
                     }
@@ -778,7 +742,7 @@ define([
                         annotate(root, billingMap, 'billingStreet');
                     });
 
-                    if (document.querySelector('.fastcheckout-native-shipping-address [data-wire-field="firstname"]')) {
+                    if (document.querySelector('.fastcheckout-native-shipping-address [data-fastcheckout-field="firstname"]')) {
                         window.fastcheckoutAddressFieldsReady = true;
                         window.dispatchEvent(new CustomEvent('fastcheckout:address-fields-ready'));
                     }
@@ -794,18 +758,6 @@ define([
 
                 function syncQuoteTotalsFromDom() {
                     return checkoutTotalsSync.syncFromDom();
-                }
-
-                function refreshCheckoutStateFromMagewire(force) {
-                    return checkoutStateBridge.refresh(force === true);
-                }
-
-                function resolveCheckoutStateRefresh(callbacks, deferred, messageContainer) {
-                    return checkoutStateBridge.resolveRefresh(callbacks, deferred, messageContainer);
-                }
-
-                function refreshShippingRatesFromMagewire() {
-                    return checkoutStateBridge.refreshShippingRates();
                 }
 
                 function syncPaymentMethods() {
@@ -1079,19 +1031,6 @@ define([
                     }, delay);
                 });
 
-                function getProperty(wire, name) {
-                    return magewireUtils.getProperty(wire, name);
-                }
-
-                function getEmailForQuote() {
-                    return addressDataBuilder.getEmailForQuote();
-                }
-
-
-                function buildAddressData(magewire, prefix) {
-                    return addressDataBuilder.buildAddressData(magewire, prefix);
-                }
-
                 function persistEmailToCheckoutData(email) {
                     checkoutDataPersistence.persistEmail(email);
                 }
@@ -1110,10 +1049,6 @@ define([
 
                 function syncAddressDataToCheckoutProvider(addressData, type) {
                     checkoutProviderBridge.syncAddressData(addressData, type);
-                }
-
-                function getMagewireComponent() {
-                    return magewireUtils.getComponent();
                 }
 
                 function getAddressValue(address, camelKey, snakeKey) {
@@ -1214,7 +1149,7 @@ define([
                         }
                     }
 
-                    return buildAddressData(getMagewireComponent(), 'shipping');
+                    return {};
                 }
 
                 function validateShippingRatesAddress(address, showMessage) {
@@ -1243,258 +1178,23 @@ define([
                     return false;
                 }
 
-                function setMagewireValue(wire, field, value, deferUpdate) {
-                    return magewireUtils.setValue(wire, field, value, deferUpdate);
-                }
-
-                function writeKoAddressToMagewire(address, isBilling, deferUpdates, additionalPayload) {
-                    var wire = getMagewireComponent(),
-                        prefix = isBilling ? 'billing' : '',
-                        operations = [],
-                        payload = {},
-                        street,
-                        customAttributes,
-                        extensionAttributes,
-                        fields;
-
-                    function valuesEqual(current, value) {
-                        var currentJson,
-                            valueJson;
-
-                        if (typeof current === 'object' || typeof value === 'object') {
-                            currentJson = JSON.stringify(current || {});
-                            valueJson = JSON.stringify(value || {});
-
-                            // Magewire hydrates empty PHP arrays as [], while Magento's
-                            // address models expose empty attribute bags as {}.
-                            currentJson = currentJson === '[]' ? '{}' : currentJson;
-                            valueJson = valueJson === '[]' ? '{}' : valueJson;
-
-                            return currentJson === valueJson;
-                        }
-
-                        return String(current || '') === String(value || '');
-                    }
-
-                    if (!wire || !address) {
-                        return Promise.resolve(false);
-                    }
-
-                    fields = [
-                        ['countryId', 'country_id', prefix ? 'billingCountryId' : 'countryId'],
-                        ['postcode', null, prefix ? 'billingPostcode' : 'postcode'],
-                        ['city', null, prefix ? 'billingCity' : 'city'],
-                        ['region', null, prefix ? 'billingRegion' : 'region'],
-                        ['regionId', 'region_id', prefix ? 'billingRegionId' : 'regionId'],
-                        ['firstname', null, prefix ? 'billingFirstname' : 'firstname'],
-                        ['lastname', null, prefix ? 'billingLastname' : 'lastname'],
-                        ['telephone', null, prefix ? 'billingTelephone' : 'telephone'],
-                        ['company', null, prefix ? 'billingCompany' : 'company'],
-                        ['prefix', null, prefix ? 'billingPrefix' : 'prefix'],
-                        ['middlename', null, prefix ? 'billingMiddlename' : 'middlename'],
-                        ['suffix', null, prefix ? 'billingSuffix' : 'suffix'],
-                        ['fax', null, prefix ? 'billingFax' : 'fax'],
-                        ['vatId', 'vat_id', prefix ? 'billingVatId' : 'vatId']
-                    ];
-
-                    fields.forEach(function (field) {
-                        payload[field[2]] = getAddressValue(address, field[0], field[1]);
-                    });
-
-                    street = getAddressValue(address, 'street');
-                    if (Array.isArray(street)) {
-                        [
-                            [prefix ? 'billingStreet1' : 'street1', street[0]],
-                            [prefix ? 'billingStreet2' : 'street2', street[1]],
-                            [prefix ? 'billingStreet3' : 'street3', street[2]],
-                            [prefix ? 'billingStreet4' : 'street4', street[3]]
-                        ].forEach(function (line) {
-                            payload[line[0]] = typeof line[1] === 'undefined' ? '' : line[1];
-                        });
-                    }
-
-                    customAttributes = normalizeAddressAttributeMap(getAddressAttributes(address, 'customAttributes', 'custom_attributes'));
-                    extensionAttributes = getAddressAttributes(address, 'extensionAttributes', 'extension_attributes');
-
-                    payload[prefix ? 'billingCustomAttributes' : 'shippingCustomAttributes'] = customAttributes;
-                    payload[prefix ? 'billingExtensionAttributes' : 'shippingExtensionAttributes'] = extensionAttributes;
-
-                    if (additionalPayload && typeof additionalPayload === 'object') {
-                        Object.keys(additionalPayload).forEach(function (field) {
-                            payload[field] = additionalPayload[field];
-                        });
-                    }
-
-                    Object.keys(payload).forEach(function (field) {
-                        var current = getProperty(wire, field),
-                            value = payload[field],
-                            equal = valuesEqual(current, value);
-
-                        if (equal) {
-                            delete payload[field];
-                        }
-                    });
-
-                    if (!Object.keys(payload).length) {
-                        return Promise.resolve(false);
-                    }
-
-                    // Deferred KO safety-net updates stay local until the next intentional
-                    // request. User actions use one atomic component call instead of a POST
-                    // per address field.
-                    if (deferUpdates === true || typeof wire.call !== 'function') {
-                        Object.keys(payload).forEach(function (field) {
-                            var operation = setMagewireValue(wire, field, payload[field], deferUpdates === true);
-
-                        if (operation && typeof operation.then === 'function') {
-                            operations.push(operation);
-                        }
-                        });
-
-                        return operations.length
-                            ? Promise.all(operations).then(function () { return true; })
-                            : Promise.resolve(true);
-                    }
-
-                    return Promise.resolve(/* native */ Promise.resolve(true) || wire.call('syncAddressFields', payload)).then(function () {
-                        return true;
-                    });
-                }
-
-                function syncStandardAddressFormsToMagewire() {
-                    var shippingAddress = quote && typeof quote.shippingAddress === 'function'
-                            ? quote.shippingAddress()
-                            : null,
-                        billingAddress = quote && typeof quote.billingAddress === 'function'
-                            ? quote.billingAddress()
-                            : null,
-                        wire = getMagewireComponent(),
-                        shippingKey,
-                        billingKey,
-                        billingSameAsShipping,
-                        addressChanged = false;
-
-                    if (!shippingAddress && !(quote.isVirtual && quote.isVirtual())) {
-                        return Promise.resolve(false);
-                    }
-
-                    shippingKey = shippingAddress && typeof shippingAddress.getCacheKey === 'function'
-                        ? shippingAddress.getCacheKey()
-                        : '';
-                    billingKey = billingAddress && typeof billingAddress.getCacheKey === 'function'
-                        ? billingAddress.getCacheKey()
-                        : '';
-                    billingSameAsShipping = Boolean(
-                        shippingAddress && billingAddress &&
-                        (shippingAddress === billingAddress || (shippingKey && shippingKey === billingKey))
-                    );
-
-                    return Promise.resolve(
-                        shippingAddress
-                            ? writeKoAddressToMagewire(shippingAddress, false, true, {
-                                email: getEmailForQuote()
-                            })
-                            : false
-                    ).then(function (changed) {
-                        addressChanged = addressChanged || changed === true;
-                        if (!billingAddress && billingSameAsShipping) {
-                            billingAddress = shippingAddress;
-                        }
-
-                        if (!billingAddress) {
-                            return false;
-                        }
-
-                        return writeKoAddressToMagewire(billingAddress, true, true, {
-                            billingSameAsShipping: billingSameAsShipping
-                        });
-                    }).then(function (changed) {
-                        addressChanged = addressChanged || changed === true;
-                        if (!addressChanged || !wire || typeof wire.call !== 'function') {
-                            return addressChanged;
-                        }
-
-                        // Deferred wire.set calls above are included in this one
-                        // request; the method remains the server-side atomic
-                        // boundary for shipping and billing address state.
-                        return Promise.resolve(/* native */ Promise.resolve(true) || wire.call('syncAddressFields', {})).then(function () {
-                            return true;
-                        });
-                    });
-                }
-
-                function syncDomShippingAttributesToMagewire(wire, deferUpdates) {
-                    return shippingAttributesSync.sync(wire, deferUpdates);
+                function syncShippingAttributes() {
+                    return shippingAttributesSync.sync();
                 }
 
                 function registerKoStateAdapter() {
-                    var isSyncingFromKo = false,
-                        koAddressSyncTimers = { shipping: null, billing: null };
-
                     if (!quote || window.fastcheckoutKoStateAdapterRegistered) {
                         return;
                     }
 
                     window.fastcheckoutKoStateAdapterRegistered = true;
 
-                    /**
-                     * KO quote address changes used to call wire.set on every keystroke
-                     * (via $watch → syncFieldToKo → valueHasMutated). Address save is owned
-                     * by Alpine blur/change → syncAddressFields. Only a deferred safety net
-                     * remains here for non-DOM KO updates (saved address, third-party).
-                     */
-                    function syncKoAddressToMagewire(address, isBilling) {
-                        var key = isBilling ? 'billing' : 'shipping';
-
-                        if (isSyncingFromKo || !address) {
-                            return;
-                        }
-                        if (window.fastcheckoutSuppressKoAddressToMagewire) {
-                            return;
-                        }
-
-                        if (koAddressSyncTimers[key]) {
-                            window.clearTimeout(koAddressSyncTimers[key]);
-                        }
-
-                        koAddressSyncTimers[key] = window.setTimeout(function () {
-                            koAddressSyncTimers[key] = null;
-                            if (window.fastcheckoutSuppressKoAddressToMagewire) {
-                                return;
-                            }
-                            isSyncingFromKo = true;
-                            // deferUpdates=true: do not open a Magewire XHR on its own.
-                            writeKoAddressToMagewire(address, isBilling, true)
-                                .catch(function (e) {
-                                    if (window.console && typeof window.console.warn === 'function') {
-                                        window.console.warn('Fastcheckout: Sync address to Magewire failed', e);
-                                    }
-                                })
-                                .then(function () {
-                                    isSyncingFromKo = false;
-                                });
-                        }, 1200);
-                    }
-
-                    if (typeof quote.shippingAddress === 'function') {
-                        quote.shippingAddress.subscribe(function (address) {
-                            syncKoAddressToMagewire(address, false);
-                        });
-                    }
-
-                    if (typeof quote.billingAddress === 'function') {
-                        quote.billingAddress.subscribe(function (address) {
-                            syncKoAddressToMagewire(address, true);
-                        });
-                    }
-
                     if (typeof quote.paymentMethod === 'function') {
                         quote.paymentMethod.subscribe(function (method) {
-                            var wire,
-                                methodCode,
+                            var methodCode,
                                 userPayment;
 
-                            if (isSyncingFromKo || paymentMethodSync.isApplyingFromBridge() || !method) {
+                            if (paymentMethodSync.isApplyingFromBridge() || !method) {
                                 return;
                             }
 
@@ -1517,351 +1217,16 @@ define([
                                 return;
                             }
 
-                            // KO re-notifies on every new object even when method string is unchanged.
-                            // Never $set Magewire for an already-synced payment — that alone can loop XHR.
                             if (!methodCode || paymentMethodSync.isSynced(methodCode)) {
                                 return;
                             }
 
-                            wire = getMagewireComponent();
-                            if (wire && getProperty(wire, 'paymentMethod') !== methodCode) {
-                                isSyncingFromKo = true;
-                                Promise.resolve(setMagewireValue(wire, 'paymentMethod', methodCode, false))
-                                    .then(function () {
-                                        paymentMethodSync.markSynced(methodCode);
-                                        isSyncingFromKo = false;
-                                    })
-                                    .catch(function () {
-                                        isSyncingFromKo = false;
-                                    });
-                            } else if (methodCode) {
-                                paymentMethodSync.markSynced(methodCode);
-                            }
+                            paymentMethodSync.persistSelection(method);
+                            paymentMethodSync.markSynced(methodCode);
                         });
                     }
                 }
-
-                function registerKoFieldSyncBridge() {
-                    window.fastcheckoutHyvaPayment = window.fastcheckoutHyvaPayment || {};
-                    window.fastcheckoutHyvaPayment.syncFieldToKo = function (field, value) {
-                        var shipping,
-                            billing,
-                            mapping,
-                            billingMapping,
-                            koField,
-                            koFieldBilling,
-                            street,
-                            billingStreet,
-                            currentPayment;
-
-                        if (!quote) {
-                            return;
-                        }
-
-                        shipping = typeof quote.shippingAddress === 'function' ? quote.shippingAddress() : null;
-                        billing = typeof quote.billingAddress === 'function' ? quote.billingAddress() : null;
-
-                        if (field === 'email') {
-                            setQuoteGuestEmail(value);
-                            syncEmailCompatibilityComponent(value, false);
-                        }
-
-                        if (field === 'paymentMethod' && typeof quote.paymentMethod === 'function') {
-                            currentPayment = quote.paymentMethod();
-                            if (!currentPayment || currentPayment.method !== value) {
-                                setQuotePaymentMethodFromBridge(value ? { method: value } : null);
-                            }
-                        }
-
-                        mapping = {
-                            'countryId': 'countryId',
-                            'postcode': 'postcode',
-                            'city': 'city',
-                            'region': 'region',
-                            'regionId': 'regionId',
-                            'firstname': 'firstname',
-                            'lastname': 'lastname',
-                            'telephone': 'telephone',
-                            'company': 'company',
-                            'prefix': 'prefix',
-                            'middlename': 'middlename',
-                            'suffix': 'suffix',
-                            'fax': 'fax',
-                            'vatId': 'vatId'
-                        };
-
-                        if (shipping && mapping[field]) {
-                            koField = mapping[field];
-                            if (shipping[koField] !== value) {
-                                shipping[koField] = value;
-                                if (typeof quote.shippingAddress.valueHasMutated === 'function') {
-                                    quote.shippingAddress.valueHasMutated();
-                                } else {
-                                    quote.shippingAddress(shipping);
-                                }
-                            }
-                        }
-
-                        billingMapping = {
-                            'billingCountryId': 'countryId',
-                            'billingPostcode': 'postcode',
-                            'billingCity': 'city',
-                            'billingRegion': 'region',
-                            'billingRegionId': 'regionId',
-                            'billingFirstname': 'firstname',
-                            'billingLastname': 'lastname',
-                            'billingTelephone': 'telephone',
-                            'billingCompany': 'company',
-                            'billingPrefix': 'prefix',
-                            'billingMiddlename': 'middlename',
-                            'billingSuffix': 'suffix',
-                            'billingFax': 'fax',
-                            'billingVatId': 'vatId'
-                        };
-
-                        if (billing && billingMapping[field]) {
-                            koFieldBilling = billingMapping[field];
-                            if (billing[koFieldBilling] !== value) {
-                                billing[koFieldBilling] = value;
-                                if (typeof quote.billingAddress.valueHasMutated === 'function') {
-                                    quote.billingAddress.valueHasMutated();
-                                } else {
-                                    quote.billingAddress(billing);
-                                }
-                            }
-                        }
-
-                        if (
-                            shipping &&
-                            (field === 'street1' || field === 'street2' || field === 'street3' || field === 'street4')
-                        ) {
-                            street = shipping.street || [];
-                            if (field === 'street1') {
-                                street[0] = value;
-                            }
-                            if (field === 'street2') {
-                                street[1] = value;
-                            }
-                            if (field === 'street3') {
-                                street[2] = value;
-                            }
-                            if (field === 'street4') {
-                                street[3] = value;
-                            }
-                            shipping.street = street;
-                            if (typeof quote.shippingAddress.valueHasMutated === 'function') {
-                                quote.shippingAddress.valueHasMutated();
-                            } else {
-                                quote.shippingAddress(shipping);
-                            }
-                        }
-
-                        if (
-                            billing &&
-                            (
-                                field === 'billingStreet1' ||
-                                field === 'billingStreet2' ||
-                                field === 'billingStreet3' ||
-                                field === 'billingStreet4'
-                            )
-                        ) {
-                            billingStreet = billing.street || [];
-                            if (field === 'billingStreet1') {
-                                billingStreet[0] = value;
-                            }
-                            if (field === 'billingStreet2') {
-                                billingStreet[1] = value;
-                            }
-                            if (field === 'billingStreet3') {
-                                billingStreet[2] = value;
-                            }
-                            if (field === 'billingStreet4') {
-                                billingStreet[3] = value;
-                            }
-                            billing.street = billingStreet;
-                            if (typeof quote.billingAddress.valueHasMutated === 'function') {
-                                quote.billingAddress.valueHasMutated();
-                            } else {
-                                quote.billingAddress(billing);
-                            }
-                        }
-                    };
-                }
-
-                function registerCheckoutDataBufferBridge() {
-                    var pending = window.fastcheckoutPendingCheckoutData || {
-                        shippingAddress: null,
-                        billingAddress: null,
-                        selectedShippingRate: null,
-                        selectedPaymentMethod: null,
-                        email: null,
-                        changed: false
-                    };
-
-                    if (window.fastcheckoutCheckoutDataBufferRegistered) {
-                        return;
-                    }
-
-                    window.fastcheckoutPendingCheckoutData = pending;
-                    window.fastcheckoutCheckoutDataBufferRegistered = true;
-                    window.fastcheckoutCheckoutDataBufferReady = false;
-
-                    window.fastcheckoutApplyPendingCheckoutData = function (wire) {
-                        var shippingAddress,
-                            billingAddress,
-                            operations = [];
-
-                        if (!wire || !pending.changed) {
-                            return Promise.resolve(false);
-                        }
-
-                        if (pending.email) {
-                            setQuoteGuestEmail(pending.email);
-                            syncEmailCompatibilityComponent(pending.email, false);
-                            operations.push(function () {
-                                return setMagewireValue(wire, 'email', pending.email, false);
-                            });
-                        }
-
-                        if (pending.shippingAddress) {
-                            shippingAddress = addressConverter.formAddressDataToQuoteAddress(pending.shippingAddress);
-                            syncAddressDataToCheckoutProvider(normalizeKoAddressData(shippingAddress), 'shipping');
-                            operations.push(function () {
-                                return writeKoAddressToMagewire(shippingAddress, false, false);
-                            });
-                        }
-
-                        if (pending.billingAddress) {
-                            billingAddress = addressConverter.formAddressDataToQuoteAddress(pending.billingAddress);
-                            syncAddressDataToCheckoutProvider(normalizeKoAddressData(billingAddress), 'billing');
-                            operations.push(function () {
-                                return writeKoAddressToMagewire(billingAddress, true, false);
-                            });
-                        }
-
-                        return operations.reduce(function (promise, operation) {
-                            return promise.then(function () {
-                                return operation();
-                            });
-                        }, Promise.resolve()).then(function () {
-                            if (!pending.selectedShippingRate) {
-                                return true;
-                            }
-
-                            if (typeof wire.call === 'function') {
-                                return Promise.resolve(true); // native KO owns shipping method
-                            }
-
-                            return setMagewireValue(wire, 'shippingMethod', pending.selectedShippingRate, false);
-                        }).then(function () {
-                            if (!pending.selectedPaymentMethod) {
-                                return true;
-                            }
-
-                            if (typeof wire.call === 'function') {
-                                return Promise.resolve(true); // native KO owns payment method
-                            }
-
-                            setQuotePaymentMethodFromBridge({ method: pending.selectedPaymentMethod });
-                            return setMagewireValue(wire, 'paymentMethod', pending.selectedPaymentMethod, false);
-                        }).then(function () {
-                            pending.shippingAddress = null;
-                            pending.billingAddress = null;
-                            pending.selectedShippingRate = null;
-                            pending.selectedPaymentMethod = null;
-                            pending.email = null;
-                            pending.changed = false;
-
-                            return true;
-                        });
-                    };
-
-                    window.addEventListener('fastcheckout:checkout-data-set', function (event) {
-                        var detail = event.detail || {};
-
-                        if (window.fastcheckoutSuppressCheckoutDataBridge || !detail.method) {
-                            return;
-                        }
-
-                        switch (detail.method) {
-                            case 'setShippingAddressFromData':
-                            case 'setNewCustomerShippingAddress':
-                                pending.shippingAddress = detail.value || null;
-                                pending.changed = true;
-                                break;
-
-                            case 'setBillingAddressFromData':
-                            case 'setNewCustomerBillingAddress':
-                                pending.billingAddress = detail.value || null;
-                                pending.changed = true;
-                                break;
-
-                            case 'setSelectedShippingRate':
-                                pending.selectedShippingRate = detail.value || null;
-                                pending.changed = true;
-                                break;
-
-                            case 'setSelectedPaymentMethod':
-                                pending.selectedPaymentMethod = detail.value || null;
-                                pending.changed = true;
-                                break;
-
-                            case 'setValidatedEmailValue':
-                            case 'setInputFieldEmailValue':
-                            case 'setCheckedEmailValue':
-                                pending.email = detail.value || null;
-                                pending.changed = true;
-                                break;
-                        }
-                    });
-
-                    pending.shippingAddress = null;
-                    pending.billingAddress = null;
-                    pending.selectedShippingRate = null;
-                    pending.selectedPaymentMethod = null;
-                    pending.email = null;
-                    pending.changed = false;
-                    window.fastcheckoutCheckoutDataBufferReady = true;
-                }
-
                 registerKoStateAdapter();
-                registerKoFieldSyncBridge();
-                registerCheckoutDataBufferBridge();
-
-                function syncCheckoutStateWithoutServer(magewire) {
-                    var shippingAddress;
-
-                    syncQuoteCustomerData();
-
-                    if (!magewire) {
-                        return;
-                    }
-
-                    shippingAddress = syncAddressToKnockout(magewire);
-                    syncBillingAddressToKnockout(magewire, shippingAddress);
-                    syncSelectedShippingMethodToKnockout(getProperty(magewire, 'shippingMethod'));
-                }
-
-                function resolveAsKoDeferred(promise, messageContainer) {
-                    return magewireUtils.resolveAsKoDeferred(
-                        promise,
-                        messageContainer,
-                        function (error, container) {
-                            if (checkoutTotals && checkoutTotals.isLoading && typeof checkoutTotals.isLoading === 'function') {
-                                checkoutTotals.isLoading(false);
-                            }
-                            handlePaymentError(error, container || getBridgeMessageContainer());
-                        },
-                        function () {
-                            if (fullScreenLoader && typeof fullScreenLoader.stopLoader === 'function') {
-                                fullScreenLoader.stopLoader(true);
-                            }
-                            if (checkoutTotals && checkoutTotals.isLoading && typeof checkoutTotals.isLoading === 'function') {
-                                checkoutTotals.isLoading(false);
-                            }
-                        }
-                    );
-                }
 
                 function normalizeStreetForCompare(street) {
                     var lines = Array.isArray(street) ? street.slice() : (street ? [street] : []);
@@ -1893,59 +1258,6 @@ define([
                         String(currentAddress.telephone || '') === String(newAddress.telephone || '');
                 }
 
-                function syncAddressToKnockout(magewire) {
-                    if (!magewire) return null;
-
-                    // Selecting a shipping method only remaps payment/totals. Re-pushing the
-                    // address into KO re-triggers rate processors and reloads the methods list.
-                    if (window.fastcheckoutSelectingShippingMethod || window.fastcheckoutLockShippingRatesList) {
-                        return quote.shippingAddress();
-                    }
-
-                    var addressData = buildAddressData(magewire, ''),
-                        newAddress = addressConverter.formAddressDataToQuoteAddress(addressData),
-                        currentAddress = quote.shippingAddress();
-
-                    persistAddressToCheckoutData(addressData, 'shipping');
-                    syncAddressDataToCheckoutProvider(addressData, 'shipping');
-
-                    if (!addressesMatch(currentAddress, newAddress)) {
-                        selectShippingAddressAction(newAddress);
-                    }
-
-                    return quote.shippingAddress() || newAddress;
-                }
-
-                function syncBillingAddressToKnockout(magewire, shippingAddress) {
-                    var billingSameAsShipping = getProperty(magewire, 'billingSameAsShipping'),
-                        newAddress,
-                        currentAddress;
-
-                    if (!magewire) return null;
-
-                    if (billingSameAsShipping === true || billingSameAsShipping === '1' || billingSameAsShipping === 1) {
-                        var shippingAddressData = buildAddressData(magewire, '');
-                        persistAddressToCheckoutData(shippingAddressData, 'billing');
-                        syncAddressDataToCheckoutProvider(shippingAddressData, 'billing');
-                        if (shippingAddress) {
-                            selectBillingAddressAction(shippingAddress);
-                        }
-                        return quote.billingAddress();
-                    }
-
-                    var addressData = buildAddressData(magewire, 'billing');
-                    persistAddressToCheckoutData(addressData, 'billing');
-                    syncAddressDataToCheckoutProvider(addressData, 'billing');
-
-                    newAddress = addressConverter.formAddressDataToQuoteAddress(addressData);
-                    currentAddress = quote.billingAddress();
-                    if (!addressesMatch(currentAddress, newAddress)) {
-                        selectBillingAddressAction(newAddress);
-                    }
-
-                    return quote.billingAddress() || newAddress;
-                }
-
                 function syncSelectedShippingMethodToKnockout(methodCode) {
                     shippingMethodSync.syncSelectedToKnockout(methodCode);
                 }
@@ -1958,12 +1270,12 @@ define([
                     return shippingMethodSync.splitCode(methodCode);
                 }
 
-                function syncShippingMethodToMagewireNow(methodCode) {
-                    return shippingMethodSync.syncToMagewireNow(methodCode);
+                function persistShippingMethodNow(methodCode) {
+                    return shippingMethodSync.persistSelectionNow(methodCode);
                 }
 
-                function syncShippingMethodToMagewire(methodCode) {
-                    shippingMethodSync.syncToMagewire(methodCode);
+                function persistShippingMethod(methodCode) {
+                    shippingMethodSync.persistSelection(methodCode);
                 }
 
                 function rememberUserShippingSelection(methodCode) {
@@ -1973,32 +1285,7 @@ define([
                 }
 
                 function resolveShippingInformationAction(originalAction) {
-                    var wire = getMagewireComponent(),
-                        selectedMethod = quote && typeof quote.shippingMethod === 'function' ? quote.shippingMethod() : null,
-                        methodCode = getShippingMethodCode(selectedMethod),
-                        deferred = $.Deferred();
-
-                    if (!wire || typeof wire.call !== 'function') {
-                        return originalAction();
-                    }
-
-                    if (!methodCode) {
-                        return originalAction();
-                    }
-
-                    syncShippingMethodToMagewireNow(methodCode)
-                        .then(function () {
-                            return originalAction();
-                        })
-                        .then(function (response) {
-                            deferred.resolve(response);
-                        })
-                        .catch(function (error) {
-                            handlePaymentError(error, getBridgeMessageContainer());
-                            deferred.reject(error);
-                        });
-
-                    return deferred.promise();
+                    return originalAction();
                 }
 
                 var lastShippingRateEstimateKey = '';
@@ -2024,7 +1311,7 @@ define([
                 }
 
                 /**
-                 * Native Magento estimate-shipping-methods (REST) — no Magewire.
+                 * Native Magento estimate-shipping-methods (REST).
                  * Used by processors / bridge callers that still hit onEstimateShippingRatesAction.
                  */
                 function resolveShippingRatesEstimate(address) {
@@ -2191,37 +1478,23 @@ define([
                     paymentMethodSync.setQuoteFromBridge(paymentMethod);
                 }
 
-                function syncPaymentMethodToMagewire(paymentMethod) {
-                    paymentMethodSync.syncToMagewire(paymentMethod);
+                function persistPaymentMethodSelection(paymentMethod) {
+                    paymentMethodSync.persistSelection(paymentMethod);
                 }
 
-                function prepareCheckoutState(magewire) {
+                function prepareCheckoutState() {
                     syncQuoteCustomerData();
 
-                    return Promise.resolve(
-                        magewire && typeof window.fastcheckoutApplyPendingCheckoutData === 'function'
-                            ? window.fastcheckoutApplyPendingCheckoutData(magewire)
-                            : true
-                    ).then(function () {
-                        var shippingAddress = syncAddressToKnockout(magewire);
-                        syncBillingAddressToKnockout(magewire, shippingAddress);
-
-                        return syncDomShippingAttributesToMagewire(magewire, true).then(function () {
-                            if (magewire) {
-                                syncSelectedShippingMethodToKnockout(getProperty(magewire, 'shippingMethod'));
-                            }
-
-                            if (quote.isVirtual && quote.isVirtual()) {
-                                return true;
-                            }
-
-                            if (!quote.shippingAddress() || !quote.shippingMethod()) {
-                                return true;
-                            }
-
-                            syncPaymentMethods();
+                    return syncShippingAttributes().then(function () {
+                        if (
+                            !(quote.isVirtual && quote.isVirtual()) &&
+                            (!quote.shippingAddress() || !quote.shippingMethod())
+                        ) {
                             return true;
-                        });
+                        }
+
+                        syncPaymentMethods();
+                        return true;
                     });
                 }
 
@@ -2234,11 +1507,9 @@ define([
                 }
 
                 window.fastcheckoutHyvaShipping = {
-                    syncAddress: syncAddressToKnockout,
-                    syncAddressFormsToMagewire: syncStandardAddressFormsToMagewire,
                     syncShippingMethod: syncSelectedShippingMethodToKnockout,
-                    syncShippingMethodToMagewire: syncShippingMethodToMagewire,
-                    syncShippingMethodToMagewireNow: syncShippingMethodToMagewireNow,
+                    persistShippingMethod: persistShippingMethod,
+                    persistShippingMethodNow: persistShippingMethodNow,
                     applyPaymentRemapForShipping: function (methodCode) {
                         if (
                             shippingMethodSync &&
@@ -2272,10 +1543,7 @@ define([
                         return shippingCompatibilityBridge.getShippingInformationComponent();
                     },
                     onSelectShippingAddressAction: function (shippingAddress) {
-                        var addressData,
-                            currentShippingAddress,
-                            wire = getMagewireComponent(),
-                            billingSameAsShipping;
+                        var addressData;
 
                         // The quote address object survives a country change, so it can still
                         // carry the previous country's region_id. Everything downstream is built
@@ -2290,38 +1558,13 @@ define([
                         persistAddressToCheckoutData(addressData, 'shipping');
                         syncAddressDataToCheckoutProvider(addressData, 'shipping');
                         syncCheckoutProviderAddressAttributes();
-                        currentShippingAddress = quote && typeof quote.shippingAddress === 'function'
-                            ? quote.shippingAddress()
-                            : null;
-                        billingSameAsShipping = getProperty(wire, 'billingSameAsShipping');
 
-                        if (
-                            (billingSameAsShipping === true || billingSameAsShipping === 1 || billingSameAsShipping === '1') &&
-                            currentShippingAddress &&
-                            typeof selectBillingAddressAction === 'function'
-                        ) {
-                            selectBillingAddressAction(currentShippingAddress);
-                        }
-
-                        return Promise.resolve(
-                            writeKoAddressToMagewire(currentShippingAddress || shippingAddress, false, true)
-                        ).then(function () {
-                            return syncDomShippingAttributesToMagewire(getMagewireComponent(), true);
-                        });
+                        return syncShippingAttributes();
                     },
                     onSelectBillingAddressAction: function (billingAddress) {
-                        var addressData = normalizeKoAddressData(billingAddress),
-                            currentBillingAddress,
-                            currentShippingAddress,
-                            billingKey,
-                            shippingKey,
-                            billingSameAsShipping,
-                            wire = getMagewireComponent();
+                        var addressData = normalizeKoAddressData(billingAddress);
 
                         if (!billingAddress) {
-                            // A renderer reset or opening the separate-address form can
-                            // transiently clear quote billing. Do not turn that intermediate
-                            // KO state into an empty Magewire billing payload.
                             return Promise.resolve(false);
                         }
 
@@ -2329,44 +1572,7 @@ define([
                         syncAddressDataToCheckoutProvider(addressData, 'billing');
                         syncCheckoutProviderAddressAttributes();
 
-                        // Selecting a shipping method remaps the allowed payment methods, and every
-                        // Magento payment renderer calls checkoutDataResolver.resolveBillingAddress()
-                        // on init — which re-selects the (unchanged) billing address. Pushing that
-                        // back to Magewire costs an extra round trip per rate switch and re-writes
-                        // billing* props the server derives from shipping anyway. KO/checkoutData are
-                        // still updated above; only the redundant server push is skipped.
-                        if (window.fastcheckoutSelectingShippingMethod || window.fastcheckoutLockShippingRatesList) {
-                            return Promise.resolve(false);
-                        }
-
-                        currentBillingAddress = quote && typeof quote.billingAddress === 'function'
-                            ? quote.billingAddress()
-                            : null;
-                        currentShippingAddress = quote && typeof quote.shippingAddress === 'function'
-                            ? quote.shippingAddress()
-                            : null;
-                        billingKey = currentBillingAddress && typeof currentBillingAddress.getCacheKey === 'function'
-                            ? currentBillingAddress.getCacheKey()
-                            : '';
-                        shippingKey = currentShippingAddress && typeof currentShippingAddress.getCacheKey === 'function'
-                            ? currentShippingAddress.getCacheKey()
-                            : '';
-                        // Only a billing address the shopper actually filled may set
-                        // billingSameAsShipping=false. The renderer's vestigial (empty) billing
-                        // form otherwise reports a distinct address object → distinct cache key
-                        // → false, which made the server save empty billing* props and reject
-                        // the order. Empty billing = same as shipping.
-                        billingSameAsShipping = !hasMeaningfulAddressData(addressData) || Boolean(
-                            currentBillingAddress && currentShippingAddress &&
-                            (
-                                currentBillingAddress === currentShippingAddress ||
-                                (billingKey && billingKey === shippingKey)
-                            )
-                        );
-
-                        return writeKoAddressToMagewire(currentBillingAddress || billingAddress, true, true, {
-                            billingSameAsShipping: billingSameAsShipping
-                        });
+                        return Promise.resolve(true);
                     },
                     onSelectShippingMethodAction: function (shippingMethod) {
                         var code = getShippingMethodCode(shippingMethod);
@@ -2382,8 +1588,7 @@ define([
                             return;
                         }
 
-                        // Sync to Magewire only — user lock is set exclusively by trusted clicks.
-                        syncShippingMethodToMagewire(code);
+                        persistShippingMethod(code);
                         // Avoid standard shipping-view select side-effects (extra rate
                         // recollect / setShippingInformation races that bounced the radio).
                     },
@@ -2393,8 +1598,8 @@ define([
                     onEstimateShippingRatesAction: function (address) {
                         return resolveShippingRatesEstimate(address);
                     },
-                    syncDomAttributes: function (wire) {
-                        return syncDomShippingAttributesToMagewire(wire || getMagewireComponent(), true);
+                    syncDomAttributes: function () {
+                        return syncShippingAttributes();
                     },
                     registerValidator: registerShippingValidator,
                     onRecollectShippingRatesAction: function (originalAction) {
@@ -2405,11 +1610,7 @@ define([
                             return Promise.resolve(null);
                         }
 
-                        if (!getMagewireComponent()) {
-                            return originalAction();
-                        }
-
-                        return refreshShippingRatesFromMagewire();
+                        return originalAction();
                     },
                     setError: function (methodCode, message) {
                         showShippingFieldError(methodCode, '', message);
@@ -2461,7 +1662,7 @@ define([
                         // ----------------------------------------------------------------
                         try {
                             clearShippingFieldError();
-                            syncDomShippingAttributesToMagewire(getMagewireComponent(), true);
+                            syncShippingAttributes();
                             var checkedDomRadio = document.querySelector('input[name="shipping_method"]:checked:not(:disabled)');
 
                             var carrierCode = '';
@@ -2473,7 +1674,7 @@ define([
 
                                 showShippingFieldError('', '', missingMethodMessage);
 
-                                // Expose for Alpine handleSubmit fallback banner.
+                                // Expose for the checkout submit fallback banner.
                                 window.fastcheckoutLastShippingValidationError = missingMethodMessage;
 
                                 return false;
@@ -2561,17 +1762,6 @@ define([
                     }
                 };
 
-                // Initial sync once Knockout is ready
-                var magewireEl = document.querySelector('[wire\\:id]');
-                if (magewireEl && magewireEl.__livewire) {
-                    var wire = magewireEl.__livewire;
-                    syncAddressToKnockout(wire);
-                    var initMethod = wire.shippingMethod || getProperty(wire, 'shippingMethod');
-                    if (initMethod) {
-                        syncSelectedShippingMethodToKnockout(initMethod);
-                    }
-                }
-
                 quote.shippingMethod.subscribe(function (method) {
                     var code,
                         userMethod;
@@ -2589,7 +1779,7 @@ define([
 
                     // Magento rate recollect / checkoutData often re-selects the previous
                     // rate after the user picked another. Snap KO back to the user choice
-                    // instead of letting the radio bounce and pushing the stale rate to Magewire.
+                    // instead of letting the radio bounce.
                     if (
                         shippingMethodSync &&
                         typeof shippingMethodSync.shouldIgnoreKnockoutApply === 'function' &&
@@ -2607,23 +1797,15 @@ define([
                     if (checkoutTotals && checkoutTotals.isLoading && typeof checkoutTotals.isLoading === 'function') {
                         checkoutTotals.isLoading(true);
                     }
-                    syncShippingMethodToMagewire(code);
+                    persistShippingMethod(code);
                 });
 
                 shippingService.getShippingRates().subscribe(function () {
-                    var magewireEl = document.querySelector('[wire\\:id]'),
-                        wire,
-                        wireMethod,
-                        userMethod,
+                    var userMethod,
+                        currentMethod,
                         preferred = '';
 
-                    if (!magewireEl || !magewireEl.__livewire) {
-                        return;
-                    }
-
-                    wire = magewireEl.__livewire;
-                    wireMethod = wire.shippingMethod || getProperty(wire, 'shippingMethod');
-                    // Prefer the user's fresh choice over a lagging wire value while rates rebind.
+                    // Prefer the user's fresh choice while rates rebind.
                     if (
                         shippingMethodSync &&
                         typeof shippingMethodSync.getUserSelectedShippingMethod === 'function' &&
@@ -2636,8 +1818,11 @@ define([
                         }
                     }
 
-                    if (!preferred && wireMethod) {
-                        preferred = wireMethod;
+                    currentMethod = quote && typeof quote.shippingMethod === 'function'
+                        ? getShippingMethodCode(quote.shippingMethod())
+                        : '';
+                    if (!preferred && currentMethod) {
+                        preferred = currentMethod;
                     }
 
                     if (!preferred) {
@@ -3273,7 +2458,7 @@ define([
                         return;
                     }
 
-                    // Already mirrored in quote + Magewire: refresh panel only when content is open.
+                    // Already mirrored in the quote: refresh the panel only when content is open.
                     // After shipping→payment remap markSynced runs before the KO panel is shown;
                     // early-return without apply left the radio checked and content closed.
                     if (paymentMethodSync.isSynced(methodCode)) {
@@ -4839,147 +4024,8 @@ define([
                     return placeOrderHooksBridge.clonePaymentPayload(paymentData);
                 }
 
-                function runPlaceOrderRequestModifiers(paymentData, includeBillingAddress, clonePaymentData) {
-                    return placeOrderHooksBridge.runRequestModifiers(paymentData, includeBillingAddress, clonePaymentData);
-                }
-
-                function buildPlaceOrderSyncPayload(paymentData) {
-                    return placeOrderHooksBridge.buildSyncPayload(paymentData);
-                }
-
                 function runPlaceOrderAfterRequestListeners() {
                     placeOrderHooksBridge.runAfterRequestListeners();
-                }
-
-                function syncPlaceOrderHookData(wire, hookData, deferUpdate) {
-                    return placeOrderHooksBridge.syncHookData(wire, hookData, deferUpdate);
-                }
-
-                /**
-                 * Call selectPaymentMethod only when the Magewire property differs.
-                 * Avoids a full component re-render (and mobile scroll jump) on every place-order click.
-                 * Payment payload is already pushed via syncWirePaymentData / placeOrderRequestData.
-                 */
-                function selectPaymentMethodIfNeeded(wire, methodCode) {
-                    if (!methodCode || !wire || typeof wire.call !== 'function') {
-                        return Promise.resolve(true);
-                    }
-                    var current = '';
-                    try {
-                        current = typeof wire.get === 'function'
-                            ? String(wire.get('paymentMethod') || '')
-                            : String(wire.paymentMethod || '');
-                    } catch (e) {
-                        current = '';
-                    }
-                    if (current === String(methodCode)) {
-                        return Promise.resolve(true);
-                    }
-                    return Promise.resolve(/* native */ Promise.resolve(true) || wire.call('selectPaymentMethod', methodCode));
-                }
-
-                function isAsyncTokenizationInProgress(component, result) {
-                    return result === false &&
-                        component &&
-                        typeof component.placeOrderDefer === 'function' &&
-                        typeof component.cardToken === 'function' &&
-                        component.secureFormError &&
-                        typeof component.secureFormError.subscribe === 'function';
-                }
-
-                function formatAsyncTokenizationErrorMessage(message) {
-                    var lines = String(message || '')
-                        .replace(/<\s*\/?\s*(?:div|p|li|br)\b[^>]*>/gi, '\n')
-                        .replace(/<[^>]*>/g, ' ')
-                        .split(/\r?\n/)
-                        .map(function (line) {
-                            return line.replace(/\s+/g, ' ').trim().replace(/[.?!]+$/, '');
-                        })
-                        .filter(function (line) {
-                            return line !== '';
-                        });
-
-                    return lines.length ? lines.join('. ') + '.' : '';
-                }
-
-                function watchAsyncTokenizationError(component, reject) {
-                    var errorObserver = component && component.secureFormError,
-                        subscription,
-                        handleError;
-
-                    if (!errorObserver || typeof errorObserver.subscribe !== 'function') {
-                        return;
-                    }
-
-                    handleError = function (message) {
-                        var errorMessage,
-                            nativeError;
-
-                        if (!message || !window.fastcheckoutHyvaPayment || !window.fastcheckoutHyvaPayment.koOrderActive) {
-                            return;
-                        }
-
-                        errorMessage = formatAsyncTokenizationErrorMessage(message) ||
-                            translateFastcheckoutMessage('The selected payment method could not complete order placement. Please try again.');
-
-                        if (String(message).trim() !== errorMessage) {
-                            errorObserver(errorMessage);
-                            return;
-                        }
-
-                        nativeError = new Error(errorMessage);
-                        nativeError.fastcheckoutNativePaymentError = true;
-                        window.fastcheckoutHyvaPayment.cleanupKoOrderState();
-                        reject(nativeError);
-                    };
-
-                    subscription = errorObserver.subscribe(handleError);
-
-                    window.fastcheckoutHyvaPayment.koOrderNativeErrorSubscription = subscription;
-                    handleError(errorObserver());
-                }
-
-                function watchRendererPlaceOrderResult(result, component, reject) {
-                    var handleReject;
-
-                    if (!result || typeof result !== 'object') {
-                        return;
-                    }
-
-                    function normalizeError(error) {
-                        if (error instanceof Error) {
-                            return error;
-                        }
-                        if (error && error.message) {
-                            return new Error(error.message);
-                        }
-                        if (typeof error === 'string' && error) {
-                            return new Error(error);
-                        }
-
-                        return new Error(translateFastcheckoutMessage('The selected payment method could not complete order placement. Please try again.'));
-                    }
-
-                    handleReject = function (error) {
-                        var messageContainer = component && component.messageContainer
-                                ? component.messageContainer
-                                : getBridgeMessageContainer(),
-                            normalizedError = normalizeError(error);
-
-                        if (!window.fastcheckoutHyvaPayment || !window.fastcheckoutHyvaPayment.koOrderActive) {
-                            return;
-                        }
-
-                        window.fastcheckoutHyvaPayment.cleanupKoOrderState();
-                        handlePaymentError(normalizedError, messageContainer);
-                        reject(normalizedError);
-                    };
-
-                    if (typeof result.fail === 'function') {
-                        result.fail(handleReject);
-                    } else if (typeof result.catch === 'function') {
-                        result.catch(handleReject);
-                    }
                 }
 
                 window.fastcheckoutHyvaPayment = $.extend(window.fastcheckoutHyvaPayment || {}, {
@@ -5016,25 +4062,6 @@ define([
                             method: getSelectedMethodCode(),
 	                            additional_data: {}
 	                        });
-	                    },
-
-	                    cleanupKoOrderState: function () {
-	                        if (this.koOrderTimeout) {
-	                            window.clearTimeout(this.koOrderTimeout);
-	                        }
-	                        if (
-	                            this.koOrderNativeErrorSubscription &&
-	                            typeof this.koOrderNativeErrorSubscription.dispose === 'function'
-	                        ) {
-	                            this.koOrderNativeErrorSubscription.dispose();
-	                        }
-	                        this.koOrderTimeout = null;
-	                        this.koOrderNativeErrorSubscription = null;
-	                        this.koOrderDeferred = null;
-	                        this.koOrderActive = false;
-	                        this.syncWire = null;
-	                        this.syncResolve = null;
-	                        this.syncReject = null;
 	                    },
 
 	                    getPurchaseOrderNumber: function (paymentData) {
@@ -5092,129 +4119,6 @@ define([
 	                        return extensionAttributes;
 	                    },
 
-                        syncWirePaymentData: function (wire, paymentData, hookData, deferHookUpdate) {
-                            paymentData = applyPaymentDataAssigners(
-                                (hookData && hookData.paymentData) || paymentData || this.getActivePaymentData()
-                            );
-                            hookData = hookData || buildPlaceOrderSyncPayload(paymentData);
-
-	                        var additionalData = this.getPaymentAdditionalData(paymentData),
-                                extensionAttributes = this.getPaymentExtensionAttributes(paymentData),
-	                            methodCode = paymentData && paymentData.method ? paymentData.method : getSelectedMethodCode(),
-	                            poNumber = methodCode === 'purchaseorder' ? this.getPurchaseOrderNumber(paymentData) : '',
-                                changed = false,
-                                write;
-
-                            // Equality-aware writes: raw wire.set always dirties Livewire and
-                            // was the main driver of idle $set → selectPaymentMethod loops.
-                            write = function (field, value) {
-                                var result = setMagewireValue(wire, field, value, true);
-
-                                if (result) {
-                                    changed = true;
-                                }
-
-                                return Promise.resolve(result);
-                            };
-
-	                        return write('paymentAdditionalData', additionalData)
-                                .then(function () {
-                                    return write('paymentExtensionAttributes', extensionAttributes);
-                                })
-		                            .then(function () {
-		                                if (methodCode === 'purchaseorder') {
-		                                    return write('poNumber', poNumber);
-		                                }
-		                                return true;
-		                            })
-                                .then(function () {
-                                    if (!hookData) {
-                                        return false;
-                                    }
-
-                                    return syncPlaceOrderHookData(wire, hookData, deferHookUpdate !== false);
-                                })
-                                .then(function (hookChanged) {
-                                    return changed || !!hookChanged;
-	                            });
-	                    },
-
-	                    syncPaymentData: function (wire) {
-                            var paymentData;
-
-	                        if (!wire || typeof wire.set !== 'function') {
-	                            return Promise.resolve();
-	                        }
-
-                            paymentData = this.getActivePaymentData();
-
-	                        return this.syncWirePaymentData(
-                                wire,
-                                paymentData,
-                                runPlaceOrderRequestModifiers(paymentData, true)
-                            );
-	                    },
-
-	                        syncActiveFormData: function (wire) {
-	                            var collected,
-	                                paymentData,
-	                                additionalData,
-	                                extensionAttributes,
-	                                methodCode,
-	                                poNumber;
-
-	                            if (!wire || typeof wire.set !== 'function') {
-	                                return Promise.resolve();
-	                            }
-
-	                            methodCode = getSelectedMethodCode();
-	                            collected = collectFastcheckoutStructuredFields(getActivePaymentFormRoots(), { mode: 'payment' });
-	                            if (
-	                                methodCode !== 'purchaseorder' &&
-	                                !Object.keys(collected.additionalData || {}).length &&
-	                                !Object.keys(collected.extensionAttributes || {}).length &&
-	                                !(collected.topLevel && collected.topLevel.po_number)
-	                            ) {
-	                                return Promise.resolve(true);
-	                            }
-
-	                            paymentData = {
-	                                method: methodCode
-	                            };
-	                            if (Object.keys(collected.additionalData || {}).length) {
-	                                paymentData.additional_data = collected.additionalData;
-	                            }
-	                            if (Object.keys(collected.extensionAttributes || {}).length) {
-	                                paymentData.extension_attributes = collected.extensionAttributes;
-	                            }
-	                            if (collected.topLevel && collected.topLevel.po_number) {
-	                                paymentData.po_number = collected.topLevel.po_number;
-	                            }
-	                            additionalData = this.getPaymentAdditionalData(paymentData);
-	                            extensionAttributes = this.getPaymentExtensionAttributes(paymentData);
-	                            additionalData = $.extend(
-	                                true,
-	                                {},
-	                                getProperty(wire, 'paymentAdditionalData') || {},
-	                                additionalData
-	                            );
-	                            extensionAttributes = $.extend(
-	                                true,
-	                                {},
-	                                getProperty(wire, 'paymentExtensionAttributes') || {},
-	                                extensionAttributes
-	                            );
-	                            poNumber = methodCode === 'purchaseorder' ? this.getPurchaseOrderNumber(paymentData) : '';
-
-	                            return Promise.resolve(wire.set('paymentAdditionalData', additionalData, true))
-	                                .then(function () {
-	                                    return wire.set('paymentExtensionAttributes', extensionAttributes, true);
-	                                })
-	                                .then(function () {
-	                                    return methodCode === 'purchaseorder' ? wire.set('poNumber', poNumber, true) : true;
-	                                });
-	                        },
-
                         onSelectPaymentMethodAction: function (paymentMethod) {
                             var methodCode = getPaymentMethodCode(paymentMethod),
                                 input,
@@ -5226,7 +4130,7 @@ define([
 
                             if (!methodCode) {
                                 persistPaymentMethodToCheckoutData(null);
-                                syncPaymentMethodToMagewire(null);
+                                persistPaymentMethodSelection(null);
                                 hidePaymentPlaceholders();
                                 return;
                             }
@@ -5240,9 +4144,8 @@ define([
                                 return;
                             }
 
-                            // Re-selection of the already-synced method is a no-op for Magewire.
-                            // Magento/KO often re-fire select with a new object reference after
-                            // every totals/shipping morph; without this guard we spam XHR.
+                            // Magento/KO can re-fire select with a new object reference after
+                            // every totals or shipping update.
                             if (paymentMethodSync.isSynced(methodCode)) {
                                 document.querySelectorAll('input[name="payment_method"]').forEach(function (element) {
                                     if (
@@ -5283,153 +4186,36 @@ define([
                                     updateActiveRendererClass(methodCode, methodCode);
                                 });
                             }
-                            syncPaymentMethodToMagewire(paymentMethod);
+                            persistPaymentMethodSelection(paymentMethod);
                         },
 
                         onSetBillingAddressAction: function (messageContainer, originalAction) {
-                            var wire = getMagewireComponent(),
-                                billingAddress = quote && typeof quote.billingAddress === 'function' ? quote.billingAddress() : null;
-
                             messageContainer = subscribePaymentMessageContainer(messageContainer) || getBridgeMessageContainer();
 
-                            if (!wire) {
-                                return originalAction(messageContainer);
-                            }
-
-                            return resolveAsKoDeferred(
-                                new Promise(function (resolve, reject) {
-                                    try {
-                                        Promise.resolve(
-                                            typeof window.fastcheckoutApplyPendingCheckoutData === 'function'
-                                                ? window.fastcheckoutApplyPendingCheckoutData(wire)
-                                                : true
-                                        )
-                                            .then(function () {
-                                                syncCheckoutStateWithoutServer(wire);
-                                                return writeKoAddressToMagewire(billingAddress, true);
-                                            })
-                                            .then(function () {
-                                                return originalAction(messageContainer);
-                                            })
-                                            .then(function (result) {
-                                                return refreshCheckoutStateFromMagewire()
-                                                    .catch(function () {
-                                                        syncQuoteTotalsFromDom();
-                                                    })
-                                                    .then(function () {
-                                                        resolve(result);
-                                                    });
-                                            })
-                                            .catch(function (error) {
-                                                reject(error);
-                                            });
-                                    } catch (error) {
-                                        reject(error);
-                                    }
-                                }),
-                                messageContainer
-                            );
+                            return originalAction(messageContainer);
                         },
 
                         onSetPaymentInformationAction: function (messageContainer, paymentData, skipBilling, originalAction) {
-                            var wire = getMagewireComponent(),
-                                self = this,
-                                methodCode = paymentData && paymentData.method ? paymentData.method : getSelectedMethodCode(),
-                                dataChanged = false,
-                                methodChanged = false;
-
                             messageContainer = subscribePaymentMessageContainer(messageContainer) || getBridgeMessageContainer();
 
-                            if (!wire) {
-                                return originalAction(messageContainer, paymentData, skipBilling);
-                            }
-
-                            return resolveAsKoDeferred(
-                                new Promise(function (resolve, reject) {
-                                    try {
-                                        if (checkoutTotals && checkoutTotals.isLoading && typeof checkoutTotals.isLoading === 'function') {
-                                            checkoutTotals.isLoading(true);
-                                        }
-                                        Promise.resolve(
-                                            typeof window.fastcheckoutApplyPendingCheckoutData === 'function'
-                                                ? window.fastcheckoutApplyPendingCheckoutData(wire)
-                                                : true
-                                        )
-                                            .then(function () {
-                                                syncCheckoutStateWithoutServer(wire);
-                                                return self.syncWirePaymentData(wire, paymentData || self.getActivePaymentData());
-                                            })
-                                            .then(function (changed) {
-                                                var currentMagewireMethod = getProperty(wire, 'paymentMethod');
-
-                                                dataChanged = !!changed;
-                                                if (
-                                                    methodCode &&
-                                                    methodCode !== currentMagewireMethod &&
-                                                    !paymentMethodSync.isSynced(methodCode) &&
-                                                    typeof wire.call === 'function'
-                                                ) {
-                                                    methodChanged = true;
-                                                    paymentMethodSync.markSynced(methodCode);
-                                                    return /* native */ Promise.resolve(true) || wire.call('selectPaymentMethod', methodCode);
-                                                }
-                                                if (methodCode) {
-                                                    paymentMethodSync.markSynced(methodCode);
-                                                }
-                                                return true;
-                                            })
-                                            .then(function () {
-                                                // Already on this payment with unchanged payload — skip idle refresh loop.
-                                                if (!methodChanged && !dataChanged && paymentMethodSync.isSynced(methodCode || '')) {
-                                                    if (checkoutTotals && checkoutTotals.isLoading && typeof checkoutTotals.isLoading === 'function') {
-                                                        checkoutTotals.isLoading(false);
-                                                    }
-                                                    return true;
-                                                }
-                                                return refreshCheckoutStateFromMagewire(true);
-                                            })
-                                            .then(function () {
-                                                resolve(true);
-                                            })
-                                            .catch(function (error) {
-                                                reject(error);
-                                            });
-                                    } catch (error) {
-                                        reject(error);
-                                    }
-                                }),
-                                messageContainer
-                            );
+                            return originalAction(messageContainer, paymentData, skipBilling);
                         },
 
                         onGetPaymentInformationAction: function (deferred, messageContainer, originalAction) {
-                            if (!getMagewireComponent()) {
-                                return originalAction(deferred, messageContainer);
-                            }
-
-                            return resolveCheckoutStateRefresh([], deferred, messageContainer);
+                            return originalAction(deferred, messageContainer);
                         },
 
                         onGetTotalsAction: function (callbacks, deferred, originalAction) {
-                            if (!getMagewireComponent()) {
-                                return originalAction(callbacks, deferred);
-                            }
-
-                            return resolveCheckoutStateRefresh(callbacks, deferred, getBridgeMessageContainer());
+                            return originalAction(callbacks, deferred);
                         },
 
-		                    placeOrder: function (wire, selectedMethod) {
+		                    placeOrder: function (unused, selectedMethod) {
 		                        var component,
 		                            paymentData,
                                     methodCode,
-                                    nativeSubmitAction,
-		                            result,
-		                            self = this;
+                                    nativeSubmitAction;
 
                             clearPaymentMessages();
-
-                            // wire is optional: native KO place-order path does not use Magewire.
-                            wire = wire && typeof wire.call === 'function' ? wire : null;
 
 	                        if (selectedMethod) {
 	                            setSelectedMethod(selectedMethod);
@@ -5462,10 +4248,7 @@ define([
                                             )
                                         );
                                     }
-                                    if (wire && typeof prepareCheckoutState === 'function') {
-                                        return prepareCheckoutState(wire);
-                                    }
-                                    return true;
+                                    return prepareCheckoutState();
                                 });
                             }).then(function () {
 		                            component = getActiveRenderer();
@@ -5494,7 +4277,7 @@ define([
 		                                        handlePaymentError(validationError, getBridgeMessageContainer());
 		                                        return Promise.reject(validationError);
 	                                    }
-                                        // Native Magento place-order action (REST) — no Magewire.
+                                        // Native Magento place-order action (REST).
                                         return new Promise(function (resolve, reject) {
                                             require([
                                                 'Magento_Checkout/js/action/place-order',
@@ -5602,298 +4385,85 @@ define([
                                     return Promise.reject(nativeActionNotReadyError);
                                 }
 
-                                // Native KO/REST place-order (no Magewire). Drive Magento
-                                // place-order action and resolve this promise from its result —
-                                // do NOT wait for syncResolve that only the Magewire path sets.
-                                if (!wire) {
-                                    return new Promise(function (resolve, reject) {
-                                        require([
-                                            'Magento_Checkout/js/action/place-order',
-                                            'Magento_Checkout/js/model/quote',
-                                            'Magento_Checkout/js/action/redirect-on-success'
-                                        ], function (placeOrderAction, quoteModel, redirectOnSuccess) {
-                                            var pm = paymentData || { method: methodCode };
+                                return new Promise(function (resolve, reject) {
+                                    require([
+                                        'Magento_Checkout/js/action/place-order',
+                                        'Magento_Checkout/js/model/quote',
+                                        'Magento_Checkout/js/action/redirect-on-success'
+                                    ], function (placeOrderAction, quoteModel, redirectOnSuccess) {
+                                        var pm = paymentData || { method: methodCode };
 
-                                            if (!ensureQuoteBillingAddressForPlaceOrder()) {
-                                                reject(new Error(
-                                                    translateFastcheckoutMessage(
-                                                        'Please check the billing address and try again.'
-                                                    )
-                                                ));
-                                                return;
-                                            }
-                                            allowPlaceOrderOnActivePayment();
+                                        if (!ensureQuoteBillingAddressForPlaceOrder()) {
+                                            reject(new Error(
+                                                translateFastcheckoutMessage(
+                                                    'Please check the billing address and try again.'
+                                                )
+                                            ));
+                                            return;
+                                        }
+                                        allowPlaceOrderOnActivePayment();
 
-                                            if (quoteModel && typeof quoteModel.paymentMethod === 'function') {
-                                                quoteModel.paymentMethod(pm);
-                                            }
+                                        if (quoteModel && typeof quoteModel.paymentMethod === 'function') {
+                                            quoteModel.paymentMethod(pm);
+                                        }
 
-                                            try {
-                                                placeOrderAction(pm)
-                                                    .done(function (orderResult) {
-                                                        window.fastcheckoutLastPlaceOrderResult = orderResult || {};
-                                                        runPlaceOrderAfterRequestListeners();
-                                                        try {
-                                                            if (redirectOnSuccess && typeof redirectOnSuccess.execute === 'function') {
-                                                                redirectOnSuccess.execute();
-                                                            } else if (window.checkoutConfig && window.checkoutConfig.defaultSuccessPageUrl) {
-                                                                window.location.replace(window.checkoutConfig.defaultSuccessPageUrl);
-                                                            }
-                                                        } catch (redirErr) {
-                                                            // order placed even if redirect helper fails
+                                        try {
+                                            placeOrderAction(pm)
+                                                .done(function (orderResult) {
+                                                    window.fastcheckoutLastPlaceOrderResult = orderResult || {};
+                                                    runPlaceOrderAfterRequestListeners();
+                                                    try {
+                                                        if (redirectOnSuccess && typeof redirectOnSuccess.execute === 'function') {
+                                                            redirectOnSuccess.execute();
+                                                        } else if (window.checkoutConfig && window.checkoutConfig.defaultSuccessPageUrl) {
+                                                            window.location.replace(window.checkoutConfig.defaultSuccessPageUrl);
                                                         }
-                                                        resolve(orderResult);
-                                                    })
-                                                    .fail(function (response) {
-                                                        var err = new Error(
-                                                            (response && response.responseJSON && response.responseJSON.message) ||
-                                                            translateFastcheckoutMessage('The order was not placed.')
-                                                        );
-                                                        runPlaceOrderAfterRequestListeners();
-                                                        handlePaymentError(err, component.messageContainer || getBridgeMessageContainer());
-                                                        reject(err);
-                                                    });
-                                            } catch (e) {
-                                                handlePaymentError(e, component.messageContainer || getBridgeMessageContainer());
-                                                reject(e);
-                                            }
-                                        }, function () {
-                                            reject(new Error(translateFastcheckoutMessage('Checkout session is not ready. Please refresh the page and try again.')));
-                                        });
+                                                    } catch (redirErr) {
+                                                        // order placed even if redirect helper fails
+                                                    }
+                                                    resolve(orderResult);
+                                                })
+                                                .fail(function (response) {
+                                                    var err = new Error(
+                                                        (response && response.responseJSON && response.responseJSON.message) ||
+                                                        translateFastcheckoutMessage('The order was not placed.')
+                                                    );
+                                                    runPlaceOrderAfterRequestListeners();
+                                                    handlePaymentError(err, component.messageContainer || getBridgeMessageContainer());
+                                                    reject(err);
+                                                });
+                                        } catch (e) {
+                                            handlePaymentError(e, component.messageContainer || getBridgeMessageContainer());
+                                            reject(e);
+                                        }
+                                    }, function () {
+                                        reject(new Error(translateFastcheckoutMessage('Checkout session is not ready. Please refresh the page and try again.')));
                                     });
-                                }
-
-                                return Promise.resolve(true).then(function () {
-		                            self.cleanupKoOrderState();
-		                            self.syncWire = wire;
-		                            self.koOrderActive = true;
-		                            self.koOrderDeferred = $.Deferred();
-
-		                            return new Promise(function (resolve, reject) {
-		                                self.syncResolve = resolve;
-		                                self.syncReject = reject;
-		                                self.koOrderTimeout = window.setTimeout(function () {
-	                                    if (!self.koOrderActive) {
-	                                        return;
-	                                    }
-	                                    self.cleanupKoOrderState();
-                                        var timeoutError = new Error(translateFastcheckoutMessage('The selected payment method did not start order placement. Please try again.'));
-                                        handlePaymentError(timeoutError, component.messageContainer || getBridgeMessageContainer());
-	                                    reject(timeoutError);
-                                }, 15000);
-
-	                                try {
-                                            if (nativeSubmitAction) {
-                                                result = nativeSubmitAction.run(component, new Event('submit'));
-                                            } else if (component.getCode && component.getCode() === 'braintree') {
-		                                        result = component.placeOrder();
-		                                    } else {
-		                                        result = component.placeOrder(paymentData, new Event('submit'));
-                                            }
-                                            watchRendererPlaceOrderResult(result, component, reject);
-
-			                                    if (isAsyncTokenizationInProgress(component, result)) {
-			                                        watchAsyncTokenizationError(component, reject);
-			                                    } else if (result === false) {
-			                                        self.cleanupKoOrderState();
-	                                            var resultError = new Error(translateFastcheckoutMessage('Please check the selected payment method and try again.'));
-                                            handlePaymentError(resultError, component.messageContainer || getBridgeMessageContainer());
-	                                        reject(resultError);
-	                                    }
-	                                } catch (e) {
-	                                    if (window.console && typeof window.console.error === 'function') {
-	                                        window.console.error('Kkkonrad Fastcheckout: component placeOrder thrown exception:', e);
-	                                    }
-	                                    self.cleanupKoOrderState();
-                                        handlePaymentError(e, component.messageContainer || getBridgeMessageContainer());
-		                                    reject(e);
-		                                }
-		                            });
-                                }).catch(function (error) {
-                                    if (!error || !error.fastcheckoutNativePaymentError) {
-                                        handlePaymentError(error, component.messageContainer || getBridgeMessageContainer());
-                                    }
-                                    throw error;
                                 });
 		                        }.bind(this));
 		                    },
 
 	                    onPlaceOrderAction: function (paymentData, messageContainer, originalAction) {
-	                        var methodCode = paymentData && paymentData.method ? paymentData.method : getSelectedMethodCode(),
-                                actionDeferred,
-                                billingError;
+	                        var billingError;
                             messageContainer = subscribePaymentMessageContainer(messageContainer) || getBridgeMessageContainer();
                             clearPaymentMessages();
 
-                            // Native pipeline: always run Magento place-order and surface result
-                            // to any deferred started by placeOrder() (syncResolve), even without Magewire.
-	                        if (this.koOrderActive) {
-                                actionDeferred = this.koOrderDeferred || $.Deferred();
-
-                                if (!ensureQuoteBillingAddressForPlaceOrder()) {
-                                    billingError = new Error(
-                                        translateFastcheckoutMessage(
-                                            'Please check the billing address and try again.'
-                                        )
-                                    );
-                                    handlePaymentError(billingError, messageContainer);
-                                    actionDeferred.reject(billingError);
-                                    if (this.syncReject) {
-                                        this.syncReject(billingError);
-                                    }
-                                    this.cleanupKoOrderState();
-
-                                    return actionDeferred.promise();
-                                }
-
-	                            try {
-	                                if (this.koOrderTimeout) {
-	                                    window.clearTimeout(this.koOrderTimeout);
-	                                    this.koOrderTimeout = null;
-	                                }
-
-                                    allowPlaceOrderOnActivePayment();
-
-                                    // Prefer Magento REST place-order; Magewire sync is optional.
-                                    Promise.resolve(
-                                        this.syncWire && typeof this.syncWirePaymentData === 'function'
-                                            ? this.syncWirePaymentData(
-                                                this.syncWire,
-                                                paymentData,
-                                                runPlaceOrderRequestModifiers(paymentData, true, true),
-                                                false
-                                            )
-                                            : true
+                            if (!ensureQuoteBillingAddressForPlaceOrder()) {
+                                billingError = new Error(
+                                    translateFastcheckoutMessage(
+                                        'Please check the billing address and try again.'
                                     )
-	                                    .then(function () {
-                                            if (this.syncWire) {
-                                                return selectPaymentMethodIfNeeded(this.syncWire, methodCode);
-                                            }
-                                            return true;
-	                                    }.bind(this))
-                                        .then(function () {
-                                            return originalAction(paymentData, messageContainer);
-                                        })
-	                                    .then(function (result) {
-                                            if (this.koOrderDeferred && typeof this.koOrderDeferred.resolve === 'function') {
-                                                this.koOrderDeferred.resolve(result);
-                                            }
-	                                        if (this.syncResolve) {
-	                                            this.syncResolve(result);
-	                                            this.syncResolve = null;
-	                                            this.syncReject = null;
-	                                        }
-                                            this.cleanupKoOrderState();
-	                                    }.bind(this))
-	                                    .catch(function (err) {
-                                            handlePaymentError(err, messageContainer);
-	                                        if (this.koOrderDeferred) {
-	                                            this.koOrderDeferred.reject(err);
-	                                        }
-	                                        if (this.syncReject) {
-	                                            this.syncReject(err);
-	                                        }
-	                                        this.cleanupKoOrderState();
-	                                    }.bind(this));
-	                            } catch (err) {
-                                    handlePaymentError(err, messageContainer);
-	                                if (this.koOrderDeferred) {
-	                                    this.koOrderDeferred.reject(err);
-	                                }
-	                                if (this.syncReject) {
-	                                    this.syncReject(err);
-	                                }
-	                                this.cleanupKoOrderState();
-	                            }
+                                );
+                                handlePaymentError(billingError, messageContainer);
 
-	                            return actionDeferred.promise();
-	                        }
+                                var deferred = $.Deferred();
+                                deferred.reject(billingError);
+                                return deferred.promise();
+                            }
 
-                                // Fallback if a gateway calls placeOrderAction outside the Tailwind submit button flow.
-                                var wire = this.syncWire || getMagewireComponent(),
-                                    fallbackDeferred;
-
-                                if (!ensureQuoteBillingAddressForPlaceOrder()) {
-                                    billingError = new Error(
-                                        translateFastcheckoutMessage(
-                                            'Please check the billing address and try again.'
-                                        )
-                                    );
-                                    handlePaymentError(billingError, messageContainer);
-                                    fallbackDeferred = $.Deferred();
-                                    fallbackDeferred.reject(billingError);
-
-                                    return fallbackDeferred.promise();
-                                }
-
-                                if (!wire || typeof wire.call !== 'function') {
-                                    allowPlaceOrderOnActivePayment();
-                                    return originalAction(paymentData, messageContainer);
-                                }
-
-                                this.cleanupKoOrderState();
-                                this.syncWire = wire;
-                                this.koOrderActive = true;
-                                this.koOrderDeferred = $.Deferred();
-                                fallbackDeferred = this.koOrderDeferred;
-                                this.koOrderTimeout = window.setTimeout(function () {
-                                    if (!this.koOrderActive) {
-                                        return;
-                                    }
-                                    var timeoutError = new Error(translateFastcheckoutMessage('The selected payment method did not complete order placement. Please try again.'));
-                                    handlePaymentError(timeoutError, messageContainer);
-                                    if (fallbackDeferred && typeof fallbackDeferred.reject === 'function') {
-                                        fallbackDeferred.reject(timeoutError);
-                                    }
-                                    this.cleanupKoOrderState();
-                                }.bind(this), 15000);
-
-                                this.syncWirePaymentData(
-                                    wire,
-                                    paymentData,
-                                    runPlaceOrderRequestModifiers(paymentData, true, true),
-                                    false
-                                )
-                                    .then(function () {
-                                        return selectPaymentMethodIfNeeded(wire, methodCode);
-                                    })
-                                    .then(function () {
-                                        return originalAction(paymentData, messageContainer);
-                                    })
-                                    .then(function (result) {
-                                        if (fallbackDeferred && typeof fallbackDeferred.resolve === 'function') {
-                                            fallbackDeferred.resolve(result);
-                                        }
-                                        this.cleanupKoOrderState();
-                                    }.bind(this))
-                                    .catch(function (err) {
-                                        handlePaymentError(err, messageContainer);
-                                        if (fallbackDeferred && typeof fallbackDeferred.reject === 'function') {
-                                            fallbackDeferred.reject(err);
-                                        }
-                                        this.cleanupKoOrderState();
-                                    }.bind(this));
-
-                                return fallbackDeferred.promise();
+                            allowPlaceOrderOnActivePayment();
+                            return originalAction(paymentData, messageContainer);
 		                    },
-
-	                    handleOrderPlaced: function (detail) {
-	                        var deferred = this.koOrderDeferred;
-
-	                        if (detail && detail.redirectUrl) {
-	                            this.cleanupKoOrderState();
-	                            window.location.replace(detail.redirectUrl);
-	                            return true;
-	                        }
-
-	                        if (deferred) {
-	                            this.cleanupKoOrderState();
-	                            deferred.resolve();
-	                            return true;
-	                        }
-
-	                        return false;
-	                    },
 
 	                    validate: function () {
 	                        var component = getActiveRenderer(),
@@ -6130,123 +4700,12 @@ define([
                 }, true);
 
                 /**
-                 * Snapshot of method codes only (not allowed/selected flags).
-                 * Same codes ⇒ card structure is stable and can be patched in place.
-                 */
-                function getPaymentOptionCodesSignature(rootEl) {
-                    return Array.from(rootEl.querySelectorAll('[data-fastcheckout-payment-option]')).map(function (el) {
-                        return el.getAttribute('data-fastcheckout-payment-option') || '';
-                    }).filter(Boolean).sort().join(',');
-                }
-
-                /**
-                 * Copy allowed/selected flags from Livewire's incoming HTML onto the live card
-                 * without morphing wire:ignore KO containers.
-                 *
-                 * Option show/hide is deferred to applyPaymentOptionVisibility() so the previously
-                 * open KO panel is not collapsed before setSelectedMethod opens the next one.
-                 */
-                function applyPaymentCardStateInPlace(fromEl, toEl) {
-                    var userPayment = paymentMethodSync.getUserSelectedPaymentMethod
-                            ? paymentMethodSync.getUserSelectedPaymentMethod()
-                            : '',
-                        userPaymentFresh = paymentMethodSync.isUserPaymentSelectionFresh &&
-                            paymentMethodSync.isUserPaymentSelectionFresh(),
-                        liveChecked = fromEl.querySelector(
-                            'input[name="payment_method"]:checked:not([disabled])'
-                        ),
-                        liveCheckedCode = liveChecked ? liveChecked.value : '',
-                        preferredCode = '';
-
-                    // Prefer shopper pick, then currently checked live radio, then server HTML.
-                    if (userPaymentFresh && userPayment) {
-                        preferredCode = userPayment;
-                    } else if (liveCheckedCode) {
-                        preferredCode = liveCheckedCode;
-                    }
-
-                    Array.from(toEl.querySelectorAll('[data-fastcheckout-payment-option]')).forEach(function (toOption) {
-                        var methodCode = toOption.getAttribute('data-fastcheckout-payment-option'),
-                            fromOption,
-                            toInput,
-                            fromInput,
-                            allowed,
-                            selected;
-
-                        if (!methodCode) {
-                            return;
-                        }
-
-                        fromOption = fromEl.querySelector(
-                            '[data-fastcheckout-payment-option="' + methodCode + '"]'
-                        );
-                        if (!fromOption) {
-                            return;
-                        }
-
-                        allowed = toOption.getAttribute('data-fastcheckout-payment-allowed') === '1';
-                        toInput = toOption.querySelector('input[name="payment_method"]');
-                        fromInput = fromOption.querySelector('input[name="payment_method"]');
-
-                        if (preferredCode) {
-                            selected = allowed && paymentMethodCodesEqual(methodCode, preferredCode);
-                        } else {
-                            selected = !!(toInput && toInput.checked && allowed);
-                        }
-
-                        // If preferred became disallowed, fall back to server-selected allowed method.
-                        if (preferredCode && paymentMethodCodesEqual(methodCode, preferredCode) && !allowed) {
-                            selected = false;
-                        }
-
-                        fromOption.setAttribute('data-fastcheckout-payment-allowed', allowed ? '1' : '0');
-
-                        if (fromInput) {
-                            fromInput.disabled = !allowed;
-                            fromInput.checked = selected;
-                        }
-                    });
-
-                    // If preferred was disallowed, apply server checked state for remaining options.
-                    if (
-                        preferredCode &&
-                        !fromEl.querySelector(
-                            'input[name="payment_method"]:checked:not([disabled])'
-                        )
-                    ) {
-                        Array.from(toEl.querySelectorAll('[data-fastcheckout-payment-option]')).forEach(function (toOption) {
-                            var methodCode = toOption.getAttribute('data-fastcheckout-payment-option'),
-                                fromOption,
-                                toInput,
-                                fromInput,
-                                allowed;
-
-                            if (!methodCode) {
-                                return;
-                            }
-                            fromOption = fromEl.querySelector(
-                                '[data-fastcheckout-payment-option="' + methodCode + '"]'
-                            );
-                            toInput = toOption.querySelector('input[name="payment_method"]');
-                            fromInput = fromOption
-                                ? fromOption.querySelector('input[name="payment_method"]')
-                                : null;
-                            allowed = toOption.getAttribute('data-fastcheckout-payment-allowed') === '1';
-                            if (fromInput && allowed && toInput && toInput.checked) {
-                                fromInput.checked = true;
-                            }
-                        });
-                    }
-                }
-
-                /**
                  * Apply option row visibility from data-fastcheckout-payment-allowed after the
                  * active KO panel has been switched (avoids empty gap during shipping remap).
                  */
                 function applyPaymentOptionVisibility(rootEl) {
                     var root = rootEl ||
                             document.querySelector('[data-fastcheckout-payment-methods-card]') ||
-                            document.querySelector('[wire\\:key="checkout-payment-methods-card"]') ||
                             document.querySelector('.fc-container-3 .card'),
                         hasAvailable = false,
                         emptyMessage,
@@ -6258,7 +4717,6 @@ define([
 
                     emptyMessage = root.querySelector('[data-fastcheckout-no-payment-methods]');
                     grid = root.querySelector('[data-fastcheckout-payment-methods-grid]') ||
-                        root.querySelector('[wire\\:key="checkout-payment-methods-grid"]') ||
                         root.querySelector('.grid');
 
                     Array.from(root.querySelectorAll('[data-fastcheckout-payment-option]')).forEach(function (option) {
@@ -6308,230 +4766,6 @@ define([
                 // Expose for shipping→payment remap after method pick.
                 window.fastcheckoutHyvaPayment = window.fastcheckoutHyvaPayment || {};
                 window.fastcheckoutHyvaPayment.applyPaymentOptionVisibility = applyPaymentOptionVisibility;
-
-                /**
-                 * Park non-active KO renderers in the off-DOM root before a structural morph.
-                 * Keep the selected method's panel mounted to avoid content flicker.
-                 */
-                function moveRenderersBackToRoot(keepMethodCode) {
-                    var root = document.getElementById('fastcheckout-ko-payment-root');
-
-                    hidePaymentPlaceholders(keepMethodCode);
-                    if (!root) {
-                        return;
-                    }
-
-                    document.querySelectorAll('.payment-method').forEach(function (element) {
-                        var host = element.closest('[data-fastcheckout-payment-method-ko-target]'),
-                            hostMethod = host ? host.getAttribute('data-fastcheckout-payment-method-ko-target') : '';
-
-                        if (
-                            keepMethodCode &&
-                            hostMethod &&
-                            paymentMethodCodesEqual(hostMethod, keepMethodCode)
-                        ) {
-                            return;
-                        }
-
-                        if (element.parentNode !== root) {
-                            root.appendChild(element);
-                        }
-                    });
-                }
-
-                if (window.Livewire && typeof window.Livewire.hook === 'function') {
-                    window.Livewire.hook('element.updating', function (fromEl, toEl) {
-                        if (fromEl.getAttribute('wire:key') !== 'checkout-payment-methods-card') {
-                            return;
-                        }
-
-                        var fromMethodCodes = getPaymentOptionCodesSignature(fromEl),
-                            toMethodCodes = getPaymentOptionCodesSignature(toEl),
-                            keepCode = '',
-                            toChecked,
-                            fromChecked;
-
-                        // Same payment options in the form — only allowed/selected flags changed.
-                        // Patch attributes in place and skip morph so KO content stays open.
-                        if (fromMethodCodes && fromMethodCodes === toMethodCodes) {
-                            applyPaymentCardStateInPlace(fromEl, toEl);
-                            return false;
-                        }
-
-                        toChecked = toEl.querySelector(
-                            'input[name="payment_method"]:checked:not([disabled])'
-                        );
-                        if (toChecked && toChecked.value) {
-                            keepCode = toChecked.value;
-                        } else {
-                            fromChecked = fromEl.querySelector(
-                                'input[name="payment_method"]:checked:not([disabled])'
-                            );
-                            if (
-                                fromChecked &&
-                                fromChecked.value &&
-                                toEl.querySelector(
-                                    '[data-fastcheckout-payment-option="' + fromChecked.value + '"]' +
-                                    '[data-fastcheckout-payment-allowed="1"]'
-                                )
-                            ) {
-                                keepCode = fromChecked.value;
-                            }
-                        }
-
-                        moveRenderersBackToRoot(keepCode);
-                    });
-
-                    window.Livewire.hook('message.processed', function () {
-                        var magewireEl = document.querySelector('[wire\\:id]'),
-                            wire = magewireEl && magewireEl.__livewire ? magewireEl.__livewire : null,
-                            wirePayment = wire ? String(getProperty(wire, 'paymentMethod') || '') : '',
-                            code = getSelectedMethodCode(),
-                            quotePayment = paymentMethodSync.getQuoteCode(),
-                            userPayment = paymentMethodSync.getUserSelectedPaymentMethod
-                                ? paymentMethodSync.getUserSelectedPaymentMethod()
-                                : '',
-                            userPaymentFresh = paymentMethodSync.isUserPaymentSelectionFresh &&
-                                paymentMethodSync.isUserPaymentSelectionFresh(),
-                            preferUserPayment = !!(
-                                userPaymentFresh &&
-                                userPayment &&
-                                domHasPaymentMethod(userPayment)
-                            );
-
-                        // Align KO quote with Magewire BEFORE syncPaymentMethods().
-                        // Otherwise a stale quote method that is no longer allowed triggers
-                        // hidePaymentPlaceholders() and causes open → close → open flicker.
-                        // Prefer a fresh shopper payment pick over lagging wire state (reversion fix).
-                        if (preferUserPayment) {
-                            code = userPayment;
-                            document.querySelectorAll('input[name="payment_method"]').forEach(function (input) {
-                                if (input.disabled) {
-                                    input.checked = false;
-                                    return;
-                                }
-                                input.checked = paymentMethodCodesEqual(input.value, userPayment);
-                            });
-                            setQuotePaymentMethodFromBridge({ method: userPayment });
-                            if (wirePayment && paymentMethodCodesEqual(wirePayment, userPayment)) {
-                                paymentMethodSync.markSynced(userPayment);
-                            } else if (
-                                paymentMethodSync.syncToMagewire &&
-                                !paymentMethodSync.isSynced(userPayment)
-                            ) {
-                                // Push user choice if server still has the previous method.
-                                paymentMethodSync.syncToMagewire({ method: userPayment });
-                            }
-                        } else if (
-                            wirePayment &&
-                            domHasPaymentMethod(wirePayment) &&
-                            (
-                                !paymentMethodSync.shouldAcceptPaymentSelection ||
-                                paymentMethodSync.shouldAcceptPaymentSelection(wirePayment)
-                            )
-                        ) {
-                            code = wirePayment;
-                            document.querySelectorAll('input[name="payment_method"]').forEach(function (input) {
-                                if (input.disabled) {
-                                    input.checked = false;
-                                    return;
-                                }
-                                input.checked = paymentMethodCodesEqual(input.value, wirePayment);
-                            });
-                            paymentMethodSync.markSynced(wirePayment);
-                            setQuotePaymentMethodFromBridge({ method: wirePayment });
-                        } else if (!wirePayment) {
-                            // Transient empty wire payment during morph — keep existing sync if quote still holds a method.
-                            if (!quotePayment) {
-                                paymentMethodSync.markSynced('');
-                            } else if (domHasPaymentMethod(quotePayment)) {
-                                code = quotePayment;
-                            }
-                        }
-
-                        // User payment no longer available after shipping→payment remap — drop lock.
-                        if (
-                            userPayment &&
-                            !domHasPaymentMethod(userPayment) &&
-                            paymentMethodSync.clearUserPaymentSelection
-                        ) {
-                            paymentMethodSync.clearUserPaymentSelection();
-                            if (wirePayment && domHasPaymentMethod(wirePayment)) {
-                                code = wirePayment;
-                            }
-                        }
-
-                        syncPaymentMethods();
-                        syncQuoteTotalsFromDom();
-
-                        runPatchRenderers();
-                        // Reveal the selected option row before opening KO content. After a
-                        // shipping→payment remap the new method may still be display:none from
-                        // the previous filter, so content opened inside it would stay invisible.
-                        if (code) {
-                            document.querySelectorAll('[data-fastcheckout-payment-option]').forEach(function (option) {
-                                var optionCode = option.getAttribute('data-fastcheckout-payment-option'),
-                                    allowed = option.getAttribute('data-fastcheckout-payment-allowed') === '1';
-
-                                if (allowed && paymentMethodCodesEqual(optionCode, code)) {
-                                    option.style.display = '';
-                                    option.removeAttribute('aria-hidden');
-                                }
-                            });
-                        }
-                        // Open/switch KO panel, then collapse remaining disallowed rows.
-                        setSelectedMethod(code);
-                        applyPaymentOptionVisibility();
-
-                        if (wire) {
-                            var currentMethod = wire.shippingMethod || getProperty(wire, 'shippingMethod'),
-                                userMethod = shippingMethodSync &&
-                                    typeof shippingMethodSync.getUserSelectedShippingMethod === 'function'
-                                    ? shippingMethodSync.getUserSelectedShippingMethod()
-                                    : '',
-                                userFresh = shippingMethodSync &&
-                                    typeof shippingMethodSync.isUserShippingSelectionFresh === 'function' &&
-                                    shippingMethodSync.isUserShippingSelectionFresh(),
-                                selectingShipping = !!(
-                                    window.fastcheckoutSelectingShippingMethod ||
-                                    window.fastcheckoutLockShippingRatesList
-                                );
-
-                            // Never re-push shipping address into KO during method selection —
-                            // that re-fires rate processors and reloads the shipping list.
-                            // Address sync stays for real address/payment updates.
-                            if (
-                                !selectingShipping &&
-                                !(
-                                    config.shippingAddress &&
-                                    config.shippingAddress.component === 'Magento_Checkout/js/view/shipping'
-                                )
-                            ) {
-                                syncAddressToKnockout(wire);
-                            }
-
-                            // Keep KO on the locked user method. If a lagging Livewire response
-                            // left wire on the previous rate, re-assert the lock once (coalesced).
-                            if (userFresh && userMethod) {
-                                syncSelectedShippingMethodToKnockout(userMethod);
-                                if (
-                                    !selectingShipping &&
-                                    currentMethod !== userMethod &&
-                                    shippingMethodSync &&
-                                    typeof shippingMethodSync.reassertLockedMethodToMagewireIfNeeded === 'function'
-                                ) {
-                                    shippingMethodSync.reassertLockedMethodToMagewireIfNeeded();
-                                }
-                            } else if (currentMethod && !selectingShipping) {
-                                syncSelectedShippingMethodToKnockout(currentMethod);
-                            }
-                        }
-                        syncCheckoutProviderAddressAttributes();
-                        if (checkoutTotals && checkoutTotals.isLoading && typeof checkoutTotals.isLoading === 'function') {
-                            checkoutTotals.isLoading(false);
-                        }
-                    });
-                }
 
                 // Load discovered layout scripts dynamically via RequireJS
                 var layoutScripts = config.layoutScripts || [];

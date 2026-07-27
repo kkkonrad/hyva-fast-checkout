@@ -1,6 +1,6 @@
 <?php
 /**
- * Fastcheckout shell — place order + coupon via RequireJS/KO (no Alpine/Magewire quote owner).
+ * Fastcheckout shell — place order and coupon via RequireJS/KO.
  *
  * @var \Kkkonrad\Fastcheckout\Block\Hyva\Checkout $block
  * @var \Magento\Framework\Escaper $escaper
@@ -113,7 +113,7 @@ $hyvaCsp = $block->getHyvaCsp();
 
         setProcessing(true);
 
-        // Prefer payment bridge placeOrder (KO renderer path). No Magewire.
+        // Prefer the payment bridge placeOrder (KO renderer path).
         if (paymentBridge && typeof paymentBridge.placeOrder === 'function') {
             return Promise.resolve(paymentBridge.placeOrder(null, selectedMethod))
                 .then(function (result) {

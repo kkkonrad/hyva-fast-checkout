@@ -6,7 +6,7 @@ define([
     'use strict';
 
     /**
-     * Native Magento totals pipeline — do not replace with Magewire refresh.
+     * Native Magento totals pipeline.
      * Coalesce concurrent / back-to-back get-totals calls (SalesRule fires one
      * after every set-payment-information; payment re-select storms multiplied them).
      */

@@ -31,8 +31,7 @@ define([], function () {
                     '[data-role="email-with-possible-login"] input[name="email"]',
                     'input[name="username"]',
                     'input[name="email"]',
-                    'input[type="email"]',
-                    '[data-wire-field="email"]'
+                    'input[type="email"]'
                 ],
                 emailEl,
                 emailVal = '',
@@ -96,8 +95,7 @@ define([], function () {
                     target.name === 'email' ||
                     target.name === 'username' ||
                     target.type === 'email' ||
-                    target.id === 'customer-email' ||
-                    target.getAttribute('data-wire-field') === 'email'
+                    target.id === 'customer-email'
                 );
             }
 
@@ -116,6 +114,7 @@ define([], function () {
 
         return {
             setGuestEmail: setGuestEmail,
+            getEmail: getEmailFromDomOrConfig,
             sync: sync,
             registerInputListener: registerInputListener
         };

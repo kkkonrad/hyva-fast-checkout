@@ -9,7 +9,7 @@ use Magento\Quote\Api\Data\CartExtensionFactory;
 
 /**
  * Class PreserveInpostLocker
- * Prevents Magewire or other checkout processes from clearing the selected InPost Locker ID
+ * Prevents checkout processes from clearing the selected InPost Locker ID
  * if it was saved via AJAX but is missing from the quote object in the current request session.
  *
  * DB lookup is intentionally narrow: only for non-virtual quotes with an InPost-like shipping
@@ -120,7 +120,7 @@ class PreserveInpostLocker
     }
 
     /**
-     * Align with Magewire\Checkout::isInpostPickupShippingMethod heuristics.
+     * Detect the InPost pickup shipping methods supported by the checkout.
      */
     private function isInpostPickupShippingMethod(string $shippingMethod): bool
     {

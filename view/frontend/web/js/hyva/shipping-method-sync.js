@@ -8,7 +8,7 @@ define([
 
     /**
      * Shipping method ownership: Magento KO quote + native set-shipping-information.
-     * No Magewire selectShippingMethod — payment remap is client-side only.
+     * Payment remapping is client-side only.
      */
     return function (deps) {
         deps = deps || {};
@@ -308,7 +308,7 @@ define([
                 });
             }
 
-            // Always refresh grid / empty message visibility (data-* selectors, not wire:key).
+            // Always refresh grid and empty-message visibility.
             if (window.fastcheckoutHyvaPayment && typeof window.fastcheckoutHyvaPayment.applyPaymentOptionVisibility === 'function') {
                 window.fastcheckoutHyvaPayment.applyPaymentOptionVisibility();
             } else {
@@ -339,7 +339,7 @@ define([
 
         /**
          * Persist selected rate on the quote via Magento set-shipping-information.
-         * Single request path — no Magewire morph / dual refresh.
+         * Keep a single native request path.
          */
         function pushNativeShippingSelection(methodCode) {
             var found,
@@ -434,12 +434,7 @@ define([
             });
         }
 
-        function reassertLockedMethodToMagewireIfNeeded() {
-            // No Magewire to reassert against.
-            return Promise.resolve(false);
-        }
-
-        function syncToMagewireNow(methodCode) {
+        function persistSelectionNow(methodCode) {
             persistShippingMethod(methodCode);
             if (syncTimer) {
                 window.clearTimeout(syncTimer);
@@ -451,7 +446,7 @@ define([
             return pushNativeShippingSelection(methodCode);
         }
 
-        function syncToMagewire(methodCode) {
+        function persistSelection(methodCode) {
             if (window.fastcheckoutSuppressShippingSync) {
                 return;
             }
@@ -520,14 +515,13 @@ define([
             getCode: getCode,
             splitCode: splitCode,
             syncSelectedToKnockout: syncSelectedToKnockout,
-            syncToMagewireNow: syncToMagewireNow,
-            syncToMagewire: syncToMagewire,
+            persistSelectionNow: persistSelectionNow,
+            persistSelection: persistSelection,
             rememberUserShippingSelection: rememberUserShippingSelection,
             getUserSelectedShippingMethod: getUserSelectedShippingMethod,
             isUserShippingSelectionFresh: isUserShippingSelectionFresh,
             shouldIgnoreKnockoutApply: shouldIgnoreKnockoutApply,
             clearUserShippingSelection: clearUserShippingSelection,
-            reassertLockedMethodToMagewireIfNeeded: reassertLockedMethodToMagewireIfNeeded,
             getShippingLockGeneration: getShippingLockGeneration,
             installQuoteGuard: installQuoteGuard,
             applyPaymentRemapForShipping: applyPaymentRemapForShipping,

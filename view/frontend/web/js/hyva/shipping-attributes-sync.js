@@ -14,10 +14,7 @@ define([
             getCheckoutProvider = typeof deps.getCheckoutProvider === 'function' ? deps.getCheckoutProvider : function () { return null; },
             normalizeAddressAttributeMap = typeof deps.normalizeAddressAttributeMap === 'function' ? deps.normalizeAddressAttributeMap : function (attributes) { return attributes || {}; },
             getAddressAttributes = typeof deps.getAddressAttributes === 'function' ? deps.getAddressAttributes : function () { return {}; },
-            updateQuoteAddressAttributes = typeof deps.updateQuoteAddressAttributes === 'function' ? deps.updateQuoteAddressAttributes : function () {},
-            getMagewireComponent = typeof deps.getMagewireComponent === 'function' ? deps.getMagewireComponent : function () { return null; },
-            getProperty = typeof deps.getProperty === 'function' ? deps.getProperty : function () { return ''; },
-            setMagewireValue = typeof deps.setMagewireValue === 'function' ? deps.setMagewireValue : function () { return null; };
+            updateQuoteAddressAttributes = typeof deps.updateQuoteAddressAttributes === 'function' ? deps.updateQuoteAddressAttributes : function () {};
 
         function getProviderAttributes(provider, camelKey, snakeKey) {
             var value;
@@ -181,7 +178,7 @@ define([
             customAttributes.pickup_location_code = pickupLocationCode;
         }
 
-        function sync(wire, deferUpdates) {
+        function sync() {
             var collected = collectStructuredFields(getShippingFormRoots(), { mode: 'shipping' }),
                 customAttributes = collected.customAttributes || {},
                 extensionAttributes = collected.extensionAttributes || {},
@@ -194,8 +191,7 @@ define([
                     provider,
                     'extensionAttributes',
                     'extension_attributes'
-                ),
-                operations = [];
+                );
 
             applyInPostLockerSelection(customAttributes, extensionAttributes);
             applyStorePickupSelection(customAttributes, extensionAttributes);
@@ -231,56 +227,7 @@ define([
                 return Promise.resolve(false);
             }
 
-            wire = wire || getMagewireComponent();
-            if (!wire || (typeof wire.call !== 'function' && typeof wire.set !== 'function')) {
-                return Promise.resolve(false);
-            }
-
-            customAttributes = $.extend(
-                true,
-                {},
-                getProperty(wire, 'shippingCustomAttributes') || {},
-                customAttributes
-            );
-            extensionAttributes = $.extend(
-                true,
-                {},
-                getProperty(wire, 'shippingExtensionAttributes') || {},
-                extensionAttributes
-            );
-
-            if (typeof wire.call === 'function') {
-                if (
-                    serializeAttributeData(getProperty(wire, 'shippingCustomAttributes')) === serializeAttributeData(customAttributes) &&
-                    serializeAttributeData(getProperty(wire, 'shippingExtensionAttributes')) === serializeAttributeData(extensionAttributes)
-                ) {
-                    return Promise.resolve(false);
-                }
-                return Promise.resolve(/* native */ Promise.resolve(true) || wire.call('syncAddressFields', {
-                    shippingCustomAttributes: customAttributes,
-                    shippingExtensionAttributes: extensionAttributes
-                })).then(function () {
-                    return true;
-                });
-            }
-
-            [
-                ['shippingCustomAttributes', customAttributes],
-                ['shippingExtensionAttributes', extensionAttributes]
-            ].forEach(function (attributeData) {
-                var operation;
-
-                if (!Object.keys(attributeData[1] || {}).length) {
-                    return;
-                }
-
-                operation = setMagewireValue(wire, attributeData[0], attributeData[1], deferUpdates === true);
-                if (operation && typeof operation.then === 'function') {
-                    operations.push(operation);
-                }
-            });
-
-            return operations.length ? Promise.all(operations).then(function () { return true; }) : Promise.resolve(false);
+            return Promise.resolve(true);
         }
 
         return {

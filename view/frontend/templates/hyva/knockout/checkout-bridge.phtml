@@ -1,6 +1,6 @@
 <?php
 /**
- * Knockout checkout bridge island for the Hyva/Magewire checkout.
+ * Knockout checkout bridge island for the Hyvä checkout.
  *
  * @var \Kkkonrad\Fastcheckout\Block\Hyva\Checkout $block
  * @var \Magento\Framework\Escaper $escaper
@@ -98,6 +98,18 @@ foreach ($layoutAssets['css'] as $cssAsset) {
     // Hyva or a payment module may define an empty checkoutConfig first. Keep
     // those additions, but always start with Magento's complete server config.
     var actualConfig = Object.assign({}, serverConfig, existingConfig);
+    if (!actualConfig.totalsData || typeof actualConfig.totalsData !== 'object') {
+        actualConfig.totalsData = {
+            items: actualConfig.quoteItemData || [],
+            total_segments: [],
+            subtotal: 0,
+            subtotal_with_discount: 0,
+            grand_total: 0
+        };
+    }
+    if (!Array.isArray(actualConfig.totalsData.items)) {
+        actualConfig.totalsData.items = actualConfig.quoteItemData || [];
+    }
     
     var initPaymentProxy = function(paymentObj) {
         paymentObj = paymentObj || {};
@@ -260,7 +272,7 @@ foreach ($layoutAssets['css'] as $cssAsset) {
         });
     }
 
-    // Native KO pipeline — do not wait for Magewire/Livewire.
+    // Native KO/REST pipeline.
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', loadRequireJs, { once: true });
     } else {

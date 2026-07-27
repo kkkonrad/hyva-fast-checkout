@@ -59,7 +59,6 @@ class ExtendedCheckoutConfigProvider implements ConfigProviderInterface
         $settings['isShowGiftMessage'] = $this->helper->isShowGiftMessage();
         $settings['isShowSubscribe'] = $this->helper->isShowSubscribe();
         $settings['isSubscribeByDefault'] = $this->helper->isSubscribeByDefault();
-        $settings['isShowLoginButton'] = $this->helper->isShowLoginButton();
         $settings['forgotPasswordUrl'] = $this->urlBuilder->getUrl('onepage/index/forgotpasswordpost');
         $settings['logoutUrl'] = $this->urlBuilder->getUrl('customer/account/logout');
         $settings['displayAllMethods'] = $this->helper->getDisplayAllMethods();

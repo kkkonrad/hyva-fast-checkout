@@ -6,11 +6,7 @@ define([
     return function (options) {
         var quote = options.quote,
             getCheckoutProvider = options.getCheckoutProvider,
-            syncTimer = null,
-            syncInFlight = false,
-            syncPending = false,
-            wireRetryCount = 0,
-            magewireSyncValues = {};
+            syncTimer = null;
 
         function getRootPath(path) {
             if (typeof path !== 'string' || !path.length) {
@@ -286,129 +282,8 @@ define([
             provider.set(path, value);
         }
 
-        function getWireProperty(wire, name) {
-            if (!wire) {
-                return '';
-            }
-            if (typeof wire.get === 'function') {
-                return wire.get(name);
-            }
-            if (typeof wire[name] !== 'undefined') {
-                return wire[name];
-            }
-            if (wire.data && typeof wire.data[name] !== 'undefined') {
-                return wire.data[name];
-            }
-
-            return '';
-        }
-
-        function getMagewireComponent() {
-            var magewireEl = document.querySelector('[wire\\:id]'),
-                livewire = window.Livewire || window.Magewire;
-
-            if (magewireEl && magewireEl.__livewire) {
-                return magewireEl.__livewire;
-            }
-
-            if (
-                magewireEl &&
-                livewire &&
-                typeof livewire.find === 'function' &&
-                magewireEl.getAttribute('wire:id')
-            ) {
-                return livewire.find(magewireEl.getAttribute('wire:id'));
-            }
-
-            return null;
-        }
-
-        function hasAttributeData(value) {
-            return value && typeof value === 'object' && Object.keys(value).length > 0;
-        }
-
         function isGuestAddressSnapshotRestorePending() {
             return window.fastcheckoutGuestAddressSnapshotRestorePending === true;
-        }
-
-        function isEmptyAttributeData(value) {
-            return !value || (typeof value === 'object' && Object.keys(value).length === 0);
-        }
-
-        function normalizeComparableAttributeData(value) {
-            var result;
-
-            if (value === null || typeof value === 'undefined' || value === '') {
-                return undefined;
-            }
-            if (Array.isArray(value)) {
-                result = value.map(normalizeComparableAttributeData).filter(function (item) {
-                    return typeof item !== 'undefined';
-                });
-                return result.length ? result : undefined;
-            }
-            if (typeof value === 'object') {
-                result = {};
-                Object.keys(value).sort().forEach(function (key) {
-                    var normalized = normalizeComparableAttributeData(value[key]);
-
-                    if (typeof normalized !== 'undefined') {
-                        result[key] = normalized;
-                    }
-                });
-                return Object.keys(result).length ? result : undefined;
-            }
-
-            return value;
-        }
-
-        function attributeDataEquals(first, second) {
-            return JSON.stringify(normalizeComparableAttributeData(first) || {}) ===
-                JSON.stringify(normalizeComparableAttributeData(second) || {});
-        }
-
-        function setMagewireValue(wire, field, value) {
-            var currentValue,
-                cachedValue;
-
-            if (!wire || typeof wire.set !== 'function' || typeof value === 'undefined' || value === null) {
-                return;
-            }
-
-            cachedValue = magewireSyncValues[field];
-            if (typeof cachedValue !== 'undefined' && JSON.stringify(cachedValue || {}) === JSON.stringify(value || {})) {
-                return;
-            }
-
-            currentValue = getWireProperty(wire, field);
-            if (isEmptyAttributeData(currentValue) && isEmptyAttributeData(value)) {
-                magewireSyncValues[field] = {};
-                return;
-            }
-
-            if (
-                (typeof currentValue === 'object' || typeof value === 'object') &&
-                JSON.stringify(currentValue || {}) === JSON.stringify(value || {})
-            ) {
-                magewireSyncValues[field] = $.extend(true, {}, value);
-                return;
-            }
-            if (
-                typeof currentValue !== 'object' &&
-                typeof value !== 'object' &&
-                String(currentValue || '') === String(value || '')
-            ) {
-                magewireSyncValues[field] = value;
-                return;
-            }
-
-            magewireSyncValues[field] = typeof value === 'object'
-                ? $.extend(true, {}, value)
-                : value;
-            // Defer: batch attribute bags into the next Magewire round-trip instead of
-            // opening an immediate XHR. Place-order / shipping-attributes-sync still
-            // read final attrs from quote/provider and push with an explicit flush when needed.
-            wire.set(field, value, true);
         }
 
         function updateQuoteAddressAttributes(address, customAttributes, extensionAttributes) {
@@ -424,7 +299,6 @@ define([
 
         function sync() {
             var provider = getCheckoutProvider(),
-                wire = getMagewireComponent(),
                 billingAddressScopes,
                 shippingCustomAttributes,
                 shippingExtensionAttributes,
@@ -568,66 +442,6 @@ define([
                 );
             });
 
-            if (!wire) {
-                if (
-                    wireRetryCount < 6 &&
-                    (
-                        hasAttributeData(shippingCustomAttributes) ||
-                        hasAttributeData(shippingExtensionAttributes) ||
-                        hasAttributeData(billingCustomAttributes) ||
-                        hasAttributeData(billingExtensionAttributes)
-                    )
-                ) {
-                    wireRetryCount += 1;
-                    window.setTimeout(sync, 150 * wireRetryCount);
-                }
-
-                return;
-            }
-
-            wireRetryCount = 0;
-            if (typeof wire.call === 'function') {
-                if (
-                    attributeDataEquals(getWireProperty(wire, 'shippingCustomAttributes'), shippingCustomAttributes) &&
-                    attributeDataEquals(getWireProperty(wire, 'shippingExtensionAttributes'), shippingExtensionAttributes) &&
-                    attributeDataEquals(getWireProperty(wire, 'billingCustomAttributes'), billingCustomAttributes) &&
-                    attributeDataEquals(getWireProperty(wire, 'billingExtensionAttributes'), billingExtensionAttributes)
-                ) {
-                    return;
-                }
-
-                if (syncInFlight) {
-                    syncPending = true;
-                    return;
-                }
-
-                syncInFlight = true;
-                syncPending = false;
-                magewireSyncValues.shippingCustomAttributes = $.extend(true, {}, shippingCustomAttributes);
-                magewireSyncValues.shippingExtensionAttributes = $.extend(true, {}, shippingExtensionAttributes);
-                magewireSyncValues.billingCustomAttributes = $.extend(true, {}, billingCustomAttributes);
-                magewireSyncValues.billingExtensionAttributes = $.extend(true, {}, billingExtensionAttributes);
-                Promise.resolve(/* native */ Promise.resolve(true) || wire.call('syncAddressFields', {
-                    shippingCustomAttributes: shippingCustomAttributes,
-                    shippingExtensionAttributes: shippingExtensionAttributes,
-                    billingCustomAttributes: billingCustomAttributes,
-                    billingExtensionAttributes: billingExtensionAttributes
-                })).catch(function () {
-                    // A later provider event can retry; never create a rejection loop here.
-                }).then(function () {
-                    syncInFlight = false;
-                    if (syncPending) {
-                        syncPending = false;
-                        schedule('shippingAddress.custom_attributes');
-                    }
-                });
-                return;
-            }
-
-            setMagewireValue(wire, 'shippingCustomAttributes', shippingCustomAttributes);
-            setMagewireValue(wire, 'shippingExtensionAttributes', shippingExtensionAttributes);
-            setMagewireValue(wire, 'billingCustomAttributes', billingCustomAttributes);
-            setMagewireValue(wire, 'billingExtensionAttributes', billingExtensionAttributes);
         }
 
         function schedule(path) {
@@ -635,8 +449,7 @@ define([
                 return;
             }
 
-            // Single debounce — equality cache in setMagewireValue already skips no-ops.
-            // Avoid multi-timeout fan-out (was 50 + 200 + 600 → up to 3 XHRs per attr write).
+            // A single debounce coalesces provider writes into one quote update.
             if (syncTimer) {
                 window.clearTimeout(syncTimer);
             }

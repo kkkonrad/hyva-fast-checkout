@@ -120,7 +120,11 @@ async function placeGuestOrder(page, billingMode) {
       const shipAddr = conv.formAddressDataToQuoteAddress(shippingData);
       const billAddr = conv.formAddressDataToQuoteAddress(billingData);
       selectShip(shipAddr);
-      selectBill(billAddr);
+      // Start exactly like the UI: billing follows shipping until the shopper
+      // explicitly unchecks "same as shipping". Selecting a distinct billing
+      // address before that click makes Magento uncheck the observable itself,
+      // so no user-intent handler runs and the test no longer mirrors checkout.
+      selectBill(quote.shippingAddress());
       // guestEmail is a plain string property on Magento quote model
       quote.guestEmail = email;
       step('address-set');
@@ -167,16 +171,6 @@ async function placeGuestOrder(page, billingMode) {
 
       await new Promise((r) => setTimeout(r, 1000));
 
-      // Reflect separate billing UI state
-      if (billingMode === 'separate') {
-        document.querySelectorAll('input[name="billing-address-same-as-shipping"]').forEach((c) => {
-          if (c.checked) c.click();
-        });
-        selectBill(billAddr);
-      } else {
-        selectBill(quote.shippingAddress());
-      }
-
       let payCode = null;
       const allowed = document.querySelector(
         '[data-fastcheckout-payment-option][data-fastcheckout-payment-allowed="1"] input'
@@ -190,8 +184,16 @@ async function placeGuestOrder(page, billingMode) {
         selectPay({ method: payCode });
       }
       if (quote.paymentMethod) quote.paymentMethod({ method: payCode });
-      // Re-assert billing after payment select (some renderers reset same-as-shipping)
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // The billing component belongs to the active payment renderer. Mirror the
+      // real interaction order: select payment, then toggle its billing checkbox.
       if (billingMode === 'separate') {
+        const activeCheckbox = document.querySelector(
+          '.payment-method._active input[name="billing-address-same-as-shipping"], ' +
+          'input[name="billing-address-same-as-shipping"]:checked'
+        );
+        if (activeCheckbox?.checked) activeCheckbox.click();
         selectBill(billAddr);
       } else {
         selectBill(quote.shippingAddress());

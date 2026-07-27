@@ -60,13 +60,6 @@ define([
                                 if (activeComponent) {
                                     activeComponent.isProcessing = false;
                                 }
-                                // 4. Reset the Fastcheckout loader/processing state
-                                if (window.fastcheckoutHyvaPayment && window.fastcheckoutHyvaPayment.syncReject) {
-                                    var rejectFn = window.fastcheckoutHyvaPayment.syncReject;
-                                    window.fastcheckoutHyvaPayment.syncResolve = null;
-                                    window.fastcheckoutHyvaPayment.syncReject = null;
-                                    rejectFn(new Error(errMsg));
-                                }
                             }
                             return callback(err, payload);
                         });
