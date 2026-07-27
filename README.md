@@ -6,6 +6,10 @@ native quote and REST actions as the single source of truth.
 
 The module does not require Magewire and does not maintain a second checkout state.
 
+## Preview
+
+![Kkkonrad Fastcheckout checkout](docs/images/checkout.png)
+
 ## Features
 
 - responsive Hyvä checkout layout;
