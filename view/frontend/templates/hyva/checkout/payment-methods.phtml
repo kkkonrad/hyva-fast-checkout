@@ -10,6 +10,13 @@
 $paymentMethodAvailability = [];
 $hasAvailablePaymentMethods = false;
 $normalizedPaymentMethods = [];
+$shippingPaymentMapping = $checkoutConfig['fastcheckoutSettings']['shippingPaymentMapping'] ?? [];
+$shippingAddress = $block->getQuote()->getShippingAddress();
+$isWaitingForShippingMethod = !empty($shippingPaymentMapping)
+    && (!$shippingAddress || (string)$shippingAddress->getShippingMethod() === '');
+$emptyPaymentMethodsMessage = $isWaitingForShippingMethod
+    ? __('To see available payment methods, select a shipping method.')
+    : __('No payment methods available.');
 
 foreach ($paymentMethods as $paymentMethod) {
     $paymentMethodCode = is_array($paymentMethod)
@@ -42,8 +49,10 @@ foreach ($paymentMethods as $paymentMethod) {
     <p class="text-sm text-gray-500<?= $hasAvailablePaymentMethods ? ' hidden' : '' ?>"
        role="status"
        data-fastcheckout-no-payment-methods
+       data-fastcheckout-no-payment-methods-message="<?= $escaper->escapeHtmlAttr(__('No payment methods available.')) ?>"
+       data-fastcheckout-select-shipping-message="<?= $escaper->escapeHtmlAttr(__('To see available payment methods, select a shipping method.')) ?>"
         <?= $hasAvailablePaymentMethods ? 'style="display: none;" aria-hidden="true"' : '' ?>>
-        <?= $escaper->escapeHtml(__('No payment methods available.')) ?>
+        <?= $escaper->escapeHtml($emptyPaymentMethodsMessage) ?>
     </p>
 
     <?php if (!empty($normalizedPaymentMethods)): ?>

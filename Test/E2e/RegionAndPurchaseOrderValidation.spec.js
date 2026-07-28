@@ -46,6 +46,16 @@ async function fillPolishShippingAddress(page) {
 }
 
 test.describe('Fastcheckout country and payment validation regressions', () => {
+    test('payment filtering prompts for a shipping method first', async ({ page }) => {
+        await openCheckoutWithProduct(page);
+
+        const message = page.locator('[data-fastcheckout-no-payment-methods]');
+        await expect(message).toBeVisible();
+        await expect(message).toHaveText(
+            'Aby zobaczyć dostępne metody płatności, wybierz metodę dostawy.'
+        );
+    });
+
     test('slow initial rate estimate does not block the restored shipping form', async ({ page }) => {
         await openCheckoutWithProduct(page);
         await fillPolishShippingAddress(page);
@@ -352,6 +362,62 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
             'Pole testowego modułu jest wymagane.'
         );
         expect(submitRequests).toEqual([]);
+    });
+
+    test('shipping validator error scrolls back to the shipping method', async ({ page }) => {
+        await openCheckoutWithProduct(page);
+        await fillPolishShippingAddress(page);
+
+        const shippingMethod = page.locator(
+            'input[name="shipping_method"][value="tablerate_bestway"]:visible:not(:disabled)'
+        );
+        await expect(shippingMethod).toBeVisible({ timeout: 30_000 });
+        await shippingMethod.evaluate((input) => input.click());
+
+        const paymentMethod = page.locator(
+            'input[name="payment_method"]:visible:not(:disabled)'
+        ).first();
+        await expect(paymentMethod).toBeVisible({ timeout: 30_000 });
+        await paymentMethod.evaluate((input) => input.click());
+
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.waitForFunction(() => (
+            typeof window.fastcheckoutHyvaShipping?.registerValidator === 'function' &&
+            typeof window.fastcheckoutHyvaPayment?.focusFirstInvalidField === 'function'
+        ));
+        await page.evaluate(() => {
+            window.fastcheckoutHyvaShipping.registerValidator(() => {
+                const selected = document.querySelector(
+                    'input[name="shipping_method"]:checked'
+                );
+                const option = selected?.closest('.fastcheckout-shipping-method-option');
+                let error = document.querySelector('[data-test-shipping-validator-error]');
+
+                if (!error) {
+                    error = document.createElement('div');
+                    error.className = 'field-error';
+                    error.setAttribute('role', 'alert');
+                    error.setAttribute('data-test-shipping-validator-error', 'true');
+                    error.textContent = 'Wybierz punkt odbioru.';
+                    option?.appendChild(error);
+                }
+
+                return false;
+            });
+            window.scrollTo(0, document.body.scrollHeight);
+        });
+
+        await page.locator('[data-fastcheckout-place-order-mobile]:visible').evaluate(
+            (button) => button.click()
+        );
+
+        const error = page.locator('[data-test-shipping-validator-error]');
+        await expect(error).toBeVisible();
+        await expect.poll(async () => error.evaluate((element) => {
+            const rect = element.getBoundingClientRect();
+
+            return rect.top >= 0 && rect.bottom <= window.innerHeight;
+        })).toBe(true);
     });
 
     test('missing payment method validation is displayed in Polish', async ({ page }) => {

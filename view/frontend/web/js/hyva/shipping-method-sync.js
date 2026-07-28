@@ -309,11 +309,18 @@ define([
             }
 
             // Always refresh grid and empty-message visibility.
+            emptyMessage = document.querySelector('[data-fastcheckout-no-payment-methods]');
+            if (emptyMessage) {
+                emptyMessage.textContent = emptyMessage.getAttribute(
+                    hasMapping && !methodCode
+                        ? 'data-fastcheckout-select-shipping-message'
+                        : 'data-fastcheckout-no-payment-methods-message'
+                ) || emptyMessage.textContent;
+            }
             if (window.fastcheckoutHyvaPayment && typeof window.fastcheckoutHyvaPayment.applyPaymentOptionVisibility === 'function') {
                 window.fastcheckoutHyvaPayment.applyPaymentOptionVisibility();
             } else {
                 grid = document.querySelector('[data-fastcheckout-payment-methods-grid]');
-                emptyMessage = document.querySelector('[data-fastcheckout-no-payment-methods]');
                 var anyAllowed = !!document.querySelector(
                     '[data-fastcheckout-payment-option][data-fastcheckout-payment-allowed="1"]'
                 );

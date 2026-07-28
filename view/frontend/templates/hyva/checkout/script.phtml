@@ -118,6 +118,28 @@ foreach ($clientMessagePhrases as $phrase) {
         return checked ? checked.value : '';
     }
 
+    function focusShippingMethodValidationError() {
+        window.setTimeout(function () {
+            var shippingMethods = form.querySelector('[data-fastcheckout-shipping-methods]');
+            var errors = shippingMethods
+                ? shippingMethods.querySelectorAll(
+                    '[aria-invalid="true"], .field-error, .mage-error, [role="alert"]'
+                )
+                : [];
+            var visibleErrors = Array.prototype.filter.call(errors, function (element) {
+                return element.offsetParent !== null && (
+                    element.matches('[aria-invalid="true"]') ||
+                    String(element.textContent || '').trim() !== ''
+                );
+            });
+            var target = visibleErrors[visibleErrors.length - 1] || shippingMethods;
+
+            if (target) {
+                target.scrollIntoView({ behavior: 'auto', block: 'center' });
+            }
+        }, 100);
+    }
+
     function placeOrderViaKo() {
         var selectedMethod = getSelectedPaymentMethod();
         var paymentBridge = window.fastcheckoutHyvaPayment;
@@ -128,6 +150,7 @@ foreach ($clientMessagePhrases as $phrase) {
         if (shippingBridge && typeof shippingBridge.validate === 'function' && !shippingBridge.validate()) {
             var shipMsg = window.fastcheckoutLastShippingValidationError ||
                 translateClientMessage('Please complete shipping information.');
+            focusShippingMethodValidationError();
             showError(shipMsg);
             return Promise.reject(new Error(shipMsg));
         }
