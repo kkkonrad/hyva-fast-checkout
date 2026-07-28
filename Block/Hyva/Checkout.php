@@ -10,8 +10,12 @@ use Magento\Checkout\Model\CompositeConfigProvider;
 use Magento\Checkout\Model\Session as CheckoutSession;
 use Magento\Checkout\Block\Checkout\LayoutProcessor;
 use Magento\Checkout\Block\Checkout\DirectoryDataProcessor;
+use Magento\Framework\App\CacheInterface;
+use Magento\Framework\App\Cache\Type\Config as ConfigCacheType;
+use Magento\Framework\App\Cache\Type\Layout as LayoutCacheType;
 use Magento\Framework\Component\ComponentRegistrar;
 use Magento\Framework\Component\ComponentRegistrarInterface;
+use Magento\Framework\Serialize\SerializerInterface;
 use Magento\Framework\Locale\ResolverInterface;
 use Magento\Framework\Module\ModuleListInterface;
 use Magento\Framework\Pricing\Helper\Data as PricingHelper;
@@ -182,6 +186,12 @@ class Checkout extends Template
     /** @var LayoutProcessor|null */
     private $checkoutLayoutProcessor;
 
+    /** @var CacheInterface|null */
+    private $appCache;
+
+    /** @var SerializerInterface|null */
+    private $serializer;
+
     /** @var DirectoryDataProcessor|null */
     private $checkoutDirectoryDataProcessor;
 
@@ -228,7 +238,9 @@ class Checkout extends Template
         LayoutProcessor $checkoutLayoutProcessor = null,
         DirectoryDataProcessor $checkoutDirectoryDataProcessor = null,
         PaymentMethodManagementInterface $paymentMethodManagement = null,
-        PaymentHelper $paymentHelper = null
+        PaymentHelper $paymentHelper = null,
+        CacheInterface $appCache = null,
+        SerializerInterface $serializer = null
     ) {
         $this->checkoutSession = $checkoutSession;
         $this->pricingHelper = $pricingHelper;
@@ -246,6 +258,8 @@ class Checkout extends Template
         $this->checkoutDirectoryDataProcessor = $checkoutDirectoryDataProcessor;
         $this->paymentMethodManagement = $paymentMethodManagement;
         $this->paymentHelper = $paymentHelper;
+        $this->appCache = $appCache;
+        $this->serializer = $serializer;
 
         parent::__construct($context, $data);
     }
@@ -1614,6 +1628,12 @@ class Checkout extends Template
             return $this->standardAddressLayoutCache;
         }
 
+        $cached = $this->loadStandardAddressLayoutFromCache();
+        if ($cached !== null) {
+            $this->standardAddressLayoutCache = $cached;
+            return $this->standardAddressLayoutCache;
+        }
+
         $this->standardAddressLayoutCache = [];
         $moduleList = $this->getModuleList();
         $componentRegistrar = $this->getComponentRegistrar();
@@ -1696,7 +1716,96 @@ class Checkout extends Template
             'checkoutProvider' => $layout['components']['checkoutProvider'] ?? []
         ];
 
+        $this->saveStandardAddressLayoutToCache($this->standardAddressLayoutCache);
+
         return $this->standardAddressLayoutCache;
+    }
+
+    /**
+     * Cache id for the processed standard checkout layout.
+     *
+     * The result is derived from installed modules, store config and locale only — it changes
+     * on deploy/config edits, never per shopper — yet it was rebuilt on every checkout render
+     * (Magento's LayoutProcessor plus a scan of every module's checkout_index_index.xml), and
+     * five public getters feed off it. The in-request property alone did not help across
+     * requests, which is where the cost actually sat.
+     *
+     * @return string
+     */
+    private function getStandardAddressLayoutCacheId(): string
+    {
+        $moduleList = $this->getModuleList();
+        $modules = $moduleList !== null ? $moduleList->getNames() : [];
+        $storeId = '';
+        $themeId = '';
+
+        try {
+            $storeId = (string)$this->_storeManager->getStore()->getId();
+        } catch (\Throwable $exception) {
+            $storeId = '';
+        }
+
+        try {
+            $theme = $this->_design->getDesignTheme();
+            $themeId = $theme ? (string)($theme->getId() ?: $theme->getCode()) : '';
+        } catch (\Throwable $exception) {
+            $themeId = '';
+        }
+
+        return 'fastcheckout_std_layout_' . sha1(implode(',', [
+            // Bump when the shape produced below changes.
+            'v1',
+            $storeId,
+            $themeId,
+            $this->localeResolver !== null ? (string)$this->localeResolver->getLocale() : '',
+            implode('|', $modules)
+        ]));
+    }
+
+    /**
+     * @return array|null null when unavailable or not cached yet
+     */
+    private function loadStandardAddressLayoutFromCache(): ?array
+    {
+        if ($this->appCache === null || $this->serializer === null) {
+            return null;
+        }
+
+        try {
+            $raw = $this->appCache->load($this->getStandardAddressLayoutCacheId());
+            if (!is_string($raw) || $raw === '') {
+                return null;
+            }
+
+            $data = $this->serializer->unserialize($raw);
+
+            return is_array($data) ? $data : null;
+        } catch (\Throwable $exception) {
+            return null;
+        }
+    }
+
+    /**
+     * Tagged with config + layout so `cache:clean config|layout` (and any config save) drops it.
+     *
+     * @param array $layout
+     * @return void
+     */
+    private function saveStandardAddressLayoutToCache(array $layout): void
+    {
+        if ($this->appCache === null || $this->serializer === null || $layout === []) {
+            return;
+        }
+
+        try {
+            $this->appCache->save(
+                $this->serializer->serialize($layout),
+                $this->getStandardAddressLayoutCacheId(),
+                [ConfigCacheType::CACHE_TAG, LayoutCacheType::CACHE_TAG]
+            );
+        } catch (\Throwable $exception) {
+            // Caching is an optimisation; never break rendering because of it.
+        }
     }
 
     /**
