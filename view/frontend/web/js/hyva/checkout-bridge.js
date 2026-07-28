@@ -2085,7 +2085,7 @@ define([
                         return;
                     }
 
-                    bindPurchaseOrderValidationFields(root);
+                    bindNativePaymentValidationFields(root);
 
                     Array.prototype.slice.call(root.querySelectorAll('.fastcheckout-native-place-order-hidden')).forEach(function (button) {
                         unmarkNativePlaceOrderHidden(button);
@@ -2800,7 +2800,12 @@ define([
                         (
                             input.required ||
                             input.getAttribute('aria-required') === 'true' ||
-                            (dataValidate && /required\s*:\s*true/.test(dataValidate))
+                            (
+                                dataValidate &&
+                                /(?:required(?:-entry|-number)?|validate-one-required(?:-by-name)?)['"]?\s*:\s*true/.test(
+                                    dataValidate
+                                )
+                            )
                         )
                     );
                 }
@@ -2862,17 +2867,18 @@ define([
                 }
 
                 /**
-                 * KO inserts the Purchase Order form after Magento's global validation
-                 * bootstrap has completed. Bind field-level validation when the renderer
-                 * is annotated so blur/input behaves like the native address fields.
+                 * KO inserts payment forms after Magento's global validation bootstrap.
+                 * Bind their declared validation rules when a renderer is annotated.
                  */
-                function bindPurchaseOrderValidationFields(root) {
+                function bindNativePaymentValidationFields(root) {
                     if (!root || typeof root.querySelectorAll !== 'function') {
                         return;
                     }
 
                     Array.prototype.slice.call(root.querySelectorAll(
-                        'input[name="payment[po_number]"], #po_number'
+                        'input[data-validate], select[data-validate], textarea[data-validate], ' +
+                        'input[required], select[required], textarea[required], ' +
+                        '[aria-required="true"]'
                     )).forEach(function (input) {
                         if (input.getAttribute('data-fastcheckout-validation-bound') === 'true') {
                             return;
@@ -2927,7 +2933,19 @@ define([
                         return isValid;
                     }
 
-                    if (!String(input.value || '').trim()) {
+                    if (
+                        $.validator &&
+                        typeof $.validator.validateSingleElement === 'function'
+                    ) {
+                        isValid = $.validator.validateSingleElement(input);
+                        if (!isValid) {
+                            scheduleNativeFieldErrorMessage(input, getRequiredFieldMessage(input));
+                        }
+
+                        return isValid;
+                    }
+
+                    if (isNativeRequiredField(input) && isNativeFieldEmpty(input)) {
                         ensureNativeFieldErrorMessage(input, getRequiredFieldMessage(input));
                         return false;
                     }
@@ -2935,6 +2953,31 @@ define([
                     input.removeAttribute('aria-invalid');
                     clearNativeFieldErrorFallback(input);
                     return true;
+                }
+
+                function validateActivePaymentFields() {
+                    var fields = [],
+                        isValid = true;
+
+                    getActivePaymentFormRoots().forEach(function (root) {
+                        Array.prototype.slice.call(root.querySelectorAll(
+                            'input[data-validate], select[data-validate], textarea[data-validate], ' +
+                            'input[required], select[required], textarea[required], ' +
+                            '[aria-required="true"]'
+                        )).forEach(function (field) {
+                            if (fields.indexOf(field) === -1) {
+                                fields.push(field);
+                            }
+                        });
+                    });
+
+                    fields.forEach(function (field) {
+                        if (!validateNativeMagentoField(field)) {
+                            isValid = false;
+                        }
+                    });
+
+                    return isValid;
                 }
 
                 function validatePurchaseOrderWithNativeValidation() {
@@ -4615,13 +4658,14 @@ define([
 
 	                    validate: function () {
 	                        var component = getActiveRenderer(),
-                                methodCode = getSelectedMethodCode(),
-                                billingValid,
-                                paymentValid = true;
+	                            methodCode = getSelectedMethodCode(),
+	                            billingValid,
+	                            paymentValid;
 
                             // Separate billing form (same-as-shipping unchecked) must validate
                             // together with payment method fields on place order.
                             billingValid = validateBillingAddressForm();
+                            paymentValid = validateActivePaymentFields();
 
                             if (methodCode === 'purchaseorder') {
                                 paymentValid = validatePurchaseOrderWithNativeValidation() &&

@@ -299,6 +299,61 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
         expect(orderRequests).toBe(0);
     });
 
+    test('main checkout submit validates fields declared by an arbitrary payment renderer', async ({ page }) => {
+        const submitRequests = [];
+
+        page.on('request', (request) => {
+            if (
+                request.method() === 'POST' &&
+                /\/V1\/guest-carts\/[^/]+\/(?:shipping-information|payment-information|order)(?:\?|$)/.test(request.url())
+            ) {
+                submitRequests.push(request.url());
+            }
+        });
+
+        await openCheckoutWithProduct(page);
+        await fillPolishShippingAddress(page);
+
+        const shippingMethod = page.locator(
+            'input[name="shipping_method"][value="tablerate_bestway"]:visible:not(:disabled)'
+        );
+        await expect(shippingMethod).toBeVisible({ timeout: 30_000 });
+        await shippingMethod.evaluate((input) => input.click());
+
+        const paymentMethod = page.locator(
+            'input[name="payment_method"]:visible:not(:disabled):not([value="purchaseorder"])'
+        ).first();
+        await expect(paymentMethod).toBeVisible({ timeout: 30_000 });
+        const methodCode = await paymentMethod.getAttribute('value');
+        await paymentMethod.evaluate((input) => input.click());
+
+        const target = page.locator(
+            '[data-fastcheckout-payment-method-ko-target="' + methodCode + '"]'
+        );
+        await expect(target).toBeVisible();
+        await target.evaluate((root) => {
+            const input = document.createElement('input');
+
+            input.id = 'fastcheckout-third-party-required';
+            input.name = 'payment[third_party_required]';
+            input.setAttribute('data-validate', "{'required':true}");
+            input.setAttribute('data-msg-required', 'Pole testowego modułu jest wymagane.');
+            root.appendChild(input);
+        });
+
+        const input = target.locator('#fastcheckout-third-party-required');
+        submitRequests.length = 0;
+        await page.locator('[data-fastcheckout-place-order]:visible').evaluate(
+            (button) => button.click()
+        );
+
+        await expect(input).toHaveAttribute('aria-invalid', 'true');
+        await expect(target.locator('#fastcheckout-third-party-required-error')).toHaveText(
+            'Pole testowego modułu jest wymagane.'
+        );
+        expect(submitRequests).toEqual([]);
+    });
+
     test('missing payment method validation is displayed in Polish', async ({ page }) => {
         await openCheckoutWithProduct(page);
         await fillPolishShippingAddress(page);
