@@ -286,7 +286,7 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
         const errorId = await poNumber.getAttribute('aria-describedby');
         expect(errorId).toBeTruthy();
         await expect(target.locator('#' + errorId)).toBeVisible();
-        await expect(target.locator('#' + errorId)).not.toHaveText('');
+        await expect(target.locator('#' + errorId)).toHaveText('To jest wymagane pole.');
         await expect(
             page.locator('[data-fastcheckout-client-order-error]:not(.hidden)')
         ).toHaveCount(0);
@@ -297,6 +297,37 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
         })).toBe(false);
         expect(submitRequests).toEqual([]);
         expect(orderRequests).toBe(0);
+    });
+
+    test('missing payment method validation is displayed in Polish', async ({ page }) => {
+        await openCheckoutWithProduct(page);
+        await fillPolishShippingAddress(page);
+
+        const shippingMethod = page.locator(
+            'input[name="shipping_method"][value="tablerate_bestway"]:visible:not(:disabled)'
+        );
+        await expect(shippingMethod).toBeVisible({ timeout: 30_000 });
+        await shippingMethod.evaluate((input) => input.click());
+
+        const paymentMethod = page.locator(
+            'input[name="payment_method"]:visible:not(:disabled)'
+        ).first();
+        await expect(paymentMethod).toBeVisible({ timeout: 30_000 });
+        await page.locator('input[name="payment_method"]').evaluateAll((inputs) => {
+            inputs.forEach((input) => {
+                input.checked = false;
+            });
+        });
+
+        await page.locator('[data-fastcheckout-place-order]:visible').evaluate(
+            (button) => button.click()
+        );
+
+        const error = page.locator(
+            '[data-fastcheckout-client-order-error]:visible'
+        );
+        await expect(error).toHaveText('Wybierz metodę płatności.');
+        await expect(error).not.toContainText('Please select a payment method.');
     });
 
     test('place order keeps the primary loader through success navigation', async ({ page }) => {

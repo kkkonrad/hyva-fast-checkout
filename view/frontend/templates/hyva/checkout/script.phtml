@@ -7,6 +7,30 @@
  * @var \Hyva\Theme\ViewModel\HyvaCsp $hyvaCsp
  */
 $hyvaCsp = $block->getHyvaCsp();
+$clientMessagePhrases = [
+    'Please complete shipping information.',
+    'Please select a payment method.',
+    'Please select a shipping method.',
+    'Please select a shipping method and try again.',
+    'Please check the shipping address and try again.',
+    'Please check the billing address and try again.',
+    'Please check the selected payment method and try again.',
+    'The order was not placed.',
+    'Checkout is not ready.',
+    'Could not estimate shipping rates.',
+    'Shipping estimate modules unavailable',
+    'Checkout session is not ready. Please refresh the page and try again.',
+    'The selected payment method is not ready. Please try again.',
+    'The selected payment method did not start order placement. Please try again.',
+    'We could not place your order. Please try again.',
+    'Something went wrong while processing your order. Please try again later.',
+    'This is a required field.',
+    'Please select a pickup point'
+];
+$clientMessages = [];
+foreach ($clientMessagePhrases as $phrase) {
+    $clientMessages[$phrase] = (string)__($phrase);
+}
 ?>
 <script>
 (function () {
@@ -18,6 +42,24 @@ $hyvaCsp = $block->getHyvaCsp();
     }
 
     window.fastcheckoutNativeQuotePipeline = true;
+
+    // This shell runs before RequireJS is guaranteed to be available, so messages
+    // cannot safely depend on mage/translate. Resolve known validation strings on
+    // the server and also use the map for English messages returned by JS bridges.
+    var clientMessages = <?= /* @noEscape */ json_encode(
+        $clientMessages,
+        JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+    ) ?>;
+
+    function translateClientMessage(message) {
+        var text = message === null || typeof message === 'undefined'
+            ? ''
+            : String(message);
+
+        return Object.prototype.hasOwnProperty.call(clientMessages, text)
+            ? clientMessages[text]
+            : text;
+    }
 
     function setProcessing(isProcessing) {
         document.body.classList.toggle('checkout-submitting', !!isProcessing);
@@ -58,6 +100,7 @@ $hyvaCsp = $block->getHyvaCsp();
     }
 
     function showError(message) {
+        message = translateClientMessage(message);
         form.querySelectorAll('[data-fastcheckout-client-order-error]').forEach(function (el) {
             if (message) {
                 el.textContent = message;
@@ -83,13 +126,14 @@ $hyvaCsp = $block->getHyvaCsp();
         showError('');
 
         if (shippingBridge && typeof shippingBridge.validate === 'function' && !shippingBridge.validate()) {
-            var shipMsg = window.fastcheckoutLastShippingValidationError || 'Please complete shipping information.';
+            var shipMsg = window.fastcheckoutLastShippingValidationError ||
+                translateClientMessage('Please complete shipping information.');
             showError(shipMsg);
             return Promise.reject(new Error(shipMsg));
         }
 
         if (!selectedMethod) {
-            var payMsg = 'Please select a payment method.';
+            var payMsg = translateClientMessage('Please select a payment method.');
             showError(payMsg);
             return Promise.reject(new Error(payMsg));
         }
@@ -108,7 +152,9 @@ $hyvaCsp = $block->getHyvaCsp();
                 paymentBridge.focusFirstInvalidField();
             }
 
-            return Promise.reject(new Error('Please check the selected payment method and try again.'));
+            return Promise.reject(new Error(
+                translateClientMessage('Please check the selected payment method and try again.')
+            ));
         }
 
         setProcessing(true);
@@ -131,7 +177,9 @@ $hyvaCsp = $block->getHyvaCsp();
                 })
                 .catch(function (error) {
                     setProcessing(false);
-                    var message = (error && error.message) ? error.message : String(error || 'The order was not placed.');
+                    var message = (error && error.message)
+                        ? translateClientMessage(error.message)
+                        : translateClientMessage(String(error || 'The order was not placed.'));
                     showError(message);
                     window.dispatchEvent(new CustomEvent('fastcheckout:payment-error', { detail: { message: message } }));
                     throw error;
@@ -142,7 +190,7 @@ $hyvaCsp = $block->getHyvaCsp();
         return new Promise(function (resolve, reject) {
             if (typeof require !== 'function') {
                 setProcessing(false);
-                reject(new Error('Checkout is not ready.'));
+                reject(new Error(translateClientMessage('Checkout is not ready.')));
                 return;
             }
             require([
@@ -172,14 +220,14 @@ $hyvaCsp = $block->getHyvaCsp();
                         errorProcessor.process(response);
                     } catch (e) { /* ignore */ }
                     var message = (response && response.responseJSON && response.responseJSON.message)
-                        ? response.responseJSON.message
-                        : 'The order was not placed.';
+                        ? translateClientMessage(response.responseJSON.message)
+                        : translateClientMessage('The order was not placed.');
                     showError(message);
                     reject(new Error(message));
                 });
             }, function () {
                 setProcessing(false);
-                reject(new Error('Checkout is not ready.'));
+                reject(new Error(translateClientMessage('Checkout is not ready.')));
             });
         });
     }

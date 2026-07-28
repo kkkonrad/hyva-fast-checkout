@@ -12,13 +12,24 @@ define([], function () {
             translate = typeof deps.translate === 'function' ? deps.translate : function (message) { return message; },
             bridgeMessageContainer = typeof Messages === 'function' ? new Messages() : null,
             localTranslations = {
+                'Please complete shipping information.': 'Uzupełnij informacje dotyczące dostawy.',
+                'Please select a payment method.': 'Wybierz metodę płatności.',
+                'Please select a shipping method.': 'Wybierz metodę dostawy.',
+                'Please select a shipping method and try again.': 'Wybierz metodę dostawy i spróbuj ponownie.',
+                'Please check the shipping address and try again.': 'Sprawdź adres dostawy i spróbuj ponownie.',
+                'Please check the billing address and try again.': 'Sprawdź adres rozliczeniowy i spróbuj ponownie.',
                 'Checkout session is not ready. Please refresh the page and try again.': 'Sesja checkoutu nie jest gotowa. Odśwież stronę i spróbuj ponownie.',
                 'Please check the selected payment method and try again.': 'Sprawdź wybraną metodę płatności i spróbuj ponownie.',
                 'The selected payment method is not ready. Please try again.': 'Wybrana metoda płatności nie jest jeszcze gotowa. Spróbuj ponownie.',
                 'The selected payment method did not start order placement. Please try again.': 'Wybrana metoda płatności nie rozpoczęła składania zamówienia. Spróbuj ponownie.',
                 'We could not place your order. Please try again.': 'Nie udało się złożyć zamówienia. Spróbuj ponownie.',
                 'Something went wrong while processing your order. Please try again later.': 'Coś poszło nie tak podczas przetwarzania zamówienia. Spróbuj ponownie później.',
-                'This is a required field.': 'To jest wymagane pole.'
+                'This is a required field.': 'To jest wymagane pole.',
+                'The order was not placed.': 'Zamówienie nie zostało złożone.',
+                'Checkout is not ready.': 'Proces zamówienia nie jest jeszcze gotowy.',
+                'Could not estimate shipping rates.': 'Nie udało się obliczyć stawek dostawy.',
+                'Shipping estimate modules unavailable': 'Moduły wyceny dostawy są niedostępne.',
+                'Please select a pickup point': 'Wybierz punkt odbioru'
             };
 
         function isPolishLocale() {
