@@ -186,3 +186,72 @@ test('intentional uncheck of same-as-shipping sticks across payment components',
     const rechecked = (result.afterSettle.allPaymentSame || []).filter((c) => c.same);
     expect(rechecked, JSON.stringify(result)).toEqual([]);
 });
+
+test('separate billing address survives checkout reload', async ({ page }) => {
+    test.setTimeout(120_000);
+    await addProductAndOpenCheckout(page);
+
+    await page.evaluate(() => new Promise((resolve, reject) => {
+        require([
+            'Magento_Checkout/js/model/address-converter',
+            'Magento_Checkout/js/action/select-shipping-address',
+            'Magento_Checkout/js/action/select-billing-address',
+            'Magento_Checkout/js/checkout-data'
+        ], (converter, selectShippingAddress, selectBillingAddress, checkoutData) => {
+            const shippingData = {
+                firstname: 'Jan',
+                lastname: 'Wysyłkowy',
+                street: { 0: 'Testowa 1', 1: '' },
+                city: 'Warszawa',
+                postcode: '00-001',
+                country_id: 'PL',
+                region_id: '1024',
+                region: 'mazowieckie',
+                telephone: '500600700'
+            };
+            const billingData = {
+                firstname: 'Anna',
+                lastname: 'Zapamiętana',
+                street: { 0: 'Rozliczeniowa 9', 1: '' },
+                city: 'Kraków',
+                postcode: '30-001',
+                country_id: 'PL',
+                region_id: '1023',
+                region: 'małopolskie',
+                telephone: '501502503'
+            };
+
+            selectShippingAddress(converter.formAddressDataToQuoteAddress(shippingData));
+            selectBillingAddress(converter.formAddressDataToQuoteAddress(billingData));
+            checkoutData.setSelectedBillingAddress('new-customer-billing-address');
+            checkoutData.setBillingAddressFromData(billingData);
+            checkoutData.setNewCustomerBillingAddress(billingData);
+            resolve();
+        }, reject);
+    }));
+
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    const target = page.locator('[data-fastcheckout-shared-billing-target]');
+    await expect(target.locator('.checkout-billing-address')).toBeVisible({ timeout: 60_000 });
+    await expect(target.locator('input[name="billing-address-same-as-shipping"]')).not.toBeChecked();
+
+    const restored = await page.evaluate(() => new Promise((resolve, reject) => {
+        require([
+            'Magento_Checkout/js/checkout-data',
+            'Magento_Checkout/js/model/quote'
+        ], (checkoutData, quote) => {
+            resolve({
+                selected: checkoutData.getSelectedBillingAddress(),
+                storedFirstname: checkoutData.getBillingAddressFromData()?.firstname,
+                quoteFirstname: quote.billingAddress()?.firstname
+            });
+        }, reject);
+    }));
+
+    expect(restored).toEqual({
+        selected: 'new-customer-billing-address',
+        storedFirstname: 'Anna',
+        quoteFirstname: 'Anna'
+    });
+    await expect(target.locator('.billing-address-details')).toContainText('Anna');
+});

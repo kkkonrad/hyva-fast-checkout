@@ -176,7 +176,8 @@ define([
                 getPaymentMethods: function () {
                     return typeof getDomPaymentMethods === 'function' ? getDomPaymentMethods() : [];
                 }
-            });
+            }),
+                persistedSeparateBillingRestored = false;
 
             if (
                 guestAddressSnapshot &&
@@ -193,9 +194,54 @@ define([
              * Restoring (especially writing dictionaries / country_id) before that
              * leaves the country field permanently empty. Wait until options exist.
              */
-            function restorePreviousGuestShippingAddress(forceQuote) {
+            function restorePersistedSeparateBillingAddress() {
+                var selectedBillingAddress,
+                    billingAddressData,
+                    billingAddress;
+
+                if (persistedSeparateBillingRestored) {
+                    return false;
+                }
+
+                if (!checkoutData || typeof checkoutData.getSelectedBillingAddress !== 'function') {
+                    return false;
+                }
+
+                selectedBillingAddress = checkoutData.getSelectedBillingAddress();
+                if (selectedBillingAddress !== 'new-customer-billing-address') {
+                    return false;
+                }
+
+                billingAddressData = typeof checkoutData.getNewCustomerBillingAddress === 'function'
+                    ? checkoutData.getNewCustomerBillingAddress()
+                    : null;
+                if (
+                    (!billingAddressData || !Object.keys(billingAddressData).length) &&
+                    typeof checkoutData.getBillingAddressFromData === 'function'
+                ) {
+                    billingAddressData = checkoutData.getBillingAddressFromData();
+                }
+                if (!billingAddressData || !Object.keys(billingAddressData).length) {
+                    return false;
+                }
+
                 try {
-                    return guestAddressSnapshot.restore({
+                    billingAddress = addressConverter.formAddressDataToQuoteAddress(billingAddressData);
+                    selectBillingAddressAction(billingAddress);
+                    checkoutProviderBridge.syncAddressData(billingAddressData, 'billing');
+                    persistedSeparateBillingRestored = true;
+
+                    return true;
+                } catch (billingRestoreError) {
+                    return false;
+                }
+            }
+
+            function restorePreviousGuestShippingAddress(forceQuote) {
+                var restoredShipping = false;
+
+                try {
+                    restoredShipping = guestAddressSnapshot.restore({
                         quote: quote,
                         checkoutData: checkoutData,
                         selectShippingAddress: selectShippingAddressAction,
@@ -210,8 +256,10 @@ define([
                         force: forceQuote === true
                     });
                 } catch (restoreErr) {
-                    return false;
+                    restoredShipping = false;
                 }
+
+                return restorePersistedSeparateBillingAddress() || restoredShipping;
             }
 
             function countryFieldReady() {
@@ -2349,6 +2397,7 @@ define([
                 var pendingSelectedMethodCode = '';
                 var paymentRendererObserver = null;
                 var paymentRendererObserverRetryTimer = null;
+                var sharedAfterMethodsObserver = null;
                 var lastSetSelectedMethodCode = '';
                 var lastSetSelectedMethodAt = 0;
 
@@ -2377,6 +2426,71 @@ define([
                     }
                 }
 
+                function isSharedBillingAddressEnabled() {
+                    return Boolean(
+                        window.checkoutConfig &&
+                        window.checkoutConfig.displayBillingOnPaymentMethod === false
+                    );
+                }
+
+                function updateSharedAfterMethodsVisibility(billingAddress, target) {
+                    if (!target) {
+                        return;
+                    }
+
+                    target.classList.toggle('hidden', !billingAddress);
+                    target.style.display = billingAddress ? 'block' : 'none';
+                    target.setAttribute('aria-hidden', billingAddress ? 'false' : 'true');
+                }
+
+                /**
+                 * Magento mounts the shared billing address in payment.afterMethods when
+                 * checkout/options/display_billing_address_on is set to the payment page.
+                 * The KO renderer root stays hidden because it also owns inactive payment
+                 * renderers. Move only the already-bound billing element: afterMethods can
+                 * also contain discount or third-party components rendered elsewhere.
+                 */
+                function mountSharedAfterMethodsRegion() {
+                    var region = document.querySelector(
+                            '[data-fastcheckout-ko-after-methods-region]'
+                        ),
+                        target = document.querySelector(
+                            '[data-fastcheckout-shared-billing-target]'
+                        ),
+                        billingAddress;
+
+                    if (!region || !target || !isSharedBillingAddressEnabled()) {
+                        updateSharedAfterMethodsVisibility(null, target);
+                        return false;
+                    }
+
+                    if (!sharedAfterMethodsObserver && typeof window.MutationObserver === 'function') {
+                        sharedAfterMethodsObserver = new MutationObserver(function () {
+                            mountSharedAfterMethodsRegion();
+                        });
+                        sharedAfterMethodsObserver.observe(region, {
+                            childList: true,
+                            subtree: true
+                        });
+                    }
+
+                    // Wait until KO has processed the virtual foreach. Moving the element
+                    // before binding would detach it from the uiComponent scope.
+                    billingAddress = target.querySelector('.checkout-billing-address') ||
+                        region.querySelector('.checkout-billing-address');
+                    if (!billingAddress) {
+                        updateSharedAfterMethodsVisibility(null, target);
+                        return false;
+                    }
+
+                    if (billingAddress.parentNode !== target) {
+                        target.appendChild(billingAddress);
+                    }
+
+                    updateSharedAfterMethodsVisibility(billingAddress, target);
+                    return true;
+                }
+
                 function observePaymentRendererRoot() {
                     var root = document.getElementById('fastcheckout-ko-payment-root');
 
@@ -2390,6 +2504,7 @@ define([
                         }
                         paymentRendererObserverRetryTimer = window.setTimeout(function () {
                             paymentRendererObserverRetryTimer = null;
+                            mountSharedAfterMethodsRegion();
                             retryPendingSelectedMethod();
                         }, 50);
                     });
@@ -2882,7 +2997,8 @@ define([
                 function getBillingAddressComponentsForValidation() {
                     var methodCode = getSelectedMethodCode(),
                         components = [],
-                        preferred = [];
+                        preferred = [],
+                        shared = [];
 
                     if (!registry || typeof registry.filter !== 'function') {
                         return components;
@@ -2900,6 +3016,21 @@ define([
                             component.name !== 'fastcheckout.billingAddress'
                         );
                     }) || [];
+
+                    if (isSharedBillingAddressEnabled()) {
+                        shared = components.filter(function (component) {
+                            return component.dataScopePrefix === 'billingAddressshared' ||
+                                (
+                                    component.name &&
+                                    String(component.name).indexOf('billing-address-form') !== -1 &&
+                                    String(component.name).indexOf('afterMethods') !== -1
+                                );
+                        });
+
+                        if (shared.length) {
+                            return shared;
+                        }
+                    }
 
                     if (methodCode) {
                         preferred = components.filter(function (component) {
@@ -2927,9 +3058,9 @@ define([
                 }
 
                 /**
-                 * Return only the billing DOM mounted for the active payment renderer.
-                 * Never fall back to an arbitrary hidden renderer: each payment method owns
-                 * a separate checkbox and provider scope.
+                 * Return the visible shared billing DOM or the form mounted for the
+                 * active payment renderer. Never fall back to an arbitrary hidden
+                 * renderer: each payment method owns a separate provider scope.
                  *
                  * @returns {HTMLElement|null}
                  */
@@ -2937,10 +3068,27 @@ define([
                     var activeRoot = document.querySelector(
                             '.payment-method._active .payment-method-billing-address'
                         ),
+                        sharedTarget = document.querySelector(
+                            '[data-fastcheckout-shared-billing-target]'
+                        ),
                         methodCode = getSelectedMethodCode(),
                         targets,
                         i,
                         root;
+
+                    if (
+                        isSharedBillingAddressEnabled() &&
+                        sharedTarget &&
+                        !sharedTarget.classList.contains('hidden') &&
+                        sharedTarget.style.display !== 'none'
+                    ) {
+                        root = sharedTarget.querySelector(
+                            '.checkout-billing-address, .payment-method-billing-address'
+                        );
+                        if (root) {
+                            return root;
+                        }
+                    }
 
                     if (activeRoot) {
                         return activeRoot;
@@ -4632,6 +4780,7 @@ define([
 
                 runPatchRenderers();
                 observePaymentRendererRoot();
+                mountSharedAfterMethodsRegion();
                 setSelectedMethod(getSelectedMethodCode());
 
                 function rememberAndSelectPayment(methodCode) {

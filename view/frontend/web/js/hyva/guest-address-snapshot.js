@@ -577,7 +577,8 @@ define([], function () {
             depsSafe = deps || {},
             quoteAlreadyFilled = false,
             applied = false,
-            generation;
+            generation,
+            separateBillingSelected = false;
 
         bindDestinationTouchGuard();
 
@@ -593,6 +594,16 @@ define([], function () {
         formData = toFormAddressData(values);
         if (!formData) {
             return false;
+        }
+
+        try {
+            separateBillingSelected = Boolean(
+                depsSafe.checkoutData &&
+                typeof depsSafe.checkoutData.getSelectedBillingAddress === 'function' &&
+                depsSafe.checkoutData.getSelectedBillingAddress()
+            );
+        } catch (billingSelectionError) {
+            separateBillingSelected = false;
         }
 
         generation = restoreGeneration;
@@ -621,11 +632,13 @@ define([], function () {
                 if (typeof depsSafe.checkoutData.setNewCustomerShippingAddress === 'function') {
                     depsSafe.checkoutData.setNewCustomerShippingAddress(formData);
                 }
-                if (typeof depsSafe.checkoutData.setBillingAddressFromData === 'function') {
-                    depsSafe.checkoutData.setBillingAddressFromData(formData);
-                }
-                if (typeof depsSafe.checkoutData.setNewCustomerBillingAddress === 'function') {
-                    depsSafe.checkoutData.setNewCustomerBillingAddress(formData);
+                if (!separateBillingSelected) {
+                    if (typeof depsSafe.checkoutData.setBillingAddressFromData === 'function') {
+                        depsSafe.checkoutData.setBillingAddressFromData(formData);
+                    }
+                    if (typeof depsSafe.checkoutData.setNewCustomerBillingAddress === 'function') {
+                        depsSafe.checkoutData.setNewCustomerBillingAddress(formData);
+                    }
                 }
                 if (values.email) {
                     if (typeof depsSafe.checkoutData.setValidatedEmailValue === 'function') {
@@ -649,7 +662,11 @@ define([], function () {
                     if (quoteAddress && typeof depsSafe.selectShippingAddress === 'function') {
                         depsSafe.selectShippingAddress(quoteAddress);
                     }
-                    if (quoteAddress && typeof depsSafe.selectBillingAddress === 'function') {
+                    if (
+                        !separateBillingSelected &&
+                        quoteAddress &&
+                        typeof depsSafe.selectBillingAddress === 'function'
+                    ) {
                         depsSafe.selectBillingAddress(quoteAddress);
                     }
                     applied = true;
@@ -673,13 +690,21 @@ define([], function () {
         if (typeof depsSafe.syncProvider === 'function') {
             try {
                 depsSafe.syncProvider(formDataWithoutCountry(formData), 'shipping');
-                depsSafe.syncProvider(formDataWithoutCountry(formData), 'billing');
+                if (!separateBillingSelected) {
+                    depsSafe.syncProvider(formDataWithoutCountry(formData), 'billing');
+                }
                 applied = true;
             } catch (e3) {
                 // ignore
             }
             // Full address including country once Magento country field has options.
-            scheduleCountryAwareProviderSync(depsSafe, formData, values, generation);
+            scheduleCountryAwareProviderSync(
+                depsSafe,
+                formData,
+                values,
+                generation,
+                separateBillingSelected
+            );
         }
 
         // Always paint text inputs when empty (UI may lag quote).
@@ -712,7 +737,13 @@ define([], function () {
         return copy;
     }
 
-    function scheduleCountryAwareProviderSync(depsSafe, formData, values, generation) {
+    function scheduleCountryAwareProviderSync(
+        depsSafe,
+        formData,
+        values,
+        generation,
+        separateBillingSelected
+    ) {
         function trySync() {
             var ready = false;
 
@@ -753,10 +784,14 @@ define([], function () {
                     // If the shopper already changed country, only push non-destination fields.
                     if (hasUserTouchedDestination()) {
                         depsSafe.syncProvider(formDataWithoutCountry(formData), 'shipping');
-                        depsSafe.syncProvider(formDataWithoutCountry(formData), 'billing');
+                        if (!separateBillingSelected) {
+                            depsSafe.syncProvider(formDataWithoutCountry(formData), 'billing');
+                        }
                     } else {
                         depsSafe.syncProvider(formData, 'shipping');
-                        depsSafe.syncProvider(formData, 'billing');
+                        if (!separateBillingSelected) {
+                            depsSafe.syncProvider(formData, 'billing');
+                        }
                     }
                 }
             } catch (e2) {

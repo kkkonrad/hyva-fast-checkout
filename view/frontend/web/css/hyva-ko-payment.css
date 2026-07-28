@@ -58,6 +58,10 @@
     border-top: 1px solid #e5e7eb;
 }
 
+#fastcheckout-checkout .payment-method-content > .payment-method-billing-address:not(:has(*)) {
+    display: none;
+}
+
 .fastcheckout-ko-payment-root .payment-method-content > .checkout-agreements-block,
 .fastcheckout-payment-method-ko-container .payment-method-content > .checkout-agreements-block,
 #fastcheckout-checkout .payment-method-content > .checkout-agreements-block {

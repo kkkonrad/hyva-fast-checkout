@@ -187,6 +187,41 @@ class NativePipelineOwnershipTest extends TestCase
         );
     }
 
+    public function testSharedBillingAddressHasVisibleAfterMethodsDestination(): void
+    {
+        $paymentTemplate = file_get_contents(
+            $this->moduleRoot() . '/view/frontend/templates/hyva/checkout/payment-methods.phtml'
+        );
+        $bridgeTemplate = file_get_contents(
+            $this->moduleRoot() . '/view/frontend/templates/hyva/knockout/checkout-bridge.phtml'
+        );
+        $bridge = file_get_contents(
+            $this->moduleRoot() . '/view/frontend/web/js/hyva/checkout-bridge.js'
+        );
+
+        $this->assertNotFalse($paymentTemplate);
+        $this->assertNotFalse($bridgeTemplate);
+        $this->assertNotFalse($bridge);
+        $this->assertStringContainsString(
+            'data-fastcheckout-shared-billing-target',
+            $paymentTemplate
+        );
+        $this->assertStringContainsString(
+            'data-fastcheckout-ko-after-methods-region',
+            $bridgeTemplate
+        );
+        $this->assertStringContainsString(
+            'function mountSharedAfterMethodsRegion()',
+            $bridge
+        );
+        $this->assertStringContainsString('target.appendChild(billingAddress);', $bridge);
+        $this->assertStringNotContainsString('target.appendChild(region);', $bridge);
+        $this->assertStringContainsString(
+            "component.dataScopePrefix === 'billingAddressshared'",
+            $bridge
+        );
+    }
+
     public function testCheckoutReusesConfiguredPaymentMethodsForInitialRender(): void
     {
         $template = file_get_contents(

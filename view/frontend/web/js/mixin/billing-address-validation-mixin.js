@@ -31,6 +31,66 @@ define([
      */
     var userChoseSeparateBilling = false;
 
+    function getPersistedNewBillingAddressData() {
+        var addressData;
+
+        if (
+            !checkoutData ||
+            typeof checkoutData.getSelectedBillingAddress !== 'function' ||
+            checkoutData.getSelectedBillingAddress() !== 'new-customer-billing-address'
+        ) {
+            return null;
+        }
+
+        addressData = typeof checkoutData.getNewCustomerBillingAddress === 'function'
+            ? checkoutData.getNewCustomerBillingAddress()
+            : null;
+        if (
+            (!addressData || !Object.keys(addressData).length) &&
+            typeof checkoutData.getBillingAddressFromData === 'function'
+        ) {
+            addressData = checkoutData.getBillingAddressFromData();
+        }
+
+        return addressData && Object.keys(addressData).length ? addressData : null;
+    }
+
+    function hasPersistedSeparateBillingAddress() {
+        var selectedBillingAddress,
+            addressData;
+
+        if (!checkoutData || typeof checkoutData.getSelectedBillingAddress !== 'function') {
+            return false;
+        }
+
+        selectedBillingAddress = checkoutData.getSelectedBillingAddress();
+        if (!selectedBillingAddress) {
+            return false;
+        }
+        if (selectedBillingAddress !== 'new-customer-billing-address') {
+            return true;
+        }
+
+        addressData = getPersistedNewBillingAddressData();
+
+        return Boolean(addressData);
+    }
+
+    function hasAddressContent(address) {
+        return Boolean(
+            address &&
+            [
+                address.firstname,
+                address.lastname,
+                address.city,
+                address.postcode,
+                address.countryId || address.country_id
+            ].some(function (value) {
+                return value !== undefined && value !== null && String(value).trim() !== '';
+            })
+        );
+    }
+
     function isBillingFormElement(element) {
         return Boolean(
             element &&
@@ -284,6 +344,10 @@ define([
              * @returns {Object}
              */
             initObservable: function () {
+                if (isFastcheckoutActive() && hasPersistedSeparateBillingAddress()) {
+                    userChoseSeparateBilling = true;
+                }
+
                 this._super();
 
                 if (
@@ -303,7 +367,10 @@ define([
              * @returns {Object}
              */
             initialize: function () {
-                var self = this;
+                var self = this,
+                    billing,
+                    shipping,
+                    persistedBillingAddressData;
 
                 this._super();
 
@@ -322,10 +389,37 @@ define([
                 this._fastcheckoutRegisterBillingDocumentGuard();
                 // Honor a prior intentional uncheck (e.g. payment method swap remounts this component).
                 if (userChoseSeparateBilling) {
+                    persistedBillingAddressData = getPersistedNewBillingAddressData();
+                    billing = quote && typeof quote.billingAddress === 'function'
+                        ? quote.billingAddress()
+                        : null;
+                    shipping = quote && typeof quote.shippingAddress === 'function'
+                        ? quote.shippingAddress()
+                        : null;
+                    if (
+                        persistedBillingAddressData &&
+                        (
+                            !hasAddressContent(billing) ||
+                            this._fastcheckoutBillingMatchesShipping(billing, shipping)
+                        )
+                    ) {
+                        selectBillingAddress(
+                            addressConverter.formAddressDataToQuoteAddress(persistedBillingAddressData)
+                        );
+                    }
                     if (this.isAddressSameAsShipping) {
                         this.isAddressSameAsShipping(false);
                     }
-                    if (this.isAddressDetailsVisible) {
+                    billing = quote && typeof quote.billingAddress === 'function'
+                        ? quote.billingAddress()
+                        : null;
+                    shipping = quote && typeof quote.shippingAddress === 'function'
+                        ? quote.shippingAddress()
+                        : null;
+                    if (
+                        this.isAddressDetailsVisible &&
+                        (!billing || this._fastcheckoutBillingMatchesShipping(billing, shipping))
+                    ) {
                         this.isAddressDetailsVisible(false);
                     }
                 } else {
