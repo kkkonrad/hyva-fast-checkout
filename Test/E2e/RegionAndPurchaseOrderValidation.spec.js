@@ -406,6 +406,14 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
             });
             window.scrollTo(0, document.body.scrollHeight);
         });
+        await page.waitForTimeout(50);
+        await page.evaluate(() => {
+            window.fastcheckoutTestScrollPositions = [];
+            const sampler = window.setInterval(() => {
+                window.fastcheckoutTestScrollPositions.push(window.scrollY);
+            }, 16);
+            window.setTimeout(() => window.clearInterval(sampler), 600);
+        });
 
         await page.locator('[data-fastcheckout-place-order-mobile]:visible').evaluate(
             (button) => button.click()
@@ -418,6 +426,10 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
 
             return rect.top >= 0 && rect.bottom <= window.innerHeight;
         })).toBe(true);
+        await page.waitForTimeout(500);
+        expect(await page.evaluate(() => (
+            new Set(window.fastcheckoutTestScrollPositions).size
+        ))).toBeGreaterThan(2);
     });
 
     test('missing payment method validation is displayed in Polish', async ({ page }) => {

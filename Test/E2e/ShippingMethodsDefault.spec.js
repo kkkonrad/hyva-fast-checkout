@@ -104,6 +104,30 @@ async function openFastCheckout(page) {
 }
 
 test.describe('Shipping methods default destination (headless)', () => {
+  test('reload keeps all shipping methods after restoring a selection', async ({ page }) => {
+    test.setTimeout(180_000);
+
+    await ensureCartHasItem(page);
+    await openFastCheckout(page);
+
+    const shippingRadios = page.locator('input[name="shipping_method"]');
+    await expect.poll(() => shippingRadios.count(), { timeout: 30_000 }).toBeGreaterThan(1);
+    const expectedMethods = await shippingRadios.evaluateAll((radios) =>
+      radios.map((radio) => radio.value).sort()
+    );
+
+    await shippingRadios.last().click({ force: true });
+    await page.waitForTimeout(2500);
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await page.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 });
+      await page.waitForSelector('#fastcheckout-checkout', { timeout: 45_000 });
+      await expect.poll(async () => shippingRadios.evaluateAll((radios) =>
+        radios.map((radio) => radio.value).sort()
+      ), { timeout: 30_000 }).toEqual(expectedMethods);
+    }
+  });
+
   test('loads rates immediately, re-estimates after address change', async ({ page }) => {
     test.setTimeout(180_000);
 

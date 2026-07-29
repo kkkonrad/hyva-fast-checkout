@@ -820,6 +820,10 @@ define([
                 // shipping-rate-service re-estimates whenever quote.shippingAddress changes.
                 var scheduleShippingRatesBootstrap = (function createShippingRatesBootstrap() {
                     var hadSsrRates = checkoutStateBridge.applyInitialShippingRates();
+                    var refreshSingleSelectedSsrRate = hadSsrRates &&
+                        Boolean(window.fastcheckoutInitialShippingMethod) &&
+                        Array.isArray(window.fastcheckoutInitialShippingRates) &&
+                        window.fastcheckoutInitialShippingRates.length === 1;
                     var seedCountry = (window.checkoutConfig && window.checkoutConfig.defaultCountryId) ||
                         (window.fastcheckoutDefaultDestination && window.fastcheckoutDefaultDestination.countryId) ||
                         '';
@@ -890,7 +894,9 @@ define([
                     }
 
                     function startAfterAddressRender() {
-                        if (hadSsrRates) {
+                        // Magento can retain only the selected grouped quote rate. Keep it
+                        // visible immediately, but refresh once so the full list returns.
+                        if (hadSsrRates && !refreshSingleSelectedSsrRate) {
                             seedQuoteShippingAddress(false);
                             return;
                         }
@@ -1554,6 +1560,56 @@ define([
                     shippingErrorBridge.show(methodCode, carrierCode, errorMessage);
                 }
 
+                function focusCustomShippingValidationError() {
+                    var errors = document.querySelectorAll(
+                            '[data-fastcheckout-shipping-methods] ' +
+                            '[aria-invalid="true"], ' +
+                            '[data-fastcheckout-shipping-methods] .field-error, ' +
+                            '[data-fastcheckout-shipping-methods] .mage-error, ' +
+                            '[data-fastcheckout-shipping-methods] [role="alert"]'
+                        ),
+                        target = Array.prototype.filter.call(errors, function (element) {
+                            return element.offsetParent !== null && (
+                                element.matches('[aria-invalid="true"]') ||
+                                String(element.textContent || '').trim() !== ''
+                            );
+                        }).pop(),
+                        start = window.pageYOffset,
+                        startedAt = Date.now(),
+                        rect,
+                        destination;
+
+                    if (!target) {
+                        return;
+                    }
+
+                    rect = target.getBoundingClientRect();
+                    destination = Math.max(
+                        0,
+                        start + rect.top - ((window.innerHeight - rect.height) / 2)
+                    );
+
+                    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                        window.scrollTo(0, destination);
+                        return;
+                    }
+
+                    startedAt = Date.now();
+                    window.setTimeout(function animate() {
+                        var progress;
+
+                        progress = Math.min((Date.now() - startedAt) / 400, 1);
+                        window.scrollTo(
+                            0,
+                            start + (destination - start) * progress * (2 - progress)
+                        );
+
+                        if (progress < 1) {
+                            window.setTimeout(animate, 16);
+                        }
+                    }, 0);
+                }
+
                 window.fastcheckoutHyvaShipping = {
                     syncShippingMethod: syncSelectedShippingMethodToKnockout,
                     persistShippingMethod: persistShippingMethod,
@@ -1791,6 +1847,7 @@ define([
                                 if (typeof validator === 'function') {
                                     try {
                                         if (!validator(activeMethod)) {
+                                            focusCustomShippingValidationError();
                                             return false;
                                         }
                                     } catch (err) {
