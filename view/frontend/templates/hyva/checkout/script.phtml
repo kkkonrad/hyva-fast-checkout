@@ -122,12 +122,16 @@ foreach ($clientMessagePhrases as $phrase) {
         var selectedMethod = getSelectedPaymentMethod();
         var paymentBridge = window.fastcheckoutHyvaPayment;
         var shippingBridge = window.fastcheckoutHyvaShipping;
+        var shippingScrollStart = window.pageYOffset;
 
         showError('');
 
         if (shippingBridge && typeof shippingBridge.validate === 'function' && !shippingBridge.validate()) {
             var shipMsg = window.fastcheckoutLastShippingValidationError ||
                 translateClientMessage('Please complete shipping information.');
+            if (typeof shippingBridge.focusFirstInvalidField === 'function') {
+                shippingBridge.focusFirstInvalidField(shippingScrollStart);
+            }
             showError(shipMsg);
             return Promise.reject(new Error(shipMsg));
         }

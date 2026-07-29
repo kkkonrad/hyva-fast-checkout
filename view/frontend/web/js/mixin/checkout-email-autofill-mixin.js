@@ -47,6 +47,25 @@ define([
         });
     }
 
+    function clearEmailValidation(input) {
+        var wrapper;
+
+        if (!input) {
+            return;
+        }
+
+        input.removeAttribute('aria-invalid');
+        input.removeAttribute('aria-describedby');
+        input.classList.remove('mage-error', 'field-error');
+        wrapper = input.closest('label') || input.closest('.field, .admin__field');
+        if (wrapper) {
+            wrapper.classList.remove('field-error', '_error');
+        }
+        input.parentNode.querySelectorAll('label.mage-error, div.mage-error').forEach(function (error) {
+            error.remove();
+        });
+    }
+
     return function (EmailComponent) {
         return EmailComponent.extend({
             /**
@@ -104,14 +123,8 @@ define([
                         '[data-role="email-with-possible-login"] input[name="username"]'
                     );
 
-                if (input && focused !== false) {
-                    input.removeAttribute('aria-invalid');
-                    input.removeAttribute('aria-describedby');
-                    input.classList.remove('mage-error', 'field-error');
-                    var wrapper = input.closest('label') || input.closest('.field, .admin__field');
-                    if (wrapper) {
-                        wrapper.classList.remove('field-error', '_error');
-                    }
+                if (typeof focused === 'undefined') {
+                    clearEmailValidation(input);
                 }
 
                 if (focused === false && email) {
@@ -119,13 +132,7 @@ define([
 
                     if (input) {
                         if (valid) {
-                            input.removeAttribute('aria-invalid');
-                            input.removeAttribute('aria-describedby');
-                            input.classList.remove('mage-error', 'field-error');
-                            var wrapperValid = input.closest('label') || input.closest('.field, .admin__field');
-                            if (wrapperValid) {
-                                wrapperValid.classList.remove('field-error', '_error');
-                            }
+                            clearEmailValidation(input);
                         } else {
                             input.setAttribute('aria-invalid', 'true');
                         }

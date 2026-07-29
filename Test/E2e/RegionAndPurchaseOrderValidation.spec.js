@@ -364,6 +364,67 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
         expect(submitRequests).toEqual([]);
     });
 
+    test('shipping address validation scrolls smoothly to the first error', async ({ page }) => {
+        await openCheckoutWithProduct(page);
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.waitForFunction(() => (
+            typeof window.fastcheckoutHyvaShipping?.focusFirstInvalidField === 'function'
+        ));
+        await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+        await page.waitForTimeout(50);
+        await page.evaluate(() => {
+            window.fastcheckoutTestAddressScrollPositions = [];
+            const sampler = window.setInterval(() => {
+                window.fastcheckoutTestAddressScrollPositions.push(window.scrollY);
+            }, 16);
+            window.setTimeout(() => window.clearInterval(sampler), 600);
+        });
+
+        await page.locator('[data-fastcheckout-place-order-mobile]:visible').evaluate(
+            (button) => button.click()
+        );
+
+        const invalid = page.locator(
+            '.fastcheckout-native-shipping-address [aria-invalid="true"]'
+        ).first();
+        await expect(invalid).toBeVisible();
+        await expect.poll(async () => invalid.evaluate((element) => {
+            const rect = element.getBoundingClientRect();
+
+            return rect.top >= 0 && rect.bottom <= window.innerHeight;
+        })).toBe(true);
+        await page.waitForTimeout(500);
+        expect(await page.evaluate(() => (
+            new Set(window.fastcheckoutTestAddressScrollPositions).size
+        ))).toBeGreaterThan(2);
+    });
+
+    test('email validation keeps one current inline error', async ({ page }) => {
+        await openCheckoutWithProduct(page);
+
+        const email = page.locator(
+            '.fastcheckout-native-shipping-address input[name="email"]'
+        );
+        const error = page.locator('#customer-email-error');
+        const submit = page.locator('[data-fastcheckout-place-order]:visible');
+
+        await submit.evaluate((button) => button.click());
+        await submit.evaluate((button) => button.click());
+        await expect(error).toHaveCount(1);
+        await expect(error).toHaveText('To jest wymagane pole.');
+
+        await email.fill('invalid-email');
+        await email.blur();
+        await submit.evaluate((button) => button.click());
+        await submit.evaluate((button) => button.click());
+        await expect(error).toHaveCount(1);
+        await expect(error).toHaveText('Podaj poprawny adres email (Ex: johndoe@domain.com).');
+
+        await email.fill('validation@example.com');
+        await email.blur();
+        await expect(error).toHaveCount(0);
+    });
+
     test('shipping validator error scrolls back to the shipping method', async ({ page }) => {
         await openCheckoutWithProduct(page);
         await fillPolishShippingAddress(page);

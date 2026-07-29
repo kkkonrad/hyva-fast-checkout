@@ -1560,10 +1560,16 @@ define([
                     shippingErrorBridge.show(methodCode, carrierCode, errorMessage);
                 }
 
-                function focusCustomShippingValidationError() {
+                function focusShippingValidationError(scrollStart) {
                     var errors = document.querySelectorAll(
-                            '[data-fastcheckout-shipping-methods] ' +
-                            '[aria-invalid="true"], ' +
+                            '.fastcheckout-native-shipping-address [aria-invalid="true"], ' +
+                            '.fastcheckout-native-shipping-address .admin__field._error input:not([type="hidden"]), ' +
+                            '.fastcheckout-native-shipping-address .admin__field._error select, ' +
+                            '.fastcheckout-native-shipping-address .field._error input:not([type="hidden"]), ' +
+                            '.fastcheckout-native-shipping-address .field._error select, ' +
+                            '.fastcheckout-native-shipping-address .admin__field-error, ' +
+                            '.fastcheckout-native-shipping-address .field-error, ' +
+                            '.fastcheckout-native-shipping-address .mage-error, ' +
                             '[data-fastcheckout-shipping-methods] .field-error, ' +
                             '[data-fastcheckout-shipping-methods] .mage-error, ' +
                             '[data-fastcheckout-shipping-methods] [role="alert"]'
@@ -1573,8 +1579,10 @@ define([
                                 element.matches('[aria-invalid="true"]') ||
                                 String(element.textContent || '').trim() !== ''
                             );
-                        }).pop(),
-                        start = window.pageYOffset,
+                        }).shift(),
+                        start = Number.isFinite(Number(scrollStart))
+                            ? Number(scrollStart)
+                            : window.pageYOffset,
                         startedAt = Date.now(),
                         rect,
                         destination;
@@ -1586,8 +1594,18 @@ define([
                     rect = target.getBoundingClientRect();
                     destination = Math.max(
                         0,
-                        start + rect.top - ((window.innerHeight - rect.height) / 2)
+                        window.pageYOffset + rect.top -
+                            ((window.innerHeight - rect.height) / 2)
                     );
+                    window.scrollTo(0, start);
+
+                    if (typeof target.focus === 'function') {
+                        try {
+                            target.focus({ preventScroll: true });
+                        } catch (e) {
+                            // Error labels are valid scroll targets but may not be focusable.
+                        }
+                    }
 
                     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
                         window.scrollTo(0, destination);
@@ -1706,6 +1724,7 @@ define([
                         return syncShippingAttributes();
                     },
                     registerValidator: registerShippingValidator,
+                    focusFirstInvalidField: focusShippingValidationError,
                     onRecollectShippingRatesAction: function (originalAction) {
                         if (
                             window.fastcheckoutLockShippingRatesList ||
@@ -1847,7 +1866,6 @@ define([
                                 if (typeof validator === 'function') {
                                     try {
                                         if (!validator(activeMethod)) {
-                                            focusCustomShippingValidationError();
                                             return false;
                                         }
                                     } catch (err) {
