@@ -534,6 +534,8 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
             '[data-fastcheckout-payment-selection-error]:visible'
         );
         await expect(error).toHaveText('Wybierz metodę płatności.');
+        await expect(error).toHaveClass(/border-red-200/);
+        await expect(error).toHaveClass(/bg-red-50/);
         await expect(error).not.toContainText('Please select a payment method.');
         await expect(page.locator(
             '[data-fastcheckout-client-order-error]:visible'

@@ -117,7 +117,7 @@ foreach ($clientMessagePhrases as $phrase) {
         var error = form.querySelector('[data-fastcheckout-payment-selection-error]');
 
         if (error) {
-            error.textContent = message || '';
+            error.firstElementChild.textContent = message || '';
             error.classList.toggle('hidden', !message);
         }
     }
