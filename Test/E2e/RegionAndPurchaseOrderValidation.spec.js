@@ -512,16 +512,42 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
                 input.checked = false;
             });
         });
+        await page.evaluate(() => {
+            window.fastcheckoutPaymentValidationScrollTarget = '';
+            const scrollIntoView = Element.prototype.scrollIntoView;
+
+            Element.prototype.scrollIntoView = function (options) {
+                if (this.matches('[data-fastcheckout-payment-selection-error]')) {
+                    window.fastcheckoutPaymentValidationScrollTarget =
+                        options && options.behavior;
+                }
+
+                return scrollIntoView.call(this, options);
+            };
+        });
 
         await page.locator('[data-fastcheckout-place-order]:visible').evaluate(
             (button) => button.click()
         );
 
         const error = page.locator(
-            '[data-fastcheckout-client-order-error]:visible'
+            '[data-fastcheckout-payment-selection-error]:visible'
         );
         await expect(error).toHaveText('Wybierz metodę płatności.');
         await expect(error).not.toContainText('Please select a payment method.');
+        await expect(page.locator(
+            '[data-fastcheckout-client-order-error]:visible'
+        )).toHaveCount(0);
+        await expect.poll(() => page.evaluate(() => (
+            window.fastcheckoutPaymentValidationScrollTarget
+        ))).toBe('smooth');
+        await expect.poll(() => error.evaluate((element) => {
+            const rect = element.getBoundingClientRect();
+
+            return rect.top >= 0 && rect.bottom <= window.innerHeight;
+        })).toBe(true);
+        await paymentMethod.evaluate((input) => input.click());
+        await expect(error).toBeHidden();
     });
 
     test('place order keeps the primary loader through success navigation', async ({ page }) => {

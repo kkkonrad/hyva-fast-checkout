@@ -113,6 +113,15 @@ foreach ($clientMessagePhrases as $phrase) {
         window.fastcheckoutLastShippingValidationError = message || '';
     }
 
+    function showPaymentSelectionError(message) {
+        var error = form.querySelector('[data-fastcheckout-payment-selection-error]');
+
+        if (error) {
+            error.textContent = message || '';
+            error.classList.toggle('hidden', !message);
+        }
+    }
+
     function getSelectedPaymentMethod() {
         var checked = form.querySelector('input[name="payment_method"]:checked:not(:disabled)');
         return checked ? checked.value : '';
@@ -125,6 +134,7 @@ foreach ($clientMessagePhrases as $phrase) {
         var shippingScrollStart = window.pageYOffset;
 
         showError('');
+        showPaymentSelectionError('');
 
         if (shippingBridge && typeof shippingBridge.validate === 'function' && !shippingBridge.validate()) {
             var shipMsg = window.fastcheckoutLastShippingValidationError ||
@@ -138,7 +148,10 @@ foreach ($clientMessagePhrases as $phrase) {
 
         if (!selectedMethod) {
             var payMsg = translateClientMessage('Please select a payment method.');
-            showError(payMsg);
+            showPaymentSelectionError(payMsg);
+            if (paymentBridge && typeof paymentBridge.focusFirstInvalidField === 'function') {
+                paymentBridge.focusFirstInvalidField();
+            }
             return Promise.reject(new Error(payMsg));
         }
 
@@ -242,6 +255,11 @@ foreach ($clientMessagePhrases as $phrase) {
         // Magento message container. Consume the promise here so an expected invalid
         // submit does not become an unhandled browser error.
         placeOrderViaKo().catch(function () {});
+    });
+    form.addEventListener('change', function (event) {
+        if (event.target && event.target.name === 'payment_method') {
+            showPaymentSelectionError('');
+        }
     });
 
     // Coupon apply/cancel via Magento guest/customer coupon REST when available.

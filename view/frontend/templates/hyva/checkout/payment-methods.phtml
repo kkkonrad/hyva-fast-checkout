@@ -46,6 +46,10 @@ foreach ($paymentMethods as $paymentMethod) {
         </h2>
     </div>
 
+    <p class="text-sm text-red-600 font-medium mb-4 hidden"
+       data-fastcheckout-payment-selection-error
+       role="alert"></p>
+
     <p class="text-sm text-gray-500<?= $hasAvailablePaymentMethods ? ' hidden' : '' ?>"
        role="status"
        data-fastcheckout-no-payment-methods
