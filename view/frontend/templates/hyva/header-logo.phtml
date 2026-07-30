@@ -1,0 +1,12 @@
+<?php
+/**
+ * Checkout header with the store logo only.
+ *
+ * @var \Magento\Framework\View\Element\Template $block
+ */
+?>
+<div id="header" class="relative z-30 w-full border-b shadow bg-white border-gray-100">
+    <div class="container flex items-center justify-center px-6 py-3 mx-auto">
+        <?= $block->getChildHtml('logo') ?>
+    </div>
+</div>

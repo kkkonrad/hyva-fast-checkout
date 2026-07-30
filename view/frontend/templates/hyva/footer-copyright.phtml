@@ -1,0 +1,13 @@
+<?php
+/**
+ * Checkout footer with copyright only.
+ *
+ * @var \Magento\Framework\View\Element\Template $block
+ */
+?>
+<div class="bg-surface border-t border-b border-gray-300">
+    <div class="container py-6 flex items-center justify-center sm:flex-row flex-col">
+        <a href="https://hyva.io" class="text-xl font-medium">Hyvä Theme</a>
+        <p><?= $block->getChildHtml('copyright') ?></p>
+    </div>
+</div>

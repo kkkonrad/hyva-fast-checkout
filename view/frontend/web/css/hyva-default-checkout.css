@@ -402,6 +402,10 @@
     margin-bottom: 1rem;
 }
 
+#fastcheckout-checkout .fastcheckout-native-shipping-address #customer-email-fieldset {
+    margin-bottom: 1rem;
+}
+
 #fastcheckout-checkout .fastcheckout-native-shipping-address .note {
     display: block;
     margin-top: 0.25rem;

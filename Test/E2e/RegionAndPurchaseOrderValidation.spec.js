@@ -730,6 +730,16 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
         const orderEntityId = JSON.parse(await orderResponse.text());
         expect(Number(orderEntityId)).toBeGreaterThan(0);
         await page.waitForURL(/checkout\/onepage\/success/, { timeout: 30_000 });
+
+        const createAccount = page.locator(
+            'a[href*="/checkout/account/delegateCreate"]'
+        );
+        await expect(createAccount).toBeVisible();
+        await expect(createAccount.locator('xpath=ancestor::*[contains(@class, "max-w-md")]')).toHaveCSS(
+            'text-align',
+            'center'
+        );
+
         console.log('Created Purchase Order test order entity ID:', orderEntityId);
     });
 });

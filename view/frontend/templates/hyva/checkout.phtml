@@ -29,6 +29,11 @@ $allowedPaymentMethodCodes = $block->getAllowedPaymentMethodCodes();
             </h1>
             <p class="mt-2 text-sm text-gray-500">
                 <?= $escaper->escapeHtml(__('Complete your purchase details below.')) ?>
+                <?php if (empty($checkoutConfig['isCustomerLoggedIn'])): ?>
+                    <span class="block mt-1">
+                        <?= $escaper->escapeHtml(__('You can create an account after checkout.')) ?>
+                    </span>
+                <?php endif; ?>
             </p>
         </div>
         <a class="btn btn-secondary w-full sm:w-auto text-center"

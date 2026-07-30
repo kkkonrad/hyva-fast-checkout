@@ -10,6 +10,13 @@
     </head>
     <body>
         <referenceBlock name="page.main.title" remove="true"/>
+        <referenceBlock name="header-content"
+                        template="Kkkonrad_Fastcheckout::hyva/header-logo.phtml"/>
+        <referenceBlock name="footer-content"
+                        template="Kkkonrad_Fastcheckout::hyva/footer-copyright.phtml"/>
+        <referenceBlock name="messages" remove="true"/>
+        <referenceBlock name="script-alpine-js" remove="true"/>
+        <referenceBlock name="require-alpine-v3" remove="true"/>
         <referenceContainer name="after.body.start">
             <block class="Magento\RequireJs\Block\Html\Head\Config"
                    name="kkkonrad.fastcheckout.requirejs.config"/>

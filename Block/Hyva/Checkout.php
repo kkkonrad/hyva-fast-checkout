@@ -760,6 +760,10 @@ class Checkout extends Template
         // its children are already registered by the UI layout renderer.
         unset($component['config']['deps']);
         $component['config']['template'] = 'Kkkonrad_Fastcheckout/hyva/shipping-address';
+        $component['config']['popUpForm']['options']['appendTo'] =
+            '#fastcheckout-checkout .fastcheckout-native-shipping-address';
+        $component['config']['popUpForm']['options']['buttons']['save']['text'] =
+            (string) __('Deliver to this address');
 
         return $component;
     }

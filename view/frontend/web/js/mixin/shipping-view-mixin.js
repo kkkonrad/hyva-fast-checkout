@@ -258,6 +258,23 @@ define([
 
     return function (Shipping) {
         return Shipping.extend({
+            saveNewAddress: function () {
+                document.querySelectorAll(
+                    '.new-shipping-address-modal._show #co-shipping-form input, ' +
+                    '.new-shipping-address-modal._show #co-shipping-form select, ' +
+                    '.new-shipping-address-modal._show #co-shipping-form textarea'
+                ).forEach(function (field) {
+                    field.dispatchEvent(new Event(
+                        field.matches('select, [type="checkbox"], [type="radio"]')
+                            ? 'change'
+                            : 'keyup',
+                        { bubbles: true }
+                    ));
+                });
+
+                return this._super();
+            },
+
             splitMethodCode: function (value) {
                 var parts = String(value || '').split('_'),
                     carrier = parts.shift() || '';

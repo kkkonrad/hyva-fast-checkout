@@ -36,6 +36,9 @@
         </p>
     </div>
 
+    <?= /* @noEscape -- standard Magento registration block validates whether it may be displayed. */
+    $block->getChildHtml('registration') ?>
+
     <!-- Print Receipt -->
     <?php if ($block->getCanViewOrder() && $block->getCanPrintOrder()): ?>
         <div class="text-sm">

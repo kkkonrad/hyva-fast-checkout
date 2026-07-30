@@ -152,6 +152,8 @@ foreach ($layoutAssets['css'] as $cssAsset) {
         enumerable: true
     });
     window.checkoutConfig = actualConfig;
+    window.isCustomerLoggedIn = actualConfig.isCustomerLoggedIn;
+    window.customerData = actualConfig.customerData || {};
 
     var config = <?= /* @noEscape */ \Laminas\Json\Json::encode($mageInitConfig) ?>;
     // Keep a single serialized checkoutConfig in the HTML. The bridge receives
