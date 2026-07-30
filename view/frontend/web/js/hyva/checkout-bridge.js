@@ -3899,9 +3899,36 @@ define([
                  * @returns {Boolean}
                  */
                 function ensureQuoteShippingAddressForPlaceOrder() {
-                    var formData = collectShippingAddressDataForPlaceOrder(),
+                    var current = quote && typeof quote.shippingAddress === 'function'
+                            ? quote.shippingAddress()
+                            : null,
+                        currentType = current && typeof current.getType === 'function'
+                            ? current.getType()
+                            : '',
+                        formData,
                         newAddress,
-                        current;
+                        currentKey;
+
+                    // A saved Magento address is authoritative. Merging the hidden new-address
+                    // form into it turns it into a new-customer-address and deselects its card.
+                    if (
+                        currentType &&
+                        currentType !== 'new-customer-address' &&
+                        hasMeaningfulAddressData(normalizeKoAddressData(current))
+                    ) {
+                        currentKey = typeof current.getKey === 'function' ? current.getKey() : '';
+                        if (
+                            currentKey &&
+                            checkoutData &&
+                            typeof checkoutData.setSelectedShippingAddress === 'function'
+                        ) {
+                            checkoutData.setSelectedShippingAddress(currentKey);
+                        }
+
+                        return true;
+                    }
+
+                    formData = collectShippingAddressDataForPlaceOrder();
 
                     if (!formData) {
                         return !!(
@@ -3929,10 +3956,6 @@ define([
                     if (!newAddress) {
                         return false;
                     }
-
-                    current = quote && typeof quote.shippingAddress === 'function'
-                        ? quote.shippingAddress()
-                        : null;
 
                     if (!addressesMatch(current, newAddress) && typeof selectShippingAddressAction === 'function') {
                         selectShippingAddressAction(newAddress);
