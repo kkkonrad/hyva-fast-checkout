@@ -3,11 +3,17 @@
       layout="1column"
       xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
     <head>
+        <script src="Kkkonrad_Fastcheckout::js/requirejs-base.js"/>
+        <script src="requirejs/require.js"/>
         <css src="Kkkonrad_Fastcheckout::css/hyva-ko-payment.css"/>
         <css src="Kkkonrad_Fastcheckout::css/hyva-default-checkout.css"/>
     </head>
     <body>
         <referenceBlock name="page.main.title" remove="true"/>
+        <referenceContainer name="after.body.start">
+            <block class="Magento\RequireJs\Block\Html\Head\Config"
+                   name="kkkonrad.fastcheckout.requirejs.config"/>
+        </referenceContainer>
         <referenceContainer name="content">
             <block class="Kkkonrad\Fastcheckout\Block\Hyva\Checkout"
                    name="kkkonrad.fastcheckout.hyva.checkout"

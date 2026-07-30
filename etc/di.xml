@@ -2,19 +2,6 @@
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
 
-    <type name="Kkkonrad\Fastcheckout\Block\Hyva\Checkout">
-        <arguments>
-            <argument name="checkoutLayoutProcessor" xsi:type="object">Magento\Checkout\Block\Checkout\LayoutProcessor</argument>
-            <argument name="checkoutDirectoryDataProcessor" xsi:type="object">Magento\Checkout\Block\Checkout\DirectoryDataProcessor</argument>
-            <argument name="paymentMethodManagement" xsi:type="object">Magento\Quote\Api\PaymentMethodManagementInterface</argument>
-            <argument name="paymentHelper" xsi:type="object">Magento\Payment\Helper\Data</argument>
-            <!-- Caches the processed standard checkout layout (LayoutProcessor + per-module
-                 layout scan) across requests; it only changes on deploy/config edits. -->
-            <argument name="appCache" xsi:type="object">Magento\Framework\App\CacheInterface</argument>
-            <argument name="serializer" xsi:type="object">Magento\Framework\Serialize\SerializerInterface</argument>
-        </arguments>
-    </type>
-
     <type name="Magento\Quote\Api\CartRepositoryInterface">
         <plugin name="fastcheckout_preserve_inpost_locker" type="Kkkonrad\Fastcheckout\Plugin\Quote\PreserveInpostLocker"/>
     </type>

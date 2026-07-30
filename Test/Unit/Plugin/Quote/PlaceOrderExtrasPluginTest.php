@@ -33,16 +33,15 @@ class PlaceOrderExtrasPluginTest extends TestCase
             ->disableOriginalConstructor()
             ->addMethods([
                 'setFastcheckoutComment',
+                'unsFastcheckoutComment',
                 'setFastcheckoutSubscribe',
-                'getFastcheckoutIdempotencyKey',
-                'setFastcheckoutIdempotencyKey',
-                'getLastRealOrderId',
+                'unsFastcheckoutSubscribe',
             ])
             ->getMock();
         $this->helper = $this->createMock(Helper::class);
         $this->request = $this->getMockBuilder(HttpRequest::class)
             ->disableOriginalConstructor()
-            ->onlyMethods(['getHeader', 'getContent'])
+            ->onlyMethods(['getContent'])
             ->getMock();
         $this->plugin = new PlaceOrderExtrasPlugin(
             $this->checkoutSession,
@@ -54,7 +53,6 @@ class PlaceOrderExtrasPluginTest extends TestCase
     public function testBeforePlaceOrderStoresCommentFromPaymentAdditionalData(): void
     {
         $this->helper->method('isEnable')->willReturn(true);
-        $this->request->method('getHeader')->willReturn('');
         $this->request->method('getContent')->willReturn('');
 
         $payment = $this->createMock(PaymentInterface::class);
@@ -76,7 +74,6 @@ class PlaceOrderExtrasPluginTest extends TestCase
     public function testBeforePlaceOrderReadsCommentFromJsonBody(): void
     {
         $this->helper->method('isEnable')->willReturn(true);
-        $this->request->method('getHeader')->willReturn('');
         $this->request->method('getContent')->willReturn(json_encode([
             'paymentMethod' => [
                 'method' => 'checkmo',
@@ -102,7 +99,6 @@ class PlaceOrderExtrasPluginTest extends TestCase
     public function testBeforePlaceOrderReadsLegacyFastcheckoutKeysFromJsonBody(): void
     {
         $this->helper->method('isEnable')->willReturn(true);
-        $this->request->method('getHeader')->willReturn('');
         $this->request->method('getContent')->willReturn(json_encode([
             'paymentMethod' => [
                 'method' => 'checkmo',
@@ -124,10 +120,22 @@ class PlaceOrderExtrasPluginTest extends TestCase
         $this->plugin->beforePlaceOrder($subject, 7, null);
     }
 
+    public function testBeforePlaceOrderClearsExtrasMissingFromCurrentRequest(): void
+    {
+        $this->helper->method('isEnable')->willReturn(true);
+        $this->request->method('getContent')->willReturn('');
+        $this->checkoutSession->expects($this->once())->method('unsFastcheckoutComment');
+        $this->checkoutSession->expects($this->once())->method('unsFastcheckoutSubscribe');
+
+        $subject = $this->createMock(CartManagementInterface::class);
+        $this->plugin->beforePlaceOrder($subject, 7, null);
+    }
+
     public function testBeforePlaceOrderNoopWhenModuleDisabled(): void
     {
         $this->helper->method('isEnable')->willReturn(false);
         $this->checkoutSession->expects($this->never())->method('setFastcheckoutComment');
+        $this->checkoutSession->expects($this->never())->method('unsFastcheckoutComment');
 
         $subject = $this->createMock(CartManagementInterface::class);
         $result = $this->plugin->beforePlaceOrder($subject, 1, null);

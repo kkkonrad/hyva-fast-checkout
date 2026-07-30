@@ -2,13 +2,13 @@
 
 namespace Kkkonrad\Fastcheckout\Block\Adminhtml\System\Config\Form\Field;
 
-use Kkkonrad\Fastcheckout\Model\Config\Source\Shipping as ShippingSource;
 use Magento\Framework\View\Element\Context;
+use Magento\Shipping\Model\Config\Source\Allmethods;
 
 class ShippingMethods extends \Magento\Framework\View\Element\Html\Select
 {
     /**
-     * @var ShippingSource
+     * @var Allmethods
      */
     private $shippingSource;
 
@@ -16,12 +16,12 @@ class ShippingMethods extends \Magento\Framework\View\Element\Html\Select
      * ShippingMethods constructor.
      *
      * @param Context $context
-     * @param ShippingSource $shippingSource
+     * @param Allmethods $shippingSource
      * @param array $data
      */
     public function __construct(
         Context $context,
-        ShippingSource $shippingSource,
+        Allmethods $shippingSource,
         array $data = []
     ) {
         parent::__construct($context, $data);
@@ -48,7 +48,7 @@ class ShippingMethods extends \Magento\Framework\View\Element\Html\Select
     {
         if (!$this->getOptions()) {
             $this->addOption('*', __('All Shipping Methods'));
-            foreach ($this->shippingSource->toOptionArray() as $shippingOption) {
+            foreach ($this->shippingSource->toOptionArray(true) as $shippingOption) {
                 if (is_array($shippingOption['value'])) {
                     $carrierCode = $this->getCarrierCodeFromMethods($shippingOption['value']);
                     if ($carrierCode !== '') {
@@ -58,7 +58,10 @@ class ShippingMethods extends \Magento\Framework\View\Element\Html\Select
                         );
                     }
                     foreach ($shippingOption['value'] as $method) {
-                        $this->addOption($method['value'], $method['label']);
+                        $this->addOption(
+                            $method['value'],
+                            preg_replace('#^\[.+?\]\s#', '', (string)$method['label'])
+                        );
                     }
                 } else {
                     $this->addOption($shippingOption['value'], $shippingOption['label']);

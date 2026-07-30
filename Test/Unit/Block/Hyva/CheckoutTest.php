@@ -708,16 +708,12 @@ XML
                     'component' => 'uiComponent',
                     'displayArea' => 'additional-fieldsets',
                     'children' => [
+                        'postcode' => [
+                            'component' => 'Magento_Ui/js/form/element/post-code'
+                        ],
                         'delivery_note' => [
                             'component' => 'Magento_Ui/js/form/element/abstract',
-                            'label' => 'Delivery Note',
-                            'provider' => 'checkoutProvider',
-                            'dataScope' => 'shippingAddress.custom_attributes.delivery_note',
-                            'customScope' => 'shippingAddress.custom_attributes',
-                            'config' => [
-                                'template' => 'ui/form/field',
-                                'elementTmpl' => 'ui/form/element/input'
-                            ]
+                            'label' => 'Delivery Note'
                         ]
                     ]
                 ]

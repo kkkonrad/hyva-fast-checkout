@@ -2,7 +2,7 @@
   "name": "kkkonrad/fastcheckout",
   "description": "Dominate Checkout Open Source",
   "type": "magento2-module",
-  "version": "6.1.1",
+  "version": "7.0.0",
   "license": [
     "proprietary"
   ],
@@ -14,12 +14,6 @@
       "Kkkonrad\\Fastcheckout\\": ""
     }
   },
-  "repositories": [
-    {
-      "type": "composer",
-      "url": "https://repo.magento.com/"
-    }
-  ],
   "require": {
     "hyva-themes/magento2-theme-module": "^1.4",
     "magento/framework": "103.*",
@@ -30,7 +24,6 @@
     "magento/module-customer": "103.*",
     "magento/module-directory": "100.*",
     "magento/module-downloadable": "100.*",
-    "magento/module-gift-message": "100.*",
     "magento/module-newsletter": "100.*",
     "magento/module-sales": "100.*|101.*|102.*|103.*",
     "magento/module-quote": "100.*|101.*|102.*|103.*",

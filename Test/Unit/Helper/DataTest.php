@@ -9,7 +9,6 @@ use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\Helper\Context;
 use Magento\Framework\Json\Helper\Data as JsonHelper;
 use Magento\Framework\View\DesignInterface;
-use Magento\Store\Model\StoreManagerInterface;
 use Magento\Theme\Model\ThemeFactory;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -200,7 +199,6 @@ class DataTest extends TestCase
 
         $helper = new Data(
             $context,
-            $this->createMock(StoreManagerInterface::class),
             $this->createMock(JsonHelper::class),
             $this->createMock(DesignInterface::class),
             $this->createMock(ThemeFactory::class)
@@ -226,7 +224,6 @@ class DataTest extends TestCase
 
         return new Data(
             $context,
-            $this->createMock(StoreManagerInterface::class),
             $jsonHelper,
             $this->createMock(DesignInterface::class),
             $this->createMock(ThemeFactory::class)

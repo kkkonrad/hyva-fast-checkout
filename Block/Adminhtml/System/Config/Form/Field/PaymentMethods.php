@@ -2,30 +2,30 @@
 
 namespace Kkkonrad\Fastcheckout\Block\Adminhtml\System\Config\Form\Field;
 
-use Kkkonrad\Fastcheckout\Model\Config\Source\Payment as PaymentSource;
 use Magento\Framework\View\Element\Context;
+use Magento\Payment\Model\Config;
 
 class PaymentMethods extends \Magento\Framework\View\Element\Html\Select
 {
     /**
-     * @var PaymentSource
+     * @var Config
      */
-    private $paymentSource;
+    private $paymentConfig;
 
     /**
      * PaymentMethods constructor.
      *
      * @param Context $context
-     * @param PaymentSource $paymentSource
+     * @param Config $paymentConfig
      * @param array $data
      */
     public function __construct(
         Context $context,
-        PaymentSource $paymentSource,
+        Config $paymentConfig,
         array $data = []
     ) {
         parent::__construct($context, $data);
-        $this->paymentSource = $paymentSource;
+        $this->paymentConfig = $paymentConfig;
     }
 
     /**
@@ -47,13 +47,9 @@ class PaymentMethods extends \Magento\Framework\View\Element\Html\Select
     public function _toHtml()
     {
         if (!$this->getOptions()) {
-            foreach ($this->paymentSource->toOptionArray() as $paymentOption) {
-                if (is_array($paymentOption['value'])) {
-                    foreach ($paymentOption['value'] as $method) {
-                        $this->addOption($method['value'], $method['label']);
-                    }
-                } else {
-                    $this->addOption($paymentOption['value'], $paymentOption['label']);
+            foreach ($this->paymentConfig->getActiveMethods() as $code => $method) {
+                if ($code !== 'free') {
+                    $this->addOption($code, $method->getTitle());
                 }
             }
         }

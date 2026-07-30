@@ -1013,64 +1013,8 @@ define([
                     readinessTimer = window.setTimeout(pollShippingReadiness, 250);
                 }
 
-                // Register both schedulers before app() because a cached KO layout can
-                // render synchronously and dispatch address-fields-ready immediately.
                 scheduleShippingRatesBootstrap();
                 scheduleDeferredPaymentComponents();
-                if (!window.fastcheckoutShippingComponentsStarted) {
-                    window.fastcheckoutShippingComponentsStarted = true;
-                    app({
-                        components: {
-                            'checkoutProvider': $.extend(
-                                true,
-                                {
-                                    component: 'uiComponent',
-                                    shippingAddress: {
-                                        street: ['', '']
-                                    }
-                                },
-                                checkoutLayoutBridge.checkoutProvider
-                            ),
-                            'checkout': {
-                                component: 'uiComponent',
-                                children: {
-                                    steps: {
-                                        component: 'uiComponent',
-                                        children: $.extend(true, {}, checkoutLayoutBridge.checkoutStepChildren, {
-                                            'shipping-step': {
-                                                component: 'uiComponent',
-                                                children: {
-                                                    'step-config': {
-                                                        component: 'uiComponent'
-                                                    },
-                                                    // shippingListChildren (before-shipping-method-form,
-                                                    // shippingAdditional) belong to this component in
-                                                    // stock Magento — core's shipping.html renders those
-                                                    // regions itself. Fastcheckout renders the same
-                                                    // regions from Kkkonrad_Fastcheckout/hyva/shipping-list,
-                                                    // bound to this very instance, so they must live here.
-                                                    shippingAddress: $.extend(
-                                                        true,
-                                                        {},
-                                                        checkoutLayoutBridge.shippingAddress,
-                                                        {
-                                                            children: $.extend(
-                                                                true,
-                                                                {},
-                                                                checkoutLayoutBridge.shippingAddressChildren,
-                                                                checkoutLayoutBridge.shippingListChildren
-                                                            )
-                                                        }
-                                                    )
-                                                }
-                                            }
-                                        })
-                                    }
-                                }
-                            }
-                        }
-                    });
-                }
 
                 [0, 50, 250, 750, 1500, 3000].forEach(function (delay) {
                     window.setTimeout(checkoutLayoutBridge.aliasStandardShippingRegistryPaths, delay);

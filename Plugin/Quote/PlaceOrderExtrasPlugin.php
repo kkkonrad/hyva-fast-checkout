@@ -56,29 +56,17 @@ class PlaceOrderExtrasPlugin
         }
 
         $comment = $this->extractComment($paymentMethod);
-        if ($comment !== '') {
+        if ($comment === '') {
+            $this->checkoutSession->unsFastcheckoutComment();
+        } else {
             $this->checkoutSession->setFastcheckoutComment($comment);
         }
 
         $subscribe = $this->extractSubscribe($paymentMethod);
-        if ($subscribe !== null) {
+        if ($subscribe === null) {
+            $this->checkoutSession->unsFastcheckoutSubscribe();
+        } else {
             $this->checkoutSession->setFastcheckoutSubscribe($subscribe ? 1 : 0);
-        }
-
-        // Simple idempotency token to reduce double-submit races.
-        $token = (string)$this->request->getHeader('X-Fastcheckout-Idempotency');
-        if ($token === '' && $paymentMethod) {
-            $ext = $paymentMethod->getExtensionAttributes();
-            if ($ext && method_exists($ext, 'getFastcheckoutIdempotency')) {
-                $token = (string)$ext->getFastcheckoutIdempotency();
-            }
-        }
-        if ($token !== '') {
-            $prev = (string)$this->checkoutSession->getFastcheckoutIdempotencyKey();
-            if ($prev !== '' && $prev === $token && $this->checkoutSession->getLastRealOrderId()) {
-                // Already processed this token — Magento will still run; order existence is checked downstream.
-            }
-            $this->checkoutSession->setFastcheckoutIdempotencyKey($token);
         }
 
         return [$cartId, $paymentMethod];

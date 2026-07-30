@@ -59,7 +59,6 @@ $mageInitConfig = [
     'layoutExternalScripts' => $layoutScripts['external'] ?? [],
     'scope' => 'fastcheckoutHyvaPaymentRenderers'
 ];
-$block->ensureRequireJsAssets();
 ?>
 <?php
 $layoutAssets = $block->getCheckoutLayoutAssets();
@@ -158,29 +157,11 @@ foreach ($layoutAssets['css'] as $cssAsset) {
     // Keep a single serialized checkoutConfig in the HTML. The bridge receives
     // the same object by reference instead of embedding the large payload twice.
     config.checkoutConfig = window.checkoutConfig;
-    var requireJsUrl = '<?= $escaper->escapeJs($block->getViewFileUrl('requirejs/require.js')) ?>';
-    var minResolverUrl = '<?= $escaper->escapeJs($block->getRequireJsMinResolverUrl()) ?>';
-    var requireJsConfigUrl = '<?= $escaper->escapeJs($block->getViewFileUrl('requirejs-config.js')) ?>';
-    var mixinsUrl = '<?= $escaper->escapeJs($block->getViewFileUrl('mage/requirejs/mixins.js')) ?>';
     var staticBaseUrl = '<?= $escaper->escapeJs($block->getViewFileUrl('/')) ?>';
     var started = false;
 
     window.LOCALE = window.LOCALE || '<?= $escaper->escapeJs($block->getLocaleCode()) ?>';
     window.BASE_URL = window.BASE_URL || '<?= $escaper->escapeJs($block->getBaseUrl()) ?>';
-
-    function loadScript(src, onload) {
-        var script = document.createElement('script');
-
-        script.src = src;
-        script.async = false;
-        script.onload = onload;
-        script.onerror = function () {
-            if (window.console && typeof window.console.warn === 'function') {
-                window.console.warn('Kkkonrad Fastcheckout: could not load script', src);
-            }
-        };
-        document.head.appendChild(script);
-    }
 
     function initFullCheckoutBridge() {
         if (
@@ -254,51 +235,10 @@ foreach ($layoutAssets['css'] as $cssAsset) {
         );
     }
 
-    function loadRequireJs() {
-        if (typeof window.require === 'function') {
-            window.require.config({
-                baseUrl: staticBaseUrl
-            });
-            if (minResolverUrl && !window.fastcheckoutRequireJsMinResolverLoaded) {
-                loadScript(minResolverUrl, function () {
-                    window.fastcheckoutRequireJsMinResolverLoaded = true;
-                    initCheckoutBridge();
-                });
-            } else {
-                initCheckoutBridge();
-            }
-            return;
-        }
-
-        loadScript(requireJsUrl, function () {
-            if (typeof window.require === 'function') {
-                window.require.config({
-                    baseUrl: staticBaseUrl
-                });
-            }
-
-            function loadConfigAndMixins() {
-                loadScript(requireJsConfigUrl, function () {
-                    loadScript(mixinsUrl, initCheckoutBridge);
-                });
-            }
-
-            if (minResolverUrl) {
-                loadScript(minResolverUrl, function () {
-                    window.fastcheckoutRequireJsMinResolverLoaded = true;
-                    loadConfigAndMixins();
-                });
-            } else {
-                loadConfigAndMixins();
-            }
-        });
-    }
-
-    // Native KO/REST pipeline.
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', loadRequireJs, { once: true });
-    } else {
-        loadRequireJs();
+    if (typeof window.require === 'function') {
+        initCheckoutBridge();
+    } else if (window.console && typeof window.console.warn === 'function') {
+        window.console.warn('Kkkonrad Fastcheckout: RequireJS is unavailable.');
     }
 })();
 </script>
