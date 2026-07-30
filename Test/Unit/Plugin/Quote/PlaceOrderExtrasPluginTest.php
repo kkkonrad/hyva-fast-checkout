@@ -6,10 +6,14 @@ namespace Kkkonrad\Fastcheckout\Test\Unit\Plugin\Quote;
 
 use Kkkonrad\Fastcheckout\Helper\Data as Helper;
 use Kkkonrad\Fastcheckout\Plugin\Quote\PlaceOrderExtrasPlugin;
+use Magento\Checkout\Model\AddressComparatorInterface;
 use Magento\Checkout\Model\Session as CheckoutSession;
 use Magento\Framework\App\Request\Http as HttpRequest;
 use Magento\Quote\Api\CartManagementInterface;
+use Magento\Quote\Api\CartRepositoryInterface;
 use Magento\Quote\Api\Data\PaymentInterface;
+use Magento\Quote\Model\Quote;
+use Magento\Quote\Model\Quote\Address;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -27,6 +31,21 @@ class PlaceOrderExtrasPluginTest extends TestCase
     /** @var PlaceOrderExtrasPlugin */
     private $plugin;
 
+    /** @var CartRepositoryInterface|MockObject */
+    private $quoteRepository;
+
+    /** @var AddressComparatorInterface|MockObject */
+    private $addressComparator;
+
+    /** @var Quote|MockObject */
+    private $quote;
+
+    /** @var Address|MockObject */
+    private $shippingAddress;
+
+    /** @var Address|MockObject */
+    private $billingAddress;
+
     protected function setUp(): void
     {
         $this->checkoutSession = $this->getMockBuilder(CheckoutSession::class)
@@ -43,10 +62,20 @@ class PlaceOrderExtrasPluginTest extends TestCase
             ->disableOriginalConstructor()
             ->onlyMethods(['getContent'])
             ->getMock();
+        $this->quoteRepository = $this->createMock(CartRepositoryInterface::class);
+        $this->addressComparator = $this->createMock(AddressComparatorInterface::class);
+        $this->shippingAddress = $this->createMock(Address::class);
+        $this->billingAddress = $this->createMock(Address::class);
+        $this->quote = $this->createMock(Quote::class);
+        $this->quote->method('getShippingAddress')->willReturn($this->shippingAddress);
+        $this->quote->method('getBillingAddress')->willReturn($this->billingAddress);
+        $this->quoteRepository->method('getActive')->willReturn($this->quote);
         $this->plugin = new PlaceOrderExtrasPlugin(
             $this->checkoutSession,
             $this->helper,
-            $this->request
+            $this->request,
+            $this->quoteRepository,
+            $this->addressComparator
         );
     }
 
@@ -140,5 +169,25 @@ class PlaceOrderExtrasPluginTest extends TestCase
         $subject = $this->createMock(CartManagementInterface::class);
         $result = $this->plugin->beforePlaceOrder($subject, 1, null);
         $this->assertSame([1, null], $result);
+    }
+
+    public function testBeforePlaceOrderPreventsDuplicateAddressBookSave(): void
+    {
+        $this->helper->method('isEnable')->willReturn(true);
+        $this->request->method('getContent')->willReturn('');
+
+        $this->shippingAddress->method('getSaveInAddressBook')->willReturn(1);
+        $this->billingAddress->method('getSaveInAddressBook')->willReturn(1);
+        $this->billingAddress->expects($this->once())->method('setSaveInAddressBook')->with(0);
+        $this->quoteRepository->expects($this->once())->method('save')->with($this->quote);
+        $this->addressComparator->method('isEqual')
+            ->with($this->shippingAddress, $this->billingAddress)
+            ->willReturn(true);
+
+        $this->plugin->beforePlaceOrder(
+            $this->createMock(CartManagementInterface::class),
+            42,
+            null
+        );
     }
 }

@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Kkkonrad\Fastcheckout\Plugin\Quote;
 
 use Kkkonrad\Fastcheckout\Helper\Data as Helper;
+use Magento\Checkout\Model\AddressComparatorInterface;
 use Magento\Checkout\Model\Session as CheckoutSession;
 use Magento\Framework\App\RequestInterface;
 use Magento\Quote\Api\CartManagementInterface;
+use Magento\Quote\Api\CartRepositoryInterface;
 use Magento\Quote\Api\Data\PaymentInterface;
 
 /**
@@ -30,14 +32,24 @@ class PlaceOrderExtrasPlugin
     /** @var RequestInterface */
     private $request;
 
+    /** @var CartRepositoryInterface */
+    private $quoteRepository;
+
+    /** @var AddressComparatorInterface */
+    private $addressComparator;
+
     public function __construct(
         CheckoutSession $checkoutSession,
         Helper $helper,
-        RequestInterface $request
+        RequestInterface $request,
+        CartRepositoryInterface $quoteRepository,
+        AddressComparatorInterface $addressComparator
     ) {
         $this->checkoutSession = $checkoutSession;
         $this->helper = $helper;
         $this->request = $request;
+        $this->quoteRepository = $quoteRepository;
+        $this->addressComparator = $addressComparator;
     }
 
     /**
@@ -53,6 +65,18 @@ class PlaceOrderExtrasPlugin
     ): array {
         if (!$this->helper->isEnable()) {
             return [$cartId, $paymentMethod];
+        }
+
+        $quote = $this->quoteRepository->getActive($cartId);
+        $shipping = $quote->getShippingAddress();
+        $billing = $quote->getBillingAddress();
+        if (
+            $shipping->getSaveInAddressBook()
+            && $billing->getSaveInAddressBook()
+            && $this->addressComparator->isEqual($shipping, $billing)
+        ) {
+            $billing->setSaveInAddressBook(0);
+            $this->quoteRepository->save($quote);
         }
 
         $comment = $this->extractComment($paymentMethod);
