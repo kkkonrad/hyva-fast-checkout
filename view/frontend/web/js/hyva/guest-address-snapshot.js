@@ -1187,15 +1187,6 @@ define([], function () {
                     subtotal: ''
                 });
             }
-            if (customerData && typeof customerData.invalidate === 'function') {
-                // Do NOT invalidate checkout-data here if we already snapshotted —
-                // Magento place-order already resets selections; wiping mage-cache entirely
-                // also drops other storefront sections unnecessarily.
-                customerData.invalidate(['cart', 'last-ordered-items']);
-            }
-            if (customerData && typeof customerData.reload === 'function') {
-                customerData.reload(['cart'], true);
-            }
         } catch (e) {
             // non-fatal
         }

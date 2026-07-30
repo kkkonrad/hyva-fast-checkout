@@ -4752,8 +4752,16 @@ define([
                     },
 
                     afterPlaceOrder: function () {
-                        var component = getActiveRenderer(),
-                            shouldRunRendererAfterPlaceOrder = !window.fastcheckoutKoSuccessRedirectInProgress;
+                        var component,
+                            shouldRunRendererAfterPlaceOrder;
+
+                        if (window.fastcheckoutSuccessRedirectStarted) {
+                            return;
+                        }
+
+                        window.fastcheckoutSuccessRedirectStarted = true;
+                        component = getActiveRenderer();
+                        shouldRunRendererAfterPlaceOrder = !window.fastcheckoutKoSuccessRedirectInProgress;
 
                         // Snapshot guest address for the next order, then clear cart cache only.
                         // Do not wipe mage-cache-storage entirely — that left only email on re-order.
