@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace Kkkonrad\Fastcheckout\Helper;
 
 use Magento\Framework\App\Helper\Context;
-use Magento\Store\Model\StoreManagerInterface;
 use Magento\Framework\Json\Helper\Data as JsonHelper;
 use Magento\Framework\App\Helper\AbstractHelper;
-use Magento\Framework\UrlInterface;
 
 use Magento\Store\Model\ScopeInterface;
 use Magento\Framework\View\DesignInterface;
@@ -19,23 +17,15 @@ class Data extends AbstractHelper
 
     const XML_PATH_ENABLE = 'fastcheckout/general/enable';
 
-    const XML_PATH_TITLE = 'fastcheckout/extended/title';
     const XML_PATH_DISCOUNT_VISIBILITY = 'fastcheckout/extended/show_discount';
     const XML_PATH_COMMENT_VISIBILITY = 'fastcheckout/extended/show_comment';
-    const XML_PATH_GIFT_MESSAGE_VISIBILITY = 'fastcheckout/extended/show_gift_message';
     const XML_PATH_SUBSCRIBE_VISIBILITY = 'fastcheckout/extended/show_subscribe';
     const XML_PATH_SUBSCRIBE_BY_DEFAULT = 'fastcheckout/extended/subscribe_by_default';
-    const XML_PATH_RELOAD_SHIPPING_ON_DISCOUNT = 'fastcheckout/extended/reload_shipping_methods_on_discount';
-    const XML_PATH_DEFAULT_SHIPPING_METHOD = 'fastcheckout/extended/default_shipping_method';
-    const XML_PATH_DEFAULT_PAYMENT_METHOD = 'fastcheckout/extended/default_payment_method';
-    const XML_PATH_PAYMENT_TITLE_TYPE = 'fastcheckout/extended/payment_title_type';
-    const XML_PATH_DISPLAY_ALL_METHODS = 'fastcheckout/extended/show_all_ship_methods';
     const XML_PATH_SHIPPING_PAYMENT_MAPPING = 'fastcheckout/extended/shipping_payment_mapping';
     const XML_PATH_REQUIRED_SHIPPING_FIELDS = 'fastcheckout/extended/required_shipping_fields';
     const XML_PATH_REQUIRED_PAYMENT_FIELDS = 'fastcheckout/extended/required_payment_fields';
     const XML_PATH_ASSIGN_ORDER_TO_CUSTOMER = 'fastcheckout/extended/assign_order_to_customer';
 
-    public $storeManager;
     public $jsonHelper;
     protected $design;
     protected $themeFactory;
@@ -49,13 +39,11 @@ class Data extends AbstractHelper
 
     public function __construct(
         Context $context,
-        StoreManagerInterface $storeManager,
         JsonHelper $jsonHelper,
         DesignInterface $design,
         ThemeFactory $themeFactory
     ) {
         parent::__construct($context);
-        $this->storeManager = $storeManager;
         $this->jsonHelper = $jsonHelper;
         $this->design = $design;
         $this->themeFactory = $themeFactory;
@@ -64,26 +52,6 @@ class Data extends AbstractHelper
     public function isEnable()
     {
         return (bool)$this->scopeConfig->getValue(self::XML_PATH_ENABLE, ScopeInterface::SCOPE_STORE);
-    }
-
-    public function isCurrentlySecure()
-    {
-        return (bool)$this->storeManager->getStore()->isCurrentlySecure();
-    }
-
-    public function getTitle()
-    {
-        return $this->scopeConfig->getValue(self::XML_PATH_TITLE, ScopeInterface::SCOPE_STORE);
-    }
-
-    public function getDefaultShippingMethod()
-    {
-        return $this->scopeConfig->getValue(self::XML_PATH_DEFAULT_SHIPPING_METHOD, ScopeInterface::SCOPE_STORE);
-    }
-
-    public function getDefaultPaymentMethod()
-    {
-        return $this->scopeConfig->getValue(self::XML_PATH_DEFAULT_PAYMENT_METHOD, ScopeInterface::SCOPE_STORE);
     }
 
     public function getShippingPaymentMapping()
@@ -274,11 +242,6 @@ class Data extends AbstractHelper
         return (bool)$this->scopeConfig->getValue(self::XML_PATH_DISCOUNT_VISIBILITY, ScopeInterface::SCOPE_STORE);
     }
 
-    public function isShowGiftMessage()
-    {
-        return (bool)$this->scopeConfig->getValue(self::XML_PATH_GIFT_MESSAGE_VISIBILITY, ScopeInterface::SCOPE_STORE);
-    }
-
     public function isShowSubscribe()
     {
         $moduleStatus = $this->isModuleOutputEnabled('Magento_Newsletter');
@@ -289,11 +252,6 @@ class Data extends AbstractHelper
     public function isSubscribeByDefault()
     {
         return (bool)$this->scopeConfig->getValue(self::XML_PATH_SUBSCRIBE_BY_DEFAULT, ScopeInterface::SCOPE_STORE);
-    }
-
-    public function isReloadShippingOnDiscount()
-    {
-        return (bool)$this->scopeConfig->getValue(self::XML_PATH_RELOAD_SHIPPING_ON_DISCOUNT, ScopeInterface::SCOPE_STORE);
     }
 
     /**
@@ -356,30 +314,6 @@ class Data extends AbstractHelper
 
         return stripos($themePath, 'frontend/Hyva/') === 0
             || stripos($themePath, '/hyva') !== false;
-    }
-
-    public function getPaymentTitleType()
-    {
-        return $this->scopeConfig->getValue(self::XML_PATH_PAYMENT_TITLE_TYPE, ScopeInterface::SCOPE_STORE);
-    }
-
-
-    public function getBaseUrl()
-    {
-        $defaultStore = $this->storeManager->getDefaultStoreView();
-        if (!$defaultStore) {
-            $allStores = $this->storeManager->getStores();
-            if (isset($allStores[0])) {
-                $defaultStore = $allStores[0];
-            }
-        }
-
-        return $defaultStore->getBaseUrl(UrlInterface::URL_TYPE_LINK);
-    }
-
-    public function getDisplayAllMethods()
-    {
-        return (bool)$this->scopeConfig->getValue(self::XML_PATH_DISPLAY_ALL_METHODS, ScopeInterface::SCOPE_STORE);
     }
 
 }

@@ -6,11 +6,9 @@ use Hyva\Theme\Model\ViewModelRegistry;
 use Hyva\Theme\ViewModel\HyvaCsp;
 use Magento\Catalog\Helper\Image as ImageHelper;
 use Magento\Catalog\Helper\Product\Configuration as ProductConfiguration;
+use Magento\Checkout\Block\Onepage;
 use Magento\Checkout\Model\CompositeConfigProvider;
 use Magento\Checkout\Model\Session as CheckoutSession;
-use Magento\Checkout\Block\Checkout\LayoutProcessor;
-use Magento\Checkout\Block\Checkout\DirectoryDataProcessor;
-use Magento\Framework\App\CacheInterface;
 use Magento\Framework\App\Cache\Type\Config as ConfigCacheType;
 use Magento\Framework\App\Cache\Type\Layout as LayoutCacheType;
 use Magento\Framework\Component\ComponentRegistrar;
@@ -19,7 +17,7 @@ use Magento\Framework\Serialize\SerializerInterface;
 use Magento\Framework\Locale\ResolverInterface;
 use Magento\Framework\Module\ModuleListInterface;
 use Magento\Framework\Pricing\Helper\Data as PricingHelper;
-use Magento\Framework\RequireJs\Config as RequireJsConfig;
+use Magento\Framework\View\Element\BlockFactory;
 use Magento\Framework\View\Element\Template;
 use Magento\Framework\View\Element\Template\Context;
 use Magento\Quote\Model\Quote;
@@ -28,30 +26,11 @@ use Magento\Quote\Api\PaymentMethodManagementInterface;
 use Magento\Payment\Helper\Data as PaymentHelper;
 use Magento\Payment\Model\MethodInterface;
 use Kkkonrad\Fastcheckout\Helper\Data as Helper;
-use Kkkonrad\Fastcheckout\Model\Hyva\RequireJsAssets;
 use Magento\Tax\Helper\Data as TaxHelper;
 
 
 class Checkout extends Template
 {
-    private const CORE_SHIPPING_ADDRESS_FIELDSET_CHILDREN = [
-        'city' => true,
-        'company' => true,
-        'country_id' => true,
-        'fax' => true,
-        'firstname' => true,
-        'lastname' => true,
-        'middlename' => true,
-        'postcode' => true,
-        'prefix' => true,
-        'region' => true,
-        'region_id' => true,
-        'street' => true,
-        'suffix' => true,
-        'telephone' => true,
-        'vat_id' => true
-    ];
-
     /**
      * @var CheckoutSession
      */
@@ -108,66 +87,6 @@ class Checkout extends Template
     private $checkoutConfigCache;
 
     /**
-     * @var string[]|null
-     */
-    private $paymentRendererComponentsCache;
-
-    /**
-     * @var array|null
-     */
-    private $paymentRendererComponentMapCache;
-
-    /**
-     * @var string[]|null
-     */
-    private $shippingRatesValidationComponentsCache;
-
-    /**
-     * @var string[]|null
-     */
-    private $paymentValidationComponentsCache;
-
-    /**
-     * @var array|null
-     */
-    private $paymentListChildrenCache;
-
-    /**
-     * @var array|null
-     */
-    private $paymentRegionChildrenCache;
-
-    /**
-     * @var array|null
-     */
-    private $shippingListChildrenCache;
-
-    /**
-     * @var array|null
-     */
-    private $shippingAddressChildrenCache;
-
-    /**
-     * @var array|null
-     */
-    private $standardAddressLayoutCache;
-
-    /**
-     * @var array|null
-     */
-    private $checkoutStepChildrenCache;
-
-    /**
-     * @var array|null
-     */
-    private $checkoutLayoutAssetsCache;
-
-    /**
-     * @var array|null
-     */
-    private $checkoutLayoutScriptsCache;
-
-    /**
      * @var array|null
      */
     private $summaryTotalsCache;
@@ -177,23 +96,20 @@ class Checkout extends Template
      */
     private $helper;
 
-    /** @var RequireJsAssets|null */
-    private $requireJsAssets;
-
     /** @var TaxHelper|null */
     private $taxHelper;
-
-    /** @var LayoutProcessor|null */
-    private $checkoutLayoutProcessor;
-
-    /** @var CacheInterface|null */
-    private $appCache;
 
     /** @var SerializerInterface|null */
     private $serializer;
 
-    /** @var DirectoryDataProcessor|null */
-    private $checkoutDirectoryDataProcessor;
+    /** @var BlockFactory|null */
+    private $blockFactory;
+
+    /** @var array|null */
+    private $rawCheckoutLayoutData;
+
+    /** @var array|null */
+    private $processedCheckoutLayout;
 
     /** @var PaymentMethodManagementInterface|null */
     private $paymentMethodManagement;
@@ -233,14 +149,11 @@ class Checkout extends Template
         ComponentRegistrarInterface $componentRegistrar = null,
         ResolverInterface $localeResolver = null,
         array $data = [],
-        RequireJsAssets $requireJsAssets = null,
         TaxHelper $taxHelper = null,
-        LayoutProcessor $checkoutLayoutProcessor = null,
-        DirectoryDataProcessor $checkoutDirectoryDataProcessor = null,
         PaymentMethodManagementInterface $paymentMethodManagement = null,
         PaymentHelper $paymentHelper = null,
-        CacheInterface $appCache = null,
-        SerializerInterface $serializer = null
+        SerializerInterface $serializer = null,
+        BlockFactory $blockFactory = null
     ) {
         $this->checkoutSession = $checkoutSession;
         $this->pricingHelper = $pricingHelper;
@@ -252,14 +165,11 @@ class Checkout extends Template
         $this->moduleList = $moduleList;
         $this->componentRegistrar = $componentRegistrar;
         $this->localeResolver = $localeResolver;
-        $this->requireJsAssets = $requireJsAssets;
         $this->taxHelper = $taxHelper;
-        $this->checkoutLayoutProcessor = $checkoutLayoutProcessor;
-        $this->checkoutDirectoryDataProcessor = $checkoutDirectoryDataProcessor;
         $this->paymentMethodManagement = $paymentMethodManagement;
         $this->paymentHelper = $paymentHelper;
-        $this->appCache = $appCache;
         $this->serializer = $serializer;
+        $this->blockFactory = $blockFactory;
 
         parent::__construct($context, $data);
     }
@@ -566,47 +476,11 @@ class Checkout extends Template
     }
 
     /**
-     * @return bool
-     */
-    public function isShowGiftMessage(): bool
-    {
-        return $this->helper->isShowGiftMessage();
-    }
-
-    /**
      * @return HyvaCsp
      */
     public function getHyvaCsp(): HyvaCsp
     {
         return $this->viewModelRegistry->require(HyvaCsp::class);
-    }
-
-    /**
-     * @return bool
-     */
-    public function ensureRequireJsAssets()
-    {
-        if ($this->requireJsAssets === null) {
-            return false;
-        }
-
-        try {
-            return $this->requireJsAssets->ensure();
-        } catch (\Throwable $exception) {
-            return false;
-        }
-    }
-
-    public function getRequireJsMinResolverUrl(): string
-    {
-        if (
-            $this->requireJsAssets === null
-            || !$this->requireJsAssets->isJsMinificationEnabled()
-        ) {
-            return '';
-        }
-
-        return $this->getViewFileUrl(RequireJsConfig::MIN_RESOLVER_FILENAME);
     }
 
     /**
@@ -633,14 +507,13 @@ class Checkout extends Template
             return $this->checkoutConfigCache;
         }
 
-        $configProvider = $this->getConfigProvider();
-        if ($configProvider === null) {
+        if ($this->configProvider === null) {
             $this->checkoutConfigCache = [];
             return $this->checkoutConfigCache;
         }
 
         try {
-            $this->checkoutConfigCache = $configProvider->getConfig();
+            $this->checkoutConfigCache = $this->configProvider->getConfig();
         } catch (\Throwable $exception) {
             $this->checkoutConfigCache = [];
         }
@@ -653,9 +526,7 @@ class Checkout extends Template
      */
     public function getLocaleCode()
     {
-        $localeResolver = $this->getLocaleResolver();
-
-        return $localeResolver ? (string)$localeResolver->getLocale() : 'en_US';
+        return $this->localeResolver ? (string)$this->localeResolver->getLocale() : 'en_US';
     }
 
     /**
@@ -666,35 +537,19 @@ class Checkout extends Template
      */
     public function getPaymentRendererComponents()
     {
-        if ($this->paymentRendererComponentsCache !== null) {
-            return $this->paymentRendererComponentsCache;
-        }
-
-        $moduleList = $this->getModuleList();
-        $componentRegistrar = $this->getComponentRegistrar();
-        if ($moduleList === null || $componentRegistrar === null) {
-            $this->paymentRendererComponentsCache = [];
-            return $this->paymentRendererComponentsCache;
-        }
-
         $components = [];
-        foreach ($moduleList->getNames() as $moduleName) {
-            $modulePath = $componentRegistrar->getPath(ComponentRegistrar::MODULE, $moduleName);
-            if (!$modulePath) {
+        foreach ($this->getPaymentRendererChildren() as $code => $renderer) {
+            if (!is_array($renderer) || !$this->isPaymentRendererEnabled((string)$code, $renderer)) {
                 continue;
             }
 
-            $layoutFile = $modulePath . '/view/frontend/layout/checkout_index_index.xml';
-            if (!is_file($layoutFile)) {
-                continue;
+            $component = $renderer['component'] ?? null;
+            if (is_string($component) && $component !== '') {
+                $components[] = $component;
             }
-
-            $components = array_merge($components, $this->getPaymentRendererComponentsFromLayout($layoutFile));
         }
 
-        $this->paymentRendererComponentsCache = array_values(array_unique($components));
-
-        return $this->paymentRendererComponentsCache;
+        return array_values(array_unique($components));
     }
 
     /**
@@ -704,47 +559,33 @@ class Checkout extends Template
      */
     public function getPaymentRendererComponentMap()
     {
-        if ($this->paymentRendererComponentMapCache !== null) {
-            return $this->paymentRendererComponentMapCache;
-        }
-
-        $moduleList = $this->getModuleList();
-        $componentRegistrar = $this->getComponentRegistrar();
-        if ($moduleList === null || $componentRegistrar === null) {
-            $this->paymentRendererComponentMapCache = [];
-            return $this->paymentRendererComponentMapCache;
-        }
-
         $map = [];
-        foreach ($moduleList->getNames() as $moduleName) {
-            $modulePath = $componentRegistrar->getPath(ComponentRegistrar::MODULE, $moduleName);
-            if (!$modulePath) {
+        foreach ($this->getPaymentRendererChildren() as $code => $renderer) {
+            if (!is_array($renderer) || !$this->isPaymentRendererEnabled((string)$code, $renderer)) {
                 continue;
             }
 
-            $layoutFile = $modulePath . '/view/frontend/layout/checkout_index_index.xml';
-            if (!is_file($layoutFile)) {
+            $component = $renderer['component'] ?? null;
+            if (!is_string($component) || $component === '' || $component === 'uiComponent') {
                 continue;
             }
 
-            $map = array_merge($map, $this->getPaymentRendererComponentMapFromLayout($layoutFile));
-        }
-
-        $unique = [];
-        foreach ($map as $entry) {
-            if (empty($entry['method']) || empty($entry['component'])) {
-                continue;
-            }
-
-            $unique[$entry['method'] . '::' . $entry['component']] = [
-                'method' => $entry['method'],
-                'component' => $entry['component']
+            $map[$code . '::' . $component] = [
+                'method' => (string)$code,
+                'component' => $component
             ];
+            foreach (array_keys(is_array($renderer['methods'] ?? null) ? $renderer['methods'] : []) as $method) {
+                if ($this->_scopeConfig->getValue('payment/' . $method . '/active') === '0') {
+                    continue;
+                }
+                $map[$method . '::' . $component] = [
+                    'method' => (string)$method,
+                    'component' => $component
+                ];
+            }
         }
 
-        $this->paymentRendererComponentMapCache = array_values($unique);
-
-        return $this->paymentRendererComponentMapCache;
+        return array_values($map);
     }
 
     /**
@@ -755,35 +596,10 @@ class Checkout extends Template
      */
     public function getShippingRatesValidationComponents()
     {
-        if ($this->shippingRatesValidationComponentsCache !== null) {
-            return $this->shippingRatesValidationComponentsCache;
-        }
+        $children = $this->getCheckoutStepsChildren()['shipping-step']['children']['step-config']['children']
+            ['shipping-rates-validation']['children'] ?? [];
 
-        $moduleList = $this->getModuleList();
-        $componentRegistrar = $this->getComponentRegistrar();
-        if ($moduleList === null || $componentRegistrar === null) {
-            $this->shippingRatesValidationComponentsCache = [];
-            return $this->shippingRatesValidationComponentsCache;
-        }
-
-        $components = [];
-        foreach ($moduleList->getNames() as $moduleName) {
-            $modulePath = $componentRegistrar->getPath(ComponentRegistrar::MODULE, $moduleName);
-            if (!$modulePath) {
-                continue;
-            }
-
-            $layoutFile = $modulePath . '/view/frontend/layout/checkout_index_index.xml';
-            if (!is_file($layoutFile)) {
-                continue;
-            }
-
-            $components = array_merge($components, $this->getShippingRatesValidationComponentsFromLayout($layoutFile));
-        }
-
-        $this->shippingRatesValidationComponentsCache = array_values(array_unique($components));
-
-        return $this->shippingRatesValidationComponentsCache;
+        return $this->getChildComponents($children);
     }
 
     /**
@@ -794,35 +610,9 @@ class Checkout extends Template
      */
     public function getPaymentValidationComponents()
     {
-        if ($this->paymentValidationComponentsCache !== null) {
-            return $this->paymentValidationComponentsCache;
-        }
+        $children = $this->getPaymentComponent()['children']['additional-payment-validators']['children'] ?? [];
 
-        $moduleList = $this->getModuleList();
-        $componentRegistrar = $this->getComponentRegistrar();
-        if ($moduleList === null || $componentRegistrar === null) {
-            $this->paymentValidationComponentsCache = [];
-            return $this->paymentValidationComponentsCache;
-        }
-
-        $components = [];
-        foreach ($moduleList->getNames() as $moduleName) {
-            $modulePath = $componentRegistrar->getPath(ComponentRegistrar::MODULE, $moduleName);
-            if (!$modulePath) {
-                continue;
-            }
-
-            $layoutFile = $modulePath . '/view/frontend/layout/checkout_index_index.xml';
-            if (!is_file($layoutFile)) {
-                continue;
-            }
-
-            $components = array_merge($components, $this->getPaymentValidationComponentsFromLayout($layoutFile));
-        }
-
-        $this->paymentValidationComponentsCache = array_values(array_unique($components));
-
-        return $this->paymentValidationComponentsCache;
+        return $this->getChildComponents($children, true);
     }
 
     /**
@@ -832,45 +622,9 @@ class Checkout extends Template
      */
     public function getPaymentListChildren()
     {
-        if ($this->paymentListChildrenCache !== null) {
-            return $this->paymentListChildrenCache;
-        }
+        $children = $this->getPaymentComponent()['children']['payments-list']['children'] ?? [];
 
-        $standardLayout = $this->getProcessedStandardAddressLayout();
-        $processedChildren = $standardLayout['payment']['children']['payments-list']['children'] ?? null;
-        if (is_array($processedChildren)) {
-            $this->paymentListChildrenCache = $processedChildren;
-            return $this->paymentListChildrenCache;
-        }
-
-        $moduleList = $this->getModuleList();
-        $componentRegistrar = $this->getComponentRegistrar();
-        if ($moduleList === null || $componentRegistrar === null) {
-            $this->paymentListChildrenCache = [];
-            return $this->paymentListChildrenCache;
-        }
-
-        $children = [];
-        foreach ($moduleList->getNames() as $moduleName) {
-            $modulePath = $componentRegistrar->getPath(ComponentRegistrar::MODULE, $moduleName);
-            if (!$modulePath) {
-                continue;
-            }
-
-            $layoutFile = $modulePath . '/view/frontend/layout/checkout_index_index.xml';
-            if (!is_file($layoutFile)) {
-                continue;
-            }
-
-            $children = $this->mergeJsLayoutArrays(
-                $children,
-                $this->getPaymentListChildrenFromLayout($layoutFile)
-            );
-        }
-
-        $this->paymentListChildrenCache = $children;
-
-        return $this->paymentListChildrenCache;
+        return is_array($children) ? $children : [];
     }
 
     /**
@@ -881,50 +635,15 @@ class Checkout extends Template
      */
     public function getPaymentRegionChildren()
     {
-        if ($this->paymentRegionChildrenCache !== null) {
-            return $this->paymentRegionChildrenCache;
-        }
-
-        $standardLayout = $this->getProcessedStandardAddressLayout();
-        $paymentChildren = $standardLayout['payment']['children'] ?? null;
-        if (is_array($paymentChildren)) {
-            $this->paymentRegionChildrenCache = [];
-            foreach (['place-order-captcha', 'beforeMethods', 'afterMethods'] as $name) {
-                if (isset($paymentChildren[$name]) && is_array($paymentChildren[$name])) {
-                    $this->paymentRegionChildrenCache[$name] = $paymentChildren[$name];
-                }
+        $result = [];
+        $children = $this->getPaymentComponent()['children'] ?? [];
+        foreach (['place-order-captcha', 'beforeMethods', 'afterMethods'] as $name) {
+            if (isset($children[$name]) && is_array($children[$name])) {
+                $result[$name] = $children[$name];
             }
-            return $this->paymentRegionChildrenCache;
         }
 
-        $moduleList = $this->getModuleList();
-        $componentRegistrar = $this->getComponentRegistrar();
-        if ($moduleList === null || $componentRegistrar === null) {
-            $this->paymentRegionChildrenCache = [];
-            return $this->paymentRegionChildrenCache;
-        }
-
-        $children = [];
-        foreach ($moduleList->getNames() as $moduleName) {
-            $modulePath = $componentRegistrar->getPath(ComponentRegistrar::MODULE, $moduleName);
-            if (!$modulePath) {
-                continue;
-            }
-
-            $layoutFile = $modulePath . '/view/frontend/layout/checkout_index_index.xml';
-            if (!is_file($layoutFile)) {
-                continue;
-            }
-
-            $children = $this->mergeJsLayoutArrays(
-                $children,
-                $this->getPaymentRegionChildrenFromLayout($layoutFile)
-            );
-        }
-
-        $this->paymentRegionChildrenCache = $children;
-
-        return $this->paymentRegionChildrenCache;
+        return $result;
     }
 
     /**
@@ -934,38 +653,15 @@ class Checkout extends Template
      */
     public function getShippingListChildren()
     {
-        if ($this->shippingListChildrenCache !== null) {
-            return $this->shippingListChildrenCache;
-        }
-
-        $moduleList = $this->getModuleList();
-        $componentRegistrar = $this->getComponentRegistrar();
-        if ($moduleList === null || $componentRegistrar === null) {
-            $this->shippingListChildrenCache = [];
-            return $this->shippingListChildrenCache;
-        }
-
-        $children = [];
-        foreach ($moduleList->getNames() as $moduleName) {
-            $modulePath = $componentRegistrar->getPath(ComponentRegistrar::MODULE, $moduleName);
-            if (!$modulePath) {
-                continue;
+        $result = [];
+        $children = $this->getShippingAddressChildren();
+        foreach (['before-shipping-method-form', 'shippingAdditional'] as $name) {
+            if (isset($children[$name]) && is_array($children[$name])) {
+                $result[$name] = $children[$name];
             }
-
-            $layoutFile = $modulePath . '/view/frontend/layout/checkout_index_index.xml';
-            if (!is_file($layoutFile)) {
-                continue;
-            }
-
-            $children = $this->mergeJsLayoutArrays(
-                $children,
-                $this->getShippingListChildrenFromLayout($layoutFile)
-            );
         }
 
-        $this->shippingListChildrenCache = $children;
-
-        return $this->shippingListChildrenCache;
+        return $result;
     }
 
     /**
@@ -975,45 +671,9 @@ class Checkout extends Template
      */
     public function getShippingAddressChildren()
     {
-        if ($this->shippingAddressChildrenCache !== null) {
-            return $this->shippingAddressChildrenCache;
-        }
+        $children = $this->getShippingAddressComponent()['children'] ?? [];
 
-        $standardLayout = $this->getProcessedStandardAddressLayout();
-        $processedChildren = $standardLayout['shippingAddress']['children'] ?? null;
-        if (is_array($processedChildren)) {
-            $this->shippingAddressChildrenCache = $this->normalizeShippingAddressChildren($processedChildren);
-            return $this->shippingAddressChildrenCache;
-        }
-
-        $moduleList = $this->getModuleList();
-        $componentRegistrar = $this->getComponentRegistrar();
-        if ($moduleList === null || $componentRegistrar === null) {
-            $this->shippingAddressChildrenCache = [];
-            return $this->shippingAddressChildrenCache;
-        }
-
-        $children = [];
-        foreach ($moduleList->getNames() as $moduleName) {
-            $modulePath = $componentRegistrar->getPath(ComponentRegistrar::MODULE, $moduleName);
-            if (!$modulePath) {
-                continue;
-            }
-
-            $layoutFile = $modulePath . '/view/frontend/layout/checkout_index_index.xml';
-            if (!is_file($layoutFile)) {
-                continue;
-            }
-
-            $children = $this->mergeJsLayoutArrays(
-                $children,
-                $this->getShippingAddressChildrenFromLayout($layoutFile)
-            );
-        }
-
-        $this->shippingAddressChildrenCache = $this->normalizeShippingAddressChildren($children);
-
-        return $this->shippingAddressChildrenCache;
+        return is_array($children) ? $this->normalizeShippingAddressChildren($children) : [];
     }
 
     /**
@@ -1039,6 +699,14 @@ class Checkout extends Template
 
         if (isset($children['customer-email']) && is_array($children['customer-email'])) {
             $children['customer-email']['template'] = 'Magento_Checkout/form/element/email';
+        }
+
+        $fastlane = $this->getCheckoutConfig()['payment']['payment_services_paypal_fastlane'] ?? [];
+        if (empty($fastlane['isVisible'])) {
+            $children = $this->removeComponentsByPrefix(
+                $children,
+                'Magento_PaymentServicesPaypal/js/view/form/element/'
+            );
         }
 
         return $this->translateShippingAddressConfig($children);
@@ -1079,12 +747,7 @@ class Checkout extends Template
      */
     public function getShippingAddressComponentConfig()
     {
-        $standardLayout = $this->getProcessedStandardAddressLayout();
-        $component = $standardLayout['shippingAddress'] ?? [];
-
-        if (!is_array($component)) {
-            $component = [];
-        }
+        $component = $this->getShippingAddressComponent();
 
         $component['component'] = $component['component'] ?? 'Magento_Checkout/js/view/shipping';
         $component['provider'] = $component['provider'] ?? 'checkoutProvider';
@@ -1097,6 +760,10 @@ class Checkout extends Template
         // its children are already registered by the UI layout renderer.
         unset($component['config']['deps']);
         $component['config']['template'] = 'Kkkonrad_Fastcheckout/hyva/shipping-address';
+        $component['config']['popUpForm']['options']['appendTo'] =
+            '#fastcheckout-checkout .fastcheckout-native-shipping-address';
+        $component['config']['popUpForm']['options']['buttons']['save']['text'] =
+            (string) __('Deliver to this address');
 
         return $component;
     }
@@ -1106,8 +773,7 @@ class Checkout extends Template
      */
     public function getCheckoutProviderConfig()
     {
-        $standardLayout = $this->getProcessedStandardAddressLayout();
-        $provider = $standardLayout['checkoutProvider'] ?? [];
+        $provider = $this->getProcessedCheckoutLayout()['components']['checkoutProvider'] ?? [];
 
         return is_array($provider) ? $provider : [];
     }
@@ -1124,38 +790,10 @@ class Checkout extends Template
      */
     public function getCheckoutStepChildren()
     {
-        if ($this->checkoutStepChildrenCache !== null) {
-            return $this->checkoutStepChildrenCache;
-        }
+        $children = $this->getCheckoutStepsChildren();
+        unset($children['shipping-step'], $children['billing-step']);
 
-        $moduleList = $this->getModuleList();
-        $componentRegistrar = $this->getComponentRegistrar();
-        if ($moduleList === null || $componentRegistrar === null) {
-            $this->checkoutStepChildrenCache = [];
-            return $this->checkoutStepChildrenCache;
-        }
-
-        $children = [];
-        foreach ($moduleList->getNames() as $moduleName) {
-            $modulePath = $componentRegistrar->getPath(ComponentRegistrar::MODULE, $moduleName);
-            if (!$modulePath) {
-                continue;
-            }
-
-            $layoutFile = $modulePath . '/view/frontend/layout/checkout_index_index.xml';
-            if (!is_file($layoutFile)) {
-                continue;
-            }
-
-            $children = $this->mergeJsLayoutArrays(
-                $children,
-                $this->getCheckoutStepChildrenFromLayout($layoutFile)
-            );
-        }
-
-        $this->checkoutStepChildrenCache = $children;
-
-        return $this->checkoutStepChildrenCache;
+        return $children;
     }
 
     /**
@@ -1166,78 +804,7 @@ class Checkout extends Template
      */
     public function getCheckoutLayoutAssets()
     {
-        if ($this->checkoutLayoutAssetsCache !== null) {
-            return $this->checkoutLayoutAssetsCache;
-        }
-
-        $moduleList = $this->getModuleList();
-        $componentRegistrar = $this->getComponentRegistrar();
-        if ($moduleList === null || $componentRegistrar === null) {
-            $this->checkoutLayoutAssetsCache = ['css' => [], 'scripts' => []];
-            return $this->checkoutLayoutAssetsCache;
-        }
-
-        $css = [];
-        $scripts = [];
-
-        foreach ($moduleList->getNames() as $moduleName) {
-            if ($moduleName === 'Kkkonrad_Fastcheckout') {
-                continue;
-            }
-
-            $modulePath = $componentRegistrar->getPath(ComponentRegistrar::MODULE, $moduleName);
-            if (!$modulePath) {
-                continue;
-            }
-
-            $layoutFile = $modulePath . '/view/frontend/layout/checkout_index_index.xml';
-            if (!is_file($layoutFile)) {
-                continue;
-            }
-
-            $dom = new \DOMDocument();
-            $previous = libxml_use_internal_errors(true);
-
-            try {
-                if ($dom->load($layoutFile)) {
-                    $xpath = new \DOMXPath($dom);
-
-                    // Find all <css> elements
-                    $cssNodes = $xpath->query('//head/css');
-                    foreach ($cssNodes as $node) {
-                        $src = $node->getAttribute('src');
-                        if ($src) {
-                            $srcType = $node->getAttribute('src_type');
-                            $css[] = [
-                                'src' => $src,
-                                'src_type' => $srcType ?: null
-                            ];
-                        }
-                    }
-
-                    // Find all <script> elements
-                    $scriptNodes = $xpath->query('//head/script');
-                    foreach ($scriptNodes as $node) {
-                        $src = $node->getAttribute('src');
-                        if ($src) {
-                            $scripts[] = $src;
-                        }
-                    }
-                }
-            } catch (\Exception $e) {
-                // Ignore parsing errors
-            } finally {
-                libxml_clear_errors();
-                libxml_use_internal_errors($previous);
-            }
-        }
-
-        $this->checkoutLayoutAssetsCache = [
-            'css' => array_values(array_unique($css, SORT_REGULAR)),
-            'scripts' => array_values(array_unique($scripts))
-        ];
-
-        return $this->checkoutLayoutAssetsCache;
+        return $this->getRawCheckoutLayoutData()['assets'];
     }
 
     /**
@@ -1245,10 +812,6 @@ class Checkout extends Template
      */
     public function getCheckoutLayoutScripts()
     {
-        if ($this->checkoutLayoutScriptsCache !== null) {
-            return $this->checkoutLayoutScriptsCache;
-        }
-
         $assets = $this->getCheckoutLayoutAssets();
         $requireModules = [];
         $externalScripts = [];
@@ -1266,546 +829,261 @@ class Checkout extends Template
             }
         }
 
-        $this->checkoutLayoutScriptsCache = [
+        return [
             'modules' => $requireModules,
             'external' => $externalScripts
         ];
-
-        return $this->checkoutLayoutScriptsCache;
     }
 
-    /**
-     * @param string $layoutFile
-     * @return string[]
-     */
-    private function getPaymentRendererComponentsFromLayout($layoutFile)
+    private function getCheckoutStepsChildren(): array
     {
-        $dom = new \DOMDocument();
-        $previous = libxml_use_internal_errors(true);
+        $children = $this->getProcessedCheckoutLayout()['components']['checkout']['children']['steps']['children']
+            ?? [];
 
-        try {
-            if (!$dom->load($layoutFile)) {
-                return [];
+        return is_array($children) ? $children : [];
+    }
+
+    private function getShippingAddressComponent(): array
+    {
+        $component = $this->getCheckoutStepsChildren()['shipping-step']['children']['shippingAddress'] ?? [];
+
+        return is_array($component) ? $component : [];
+    }
+
+    private function getPaymentComponent(): array
+    {
+        $component = $this->getCheckoutStepsChildren()['billing-step']['children']['payment'] ?? [];
+
+        return is_array($component) ? $component : [];
+    }
+
+    private function getPaymentRendererChildren(): array
+    {
+        $children = $this->getPaymentComponent()['children']['renders']['children'] ?? [];
+
+        return is_array($children) ? $children : [];
+    }
+
+    private function isPaymentRendererEnabled(string $code, array $renderer): bool
+    {
+        if ($this->_scopeConfig->getValue('payment/' . $code . '/active') === '0') {
+            return false;
+        }
+
+        $methods = is_array($renderer['methods'] ?? null) ? $renderer['methods'] : [];
+        if ($methods === []) {
+            return true;
+        }
+
+        foreach (array_keys($methods) as $method) {
+            if ($this->_scopeConfig->getValue('payment/' . $method . '/active') !== '0') {
+                return true;
             }
+        }
 
-            $xpath = new \DOMXPath($dom);
-            $nodes = $xpath->query(
-                '//*[local-name()="item"][@name="renders"]' .
-                '/*[local-name()="item"][@name="children"]' .
-                '/*[local-name()="item"]' .
-                '/*[local-name()="item"][@name="component"]'
-            );
+        return false;
+    }
 
-            $components = [];
-            foreach ($nodes as $node) {
-                $parent = $node->parentNode;
-                if ($parent) {
-                    $methodCode = $parent->getAttribute('name');
-                    $isActive = true;
-                    if ($methodCode && $this->_scopeConfig->getValue('payment/' . $methodCode . '/active') === '0') {
-                        $isActive = false;
-                    } elseif ($methodCode) {
-                        $methodsNodes = $xpath->query('./*[local-name()="item"][@name="methods"]/*[local-name()="item"]', $parent);
-                        if ($methodsNodes->length > 0) {
-                            $hasActiveSubmethod = false;
-                            foreach ($methodsNodes as $methodItem) {
-                                $code = $methodItem->getAttribute('name');
-                                if ($code && $this->_scopeConfig->getValue('payment/' . $code . '/active') !== '0') {
-                                    $hasActiveSubmethod = true;
-                                    break;
-                                }
-                            }
-                            if (!$hasActiveSubmethod) {
-                                $isActive = false;
-                            }
-                        }
-                    }
-
-                    if ($isActive) {
-                        $component = trim($node->textContent);
-                        if ($component !== '') {
-                            $components[] = $component;
-                        }
-                    }
-                }
-            }
-
-            return $components;
-        } catch (\Exception $e) {
+    private function getChildComponents($children, bool $skipUiComponent = false): array
+    {
+        if (!is_array($children)) {
             return [];
-        } finally {
-            libxml_clear_errors();
-            libxml_use_internal_errors($previous);
         }
+
+        $components = [];
+        foreach ($children as $child) {
+            $component = is_array($child) ? ($child['component'] ?? null) : null;
+            if (
+                is_string($component) &&
+                $component !== '' &&
+                (!$skipUiComponent || $component !== 'uiComponent')
+            ) {
+                $components[] = $component;
+            }
+        }
+
+        return array_values(array_unique($components));
     }
 
     /**
-     * @param string $layoutFile
-     * @return array[]
+     * Read every active module's checkout layout once. Only the static XML merge
+     * is cached; Magento's processors remain request/quote aware.
      */
-    private function getPaymentRendererComponentMapFromLayout($layoutFile)
+    private function getRawCheckoutLayoutData(): array
     {
-        $dom = new \DOMDocument();
-        $previous = libxml_use_internal_errors(true);
-
-        try {
-            if (!$dom->load($layoutFile)) {
-                return [];
-            }
-
-            $xpath = new \DOMXPath($dom);
-            $nodes = $xpath->query(
-                '//*[local-name()="item"][@name="renders"]' .
-                '/*[local-name()="item"][@name="children"]' .
-                '/*[local-name()="item"]'
-            );
-
-            $map = [];
-            foreach ($nodes as $rendererNode) {
-                $rendererCode = $rendererNode->getAttribute('name');
-                $componentNodes = $xpath->query('./*[local-name()="item"][@name="component"]', $rendererNode);
-                if ($componentNodes->length === 0) {
-                    continue;
-                }
-
-                $component = trim($componentNodes->item(0)->textContent);
-                if ($component === '' || $component === 'uiComponent') {
-                    continue;
-                }
-
-                if ($rendererCode && $this->_scopeConfig->getValue('payment/' . $rendererCode . '/active') === '0') {
-                    continue;
-                }
-
-                if ($rendererCode) {
-                    $map[] = [
-                        'method' => $rendererCode,
-                        'component' => $component
-                    ];
-                }
-
-                $methodNodes = $xpath->query('./*[local-name()="item"][@name="methods"]/*[local-name()="item"]', $rendererNode);
-                if ($methodNodes->length === 0) {
-                    continue;
-                }
-
-                foreach ($methodNodes as $methodNode) {
-                    $methodCode = $methodNode->getAttribute('name');
-                    if ($methodCode && $this->_scopeConfig->getValue('payment/' . $methodCode . '/active') !== '0') {
-                        $map[] = [
-                            'method' => $methodCode,
-                            'component' => $component
-                        ];
-                    }
-                }
-            }
-
-            return $map;
-        } catch (\Exception $e) {
-            return [];
-        } finally {
-            libxml_clear_errors();
-            libxml_use_internal_errors($previous);
-        }
-    }
-
-    /**
-     * @param string $layoutFile
-     * @return string[]
-     */
-    private function getShippingRatesValidationComponentsFromLayout($layoutFile)
-    {
-        $dom = new \DOMDocument();
-        $previous = libxml_use_internal_errors(true);
-
-        try {
-            if (!$dom->load($layoutFile)) {
-                return [];
-            }
-
-            $xpath = new \DOMXPath($dom);
-            $nodes = $xpath->query(
-                '//*[local-name()="item"][@name="shipping-rates-validation"]' .
-                '//*[local-name()="item"][@name="component"]'
-            );
-
-            $components = [];
-            foreach ($nodes as $node) {
-                $component = trim($node->textContent);
-                if ($component !== '') {
-                    $components[] = $component;
-                }
-            }
-
-            return $components;
-        } catch (\Exception $e) {
-            return [];
-        } finally {
-            libxml_clear_errors();
-            libxml_use_internal_errors($previous);
-        }
-    }
-
-    /**
-     * @param string $layoutFile
-     * @return string[]
-     */
-    private function getPaymentValidationComponentsFromLayout($layoutFile)
-    {
-        $dom = new \DOMDocument();
-        $previous = libxml_use_internal_errors(true);
-
-        try {
-            if (!$dom->load($layoutFile)) {
-                return [];
-            }
-
-            $xpath = new \DOMXPath($dom);
-            $nodes = $xpath->query(
-                '//*[local-name()="item"][@name="additional-payment-validators"]' .
-                '//*[local-name()="item"][@name="component"]'
-            );
-
-            $components = [];
-            foreach ($nodes as $node) {
-                $component = trim($node->textContent);
-                if ($component !== '' && $component !== 'uiComponent') {
-                    $components[] = $component;
-                }
-            }
-
-            return $components;
-        } catch (\Exception $e) {
-            return [];
-        } finally {
-            libxml_clear_errors();
-            libxml_use_internal_errors($previous);
-        }
-    }
-
-    /**
-     * @param string $layoutFile
-     * @return array
-     */
-    private function getPaymentListChildrenFromLayout($layoutFile)
-    {
-        $dom = new \DOMDocument();
-        $previous = libxml_use_internal_errors(true);
-
-        try {
-            if (!$dom->load($layoutFile)) {
-                return [];
-            }
-
-            $xpath = new \DOMXPath($dom);
-            $nodes = $xpath->query(
-                '//*[local-name()="item"][@name="payment"]' .
-                '/*[local-name()="item"][@name="children"]' .
-                '/*[local-name()="item"][@name="payments-list"]' .
-                '/*[local-name()="item"][@name="children"]' .
-                '/*[local-name()="item"]'
-            );
-
-            $children = [];
-            foreach ($nodes as $node) {
-                $name = $node->getAttribute('name');
-                if (!$name) {
-                    continue;
-                }
-
-                $children[$name] = $this->mergeJsLayoutArrays(
-                    $children[$name] ?? [],
-                    $this->parseJsLayoutItem($node)
-                );
-            }
-
-            return $children;
-        } catch (\Exception $e) {
-            return [];
-        } finally {
-            libxml_clear_errors();
-            libxml_use_internal_errors($previous);
-        }
-    }
-
-    /**
-     * @param string $layoutFile
-     * @return array
-     */
-    private function getPaymentRegionChildrenFromLayout($layoutFile)
-    {
-        $dom = new \DOMDocument();
-        $previous = libxml_use_internal_errors(true);
-
-        try {
-            if (!$dom->load($layoutFile)) {
-                return [];
-            }
-
-            $xpath = new \DOMXPath($dom);
-            $nodes = $xpath->query(
-                '//*[local-name()="item"][@name="payment"]' .
-                '/*[local-name()="item"][@name="children"]' .
-                '/*[local-name()="item"][@name="place-order-captcha" or @name="beforeMethods" or @name="afterMethods"]'
-            );
-
-            $children = [];
-            foreach ($nodes as $node) {
-                $name = $node->getAttribute('name');
-                if (!$name) {
-                    continue;
-                }
-
-                $children[$name] = $this->mergeJsLayoutArrays(
-                    $children[$name] ?? [],
-                    $this->parseJsLayoutItem($node)
-                );
-            }
-
-            return $children;
-        } catch (\Exception $e) {
-            return [];
-        } finally {
-            libxml_clear_errors();
-            libxml_use_internal_errors($previous);
-        }
-    }
-
-    /**
-     * @param string $layoutFile
-     * @return array
-     */
-    private function getShippingListChildrenFromLayout($layoutFile)
-    {
-        $dom = new \DOMDocument();
-        $previous = libxml_use_internal_errors(true);
-
-        try {
-            if (!$dom->load($layoutFile)) {
-                return [];
-            }
-
-            $xpath = new \DOMXPath($dom);
-            $nodes = $xpath->query(
-                '//*[local-name()="item"][@name="shippingAddress"]' .
-                '/*[local-name()="item"][@name="children"]' .
-                '/*[local-name()="item"][@name="before-shipping-method-form" or @name="shippingAdditional"]'
-            );
-
-            $children = [];
-            foreach ($nodes as $node) {
-                $name = $node->getAttribute('name');
-                if (!$name) {
-                    continue;
-                }
-
-                $children[$name] = $this->mergeJsLayoutArrays(
-                    $children[$name] ?? [],
-                    $this->parseJsLayoutItem($node)
-                );
-            }
-
-            return $children;
-        } catch (\Exception $e) {
-            return [];
-        } finally {
-            libxml_clear_errors();
-            libxml_use_internal_errors($previous);
-        }
-    }
-
-    /**
-     * Build the address-related part of the standard checkout jsLayout and let
-     * Magento's own layout processor add EAV fields, validation and billing
-     * forms. The result is intentionally limited to address components so the
-     * native checkout step and shipping-method UI are not rendered twice.
-     *
-     * @return array
-     */
-    private function getProcessedStandardAddressLayout()
-    {
-        if ($this->standardAddressLayoutCache !== null) {
-            return $this->standardAddressLayoutCache;
+        if ($this->rawCheckoutLayoutData !== null) {
+            return $this->rawCheckoutLayoutData;
         }
 
-        $cached = $this->loadStandardAddressLayoutFromCache();
-        if ($cached !== null) {
-            $this->standardAddressLayoutCache = $cached;
-            return $this->standardAddressLayoutCache;
+        $this->rawCheckoutLayoutData = [
+            'jsLayout' => [],
+            'assets' => ['css' => [], 'scripts' => []]
+        ];
+        if ($this->moduleList === null || $this->componentRegistrar === null) {
+            return $this->rawCheckoutLayoutData;
         }
 
-        $this->standardAddressLayoutCache = [];
-        $moduleList = $this->getModuleList();
-        $componentRegistrar = $this->getComponentRegistrar();
-        if (
-            $this->checkoutLayoutProcessor === null ||
-            $moduleList === null ||
-            $componentRegistrar === null
-        ) {
-            return $this->standardAddressLayoutCache;
-        }
-
-        $shippingAddress = [];
-        $payment = [];
-        foreach ($moduleList->getNames() as $moduleName) {
-            $modulePath = $componentRegistrar->getPath(ComponentRegistrar::MODULE, $moduleName);
-            if (!$modulePath) {
-                continue;
+        if ($this->serializer !== null) {
+            try {
+                $cached = $this->_cache->load($this->getRawCheckoutLayoutCacheId());
+                $cached = is_string($cached) && $cached !== ''
+                    ? $this->serializer->unserialize($cached)
+                    : null;
+                if (
+                    is_array($cached) &&
+                    is_array($cached['jsLayout'] ?? null) &&
+                    is_array($cached['assets'] ?? null)
+                ) {
+                    $this->rawCheckoutLayoutData = $cached;
+                    return $this->rawCheckoutLayoutData;
+                }
+            } catch (\Throwable $exception) {
+                // A cache miss or stale entry only requires rebuilding the static merge.
             }
+        }
 
-            $layoutFile = $modulePath . '/view/frontend/layout/checkout_index_index.xml';
+        foreach ($this->moduleList->getNames() as $moduleName) {
+            $modulePath = $this->componentRegistrar->getPath(ComponentRegistrar::MODULE, $moduleName);
+            $layoutFile = $modulePath
+                ? $modulePath . '/view/frontend/layout/checkout_index_index.xml'
+                : '';
             if (!is_file($layoutFile)) {
                 continue;
             }
 
-            $shippingAddress = $this->mergeJsLayoutArrays(
-                $shippingAddress,
-                $this->getCheckoutStepComponentFromLayout($layoutFile, 'shipping-step', 'shippingAddress')
-            );
-            $payment = $this->mergeJsLayoutArrays(
-                $payment,
-                $this->getCheckoutStepComponentFromLayout($layoutFile, 'billing-step', 'payment')
-            );
-        }
+            $dom = new \DOMDocument();
+            $previous = libxml_use_internal_errors(true);
+            try {
+                if (!$dom->load($layoutFile)) {
+                    continue;
+                }
 
-        if ($shippingAddress === [] || $payment === []) {
-            return $this->standardAddressLayoutCache;
-        }
+                $xpath = new \DOMXPath($dom);
+                $arguments = $xpath->query(
+                    '//*[(local-name()="block" or local-name()="referenceBlock") and @name="checkout.root"]' .
+                    '/*[local-name()="arguments"]/*[local-name()="argument" and @name="jsLayout"]'
+                );
+                foreach ($arguments as $argument) {
+                    $layout = $this->parseJsLayoutItem($argument);
+                    if (is_array($layout)) {
+                        $this->rawCheckoutLayoutData['jsLayout'] = $this->mergeJsLayoutArrays(
+                            $this->rawCheckoutLayoutData['jsLayout'],
+                            $layout
+                        );
+                    }
+                }
 
-        $layout = [
-            'components' => [
-                'checkoutProvider' => [
-                    'component' => 'uiComponent'
-                ],
-                'checkout' => [
-                    'children' => [
-                        'steps' => [
-                            'children' => [
-                                'shipping-step' => [
-                                    'children' => [
-                                        'shippingAddress' => $shippingAddress
-                                    ]
-                                ],
-                                'billing-step' => [
-                                    'children' => [
-                                        'payment' => $payment
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
-                ]
-            ]
-        ];
-
-        try {
-            $layout = $this->checkoutLayoutProcessor->process($layout);
-            if ($this->checkoutDirectoryDataProcessor !== null) {
-                $layout = $this->checkoutDirectoryDataProcessor->process($layout);
+                if ($moduleName === 'Kkkonrad_Fastcheckout') {
+                    continue;
+                }
+                foreach ($xpath->query('//*[local-name()="head"]/*[local-name()="css"]') as $node) {
+                    $src = $node->getAttribute('src');
+                    if ($src !== '') {
+                        $this->rawCheckoutLayoutData['assets']['css'][] = [
+                            'src' => $src,
+                            'src_type' => $node->getAttribute('src_type') ?: null
+                        ];
+                    }
+                }
+                foreach ($xpath->query('//*[local-name()="head"]/*[local-name()="script"]') as $node) {
+                    $src = $node->getAttribute('src');
+                    if ($src !== '') {
+                        $this->rawCheckoutLayoutData['assets']['scripts'][] = $src;
+                    }
+                }
+            } catch (\Throwable $exception) {
+                // A malformed optional module layout must not break checkout.
+            } finally {
+                libxml_clear_errors();
+                libxml_use_internal_errors($previous);
             }
-            $layout = $this->normalizeStandardStreetLineDefaults($layout);
-        } catch (\Throwable $exception) {
-            return $this->standardAddressLayoutCache;
         }
 
-        $this->standardAddressLayoutCache = [
-            'shippingAddress' => $layout['components']['checkout']['children']['steps']['children']
-                ['shipping-step']['children']['shippingAddress'] ?? [],
-            'payment' => $layout['components']['checkout']['children']['steps']['children']
-                ['billing-step']['children']['payment'] ?? [],
-            'checkoutProvider' => $layout['components']['checkoutProvider'] ?? []
-        ];
+        $this->rawCheckoutLayoutData['assets']['css'] = array_values(array_unique(
+            $this->rawCheckoutLayoutData['assets']['css'],
+            SORT_REGULAR
+        ));
+        $this->rawCheckoutLayoutData['assets']['scripts'] = array_values(array_unique(
+            $this->rawCheckoutLayoutData['assets']['scripts']
+        ));
 
-        $this->saveStandardAddressLayoutToCache($this->standardAddressLayoutCache);
+        if ($this->serializer !== null) {
+            try {
+                $this->_cache->save(
+                    $this->serializer->serialize($this->rawCheckoutLayoutData),
+                    $this->getRawCheckoutLayoutCacheId(),
+                    [ConfigCacheType::CACHE_TAG, LayoutCacheType::CACHE_TAG]
+                );
+            } catch (\Throwable $exception) {
+                // Caching is optional.
+            }
+        }
 
-        return $this->standardAddressLayoutCache;
+        return $this->rawCheckoutLayoutData;
     }
 
-    /**
-     * Cache id for the processed standard checkout layout.
-     *
-     * The result is derived from installed modules, store config and locale only — it changes
-     * on deploy/config edits, never per shopper — yet it was rebuilt on every checkout render
-     * (Magento's LayoutProcessor plus a scan of every module's checkout_index_index.xml), and
-     * five public getters feed off it. The in-request property alone did not help across
-     * requests, which is where the cost actually sat.
-     *
-     * @return string
-     */
-    private function getStandardAddressLayoutCacheId(): string
+    private function getRawCheckoutLayoutCacheId(): string
     {
-        $moduleList = $this->getModuleList();
-        $modules = $moduleList !== null ? $moduleList->getNames() : [];
         $storeId = '';
         $themeId = '';
-
         try {
             $storeId = (string)$this->_storeManager->getStore()->getId();
-        } catch (\Throwable $exception) {
-            $storeId = '';
-        }
-
-        try {
             $theme = $this->_design->getDesignTheme();
             $themeId = $theme ? (string)($theme->getId() ?: $theme->getCode()) : '';
         } catch (\Throwable $exception) {
-            $themeId = '';
+            // Unit tests and early bootstrap can run without a resolved store/theme.
         }
 
-        return 'fastcheckout_std_layout_' . sha1(implode(',', [
-            // Bump when the shape produced below changes.
+        return 'fastcheckout_raw_layout_' . sha1(implode('|', [
             'v1',
             $storeId,
             $themeId,
-            $this->localeResolver !== null ? (string)$this->localeResolver->getLocale() : '',
-            implode('|', $modules)
+            $this->getLocaleCode(),
+            implode(',', $this->moduleList !== null ? $this->moduleList->getNames() : [])
         ]));
     }
 
-    /**
-     * @return array|null null when unavailable or not cached yet
-     */
-    private function loadStandardAddressLayoutFromCache(): ?array
+    private function getProcessedCheckoutLayout(): array
     {
-        if ($this->appCache === null || $this->serializer === null) {
-            return null;
+        if ($this->processedCheckoutLayout !== null) {
+            return $this->processedCheckoutLayout;
+        }
+
+        $raw = $this->getRawCheckoutLayoutData()['jsLayout'];
+        $this->processedCheckoutLayout = $this->normalizeStandardStreetLineDefaults($raw);
+        if ($raw === [] || $this->blockFactory === null || $this->serializer === null) {
+            return $this->processedCheckoutLayout;
         }
 
         try {
-            $raw = $this->appCache->load($this->getStandardAddressLayoutCacheId());
-            if (!is_string($raw) || $raw === '') {
-                return null;
+            $onepage = $this->blockFactory->createBlock(Onepage::class, ['data' => ['jsLayout' => $raw]]);
+            $processed = $this->serializer->unserialize($onepage->getJsLayout());
+            if (is_array($processed)) {
+                $this->processedCheckoutLayout = $this->normalizeStandardStreetLineDefaults($processed);
             }
-
-            $data = $this->serializer->unserialize($raw);
-
-            return is_array($data) ? $data : null;
         } catch (\Throwable $exception) {
-            return null;
+            $this->_logger->warning('Fastcheckout could not process the native checkout jsLayout.', [
+                'exception' => $exception
+            ]);
         }
+
+        return $this->processedCheckoutLayout;
     }
 
-    /**
-     * Tagged with config + layout so `cache:clean config|layout` (and any config save) drops it.
-     *
-     * @param array $layout
-     * @return void
-     */
-    private function saveStandardAddressLayoutToCache(array $layout): void
+    private function removeComponentsByPrefix(array $nodes, string $prefix): array
     {
-        if ($this->appCache === null || $this->serializer === null || $layout === []) {
-            return;
+        foreach ($nodes as $name => $node) {
+            if (!is_array($node)) {
+                continue;
+            }
+            if (strpos((string)($node['component'] ?? ''), $prefix) === 0) {
+                unset($nodes[$name]);
+                continue;
+            }
+            $nodes[$name] = $this->removeComponentsByPrefix($node, $prefix);
         }
 
-        try {
-            $this->appCache->save(
-                $this->serializer->serialize($layout),
-                $this->getStandardAddressLayoutCacheId(),
-                [ConfigCacheType::CACHE_TAG, LayoutCacheType::CACHE_TAG]
-            );
-        } catch (\Throwable $exception) {
-            // Caching is an optimisation; never break rendering because of it.
-        }
+        return $nodes;
     }
 
     /**
@@ -1890,202 +1168,8 @@ class Checkout extends Template
     }
 
     /**
-     * @param string $layoutFile
-     * @param string $stepName
-     * @param string $componentName
-     * @return array
-     */
-    private function getCheckoutStepComponentFromLayout($layoutFile, $stepName, $componentName)
-    {
-        $dom = new \DOMDocument();
-        $previous = libxml_use_internal_errors(true);
-
-        try {
-            if (!$dom->load($layoutFile)) {
-                return [];
-            }
-
-            $xpath = new \DOMXPath($dom);
-            $nodes = $xpath->query(
-                '//*[local-name()="item"][@name="' . $stepName . '"]' .
-                '/*[local-name()="item"][@name="children"]' .
-                '/*[local-name()="item"][@name="' . $componentName . '"]'
-            );
-            $component = [];
-            foreach ($nodes as $node) {
-                $parsed = $this->parseJsLayoutItem($node);
-                if (is_array($parsed)) {
-                    $component = $this->mergeJsLayoutArrays($component, $parsed);
-                }
-            }
-
-            return $component;
-        } catch (\Exception $e) {
-            return [];
-        } finally {
-            libxml_clear_errors();
-            libxml_use_internal_errors($previous);
-        }
-    }
-
-    /**
-     * @param string $layoutFile
-     * @return array
-     */
-    private function getShippingAddressChildrenFromLayout($layoutFile)
-    {
-        $dom = new \DOMDocument();
-        $previous = libxml_use_internal_errors(true);
-
-        try {
-            if (!$dom->load($layoutFile)) {
-                return [];
-            }
-
-            $xpath = new \DOMXPath($dom);
-            $nodes = $xpath->query(
-                '//*[local-name()="item"][@name="shippingAddress"]' .
-                '/*[local-name()="item"][@name="children"]' .
-                '/*[local-name()="item"][' .
-                '@name="before-form" or ' .
-                '@name="before-fields" or ' .
-                '@name="address-list-additional-addresses" or ' .
-                '@name="shipping-address-fieldset"' .
-                ']'
-            );
-
-            $children = [];
-            foreach ($nodes as $node) {
-                $name = $node->getAttribute('name');
-                if (!$name) {
-                    continue;
-                }
-
-                $parsed = $this->parseJsLayoutItem($node);
-                if ($name === 'shipping-address-fieldset') {
-                    $parsed = $this->filterShippingAddressFieldset($parsed);
-                    if (empty($parsed['children'])) {
-                        continue;
-                    }
-                }
-
-                $children[$name] = $this->mergeJsLayoutArrays(
-                    $children[$name] ?? [],
-                    $parsed
-                );
-            }
-
-            return $children;
-        } catch (\Exception $e) {
-            return [];
-        } finally {
-            libxml_clear_errors();
-            libxml_use_internal_errors($previous);
-        }
-    }
-
-    /**
-     * @param string $layoutFile
-     * @return array
-     */
-    private function getCheckoutStepChildrenFromLayout($layoutFile)
-    {
-        $dom = new \DOMDocument();
-        $previous = libxml_use_internal_errors(true);
-
-        try {
-            if (!$dom->load($layoutFile)) {
-                return [];
-            }
-
-            $xpath = new \DOMXPath($dom);
-            $nodes = $xpath->query(
-                '//*[local-name()="item"][@name="steps"]' .
-                '/*[local-name()="item"][@name="children"]' .
-                '/*[local-name()="item"]'
-            );
-
-            $children = [];
-            foreach ($nodes as $node) {
-                $name = $node->getAttribute('name');
-                if (!$name || $name === 'shipping-step' || $name === 'billing-step') {
-                    continue;
-                }
-
-                $children[$name] = $this->mergeJsLayoutArrays(
-                    $children[$name] ?? [],
-                    $this->parseJsLayoutItem($node)
-                );
-            }
-
-            return $children;
-        } catch (\Exception $e) {
-            return [];
-        } finally {
-            libxml_clear_errors();
-            libxml_use_internal_errors($previous);
-        }
-    }
-
-    /**
-     * @param mixed $fieldset
-     * @return array
-     */
-    private function filterShippingAddressFieldset($fieldset)
-    {
-        if (!is_array($fieldset)) {
-            return [];
-        }
-
-        $fieldset['component'] = $fieldset['component'] ?? 'uiComponent';
-        $fieldset['displayArea'] = $fieldset['displayArea'] ?? 'additional-fieldsets';
-
-        if (empty($fieldset['children']) || !is_array($fieldset['children'])) {
-            $fieldset['children'] = [];
-            return $fieldset;
-        }
-
-        foreach (array_keys($fieldset['children']) as $childName) {
-            if (isset(self::CORE_SHIPPING_ADDRESS_FIELDSET_CHILDREN[$childName])) {
-                unset($fieldset['children'][$childName]);
-                continue;
-            }
-
-            if (is_array($fieldset['children'][$childName])) {
-                $fieldset['children'][$childName] = $this->normalizeShippingAddressCustomField(
-                    $childName,
-                    $fieldset['children'][$childName]
-                );
-            }
-        }
-
-        return $fieldset;
-    }
-
-    /**
-     * @param string $fieldName
-     * @param array $field
-     * @return array
-     */
-    private function normalizeShippingAddressCustomField($fieldName, array $field)
-    {
-        $field['provider'] = $field['provider'] ?? 'checkoutProvider';
-        $field['dataScope'] = $field['dataScope'] ?? 'shippingAddress.custom_attributes.' . $fieldName;
-        $field['customScope'] = $field['customScope'] ?? 'shippingAddress.custom_attributes';
-
-        if (empty($field['config']) || !is_array($field['config'])) {
-            $field['config'] = [];
-        }
-
-        $field['config']['template'] = $field['config']['template'] ?? 'ui/form/field';
-        $field['config']['elementTmpl'] = $field['config']['elementTmpl'] ?? 'ui/form/element/input';
-
-        return $field;
-    }
-
-    /**
      * @param \DOMElement $node
-     * @return array|bool|string|null
+     * @return array|bool|float|int|string|null
      */
     private function parseJsLayoutItem(\DOMElement $node)
     {
@@ -2119,11 +1203,14 @@ class Checkout extends Template
         if ($type === 'boolean') {
             return $value === 'true' || $value === '1';
         }
+        if ($type === 'number') {
+            return strpos($value, '.') === false ? (int)$value : (float)$value;
+        }
         if ($value === '') {
             return null;
         }
 
-        return $value;
+        return $node->getAttribute('translate') === 'true' ? (string)__($value) : $value;
     }
 
     /**
@@ -2146,38 +1233,6 @@ class Checkout extends Template
         }
 
         return $left;
-    }
-
-    /**
-     * @return CompositeConfigProvider|null
-     */
-    private function getConfigProvider()
-    {
-        return $this->configProvider;
-    }
-
-    /**
-     * @return ModuleListInterface|null
-     */
-    private function getModuleList()
-    {
-        return $this->moduleList;
-    }
-
-    /**
-     * @return ComponentRegistrarInterface|null
-     */
-    private function getComponentRegistrar()
-    {
-        return $this->componentRegistrar;
-    }
-
-    /**
-     * @return ResolverInterface|null
-     */
-    private function getLocaleResolver()
-    {
-        return $this->localeResolver;
     }
 
     /**

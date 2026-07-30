@@ -715,6 +715,22 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
             response.request().method() === 'POST' &&
             /\/V1\/guest-carts\/[^/]+\/payment-information(?:\?|$)/.test(response.url())
         ), { timeout: 60_000 });
+        const successNavigations = [];
+        const privateContentErrors = [];
+
+        page.on('request', (request) => {
+            if (
+                request.isNavigationRequest() &&
+                /\/checkout\/onepage\/success\/?(?:\?|$)/.test(request.url())
+            ) {
+                successNavigations.push(request.url());
+            }
+        });
+        page.on('console', (message) => {
+            if (message.text().includes("Couldn't fetch privateContent")) {
+                privateContentErrors.push(message.text());
+            }
+        });
 
         await page.locator('[data-fastcheckout-place-order]:visible').evaluate(
             (button) => button.click()
@@ -730,6 +746,19 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
         const orderEntityId = JSON.parse(await orderResponse.text());
         expect(Number(orderEntityId)).toBeGreaterThan(0);
         await page.waitForURL(/checkout\/onepage\/success/, { timeout: 30_000 });
+        await page.waitForLoadState('networkidle');
+        expect(successNavigations).toHaveLength(1);
+        expect(privateContentErrors).toEqual([]);
+
+        const createAccount = page.locator(
+            'a[href*="/checkout/account/delegateCreate"]'
+        );
+        await expect(createAccount).toBeVisible();
+        await expect(createAccount.locator('xpath=ancestor::*[contains(@class, "max-w-md")]')).toHaveCSS(
+            'text-align',
+            'center'
+        );
+
         console.log('Created Purchase Order test order entity ID:', orderEntityId);
     });
 });

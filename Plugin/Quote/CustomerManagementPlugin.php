@@ -6,6 +6,7 @@ declare(strict_types=1);
 
 namespace Kkkonrad\Fastcheckout\Plugin\Quote;
 
+use Kkkonrad\Fastcheckout\Helper\Data as Helper;
 use Magento\Quote\Model\Quote as QuoteEntity;
 use Magento\Quote\Model\CustomerManagement;
 
@@ -31,6 +32,9 @@ class CustomerManagementPlugin
      */
     private $customerAddressRepository;
 
+    /** @var Helper */
+    private $helper;
+
     /**
      * CustomerManagementPlugin constructor.
      *
@@ -43,12 +47,14 @@ class CustomerManagementPlugin
         \Magento\Customer\Api\Data\AddressInterfaceFactory $customerAddressFactory,
         \Magento\Framework\Validator\Factory $validatorFactory,
         \Magento\Customer\Model\AddressFactory $addressFactory,
-        \Magento\Customer\Api\AddressRepositoryInterface $customerAddressRepository
+        \Magento\Customer\Api\AddressRepositoryInterface $customerAddressRepository,
+        Helper $helper
     ) {
         $this->customerAddressFactory = $customerAddressFactory;
         $this->validatorFactory = $validatorFactory;
         $this->addressFactory = $addressFactory;
         $this->customerAddressRepository = $customerAddressRepository;
+        $this->helper = $helper;
     }
 
     /**
@@ -66,6 +72,10 @@ class CustomerManagementPlugin
         callable $proceed,
         QuoteEntity $quote
     ) {
+        if (!$this->helper->isEnable()) {
+            return $proceed($quote);
+        }
+
         $addresses = [];
         if ($quote->getBillingAddress()->getCustomerAddressId()) {
             $addresses[] = $this->customerAddressRepository->getById(

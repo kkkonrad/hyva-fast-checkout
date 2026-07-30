@@ -171,10 +171,6 @@ define([
                     if (email) {
                         window.sessionStorage.setItem('fastcheckout_email', email);
                     }
-                    if (comment) {
-                        window.sessionStorage.setItem('fastcheckout_comment', comment);
-                    }
-                    window.sessionStorage.setItem('fastcheckout_subscribe', subscribe ? '1' : '0');
                 } catch (e) {
                     // ignore storage failures
                 }

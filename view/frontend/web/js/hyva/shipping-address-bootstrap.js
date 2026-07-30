@@ -3,8 +3,9 @@ define([
     'Magento_Ui/js/core/app',
     'Magento_Ui/js/core/renderer/layout',
     'uiRegistry',
+    'mage/translate',
     'Kkkonrad_Fastcheckout/js/hyva/checkout-layout-bridge'
-], function ($, app, uiLayout, registry, createCheckoutLayoutBridge) {
+], function ($, app, uiLayout, registry, $t, createCheckoutLayoutBridge) {
     'use strict';
 
     return function (config) {
@@ -79,6 +80,7 @@ define([
 
         window.fastcheckoutShippingComponentsStarted = true;
         window.fastcheckoutShippingComponentsStartedAt = performance.now();
+        $.mage.translate.add('Ship Here', $t('Deliver to this address'));
 
         observer = new MutationObserver(function () {
             if (announceAddressFieldsReady()) {

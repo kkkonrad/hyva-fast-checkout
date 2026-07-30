@@ -1013,64 +1013,8 @@ define([
                     readinessTimer = window.setTimeout(pollShippingReadiness, 250);
                 }
 
-                // Register both schedulers before app() because a cached KO layout can
-                // render synchronously and dispatch address-fields-ready immediately.
                 scheduleShippingRatesBootstrap();
                 scheduleDeferredPaymentComponents();
-                if (!window.fastcheckoutShippingComponentsStarted) {
-                    window.fastcheckoutShippingComponentsStarted = true;
-                    app({
-                        components: {
-                            'checkoutProvider': $.extend(
-                                true,
-                                {
-                                    component: 'uiComponent',
-                                    shippingAddress: {
-                                        street: ['', '']
-                                    }
-                                },
-                                checkoutLayoutBridge.checkoutProvider
-                            ),
-                            'checkout': {
-                                component: 'uiComponent',
-                                children: {
-                                    steps: {
-                                        component: 'uiComponent',
-                                        children: $.extend(true, {}, checkoutLayoutBridge.checkoutStepChildren, {
-                                            'shipping-step': {
-                                                component: 'uiComponent',
-                                                children: {
-                                                    'step-config': {
-                                                        component: 'uiComponent'
-                                                    },
-                                                    // shippingListChildren (before-shipping-method-form,
-                                                    // shippingAdditional) belong to this component in
-                                                    // stock Magento — core's shipping.html renders those
-                                                    // regions itself. Fastcheckout renders the same
-                                                    // regions from Kkkonrad_Fastcheckout/hyva/shipping-list,
-                                                    // bound to this very instance, so they must live here.
-                                                    shippingAddress: $.extend(
-                                                        true,
-                                                        {},
-                                                        checkoutLayoutBridge.shippingAddress,
-                                                        {
-                                                            children: $.extend(
-                                                                true,
-                                                                {},
-                                                                checkoutLayoutBridge.shippingAddressChildren,
-                                                                checkoutLayoutBridge.shippingListChildren
-                                                            )
-                                                        }
-                                                    )
-                                                }
-                                            }
-                                        })
-                                    }
-                                }
-                            }
-                        }
-                    });
-                }
 
                 [0, 50, 250, 750, 1500, 3000].forEach(function (delay) {
                     window.setTimeout(checkoutLayoutBridge.aliasStandardShippingRegistryPaths, delay);
@@ -1665,7 +1609,11 @@ define([
                         return shippingCompatibilityBridge.getShippingInformationComponent();
                     },
                     onSelectShippingAddressAction: function (shippingAddress) {
-                        var addressData;
+                        var addressData,
+                            addressType = shippingAddress &&
+                                typeof shippingAddress.getType === 'function'
+                                ? shippingAddress.getType()
+                                : '';
 
                         // The quote address object survives a country change, so it can still
                         // carry the previous country's region_id. Everything downstream is built
@@ -1677,7 +1625,17 @@ define([
 
                         addressData = normalizeKoAddressData(shippingAddress);
 
-                        persistAddressToCheckoutData(addressData, 'shipping');
+                        if (addressType && addressType !== 'new-customer-address') {
+                            if (
+                                checkoutData &&
+                                typeof checkoutData.setSelectedShippingAddress === 'function' &&
+                                typeof shippingAddress.getKey === 'function'
+                            ) {
+                                checkoutData.setSelectedShippingAddress(shippingAddress.getKey());
+                            }
+                        } else {
+                            persistAddressToCheckoutData(addressData, 'shipping');
+                        }
                         syncAddressDataToCheckoutProvider(addressData, 'shipping');
                         syncCheckoutProviderAddressAttributes();
 
@@ -3941,9 +3899,36 @@ define([
                  * @returns {Boolean}
                  */
                 function ensureQuoteShippingAddressForPlaceOrder() {
-                    var formData = collectShippingAddressDataForPlaceOrder(),
+                    var current = quote && typeof quote.shippingAddress === 'function'
+                            ? quote.shippingAddress()
+                            : null,
+                        currentType = current && typeof current.getType === 'function'
+                            ? current.getType()
+                            : '',
+                        formData,
                         newAddress,
-                        current;
+                        currentKey;
+
+                    // A saved Magento address is authoritative. Merging the hidden new-address
+                    // form into it turns it into a new-customer-address and deselects its card.
+                    if (
+                        currentType &&
+                        currentType !== 'new-customer-address' &&
+                        hasMeaningfulAddressData(normalizeKoAddressData(current))
+                    ) {
+                        currentKey = typeof current.getKey === 'function' ? current.getKey() : '';
+                        if (
+                            currentKey &&
+                            checkoutData &&
+                            typeof checkoutData.setSelectedShippingAddress === 'function'
+                        ) {
+                            checkoutData.setSelectedShippingAddress(currentKey);
+                        }
+
+                        return true;
+                    }
+
+                    formData = collectShippingAddressDataForPlaceOrder();
 
                     if (!formData) {
                         return !!(
@@ -3971,10 +3956,6 @@ define([
                     if (!newAddress) {
                         return false;
                     }
-
-                    current = quote && typeof quote.shippingAddress === 'function'
-                        ? quote.shippingAddress()
-                        : null;
 
                     if (!addressesMatch(current, newAddress) && typeof selectShippingAddressAction === 'function') {
                         selectShippingAddressAction(newAddress);
@@ -4808,8 +4789,16 @@ define([
                     },
 
                     afterPlaceOrder: function () {
-                        var component = getActiveRenderer(),
-                            shouldRunRendererAfterPlaceOrder = !window.fastcheckoutKoSuccessRedirectInProgress;
+                        var component,
+                            shouldRunRendererAfterPlaceOrder;
+
+                        if (window.fastcheckoutSuccessRedirectStarted) {
+                            return;
+                        }
+
+                        window.fastcheckoutSuccessRedirectStarted = true;
+                        component = getActiveRenderer();
+                        shouldRunRendererAfterPlaceOrder = !window.fastcheckoutKoSuccessRedirectInProgress;
 
                         // Snapshot guest address for the next order, then clear cart cache only.
                         // Do not wipe mage-cache-storage entirely — that left only email on re-order.

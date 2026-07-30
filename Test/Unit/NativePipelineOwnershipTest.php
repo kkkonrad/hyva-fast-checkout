@@ -124,6 +124,31 @@ class NativePipelineOwnershipTest extends TestCase
         );
     }
 
+    public function testPlaceOrderKeepsSavedShippingAddressMagentoOwned(): void
+    {
+        $js = file_get_contents(
+            $this->moduleRoot() . '/view/frontend/web/js/hyva/checkout-bridge.js'
+        );
+        $this->assertNotFalse($js);
+
+        $start = strpos($js, 'function ensureQuoteShippingAddressForPlaceOrder()');
+        $end = strpos($js, 'function ensureQuoteShippingMethodForPlaceOrder()', $start);
+        $this->assertNotFalse($start);
+        $this->assertNotFalse($end);
+
+        $function = substr($js, $start, $end - $start);
+        $guard = strpos($function, "currentType !== 'new-customer-address'");
+        $formMerge = strpos($function, 'formData = collectShippingAddressDataForPlaceOrder()');
+
+        $this->assertNotFalse($guard);
+        $this->assertNotFalse($formMerge);
+        $this->assertLessThan($formMerge, $guard);
+        $this->assertStringContainsString(
+            'checkoutData.setSelectedShippingAddress(currentKey);',
+            $function
+        );
+    }
+
     public function testPaymentUiStartsAfterShippingAddressFieldsAreReady(): void
     {
         $js = file_get_contents(

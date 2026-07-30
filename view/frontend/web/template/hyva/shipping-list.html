@@ -15,6 +15,17 @@
     <!-- ko foreach: getRegion('before-shipping-method-form') -->
         <!-- ko template: getTemplate() --><!-- /ko -->
     <!-- /ko -->
+
+    <!-- List-level validation (e.g. no shipping method selected) -->
+    <!-- ko if: hasGeneralError -->
+        <div class="rounded-lg border border-red-200 bg-red-50 px-3 py-2"
+             role="alert"
+             data-fastcheckout-shipping-method-error="1">
+            <span class="field-error shipping-field-error text-sm text-red-600 font-medium block"
+                  data-bind="text: errorValidationMessage"></span>
+        </div>
+    <!-- /ko -->
+
     <!-- ko foreach: { data: rates(), as: 'method' } -->
         <!-- selectionRevision forces border/css recompute when user lock changes -->
         <div class="fastcheckout-shipping-method-option rounded p-4 transition-all duration-200 cursor-pointer"
@@ -52,16 +63,6 @@
     <!-- ko ifnot: rates().length -->
         <p class="text-sm text-gray-500" data-bind="i18n: 'Please enter your shipping address details to estimate shipping rates.'">
         </p>
-    <!-- /ko -->
-
-    <!-- List-level validation (e.g. no shipping method selected) -->
-    <!-- ko if: hasGeneralError -->
-        <div class="rounded-lg border border-red-200 bg-red-50 px-3 py-2"
-             role="alert"
-             data-fastcheckout-shipping-method-error="1">
-            <span class="field-error shipping-field-error text-sm text-red-600 font-medium block"
-                  data-bind="text: errorValidationMessage"></span>
-        </div>
     <!-- /ko -->
 
     <div id="onepage-checkout-shipping-method-additional-load">

@@ -16,10 +16,11 @@ Moduł nie wymaga Magewire i nie utrzymuje dodatkowego stanu procesu zamówienia
 - responsywny układ procesu zamówienia zgodny z Hyvä;
 - standardowe formularze adresu wysyłki i adresu rozliczeniowego Magento wraz z
   natywną walidacją;
-- warstwa zgodności dla rendererów płatności RequireJS/Knockout;
+- natywny bootstrap RequireJS Magento i warstwa zgodności rendererów płatności
+  Knockout;
 - mapowanie metod płatności do metod dostawy;
 - zachowanie adresu gościa po odświeżeniu strony;
-- obsługa komentarzy do zamówienia, zapisu do newslettera i wiadomości prezentowych;
+- obsługa komentarzy do zamówienia i zapisu do newslettera;
 - zachowanie atrybutu rozszerzającego automatu paczkowego InPost;
 - opcjonalne przypisanie zamówienia gościa do istniejącego klienta o tym samym
   adresie e-mail.
@@ -58,9 +59,9 @@ Konfiguracja jest dostępna w panelu administracyjnym:
 
 `Stores > Configuration > Kkkonrad > Checkout`
 
-Ustawienia pozwalają włączyć moduł, wybrać domyślne metody dostawy i płatności,
-zarządzać polami dodatkowymi oraz zdefiniować mapowanie metod płatności do metod
-dostawy.
+Ustawienia pozwalają włączyć moduł, sterować widocznością komentarza, rabatu i
+newslettera, opcjonalnie przypisywać zamówienia gości oraz definiować mapowanie
+metod płatności do metod dostawy.
 
 Proces zamówienia jest dostępny pod standardową ścieżką `/checkout/`. Gdy moduł oraz
 zgodny motyw Hyvä są aktywne, Fastcheckout zastępuje zawartość tej strony bez
@@ -69,10 +70,13 @@ dostępna jako alias zapewniający zgodność wsteczną.
 
 ## Architektura
 
-- `Block/Hyva/Checkout.php` przygotowuje konfigurację procesu zamówienia po stronie
-  serwera.
-- `view/frontend/templates/hyva/knockout/checkout-bridge.phtml` uruchamia RequireJS
-  i Knockout.
+- `Block/Hyva/Checkout.php` jednokrotnie scala standardowy `jsLayout` i przekazuje
+  go natywnym procesorom checkoutu Magento.
+- `view/frontend/web/js/requirejs-base.js` ustawia ścieżkę zasobów przed natywnym
+  bootstrapem RequireJS, również przy włączonej minifikacji i łączeniu JavaScript.
+- Magento ładuje własną konfigurację RequireJS; szablon
+  `view/frontend/templates/hyva/knockout/checkout-bridge.phtml` uruchamia wyłącznie
+  most Knockout.
 - `view/frontend/web/js/hyva/checkout-bridge.js` montuje komponenty procesu
   zamówienia Magento.
 - Obiekty Magento `quote`, `checkout-data` oraz operacje REST zarządzają adresami,
@@ -88,7 +92,8 @@ ani orkiestratora stanu opartego na Alpine.
 Uruchomienie testów jednostkowych PHP z katalogu głównego Magento:
 
 ```bash
-vendor/bin/phpunit -c app/code/Kkkonrad/Fastcheckout/phpunit.xml.dist
+vendor/bin/phpunit --no-extensions -c dev/tests/unit/phpunit.xml.dist \
+    app/code/Kkkonrad/Fastcheckout/Test/Unit
 ```
 
 Uruchomienie testów jednostkowych JavaScript:

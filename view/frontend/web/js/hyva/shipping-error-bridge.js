@@ -34,9 +34,9 @@ define([], function () {
                 box = document.createElement('div');
                 box.setAttribute('data-fastcheckout-shipping-method-error-fallback', '1');
                 box.setAttribute('role', 'alert');
-                box.className = 'rounded-lg border border-red-200 bg-red-50 px-3 py-2 mt-2';
+                box.className = 'rounded-lg border border-red-200 bg-red-50 px-3 py-2 mb-3';
                 box.innerHTML = '<span class="field-error shipping-field-error text-sm text-red-600 font-medium block"></span>';
-                root.appendChild(box);
+                root.prepend(box);
             }
 
             box.style.display = '';

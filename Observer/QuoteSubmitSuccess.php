@@ -12,7 +12,6 @@ use Magento\Downloadable\Model\Link\PurchasedFactory;
 use Magento\Framework\Event\Observer;
 use Magento\Framework\Event\ObserverInterface;
 use Magento\Framework\Exception\NoSuchEntityException;
-use Magento\Framework\App\ObjectManager;
 use Magento\Newsletter\Model\SubscriberFactory;
 use Magento\Sales\Api\OrderRepositoryInterface;
 use Magento\Sales\Model\Order;
@@ -49,10 +48,10 @@ class QuoteSubmitSuccess implements ObserverInterface
     /** @var OrderRepositoryInterface */
     private $orderRepository;
 
-    /** @var PurchasedFactory|null */
+    /** @var PurchasedFactory */
     private $downloadLinkFactory;
 
-    /** @var SubscriberFactory|null */
+    /** @var SubscriberFactory */
     private $subscriberFactory;
 
     public function __construct(
@@ -62,8 +61,8 @@ class QuoteSubmitSuccess implements ObserverInterface
         LoggerInterface $logger,
         CustomerRepositoryInterface $customerRepository,
         OrderRepositoryInterface $orderRepository,
-        ?PurchasedFactory $downloadLinkFactory = null,
-        ?SubscriberFactory $subscriberFactory = null
+        PurchasedFactory $downloadLinkFactory,
+        SubscriberFactory $subscriberFactory
     ) {
         $this->helper = $helper;
         $this->checkoutSession = $checkoutSession;
@@ -72,9 +71,7 @@ class QuoteSubmitSuccess implements ObserverInterface
         $this->customerRepository = $customerRepository;
         $this->orderRepository = $orderRepository;
         $this->downloadLinkFactory = $downloadLinkFactory;
-        // Optional arg: resolve via OM when DI config is stale after deploy.
-        $this->subscriberFactory = $subscriberFactory
-            ?: ObjectManager::getInstance()->get(SubscriberFactory::class);
+        $this->subscriberFactory = $subscriberFactory;
     }
 
     /**
@@ -174,7 +171,7 @@ class QuoteSubmitSuccess implements ObserverInterface
      */
     private function reassignDownloadableLinks(Order $order, int $customerId): void
     {
-        if ($this->downloadLinkFactory === null || $customerId <= 0) {
+        if ($customerId <= 0) {
             return;
         }
 
@@ -244,7 +241,7 @@ class QuoteSubmitSuccess implements ObserverInterface
         }
 
         $email = trim((string)$order->getCustomerEmail());
-        if ($email === '' || $this->subscriberFactory === null) {
+        if ($email === '') {
             $this->clearSubscribeFlag();
             return;
         }
@@ -266,11 +263,7 @@ class QuoteSubmitSuccess implements ObserverInterface
     private function clearSubscribeFlag(): void
     {
         try {
-            if (method_exists($this->checkoutSession, 'unsFastcheckoutSubscribe')) {
-                $this->checkoutSession->unsFastcheckoutSubscribe();
-            } else {
-                $this->checkoutSession->setFastcheckoutSubscribe(null);
-            }
+            $this->checkoutSession->unsFastcheckoutSubscribe();
         } catch (\Throwable $exception) {
             // ignore session cleanup errors
         }

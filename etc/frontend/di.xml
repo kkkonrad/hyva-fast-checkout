@@ -16,10 +16,11 @@
             <argument name="moduleList" xsi:type="object">Magento\Framework\Module\ModuleListInterface</argument>
             <argument name="componentRegistrar" xsi:type="object">Magento\Framework\Component\ComponentRegistrarInterface</argument>
             <argument name="localeResolver" xsi:type="object">Magento\Framework\Locale\ResolverInterface</argument>
-            <argument name="requireJsAssets" xsi:type="object">Kkkonrad\Fastcheckout\Model\Hyva\RequireJsAssets</argument>
             <argument name="taxHelper" xsi:type="object">Magento\Tax\Helper\Data</argument>
             <argument name="paymentMethodManagement" xsi:type="object">Magento\Quote\Api\PaymentMethodManagementInterface</argument>
             <argument name="paymentHelper" xsi:type="object">Magento\Payment\Helper\Data</argument>
+            <argument name="serializer" xsi:type="object">Magento\Framework\Serialize\SerializerInterface</argument>
+            <argument name="blockFactory" xsi:type="object">Magento\Framework\View\Element\BlockFactory</argument>
         </arguments>
     </type>
     <type name="Magento\Checkout\Controller\Index\Index">
@@ -34,30 +35,4 @@
         <plugin name="fastcheckout_checkout_success"
                 type="Kkkonrad\Fastcheckout\Plugin\Checkout\Controller\Onepage\Success"/>
     </type>
-    <type name="Magento\Checkout\Model\DefaultConfigProvider">
-        <plugin name="fastcheckout_get_checkout_url_dcp"
-                type="Kkkonrad\Fastcheckout\Plugin\Checkout\DefaultConfigProvider"/>
-    </type>
-    <type name="Magento\Checkout\Block\Onepage\Link">
-        <plugin name="fastcheckout_get_checkout_url_onepage_link"
-                type="Kkkonrad\Fastcheckout\Plugin\Checkout\Block\Onepage\Link"/>
-    </type>
-    <type name="Magento\Checkout\Block\Cart\Sidebar">
-        <plugin name="fastcheckout_get_checkout_url_cart_sidebar"
-                type="Kkkonrad\Fastcheckout\Plugin\Checkout\Block\Cart\Sidebar"/>
-    </type>
-    <type name="Magento\Checkout\Block\Link">
-        <plugin name="fastcheckout_get_checkout_url_link"
-                type="Kkkonrad\Fastcheckout\Plugin\Checkout\Block\Link"/>
-    </type>
-    <type name="Magento\Checkout\Block\Cart">
-        <plugin name="fastcheckout_get_checkout_url_cart"
-                type="Kkkonrad\Fastcheckout\Plugin\Checkout\Block\Cart"/>
-    </type>
-
-    <type name="Magento\Framework\View\Model\Layout\Merge">
-        <plugin name="fastcheckout_hyva_layout_merge_fix"
-                type="Kkkonrad\Fastcheckout\Plugin\Layout\MergePlugin"/>
-    </type>
-
 </config>
