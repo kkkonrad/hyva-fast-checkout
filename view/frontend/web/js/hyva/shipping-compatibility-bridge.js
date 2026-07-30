@@ -149,7 +149,6 @@ define(['jquery'], function ($) {
             }
 
             component.source = provider;
-            component.isFormInline = true;
             component.countryOptions = getCountryOptionsByValue();
             component.messageContainer = component.messageContainer || getBridgeMessageContainer();
 
