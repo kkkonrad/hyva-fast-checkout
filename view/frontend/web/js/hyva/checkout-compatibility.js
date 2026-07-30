@@ -78,7 +78,23 @@ define([], function () {
         Object.keys(originalAccessor).forEach(function (key) {
             quote[accessorName][key] = originalAccessor[key];
         });
-        quote[accessorName].subscribe = originalAccessor.subscribe.bind(originalAccessor);
+        [
+            'subscribe', 'notifySubscribers', 'getSubscriptionsCount',
+            'hasSubscriptionsForEvent', 'extend', 'peek',
+            'valueHasMutated', 'valueWillMutate'
+        ].forEach(function (method) {
+            if (typeof originalAccessor[method] === 'function') {
+                quote[accessorName][method] = originalAccessor[method].bind(originalAccessor);
+            }
+        });
+        if (
+            typeof quote[accessorName].valueHasMutated !== 'function' &&
+            typeof quote[accessorName].notifySubscribers === 'function'
+        ) {
+            quote[accessorName].valueHasMutated = function () {
+                quote[accessorName].notifySubscribers(originalAccessor());
+            };
+        }
     }
 
     function getCheckoutDataLocalStore() {
