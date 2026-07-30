@@ -52,7 +52,7 @@ define([
                 normalizeAddressValue(Object.values(rightStreet).filter(Boolean).join(' '));
     }
 
-    function clearStaleNewCustomerAddress() {
+    function clearStaleNewCustomerAddress(resolver) {
         var config = window.checkoutConfig || {},
             addresses = (config.customerData || {}).addresses || {},
             addressKeys = Object.keys(addresses),
@@ -63,7 +63,8 @@ define([
             street = address && address.street || {},
             isSavedAddress,
             storeCode = config.storeCode || 'default',
-            quoteAddress;
+            quoteAddress,
+            savedAddress;
 
         if (!config.isCustomerLoggedIn || !addressKeys.length || !address) {
             return;
@@ -101,7 +102,16 @@ define([
                 return addressesMatch(quoteAddress, addresses[key]);
             })
         ) {
-            quote.shippingAddress(null);
+            savedAddress = resolver &&
+                typeof resolver.getShippingAddressFromCustomerAddressList === 'function'
+                ? resolver.getShippingAddressFromCustomerAddressList()
+                : null;
+            if (savedAddress) {
+                quote.shippingAddress(savedAddress);
+                if (typeof checkoutData.setSelectedShippingAddress === 'function') {
+                    checkoutData.setSelectedShippingAddress(savedAddress.getKey());
+                }
+            }
         }
     }
 
@@ -134,7 +144,7 @@ define([
         }
     }
 
-    function ensureAddressData() {
+    function ensureAddressData(resolver) {
         var shippingAddress,
             billingAddress,
             shippingAddressData,
@@ -144,13 +154,22 @@ define([
             return;
         }
 
-        clearStaleNewCustomerAddress();
+        clearStaleNewCustomerAddress(resolver);
         ensureCustomerNameData();
 
         shippingAddress = typeof quote.shippingAddress === 'function' ? quote.shippingAddress() : null;
         billingAddress = typeof quote.billingAddress === 'function' ? quote.billingAddress() : null;
 
-        if (shippingAddress && checkoutData && !hasAddressData(checkoutData.getShippingAddressFromData())) {
+        if (
+            shippingAddress &&
+            checkoutData &&
+            !hasAddressData(checkoutData.getShippingAddressFromData()) &&
+            !(
+                window.checkoutConfig.isCustomerLoggedIn &&
+                typeof shippingAddress.getType === 'function' &&
+                shippingAddress.getType() === 'customer-address'
+            )
+        ) {
             shippingAddressData = getAddressData(shippingAddress);
             safeSet('setShippingAddressFromData', shippingAddressData);
         }
@@ -168,7 +187,7 @@ define([
         }
 
         resolver[method] = wrapper.wrap(resolver[method], function (originalMethod) {
-            ensureAddressData();
+            ensureAddressData(resolver);
 
             return originalMethod.apply(resolver, Array.prototype.slice.call(arguments, 1));
         });

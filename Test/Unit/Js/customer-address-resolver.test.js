@@ -4,26 +4,46 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-function run(addresses, newShipping, shipping, selectedShipping) {
-    const stored = { newShipping, shipping, selectedShipping };
+function run(addresses, newShipping, shipping, selectedShipping, quoteShipping) {
+    const stored = { newShipping, shipping, selectedShipping, quoteShipping };
+    const savedData = Object.values(addresses)[0];
+    const savedQuoteAddress = savedData && Object.assign({}, savedData, {
+        customerAddressId: savedData.id,
+        countryId: savedData.country_id,
+        getType: () => 'customer-address',
+        getKey: () => 'customer-address' + savedData.id
+    });
     const checkoutData = {
         getShippingAddressFromData: () => stored.shipping || null,
         getBillingAddressFromData: () => null,
         getNewCustomerShippingAddress: () => stored.newShipping || null,
         setShippingAddressFromData: value => { stored.shipping = value; },
-        setNewCustomerShippingAddress: value => { stored.newShipping = value; }
+        setNewCustomerShippingAddress: value => { stored.newShipping = value; },
+        setSelectedShippingAddress: value => { stored.selectedShipping = value; }
     };
-    const resolver = { resolveShippingAddress: () => stored.resolved = stored.shipping };
+    const quote = {
+        shippingAddress: function (value) {
+            if (arguments.length) {
+                if (value === null) {
+                    throw new TypeError('Inventory pickup converter cannot format a null address.');
+                }
+                stored.quoteShipping = value;
+            }
+            return stored.quoteShipping || null;
+        },
+        billingAddress: () => null
+    };
+    const resolver = {
+        resolveShippingAddress: () => stored.resolved = stored.shipping,
+        getShippingAddressFromCustomerAddressList: () => savedQuoteAddress || null
+    };
     const modules = {
         'mage/utils/wrapper': {
             wrap: (original, wrapped) => function () {
                 return wrapped.apply(this, [original].concat(Array.from(arguments)));
             }
         },
-        'Magento_Checkout/js/model/quote': {
-            shippingAddress: () => null,
-            billingAddress: () => null
-        },
+        'Magento_Checkout/js/model/quote': quote,
         'Magento_Checkout/js/checkout-data': checkoutData,
         'Magento_Checkout/js/model/address-converter': {},
         'Magento_Customer/js/customer-data': {
@@ -90,10 +110,16 @@ const clearedDuplicate = run(
     { 1: savedAddress },
     duplicateWithoutId,
     duplicateWithoutId,
-    'new-customer-address'
+    'new-customer-address',
+    Object.assign({}, duplicateWithoutId, {
+        countryId: 'PL',
+        customAttributes: [],
+        getType: () => 'new-customer-address'
+    })
 );
 if (clearedDuplicate.newShipping || clearedDuplicate.shipping ||
-    clearedDuplicate.selectedShipping) {
+    clearedDuplicate.selectedShipping !== 'customer-address1' ||
+    clearedDuplicate.quoteShipping.getType() !== 'customer-address') {
     throw new Error('A duplicate address without a customer address ID was not cleared.');
 }
 

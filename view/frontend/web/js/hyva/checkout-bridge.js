@@ -1609,7 +1609,11 @@ define([
                         return shippingCompatibilityBridge.getShippingInformationComponent();
                     },
                     onSelectShippingAddressAction: function (shippingAddress) {
-                        var addressData;
+                        var addressData,
+                            addressType = shippingAddress &&
+                                typeof shippingAddress.getType === 'function'
+                                ? shippingAddress.getType()
+                                : '';
 
                         // The quote address object survives a country change, so it can still
                         // carry the previous country's region_id. Everything downstream is built
@@ -1621,7 +1625,17 @@ define([
 
                         addressData = normalizeKoAddressData(shippingAddress);
 
-                        persistAddressToCheckoutData(addressData, 'shipping');
+                        if (addressType && addressType !== 'new-customer-address') {
+                            if (
+                                checkoutData &&
+                                typeof checkoutData.setSelectedShippingAddress === 'function' &&
+                                typeof shippingAddress.getKey === 'function'
+                            ) {
+                                checkoutData.setSelectedShippingAddress(shippingAddress.getKey());
+                            }
+                        } else {
+                            persistAddressToCheckoutData(addressData, 'shipping');
+                        }
                         syncAddressDataToCheckoutProvider(addressData, 'shipping');
                         syncCheckoutProviderAddressAttributes();
 
