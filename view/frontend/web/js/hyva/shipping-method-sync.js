@@ -376,6 +376,30 @@ define([
             return codes;
         }
 
+        // Invalidates in-flight select('') / activate timers so a late empty clear
+        // cannot close a panel we just opened for the sole mapped payment.
+        var paymentUiActivationToken = 0;
+
+        function isPaymentKoPanelOpen(methodCode) {
+            var target;
+
+            if (!methodCode) {
+                return false;
+            }
+            target = document.querySelector(
+                '[data-fastcheckout-payment-method-ko-target="' +
+                String(methodCode).replace(/"/g, '') + '"]'
+            );
+            if (!target || target.classList.contains('hidden') || target.style.display === 'none') {
+                return false;
+            }
+
+            return !!(
+                target.querySelector('.payment-method._active, [data-fastcheckout-active="true"]') ||
+                target.children.length > 0
+            );
+        }
+
         /**
          * Check radio + open KO panel / bind Magento renderer so place-order
          * validation actually runs. Radio-only selection (SSR or Magento resolver)
@@ -385,32 +409,73 @@ define([
          * @param {string} methodCode
          */
         function activatePaymentMethodUi(methodCode) {
+            var token,
+                delays;
+
             methodCode = methodCode ? String(methodCode) : '';
             if (!methodCode) {
                 return;
             }
 
+            // Cancel any pending select('') from dropPaymentSelectionCompletely.
+            paymentUiActivationToken += 1;
+            token = paymentUiActivationToken;
+
             document.querySelectorAll('input[name="payment_method"]').forEach(function (input) {
                 input.checked = String(input.value) === methodCode && !input.disabled;
             });
 
-            if (
-                !window.fastcheckoutHyvaPayment ||
-                typeof window.fastcheckoutHyvaPayment.selectPaymentMethod !== 'function'
-            ) {
-                return;
-            }
+            function tryOpen(attempt) {
+                if (token !== paymentUiActivationToken) {
+                    return;
+                }
+                if (
+                    !window.fastcheckoutHyvaPayment ||
+                    typeof window.fastcheckoutHyvaPayment.selectPaymentMethod !== 'function'
+                ) {
+                    return;
+                }
 
-            // Defer so KO remount after shipping-information can finish first.
-            window.setTimeout(function () {
                 if (
                     window.fastcheckoutHyvaPayment &&
                     typeof window.fastcheckoutHyvaPayment.rememberUserPaymentSelection === 'function'
                 ) {
                     window.fastcheckoutHyvaPayment.rememberUserPaymentSelection(methodCode);
                 }
+
+                // Keep radio sticky across late remap / empty-select races.
+                document.querySelectorAll('input[name="payment_method"]').forEach(function (input) {
+                    input.checked = String(input.value) === methodCode && !input.disabled;
+                });
+
                 window.fastcheckoutHyvaPayment.selectPaymentMethod(methodCode);
-            }, 0);
+
+                // If renderer was still booting, re-try until panel is really open.
+                if (!isPaymentKoPanelOpen(methodCode) && attempt < 6) {
+                    window.setTimeout(function () {
+                        tryOpen(attempt + 1);
+                    }, attempt === 0 ? 50 : 150 * attempt);
+                }
+            }
+
+            // Immediate attempt + delayed retries (shipping-information / KO mount lag).
+            tryOpen(0);
+            delays = [120, 350, 800, 1600];
+            delays.forEach(function (delay) {
+                window.setTimeout(function () {
+                    if (token !== paymentUiActivationToken) {
+                        return;
+                    }
+                    if (!isPaymentKoPanelOpen(methodCode)) {
+                        tryOpen(1);
+                    } else {
+                        // Re-assert radio only — panel already open.
+                        document.querySelectorAll('input[name="payment_method"]').forEach(function (input) {
+                            input.checked = String(input.value) === methodCode && !input.disabled;
+                        });
+                    }
+                }, delay);
+            });
         }
 
         /**
@@ -453,27 +518,65 @@ define([
             }
 
             if (stillAllowed && allowedInput) {
-                // Same payment remains valid — radio alone is not enough after remap
-                // (panel was closed / renderer unbound). Fully re-activate.
-                activatePaymentMethodUi(quoteCode);
+                // Same payment remains valid. Re-open only when the KO panel is down
+                // (shipping-information remaps 2–3×; re-closing causes a flash /
+                // stuck checked-but-closed state).
+                if (!isPaymentKoPanelOpen(quoteCode)) {
+                    activatePaymentMethodUi(quoteCode);
+                } else {
+                    document.querySelectorAll('input[name="payment_method"]').forEach(function (input) {
+                        input.checked = String(input.value) === String(quoteCode) && !input.disabled;
+                    });
+                }
+                return;
+            }
+
+            allowedCodes = getAllowedPaymentCodes();
+            soleCode = allowedCodes.length === 1 ? allowedCodes[0] : '';
+
+            if (soleCode) {
+                // shipping-information re-runs remap 2–3×. If the sole method panel is
+                // already open, only re-assert radio/quote — do not uncheck or close.
+                if (isPaymentKoPanelOpen(soleCode)) {
+                    document.querySelectorAll('input[name="payment_method"]').forEach(function (input) {
+                        input.checked = String(input.value) === String(soleCode) && !input.disabled;
+                    });
+                    if (
+                        window.fastcheckoutHyvaPayment &&
+                        typeof window.fastcheckoutHyvaPayment.selectPaymentMethod === 'function' &&
+                        (
+                            !quote ||
+                            typeof quote.paymentMethod !== 'function' ||
+                            !quote.paymentMethod() ||
+                            String(quote.paymentMethod().method || '') !== String(soleCode)
+                        )
+                    ) {
+                        window.fastcheckoutHyvaPayment.selectPaymentMethod(soleCode);
+                    }
+                    return;
+                }
+
+                // Clear quote/checkout-data without select('') and without tearing down
+                // KO targets — activate opens the sole method.
+                dropPaymentSelectionCompletely({ skipSelectEmpty: true, keepPanels: true });
+                activatePaymentMethodUi(soleCode);
                 return;
             }
 
             dropPaymentSelectionCompletely();
-
-            allowedCodes = getAllowedPaymentCodes();
-            soleCode = allowedCodes.length === 1 ? allowedCodes[0] : '';
-            if (soleCode) {
-                // Single allowed payment for this shipping method: select + open.
-                activatePaymentMethodUi(soleCode);
-            }
         }
 
         /**
          * Uncheck radios, clear quote + Magento checkout-data, close KO panels.
          * Used when the selected payment is not allowed for the current shipping method.
+         *
+         * @param {{skipSelectEmpty?: boolean}} [options]
          */
-        function dropPaymentSelectionCompletely() {
+        function dropPaymentSelectionCompletely(options) {
+            var token;
+
+            options = options || {};
+
             document.querySelectorAll('input[name="payment_method"]').forEach(function (input) {
                 input.checked = false;
             });
@@ -503,11 +606,33 @@ define([
                 window.fastcheckoutHyvaPayment.clearUserPaymentSelection();
             }
 
+            if (options.skipSelectEmpty) {
+                // Caller activates another method immediately — avoid select('') race.
+                // Optionally keep KO panel shells mounted (sole-payment remap path).
+                if (!options.keepPanels) {
+                    document.querySelectorAll('.payment-method._active').forEach(function (el) {
+                        el.classList.remove('_active');
+                        el.removeAttribute('data-fastcheckout-active');
+                    });
+                    document.querySelectorAll('[data-fastcheckout-payment-method-ko-target]').forEach(function (el) {
+                        el.classList.add('hidden');
+                        el.style.display = 'none';
+                    });
+                }
+                return;
+            }
+
+            paymentUiActivationToken += 1;
+            token = paymentUiActivationToken;
+
             if (
                 window.fastcheckoutHyvaPayment &&
                 typeof window.fastcheckoutHyvaPayment.selectPaymentMethod === 'function'
             ) {
                 window.setTimeout(function () {
+                    if (token !== paymentUiActivationToken) {
+                        return;
+                    }
                     window.fastcheckoutHyvaPayment.selectPaymentMethod('');
                 }, 0);
             } else {
