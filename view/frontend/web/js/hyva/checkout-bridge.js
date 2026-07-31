@@ -5055,17 +5055,115 @@ define([
                 window.fastcheckoutHyvaPayment = window.fastcheckoutHyvaPayment || {};
                 window.fastcheckoutHyvaPayment.applyPaymentOptionVisibility = applyPaymentOptionVisibility;
 
+                /**
+                 * Magento payment modules register renderers by side-effect when their
+                 * "payments" / "offline-payments" / "payu_gateway" components load
+                 * (they push into Magento_Checkout/js/model/payment/renderer-list).
+                 * Without that list, payment-list.createRenderer never builds
+                 * .payment-method nodes — radio stays checked, panel stays empty.
+                 *
+                 * layoutScripts alone is not enough: some stores only collect third-party
+                 * extras (e.g. InPost) and omit OfflinePayments. Always load the payment
+                 * renderer registration components discovered from jsLayout.
+                 */
+                function loadPaymentRegistrationModules() {
+                    var modules = [],
+                        seen = {},
+                        list = config.rendererComponents || [];
+
+                    list.forEach(function (scriptModule) {
+                        if (!scriptModule || seen[scriptModule]) {
+                            return;
+                        }
+                        seen[scriptModule] = true;
+                        modules.push(scriptModule);
+                    });
+
+                    // Fallback when PHP map only exposes group codes (offline-payments)
+                    // without expanding active method codes into rendererComponents.
+                    [
+                        'Magento_OfflinePayments/js/view/payment/offline-payments',
+                        'Magento_Payment/js/view/payment/payments'
+                    ].forEach(function (scriptModule) {
+                        if (!seen[scriptModule]) {
+                            seen[scriptModule] = true;
+                            modules.push(scriptModule);
+                        }
+                    });
+
+                    modules.forEach(function (scriptModule) {
+                        require([scriptModule], function () {
+                            if (
+                                window.fastcheckoutHyvaPaymentList &&
+                                typeof window.fastcheckoutHyvaPaymentList.syncRenderers === 'function'
+                            ) {
+                                window.fastcheckoutHyvaPaymentList.syncRenderers();
+                            }
+                            runPatchRenderers();
+                            // If a sole payment is already checked, re-open its panel now
+                            // that KO renderers exist.
+                            if (
+                                window.fastcheckoutHyvaShipping &&
+                                typeof window.fastcheckoutHyvaShipping.applyPaymentRemapForShipping === 'function'
+                            ) {
+                                var shipCode = '';
+                                try {
+                                    var sm = quote && quote.shippingMethod && quote.shippingMethod();
+                                    if (sm && sm.carrier_code) {
+                                        shipCode = sm.carrier_code + '_' + sm.method_code;
+                                    }
+                                } catch (e) { /* */ }
+                                if (!shipCode) {
+                                    var radio = document.querySelector(
+                                        'input[name="shipping_method"]:checked'
+                                    );
+                                    shipCode = radio ? radio.value : '';
+                                }
+                                if (shipCode) {
+                                    window.fastcheckoutHyvaShipping.applyPaymentRemapForShipping(shipCode);
+                                }
+                            } else {
+                                var checkedPay = document.querySelector(
+                                    'input[name="payment_method"]:checked:not([disabled])'
+                                );
+                                if (checkedPay && checkedPay.value) {
+                                    setSelectedMethod(checkedPay.value);
+                                }
+                            }
+                        }, function (err) {
+                            if (window.console && typeof window.console.warn === 'function') {
+                                window.console.warn(
+                                    'Kkkonrad Fastcheckout: payment registration module could not load',
+                                    scriptModule,
+                                    err
+                                );
+                            }
+                        });
+                    });
+                }
+
+                loadPaymentRegistrationModules();
+
                 // Load discovered layout scripts dynamically via RequireJS
                 var layoutScripts = config.layoutScripts || [];
                 if (layoutScripts.length > 0) {
                     layoutScripts.forEach(function (scriptModule) {
                         var namespace = String(scriptModule).split('/')[0];
 
-                        if (!/^(Magento_|Kkkonrad_)/.test(namespace)) {
+                        // Allow Magento_ / Kkkonrad_ and known payment vendors that register
+                        // into renderer-list (PayU/Tpay/Braintree/Mollie/InPost extras).
+                        if (
+                            !/^(Magento_|Kkkonrad_|PayU_|Tpay_|PayPal_|Mollie_|Smartmage_)/.test(namespace)
+                        ) {
                             return;
                         }
                         require([scriptModule], function () {
-                            
+                            if (
+                                window.fastcheckoutHyvaPaymentList &&
+                                typeof window.fastcheckoutHyvaPaymentList.syncRenderers === 'function'
+                            ) {
+                                window.fastcheckoutHyvaPaymentList.syncRenderers();
+                            }
                         }, function (err) {
                             if (window.console && typeof window.console.warn === 'function') {
                                 window.console.warn('Kkkonrad Fastcheckout: Could not load layout script:', scriptModule, err);
