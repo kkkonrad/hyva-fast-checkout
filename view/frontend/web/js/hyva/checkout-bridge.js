@@ -179,7 +179,12 @@ define([
             }),
                 persistedSeparateBillingRestored = false;
 
+            // Guest form snapshot only — never for logged-in customers. Restoring a
+            // guest snapshot while an address-book entry exists writes
+            // newCustomerShippingAddress + selectShippingAddress(new-customer-address),
+            // which adds a second list item and leaves the default card unselected.
             if (
+                !window.isCustomerLoggedIn &&
                 guestAddressSnapshot &&
                 typeof guestAddressSnapshot.bindAutoSnapshot === 'function'
             ) {
@@ -239,6 +244,12 @@ define([
 
             function restorePreviousGuestShippingAddress(forceQuote) {
                 var restoredShipping = false;
+
+                // Logged-in shoppers own Magento address-book selection; never inject
+                // a guest session snapshot into their shipping quote/list.
+                if (window.isCustomerLoggedIn) {
+                    return restorePersistedSeparateBillingAddress();
+                }
 
                 try {
                     restoredShipping = guestAddressSnapshot.restore({
