@@ -410,12 +410,22 @@ define([], function () {
      *
      * @returns {Object|null}
      */
+    function isCustomerLoggedIn() {
+        return !!(
+            (typeof window !== 'undefined' && window.isCustomerLoggedIn) ||
+            (typeof window !== 'undefined' &&
+                window.checkoutConfig &&
+                window.checkoutConfig.isCustomerLoggedIn)
+        );
+    }
+
     function snapshotCurrentForm() {
         var values;
 
         if (
             restoreWriteInProgress ||
-            window.fastcheckoutOrderPlaced
+            window.fastcheckoutOrderPlaced ||
+            isCustomerLoggedIn()
         ) {
             return null;
         }
@@ -477,7 +487,8 @@ define([], function () {
     function bindAutoSnapshot() {
         if (
             autoSnapshotBound ||
-            typeof document === 'undefined'
+            typeof document === 'undefined' ||
+            isCustomerLoggedIn()
         ) {
             return;
         }
@@ -581,6 +592,13 @@ define([], function () {
             separateBillingSelected = false;
 
         bindDestinationTouchGuard();
+
+        // Address-book customers must keep Magento customer-address selection.
+        // Writing newCustomerShippingAddress here creates a second list item and
+        // deselects the default shipping card after reload.
+        if (isCustomerLoggedIn()) {
+            return false;
+        }
 
         if (!values) {
             return false;

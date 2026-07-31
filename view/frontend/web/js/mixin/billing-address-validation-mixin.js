@@ -433,19 +433,32 @@ define([
                             return;
                         }
 
-                        // Shopper opted into a separate billing address — never re-check
-                        // for them, and undo accidental true from Magento cache-key sync.
+                        // Shopper opted into a separate billing address.
+                        // Magento may flip the observable true via cache-key equality —
+                        // undo that. But when the shopper re-checks the box, KO's
+                        // `checked` binding sets true *before* click:useShippingAddress
+                        // clears userChoseSeparateBilling. Defer the undo so an
+                        // intentional recheck can land first.
                         if (userChoseSeparateBilling) {
                             if (sameAsShipping) {
-                                self._fastcheckoutSyncingSameAsShipping = true;
-                                try {
-                                    self.isAddressSameAsShipping(false);
-                                    if (self.isAddressDetailsVisible) {
-                                        self.isAddressDetailsVisible(false);
+                                window.setTimeout(function () {
+                                    if (!userChoseSeparateBilling) {
+                                        // useShippingAddress cleared the flag → real recheck
+                                        return;
                                     }
-                                } finally {
-                                    self._fastcheckoutSyncingSameAsShipping = false;
-                                }
+                                    if (!self.isAddressSameAsShipping || !self.isAddressSameAsShipping()) {
+                                        return;
+                                    }
+                                    self._fastcheckoutSyncingSameAsShipping = true;
+                                    try {
+                                        self.isAddressSameAsShipping(false);
+                                        if (self.isAddressDetailsVisible) {
+                                            self.isAddressDetailsVisible(false);
+                                        }
+                                    } finally {
+                                        self._fastcheckoutSyncingSameAsShipping = false;
+                                    }
+                                }, 0);
                             } else {
                                 self._fastcheckoutBeginBillingValidationSuppress();
                             }

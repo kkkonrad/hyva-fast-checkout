@@ -179,7 +179,12 @@ define([
             }),
                 persistedSeparateBillingRestored = false;
 
+            // Guest form snapshot only — never for logged-in customers. Restoring a
+            // guest snapshot while an address-book entry exists writes
+            // newCustomerShippingAddress + selectShippingAddress(new-customer-address),
+            // which adds a second list item and leaves the default card unselected.
             if (
+                !window.isCustomerLoggedIn &&
                 guestAddressSnapshot &&
                 typeof guestAddressSnapshot.bindAutoSnapshot === 'function'
             ) {
@@ -239,6 +244,12 @@ define([
 
             function restorePreviousGuestShippingAddress(forceQuote) {
                 var restoredShipping = false;
+
+                // Logged-in shoppers own Magento address-book selection; never inject
+                // a guest session snapshot into their shipping quote/list.
+                if (window.isCustomerLoggedIn) {
+                    return restorePersistedSeparateBillingAddress();
+                }
 
                 try {
                     restoredShipping = guestAddressSnapshot.restore({
@@ -1613,7 +1624,9 @@ define([
                             addressType = shippingAddress &&
                                 typeof shippingAddress.getType === 'function'
                                 ? shippingAddress.getType()
-                                : '';
+                                : '',
+                            isSavedCustomerAddress = addressType &&
+                                addressType !== 'new-customer-address';
 
                         // The quote address object survives a country change, so it can still
                         // carry the previous country's region_id. Everything downstream is built
@@ -1625,7 +1638,7 @@ define([
 
                         addressData = normalizeKoAddressData(shippingAddress);
 
-                        if (addressType && addressType !== 'new-customer-address') {
+                        if (isSavedCustomerAddress) {
                             if (
                                 checkoutData &&
                                 typeof checkoutData.setSelectedShippingAddress === 'function' &&
@@ -1633,9 +1646,15 @@ define([
                             ) {
                                 checkoutData.setSelectedShippingAddress(shippingAddress.getKey());
                             }
-                        } else {
-                            persistAddressToCheckoutData(addressData, 'shipping');
+                            // Do NOT push address-book data into checkoutProvider / form fields.
+                            // Magento's shipping-rates-validator listens to those fields and would
+                            // re-selectShippingAddress as a new-customer-address — first "Ship Here"
+                            // click only deselects the previous card. Rates use quote address
+                            // (customer-address processor) without form sync.
+                            return syncShippingAttributes();
                         }
+
+                        persistAddressToCheckoutData(addressData, 'shipping');
                         syncAddressDataToCheckoutProvider(addressData, 'shipping');
                         syncCheckoutProviderAddressAttributes();
 
@@ -2276,12 +2295,24 @@ define([
                         existingInTarget,
                         allRenderers;
 
-                    // Already open for this method — skip hide/show cycle.
+                    // Already open for this method — skip hide/show cycle, but always
+                    // keep the radio checked (shipping remap can open content while
+                    // leaving the input unchecked).
                     if (isPaymentPanelOpen(methodCode, activeCode)) {
                         existingInTarget = target ? target.querySelector('.payment-method') : null;
                         if (existingInTarget) {
                             annotateNativePaymentActions(existingInTarget);
                         }
+                        document.querySelectorAll('input[name="payment_method"]').forEach(function (input) {
+                            if (
+                                paymentMethodCodesEqual(input.value, methodCode) ||
+                                paymentMethodCodesEqual(input.value, activeCode)
+                            ) {
+                                if (!input.disabled) {
+                                    input.checked = true;
+                                }
+                            }
+                        });
                         holdPaymentPanel(methodCode);
                         hidePaymentPlaceholders(methodCode);
                         return true;
@@ -2307,6 +2338,18 @@ define([
                     activeElement.classList.add('_active');
                     activeElement.setAttribute('data-fastcheckout-active', 'true');
                     annotateNativePaymentActions(activeElement);
+
+                    // Keep the matching payment radio checked whenever we open/activate a panel.
+                    document.querySelectorAll('input[name="payment_method"]').forEach(function (input) {
+                        if (
+                            paymentMethodCodesEqual(input.value, methodCode) ||
+                            paymentMethodCodesEqual(input.value, activeCode)
+                        ) {
+                            if (!input.disabled) {
+                                input.checked = true;
+                            }
+                        }
+                    });
 
                     if (target) {
                         if (activeElement.parentNode !== target) {
@@ -4992,6 +5035,8 @@ define([
                             option.setAttribute('aria-hidden', 'true');
                             if (input) {
                                 input.disabled = true;
+                                // Disallowed method must not keep a checked radio.
+                                input.checked = false;
                             }
                         }
                     });

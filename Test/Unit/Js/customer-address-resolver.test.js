@@ -46,6 +46,15 @@ function run(addresses, newShipping, shipping, selectedShipping, quoteShipping) 
         'Magento_Checkout/js/model/quote': quote,
         'Magento_Checkout/js/checkout-data': checkoutData,
         'Magento_Checkout/js/model/address-converter': {},
+        'Magento_Customer/js/model/address-list': (() => {
+            const list = function (value) {
+                if (arguments.length) {
+                    stored.addressList = value;
+                }
+                return stored.addressList || [];
+            };
+            return list;
+        })(),
         'Magento_Customer/js/customer-data': {
             get: () => () => ({
                 newCustomerShippingAddress: { default: stored.newShipping },

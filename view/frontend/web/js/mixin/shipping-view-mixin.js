@@ -21,17 +21,96 @@
  */
 define([
     'ko',
+    'uiRegistry',
     'Magento_Checkout/js/model/shipping-service',
     'Magento_Checkout/js/action/select-shipping-method',
     'Magento_Checkout/js/model/quote',
+    'Magento_Checkout/js/model/shipping-rates-validator',
     'Magento_Catalog/js/price-utils'
-], function (ko, shippingService, selectShippingMethodAction, quote, priceUtils) {
+], function (
+    ko,
+    registry,
+    shippingService,
+    selectShippingMethodAction,
+    quote,
+    shippingRatesValidator,
+    priceUtils
+) {
     'use strict';
 
     // How long after a trusted rate click the list ignores isLoading. Covers the
     // redundant estimate Magento fires on the post-selection address re-notify
     // (~2s here); address edits outside this window still show their spinner.
     var SELECTION_LOADER_MUTE_MS = 3000;
+
+    // Magento stock bindHandler closes over validateDelay=2000 (meant to coalesce
+    // postcode keystrokes, not to fix a Fastcheckout race). Country/region are
+    // discrete selects — re-estimate immediately (no artificial wait).
+    // setTimeout(0) only yields so Magento's own value listener can schedule first;
+    // we then cancel that 2000ms timer and run validateFields now.
+    var destinationEstimateBound = false;
+
+    function scheduleFastDestinationEstimate() {
+        if (!shippingRatesValidator) {
+            return;
+        }
+        // Cancel Magento's pending 2000ms validateFields timeout.
+        if (shippingRatesValidator.validateAddressTimeout) {
+            clearTimeout(shippingRatesValidator.validateAddressTimeout);
+            shippingRatesValidator.validateAddressTimeout = 0;
+        }
+        if (shippingService && shippingService.isLoading) {
+            shippingService.isLoading(true);
+        }
+        if (typeof shippingRatesValidator.validateFields === 'function') {
+            shippingRatesValidator.validateFields();
+        }
+    }
+
+    function bindFastDestinationEstimate() {
+        var countryName =
+                'checkout.steps.shipping-step.shippingAddress.shipping-address-fieldset.country_id',
+            regionName =
+                'checkout.steps.shipping-step.shippingAddress.shipping-address-fieldset.region_id',
+            regionTextName =
+                'checkout.steps.shipping-step.shippingAddress.shipping-address-fieldset.region';
+
+        if (destinationEstimateBound || !registry) {
+            return;
+        }
+        destinationEstimateBound = true;
+
+        function watch(name) {
+            function attach(field) {
+                if (!field || typeof field.value !== 'function' || !field.value.subscribe) {
+                    return;
+                }
+                // Magento's rates-validator schedules validateFields in 2000ms.
+                // That listener may run after ours in the same turn — yield once,
+                // cancel its timer, then estimate immediately (no delay).
+                field.value.subscribe(function () {
+                    window.setTimeout(scheduleFastDestinationEstimate, 0);
+                });
+            }
+
+            try {
+                var existing = registry.get(name);
+                if (existing) {
+                    attach(existing);
+                    return;
+                }
+            } catch (e) {
+                // not registered yet
+            }
+            if (typeof registry.async === 'function') {
+                registry.async(name)(attach);
+            }
+        }
+
+        watch(countryName);
+        watch(regionName);
+        watch(regionTextName);
+    }
 
     function isInPostModuleAvailable() {
         var context, paths, map;
@@ -498,6 +577,9 @@ define([
 
                 // shipping-error-bridge resolves the list through this global first.
                 window.fastcheckoutHyvaShippingListInstance = this;
+
+                // Cut Magento's 2000ms estimate debounce for country/region changes.
+                bindFastDestinationEstimate();
 
                 // Initial rates are populated before this component subscribes to
                 // shippingService, so initialize carrier widgets explicitly once.
