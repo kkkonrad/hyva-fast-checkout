@@ -4304,6 +4304,160 @@ define([
                     placeOrderHooksBridge.runAfterRequestListeners();
                 }
 
+                /**
+                 * Strip HTML from PayU secureFormError messages for the top banner.
+                 *
+                 * @param {*} message
+                 * @returns {String}
+                 */
+                function stripPaymentErrorHtml(message) {
+                    return String(message || '')
+                        .replace(/<[^>]*>/g, ' ')
+                        .replace(/&nbsp;/g, ' ')
+                        .replace(/\s+/g, ' ')
+                        .trim();
+                }
+
+                /**
+                 * Run Magento payment renderer placeOrder so gateways can show their own
+                 * validation (PayU Secure Form tokenize errors on secureFormError, etc.).
+                 *
+                 * @param {Object} component
+                 * @param {String} methodCode
+                 * @returns {Promise}
+                 */
+                function invokeRendererPlaceOrder(component, methodCode) {
+                    return new Promise(function (resolve, reject) {
+                        var settled = false,
+                            errorSub = null,
+                            fakeEvent = {
+                                preventDefault: function () {},
+                                stopPropagation: function () {},
+                                type: 'click'
+                            };
+
+                        function cleanup() {
+                            if (errorSub && typeof errorSub.dispose === 'function') {
+                                try {
+                                    errorSub.dispose();
+                                } catch (e) {
+                                    // ignore
+                                }
+                            }
+                            errorSub = null;
+                        }
+
+                        function scrollActivePaymentIntoView() {
+                            var target;
+
+                            try {
+                                target = document.querySelector(
+                                    '[data-fastcheckout-payment-method-ko-target="' +
+                                    String(methodCode || '').replace(/"/g, '') + '"]'
+                                ) || document.querySelector('.payment-method._active');
+                                if (target && typeof target.scrollIntoView === 'function') {
+                                    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                }
+                            } catch (e) {
+                                // ignore
+                            }
+                        }
+
+                        function fail(message) {
+                            var text,
+                                err;
+
+                            if (settled) {
+                                return;
+                            }
+                            settled = true;
+                            cleanup();
+                            text = stripPaymentErrorHtml(message) ||
+                                translateFastcheckoutMessage(
+                                    'Please check the selected payment method and try again.'
+                                );
+                            err = new Error(text);
+                            handlePaymentError(
+                                err,
+                                component.messageContainer || getBridgeMessageContainer()
+                            );
+                            scrollActivePaymentIntoView();
+                            reject(err);
+                        }
+
+                        if (!component || typeof component.placeOrder !== 'function') {
+                            fail(translateFastcheckoutMessage(
+                                'The selected payment method is not ready. Please try again.'
+                            ));
+                            return;
+                        }
+
+                        subscribePaymentMessageContainer(component.messageContainer);
+
+                        // PayU Secure Form (and similar) publish field errors here after tokenize.
+                        if (
+                            component.secureFormError &&
+                            typeof component.secureFormError === 'function' &&
+                            typeof component.secureFormError.subscribe === 'function'
+                        ) {
+                            try {
+                                component.secureFormError('');
+                            } catch (clearErr) {
+                                // ignore
+                            }
+                            errorSub = component.secureFormError.subscribe(function (msg) {
+                                if (msg) {
+                                    fail(msg);
+                                }
+                            });
+                        }
+
+                        try {
+                            // Renderer-owned validation first (PayU: agreement / stored card).
+                            // Do not run the generic DOM field scan — it hits hidden billing
+                            // forms of other methods and never sees Secure Form iframes.
+                            if (
+                                typeof component.validate === 'function' &&
+                                component.validate() === false
+                            ) {
+                                fail(translateFastcheckoutMessage(
+                                    'Please check the selected payment method and try again.'
+                                ));
+                                return;
+                            }
+
+                            if (
+                                typeof component.isPlaceOrderActionAllowed === 'function' &&
+                                !component.isPlaceOrderActionAllowed() &&
+                                !(quote && typeof quote.billingAddress === 'function' && quote.billingAddress())
+                            ) {
+                                fail(translateFastcheckoutMessage(
+                                    'The selected payment method is not ready. Please try again.'
+                                ));
+                                return;
+                            }
+
+                            // Magento / PayU placeOrder typically returns false even on success
+                            // start (async tokenize). Success redirects; failures set
+                            // secureFormError or messageContainer.
+                            component.placeOrder({}, fakeEvent);
+
+                            // Keep promise open until redirect or secureFormError; do not
+                            // resolve early or the outer submit handler may continue wrongly.
+                            window.setTimeout(function () {
+                                // If tokenize already failed, fail() settled the promise.
+                                if (settled) {
+                                    return;
+                                }
+                                // No error yet — order may still be placing / redirecting.
+                                cleanup();
+                            }, 30000);
+                        } catch (placeErr) {
+                            fail(placeErr && placeErr.message ? placeErr.message : placeErr);
+                        }
+                    });
+                }
+
                 window.fastcheckoutHyvaPayment = $.extend(window.fastcheckoutHyvaPayment || {}, {
                         registerDataAssigner: registerPaymentDataAssigner,
                         registerValidator: registerPaymentValidator,
@@ -4611,11 +4765,6 @@ define([
                                             }, reject);
                                         });
                                     }
-			                            if (methodCode !== 'purchaseorder' && !this.validate()) {
-		                                    var activeValidationError = new Error(translateFastcheckoutMessage('Please check the selected payment method and try again.'));
-		                                    handlePaymentError(activeValidationError, component.messageContainer || getBridgeMessageContainer());
-			                                return Promise.reject(activeValidationError);
-		                            }
 
                             // Magento payment renderers set isPlaceOrderActionAllowed from
                             // quote.billingAddress(). Unchecking same-as-shipping nulls it;
@@ -4634,88 +4783,25 @@ define([
                             }
                             allowPlaceOrderOnActivePayment();
 
-		                            if (
-	                                typeof component.isPlaceOrderActionAllowed === 'function' &&
-	                                !component.isPlaceOrderActionAllowed() &&
-                                    !(quote && typeof quote.billingAddress === 'function' && quote.billingAddress())
-	                            ) {
-                                    var notReadyError = new Error(translateFastcheckoutMessage('The selected payment method is not ready. Please try again.'));
-                                    handlePaymentError(notReadyError, component.messageContainer || getBridgeMessageContainer());
-	                                return Promise.reject(notReadyError);
-	                            }
+                            // Agreements / additional validators still apply before gateways run.
+                            if (!validateAdditionalValidators(false)) {
+                                var agreementsError = new Error(
+                                    translateFastcheckoutMessage(
+                                        'Please check the selected payment method and try again.'
+                                    )
+                                );
+                                handlePaymentError(
+                                    agreementsError,
+                                    component.messageContainer || getBridgeMessageContainer()
+                                );
+                                return Promise.reject(agreementsError);
+                            }
 
-                            // Hidden Magento place-order buttons stay disabled while billing
-                            // was null; once quote billing is set, do not block on that flag.
-                                if (
-                                    nativeSubmitAction &&
-                                    nativeSubmitAction.button &&
-                                    (
-                                        nativeSubmitAction.button.disabled ||
-                                        nativeSubmitAction.button.classList.contains('disabled') ||
-                                        nativeSubmitAction.button.getAttribute('aria-disabled') === 'true'
-                                    ) &&
-                                    !(quote && typeof quote.billingAddress === 'function' && quote.billingAddress())
-                                ) {
-                                    var nativeActionNotReadyError = new Error(translateFastcheckoutMessage('The selected payment method is not ready. Please try again.'));
-                                    handlePaymentError(nativeActionNotReadyError, component.messageContainer || getBridgeMessageContainer());
-                                    return Promise.reject(nativeActionNotReadyError);
-                                }
-
-                                return new Promise(function (resolve, reject) {
-                                    require([
-                                        'Magento_Checkout/js/action/place-order',
-                                        'Magento_Checkout/js/model/quote',
-                                        'Magento_Checkout/js/action/redirect-on-success'
-                                    ], function (placeOrderAction, quoteModel, redirectOnSuccess) {
-                                        var pm = paymentData || { method: methodCode };
-
-                                        if (!ensureQuoteBillingAddressForPlaceOrder()) {
-                                            reject(new Error(
-                                                translateFastcheckoutMessage(
-                                                    'Please check the billing address and try again.'
-                                                )
-                                            ));
-                                            return;
-                                        }
-                                        allowPlaceOrderOnActivePayment();
-
-                                        if (quoteModel && typeof quoteModel.paymentMethod === 'function') {
-                                            quoteModel.paymentMethod(pm);
-                                        }
-
-                                        try {
-                                            placeOrderAction(pm)
-                                                .done(function (orderResult) {
-                                                    window.fastcheckoutLastPlaceOrderResult = orderResult || {};
-                                                    runPlaceOrderAfterRequestListeners();
-                                                    try {
-                                                        if (redirectOnSuccess && typeof redirectOnSuccess.execute === 'function') {
-                                                            redirectOnSuccess.execute();
-                                                        } else if (window.checkoutConfig && window.checkoutConfig.defaultSuccessPageUrl) {
-                                                            window.location.replace(window.checkoutConfig.defaultSuccessPageUrl);
-                                                        }
-                                                    } catch (redirErr) {
-                                                        // order placed even if redirect helper fails
-                                                    }
-                                                    resolve(orderResult);
-                                                })
-                                                .fail(function (response) {
-                                                    var err = new Error(
-                                                        (response && response.responseJSON && response.responseJSON.message) ||
-                                                        translateFastcheckoutMessage('The order was not placed.')
-                                                    );
-                                                    runPlaceOrderAfterRequestListeners();
-                                                    handlePaymentError(err, component.messageContainer || getBridgeMessageContainer());
-                                                    reject(err);
-                                                });
-                                        } catch (e) {
-                                            handlePaymentError(e, component.messageContainer || getBridgeMessageContainer());
-                                            reject(e);
-                                        }
-                                    }, function () {
-                                        reject(new Error(translateFastcheckoutMessage('Checkout session is not ready. Please refresh the page and try again.')));
-                                    });
-                                });
+                            // Gateways with their own placeOrder (PayU Secure Form, Braintree,
+                            // Mollie, …) must run that method so field-level / tokenize errors
+                            // surface (e.g. PayU secureFormError). Bypassing to Magento REST
+                            // only shows a generic banner and never validates card iframes.
+                            return invokeRendererPlaceOrder(component, methodCode);
 		                        }.bind(this));
 		                    },
 

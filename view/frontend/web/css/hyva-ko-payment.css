@@ -289,6 +289,35 @@
     font-size: var(--text-sm) !important;
 }
 
+/*
+ * PayU Secure Form publishes tokenize errors into .payu-msg / .msg__error via
+ * secureFormError(). Keep them clearly visible under the card fields.
+ */
+#fastcheckout-checkout .payu-msg,
+.fastcheckout-payment-method-ko-container .payu-msg,
+.fastcheckout-ko-payment-root .payu-msg {
+    display: block;
+    margin: 0.75rem 0 0;
+    padding: 0.75rem 1rem;
+    border: 1px solid #fecaca;
+    border-radius: 0.5rem;
+    background: #fef2f2;
+    color: var(--color-red-600, #dc2626);
+    font-size: 0.875rem;
+    line-height: 1.4;
+}
+
+#fastcheckout-checkout .payu-msg .msg__error,
+.fastcheckout-payment-method-ko-container .payu-msg .msg__error {
+    margin: 0.25rem 0 0;
+    color: inherit !important;
+}
+
+#fastcheckout-checkout .payu-card-form-container .payu-card-form,
+.fastcheckout-payment-method-ko-container .payu-card-form {
+    min-height: 2.5rem;
+}
+
 /* InPost Paczkomaty / Locker Widget Styles */
 .inpost-carrier-wrapper {
     margin-top: 0.75rem;
