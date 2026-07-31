@@ -2276,12 +2276,24 @@ define([
                         existingInTarget,
                         allRenderers;
 
-                    // Already open for this method — skip hide/show cycle.
+                    // Already open for this method — skip hide/show cycle, but always
+                    // keep the radio checked (shipping remap can open content while
+                    // leaving the input unchecked).
                     if (isPaymentPanelOpen(methodCode, activeCode)) {
                         existingInTarget = target ? target.querySelector('.payment-method') : null;
                         if (existingInTarget) {
                             annotateNativePaymentActions(existingInTarget);
                         }
+                        document.querySelectorAll('input[name="payment_method"]').forEach(function (input) {
+                            if (
+                                paymentMethodCodesEqual(input.value, methodCode) ||
+                                paymentMethodCodesEqual(input.value, activeCode)
+                            ) {
+                                if (!input.disabled) {
+                                    input.checked = true;
+                                }
+                            }
+                        });
                         holdPaymentPanel(methodCode);
                         hidePaymentPlaceholders(methodCode);
                         return true;
@@ -2307,6 +2319,18 @@ define([
                     activeElement.classList.add('_active');
                     activeElement.setAttribute('data-fastcheckout-active', 'true');
                     annotateNativePaymentActions(activeElement);
+
+                    // Keep the matching payment radio checked whenever we open/activate a panel.
+                    document.querySelectorAll('input[name="payment_method"]').forEach(function (input) {
+                        if (
+                            paymentMethodCodesEqual(input.value, methodCode) ||
+                            paymentMethodCodesEqual(input.value, activeCode)
+                        ) {
+                            if (!input.disabled) {
+                                input.checked = true;
+                            }
+                        }
+                    });
 
                     if (target) {
                         if (activeElement.parentNode !== target) {
@@ -4992,6 +5016,8 @@ define([
                             option.setAttribute('aria-hidden', 'true');
                             if (input) {
                                 input.disabled = true;
+                                // Disallowed method must not keep a checked radio.
+                                input.checked = false;
                             }
                         }
                     });
