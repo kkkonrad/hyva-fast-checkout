@@ -92,7 +92,7 @@ foreach ($layoutAssets['css'] as $cssAsset) {
 (function () {
     // Safely define checkoutConfig and payment config inline before RequireJS is loaded/executed
     // We use a getter/setter to prevent subsequent scripts (e.g. from PayPal_Braintree) from overwriting it completely and removing key structures
-    var serverConfig = <?= /* @noEscape */ \Laminas\Json\Json::encode($checkoutConfig) ?>;
+    var serverConfig = <?= /* @noEscape */ $block->serializeForScript($checkoutConfig) ?>;
     var existingConfig = window.checkoutConfig && typeof window.checkoutConfig === 'object'
         ? window.checkoutConfig
         : {};
@@ -112,26 +112,13 @@ foreach ($layoutAssets['css'] as $cssAsset) {
         actualConfig.totalsData.items = actualConfig.quoteItemData || [];
     }
     
-    var initPaymentProxy = function(paymentObj) {
-        paymentObj = paymentObj || {};
-        // If it is already a Proxy, return it
-        if (paymentObj.__isProxy) {
-            return paymentObj;
-        }
-        return new Proxy(paymentObj, {
-            get: function(target, prop) {
-                if (prop === '__isProxy') {
-                    return true;
-                }
-                if (prop === '__raw__') {
-                    return target;
-                }
-                if (typeof prop === 'string' && !(prop in target)) {
-                    target[prop] = {};
-                }
-                return target[prop];
-            }
-        });
+    // Defined by Kkkonrad_Fastcheckout::js/requirejs-base.js, which the layout loads
+    // ahead of this block. Missing only if that asset failed, and then the raw config
+    // is still usable.
+    var initPaymentProxy = function (paymentObj) {
+        return typeof window.fastcheckoutInitPaymentProxy === 'function'
+            ? window.fastcheckoutInitPaymentProxy(paymentObj, actualConfig.paymentMethods)
+            : (paymentObj || {});
     };
 
     Object.defineProperty(window, 'checkoutConfig', {
@@ -155,7 +142,7 @@ foreach ($layoutAssets['css'] as $cssAsset) {
     window.isCustomerLoggedIn = actualConfig.isCustomerLoggedIn;
     window.customerData = actualConfig.customerData || {};
 
-    var config = <?= /* @noEscape */ \Laminas\Json\Json::encode($mageInitConfig) ?>;
+    var config = <?= /* @noEscape */ $block->serializeForScript($mageInitConfig) ?>;
     // Keep a single serialized checkoutConfig in the HTML. The bridge receives
     // the same object by reference instead of embedding the large payload twice.
     config.checkoutConfig = window.checkoutConfig;

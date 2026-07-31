@@ -82,9 +82,11 @@ class Checkout extends Template
     private $localeResolver;
 
     /**
-     * @var array|null
+     * Checkout config per quote object, shared by every block instance in the request.
+     *
+     * @var array<int, array>
      */
-    private $checkoutConfigCache;
+    private static $checkoutConfigCache = [];
 
     /**
      * @var array|null
@@ -145,15 +147,15 @@ class Checkout extends Template
         ViewModelRegistry $viewModelRegistry,
         Helper $helper,
         ?CompositeConfigProvider $configProvider = null,
-        ModuleListInterface $moduleList = null,
-        ComponentRegistrarInterface $componentRegistrar = null,
-        ResolverInterface $localeResolver = null,
+        ?ModuleListInterface $moduleList = null,
+        ?ComponentRegistrarInterface $componentRegistrar = null,
+        ?ResolverInterface $localeResolver = null,
         array $data = [],
-        TaxHelper $taxHelper = null,
-        PaymentMethodManagementInterface $paymentMethodManagement = null,
-        PaymentHelper $paymentHelper = null,
-        SerializerInterface $serializer = null,
-        BlockFactory $blockFactory = null
+        ?TaxHelper $taxHelper = null,
+        ?PaymentMethodManagementInterface $paymentMethodManagement = null,
+        ?PaymentHelper $paymentHelper = null,
+        ?SerializerInterface $serializer = null,
+        ?BlockFactory $blockFactory = null
     ) {
         $this->checkoutSession = $checkoutSession;
         $this->pricingHelper = $pricingHelper;
@@ -203,7 +205,7 @@ class Checkout extends Template
      *
      * @return array
      */
-    public function getAvailablePaymentMethods(?array $configuredMethods = null): array
+    public function getAvailablePaymentMethods(): array
     {
         if ($this->paymentMethodsCache !== null) {
             return $this->paymentMethodsCache;
@@ -214,6 +216,9 @@ class Checkout extends Template
         if (!$quote || !$quote->getId()) {
             return $this->paymentMethodsCache;
         }
+
+        $configuredMethods = $this->getCheckoutConfig()['paymentMethods'] ?? null;
+        $configuredMethods = is_array($configuredMethods) ? $configuredMethods : null;
 
         $paymentMethodManagement = $this->paymentMethodManagement
             ?: $this->resolveObject(\Magento\Quote\Api\PaymentMethodManagementInterface::class);
@@ -304,13 +309,14 @@ class Checkout extends Template
         return $this->helper->getMappedPaymentMethodsForShipping($shippingMethod);
     }
 
-    public function isPaymentMethodAvailable(string $paymentMethodCode, array $allowedCodes = null): bool
+    public function isPaymentMethodAvailable(string $paymentMethodCode, ?array $allowedCodes = null): bool
     {
-        $allowedCodes = $allowedCodes !== null ? $allowedCodes : $this->getAllowedPaymentMethodCodes();
         if (!$this->helper->hasShippingPaymentMapping()) {
             // No mapping configured → all payment methods allowed.
             return true;
         }
+
+        $allowedCodes = $allowedCodes !== null ? $allowedCodes : $this->getAllowedPaymentMethodCodes();
         if (empty($allowedCodes)) {
             // Mapping exists but no shipping selected (or no rules match) → hide until pick.
             return false;
@@ -348,25 +354,32 @@ class Checkout extends Template
     }
 
     /**
-     * Apply Magento default destination (country / optional origin postcode+region)
-     * so rates can be collected before the shopper types an address.
+     * Apply the Magento default destination (country / optional origin postcode,
+     * region and city) so already-collected rates can be read before the shopper
+     * types an address, and report which fields were written so the caller can put
+     * the address back the way the shopper left it.
+     *
+     * @return string[] data keys written by this call
      */
-    public function ensureDefaultShippingDestination(): void
+    private function applyDefaultShippingDestination(): array
     {
         $quote = $this->getQuote();
         if (!$quote || $quote->isVirtual()) {
-            return;
+            return [];
         }
 
         $shippingAddress = $quote->getShippingAddress();
         if (!$shippingAddress) {
-            return;
+            return [];
         }
+
+        $applied = [];
 
         if (!(string)$shippingAddress->getCountryId()) {
             $country = $this->getDefaultDestinationCountryId();
             if ($country !== '') {
                 $shippingAddress->setCountryId($country);
+                $applied[] = 'country_id';
             }
         }
 
@@ -377,6 +390,7 @@ class Checkout extends Template
             );
             if ($postcode !== '') {
                 $shippingAddress->setPostcode($postcode);
+                $applied[] = 'postcode';
             }
         }
 
@@ -387,6 +401,7 @@ class Checkout extends Template
             );
             if ($regionId > 0) {
                 $shippingAddress->setRegionId($regionId);
+                $applied[] = 'region_id';
             }
         }
 
@@ -397,7 +412,34 @@ class Checkout extends Template
             );
             if ($city !== '') {
                 $shippingAddress->setCity($city);
+                $applied[] = 'city';
             }
+        }
+
+        return $applied;
+    }
+
+    /**
+     * Drop the placeholder destination again. Rendering must not leave the shipping
+     * origin on the quote: anything saving the quote later in the request would
+     * persist the store address as the shopper's own.
+     *
+     * @param string[] $applied
+     */
+    private function revertDefaultShippingDestination(array $applied): void
+    {
+        if ($applied === []) {
+            return;
+        }
+
+        $quote = $this->getQuote();
+        $shippingAddress = $quote ? $quote->getShippingAddress() : null;
+        if (!$shippingAddress) {
+            return;
+        }
+
+        foreach ($applied as $field) {
+            $shippingAddress->unsetData($field);
         }
     }
 
@@ -422,9 +464,10 @@ class Checkout extends Template
             return $this->shippingMethodsCache;
         }
 
-        $this->ensureDefaultShippingDestination();
+        $applied = $this->applyDefaultShippingDestination();
         $shippingAddress = $quote->getShippingAddress();
         if (!$shippingAddress || !$shippingAddress->getCountryId()) {
+            $this->revertDefaultShippingDestination($applied);
             return $this->shippingMethodsCache;
         }
 
@@ -433,6 +476,8 @@ class Checkout extends Template
             $this->shippingMethodsCache = is_array($rates) ? $rates : [];
         } catch (\Throwable $exception) {
             $this->shippingMethodsCache = [];
+        } finally {
+            $this->revertDefaultShippingDestination($applied);
         }
 
         return $this->shippingMethodsCache;
@@ -457,6 +502,24 @@ class Checkout extends Template
     public function getHelper(): Helper
     {
         return $this->helper;
+    }
+
+    /**
+     * JSON for an inline <script> block.
+     *
+     * JSON_HEX_TAG is what keeps shopper-supplied values (city, postcode, saved
+     * address inside checkoutConfig) from closing the script element. Matches
+     * Magento\Framework\Serialize\Serializer\JsonHexTag, which core uses for the
+     * same purpose in Template::getJsLayout().
+     *
+     * @param mixed $data
+     * @return string
+     */
+    public function serializeForScript($data): string
+    {
+        $json = json_encode($data, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+
+        return $json === false ? 'null' : $json;
     }
 
     /**
@@ -495,30 +558,31 @@ class Checkout extends Template
         return $this->quote;
     }
 
+    /**
+     * The checkout page renders two instances of this block (the Tailwind shell and
+     * the Knockout bridge), so the memo is shared per quote instead of per block.
+     * CompositeConfigProvider is one of the most expensive calls in the request.
+     *
+     * ponytail: per-request static keyed by quote object; move to a DI-scoped service
+     * if the module ever runs under a persistent app server (RoadRunner/FrankenPHP).
+     */
     public function getCheckoutConfig()
     {
-        if ($this->checkoutConfigCache !== null) {
-            return $this->checkoutConfigCache;
-        }
-
         $quote = $this->getQuote();
-        if (!$quote || !$quote->getId() || !$quote->hasItems()) {
-            $this->checkoutConfigCache = [];
-            return $this->checkoutConfigCache;
+        $cacheKey = $quote ? spl_object_id($quote) : 0;
+        if (array_key_exists($cacheKey, self::$checkoutConfigCache)) {
+            return self::$checkoutConfigCache[$cacheKey];
         }
 
-        if ($this->configProvider === null) {
-            $this->checkoutConfigCache = [];
-            return $this->checkoutConfigCache;
+        if (!$quote || !$quote->getId() || !$quote->hasItems() || $this->configProvider === null) {
+            return self::$checkoutConfigCache[$cacheKey] = [];
         }
 
         try {
-            $this->checkoutConfigCache = $this->configProvider->getConfig();
+            return self::$checkoutConfigCache[$cacheKey] = $this->configProvider->getConfig();
         } catch (\Throwable $exception) {
-            $this->checkoutConfigCache = [];
+            return self::$checkoutConfigCache[$cacheKey] = [];
         }
-
-        return $this->checkoutConfigCache;
     }
 
     /**
@@ -1049,23 +1113,25 @@ class Checkout extends Template
             return $this->processedCheckoutLayout;
         }
 
-        $raw = $this->getRawCheckoutLayoutData()['jsLayout'];
-        $this->processedCheckoutLayout = $this->normalizeStandardStreetLineDefaults($raw);
-        if ($raw === [] || $this->blockFactory === null || $this->serializer === null) {
-            return $this->processedCheckoutLayout;
+        $layout = $this->getRawCheckoutLayoutData()['jsLayout'];
+
+        if ($layout !== [] && $this->blockFactory !== null && $this->serializer !== null) {
+            try {
+                $onepage = $this->blockFactory->createBlock(Onepage::class, ['data' => ['jsLayout' => $layout]]);
+                $processed = $this->serializer->unserialize($onepage->getJsLayout());
+                if (is_array($processed)) {
+                    $layout = $processed;
+                }
+            } catch (\Throwable $exception) {
+                $this->_logger->warning('Fastcheckout could not process the native checkout jsLayout.', [
+                    'exception' => $exception
+                ]);
+            }
         }
 
-        try {
-            $onepage = $this->blockFactory->createBlock(Onepage::class, ['data' => ['jsLayout' => $raw]]);
-            $processed = $this->serializer->unserialize($onepage->getJsLayout());
-            if (is_array($processed)) {
-                $this->processedCheckoutLayout = $this->normalizeStandardStreetLineDefaults($processed);
-            }
-        } catch (\Throwable $exception) {
-            $this->_logger->warning('Fastcheckout could not process the native checkout jsLayout.', [
-                'exception' => $exception
-            ]);
-        }
+        // One normalization pass over the final tree. Normalizing the raw layout first
+        // only to overwrite it with the processed one walked the whole tree twice.
+        $this->processedCheckoutLayout = $this->normalizeStandardStreetLineDefaults($layout);
 
         return $this->processedCheckoutLayout;
     }

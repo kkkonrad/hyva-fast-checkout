@@ -254,17 +254,18 @@ class NativePipelineOwnershipTest extends TestCase
         );
         $this->assertNotFalse($template);
         $this->assertStringContainsString(
-            'getAvailablePaymentMethods(',
-            $template
-        );
-        $this->assertStringContainsString(
-            'is_array($configuredPaymentMethods) ? $configuredPaymentMethods : null',
+            'getAvailablePaymentMethods()',
             $template
         );
         $this->assertStringNotContainsString('getShippingMethods()', $template);
+
+        // The configured list comes from the (memoized) checkout config, so the initial
+        // render never repeats the payment-method quote API call.
+        $block = file_get_contents($this->moduleRoot() . '/Block/Hyva/Checkout.php');
+        $this->assertNotFalse($block);
         $this->assertStringContainsString(
-            "\$checkoutConfig['paymentMethods']",
-            $template
+            "\$this->getCheckoutConfig()['paymentMethods']",
+            $block
         );
     }
 

@@ -25,7 +25,7 @@ use PHPUnit\Framework\TestCase;
  */
 class DefaultDestinationRatesTest extends TestCase
 {
-    public function testEnsureDefaultShippingDestinationSetsStoreDefaultCountry(): void
+    public function testShippingMethodsFillTheStoreDefaultDestinationBeforeReadingRates(): void
     {
         $scopeConfig = $this->createMock(ScopeConfigInterface::class);
         $scopeConfig->method('getValue')->willReturnCallback(function ($path) {
@@ -55,22 +55,47 @@ class DefaultDestinationRatesTest extends TestCase
                 'setRegionId',
                 'getCity',
                 'setCity',
+                'getGroupedAllShippingRates',
+                'unsetData',
             ])
             ->getMock();
-        $shippingAddress->method('getCountryId')->willReturn(null);
+        $country = null;
+        $shippingAddress->method('getCountryId')->willReturnCallback(static function () use (&$country) {
+            return $country;
+        });
         $shippingAddress->method('getPostcode')->willReturn('');
         $shippingAddress->method('getRegionId')->willReturn(0);
         $shippingAddress->method('getCity')->willReturn('');
-        $shippingAddress->expects($this->once())->method('setCountryId')->with('PL');
+        $shippingAddress->expects($this->once())
+            ->method('setCountryId')
+            ->with('PL')
+            ->willReturnCallback(static function ($value) use (&$country, $shippingAddress) {
+                $country = $value;
+
+                return $shippingAddress;
+            });
         $shippingAddress->expects($this->once())->method('setPostcode')->with('00-001');
         $shippingAddress->expects($this->once())->method('setCity')->with('Warsaw');
+        $shippingAddress->method('getGroupedAllShippingRates')->willReturn([]);
+
+        // Everything that was filled in has to be dropped again after the rates are read.
+        $unset = [];
+        $shippingAddress->expects($this->exactly(3))
+            ->method('unsetData')
+            ->willReturnCallback(static function ($field) use (&$unset, $shippingAddress) {
+                $unset[] = $field;
+
+                return $shippingAddress;
+            });
 
         $quote = $this->createMock(Quote::class);
         $quote->method('isVirtual')->willReturn(false);
         $quote->method('getShippingAddress')->willReturn($shippingAddress);
 
         $block = $this->createPartialBlock($scopeConfig, $quote);
-        $block->ensureDefaultShippingDestination();
+        $block->getShippingMethods();
+
+        $this->assertSame(['country_id', 'postcode', 'city'], $unset);
     }
 
     public function testGetShippingMethodsReusesRatesWithoutCollectingTotals(): void
@@ -96,6 +121,7 @@ class DefaultDestinationRatesTest extends TestCase
                 'getCity',
                 'setCity',
                 'getGroupedAllShippingRates',
+                'unsetData',
             ])
             ->addMethods([
                 'getCollectShippingRates',
@@ -116,7 +142,18 @@ class DefaultDestinationRatesTest extends TestCase
         $shippingAddress->method('getCity')->willReturn('');
         $shippingAddress->method('getCollectShippingRates')->willReturn(true);
         $shippingAddress->expects($this->never())->method('setCollectShippingRates');
-        $shippingAddress->method('getGroupedAllShippingRates')->willReturn(['flatrate' => [$rate]]);
+        $shippingAddress->method('getGroupedAllShippingRates')->willReturnCallback(
+            function () use ($rate, &$country) {
+                // The placeholder destination must still be in place while rates are read.
+                $this->assertSame('DE', $country);
+
+                return ['flatrate' => [$rate]];
+            }
+        );
+
+        // ...and must be gone afterwards, so a later quote save cannot persist the
+        // store's shipping origin as the shopper's own address.
+        $shippingAddress->expects($this->once())->method('unsetData')->with('country_id');
 
         $quote = $this->createMock(Quote::class);
         $quote->method('isVirtual')->willReturn(false);
@@ -126,7 +163,6 @@ class DefaultDestinationRatesTest extends TestCase
         $block = $this->createPartialBlock($scopeConfig, $quote);
         $methods = $block->getShippingMethods();
 
-        $this->assertSame('DE', $country);
         $this->assertArrayHasKey('flatrate', $methods);
     }
 

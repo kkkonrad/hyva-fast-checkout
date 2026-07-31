@@ -35,4 +35,9 @@
         <plugin name="fastcheckout_checkout_success"
                 type="Kkkonrad\Fastcheckout\Plugin\Checkout\Controller\Onepage\Success"/>
     </type>
+
+    <type name="Magento\Framework\View\Model\Layout\Merge">
+        <plugin name="fastcheckout_hyva_layout_merge_fix"
+                type="Kkkonrad\Fastcheckout\Plugin\Layout\MergePlugin"/>
+    </type>
 </config>

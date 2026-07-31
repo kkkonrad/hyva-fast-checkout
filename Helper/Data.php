@@ -308,12 +308,19 @@ class Data extends AbstractHelper
         return $this->canUseHyvaNativeCheckoutCache = $this->isHyvaThemePath($themePath);
     }
 
+    /**
+     * Theme paths look like "frontend/<vendor>/<theme>". Hyvä ships under the Hyva
+     * vendor, child themes keep it in the theme segment (e.g. frontend/Acme/hyva-child).
+     */
     private function isHyvaThemePath($themePath)
     {
-        $themePath = (string)$themePath;
+        foreach (explode('/', (string)$themePath) as $segment) {
+            if (stripos($segment, 'hyva') === 0) {
+                return true;
+            }
+        }
 
-        return stripos($themePath, 'frontend/Hyva/') === 0
-            || stripos($themePath, '/hyva') !== false;
+        return false;
     }
 
 }

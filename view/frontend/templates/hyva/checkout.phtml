@@ -15,10 +15,7 @@ $hyvaCsp = $block->getHyvaCsp();
 
 $items = $block->getVisibleItems();
 $checkoutConfig = $block->getCheckoutConfig();
-$configuredPaymentMethods = $checkoutConfig['paymentMethods'] ?? null;
-$paymentMethods = $block->getAvailablePaymentMethods(
-    is_array($configuredPaymentMethods) ? $configuredPaymentMethods : null
-);
+$paymentMethods = $block->getAvailablePaymentMethods();
 $allowedPaymentMethodCodes = $block->getAllowedPaymentMethodCodes();
 ?>
 <section class="space-y-8 max-w-7xl mx-auto px-0 py-4 pb-24 md:p-6 md:pb-6 overflow-x-hidden" id="fastcheckout-checkout">

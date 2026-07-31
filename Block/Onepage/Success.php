@@ -95,8 +95,20 @@ class Success extends CheckoutSuccess
         return $this->customerSession->isLoggedIn();
     }
 
+    /**
+     * @return \Magento\Sales\Api\Data\OrderInterface|null
+     */
     public function getOrder()
     {
-        return $this->orderRepository->get($this->_checkoutSession->getLastOrderId());
+        $orderId = (int)$this->_checkoutSession->getLastOrderId();
+        if ($orderId <= 0) {
+            return null;
+        }
+
+        try {
+            return $this->orderRepository->get($orderId);
+        } catch (\Magento\Framework\Exception\NoSuchEntityException $exception) {
+            return null;
+        }
     }
 }

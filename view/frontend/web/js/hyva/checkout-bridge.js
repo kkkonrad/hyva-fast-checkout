@@ -77,27 +77,13 @@ define([
 
         window.checkoutConfig = config.checkoutConfig || {};
 
-        var initPaymentProxy = function(paymentObj) {
-            paymentObj = paymentObj || {};
-            if (paymentObj.__isProxy) {
-                return paymentObj;
-            }
-            return new Proxy(paymentObj, {
-                get: function(target, prop) {
-                    if (prop === '__isProxy') {
-                        return true;
-                    }
-                    if (prop === '__raw__') {
-                        return target;
-                    }
-                    if (typeof prop === 'string' && !(prop in target)) {
-                        target[prop] = {};
-                    }
-                    return target[prop];
-                }
-            });
-        };
-        window.checkoutConfig.payment = initPaymentProxy(window.checkoutConfig.payment);
+        // Same factory the inline bootstrap uses (Kkkonrad_Fastcheckout::js/requirejs-base.js).
+        if (typeof window.fastcheckoutInitPaymentProxy === 'function') {
+            window.checkoutConfig.payment = window.fastcheckoutInitPaymentProxy(
+                window.checkoutConfig.payment,
+                window.checkoutConfig.paymentMethods
+            );
+        }
         if (!window.checkoutConfig.totalsData || typeof window.checkoutConfig.totalsData !== 'object') {
             window.checkoutConfig.totalsData = {
                 items: window.checkoutConfig.quoteItemData || [],

@@ -6,26 +6,22 @@ namespace Kkkonrad\Fastcheckout\Observer;
 
 use Kkkonrad\Fastcheckout\Helper\Data as Helper;
 use Magento\Checkout\Model\Session as CheckoutSession;
-use Magento\Customer\Api\CustomerRepositoryInterface;
-use Magento\Customer\Api\Data\CustomerInterface;
-use Magento\Downloadable\Model\Link\PurchasedFactory;
 use Magento\Framework\Event\Observer;
 use Magento\Framework\Event\ObserverInterface;
-use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Newsletter\Model\SubscriberFactory;
-use Magento\Sales\Api\OrderRepositoryInterface;
 use Magento\Sales\Model\Order;
 use Magento\Sales\Model\Order\Status\HistoryFactory;
 use Psr\Log\LoggerInterface;
 
 /**
  * After successful quote submit:
- * - optionally attach guest order to existing customer matched by email (website scope);
  * - persist Fastcheckout order comment from checkout session;
- * - subscribe guest/customer to newsletter when Fastcheckout checkbox was checked;
- * - re-point downloadable purchased links to that customer when assignment happened.
+ * - subscribe guest/customer to newsletter when Fastcheckout checkbox was checked.
  *
- * Does not re-run Magento Downloadable place-order observers (would duplicate links).
+ * Attaching a guest order to an existing customer runs earlier, in
+ * {@see QuoteSubmitBefore}, so the order is written only once and Magento's own
+ * downloadable-link observers pick the customer id up on their own.
+ *
  * Does not log the shopper in.
  */
 class QuoteSubmitSuccess implements ObserverInterface
@@ -42,15 +38,6 @@ class QuoteSubmitSuccess implements ObserverInterface
     /** @var LoggerInterface */
     private $logger;
 
-    /** @var CustomerRepositoryInterface */
-    private $customerRepository;
-
-    /** @var OrderRepositoryInterface */
-    private $orderRepository;
-
-    /** @var PurchasedFactory */
-    private $downloadLinkFactory;
-
     /** @var SubscriberFactory */
     private $subscriberFactory;
 
@@ -59,18 +46,12 @@ class QuoteSubmitSuccess implements ObserverInterface
         CheckoutSession $checkoutSession,
         HistoryFactory $historyFactory,
         LoggerInterface $logger,
-        CustomerRepositoryInterface $customerRepository,
-        OrderRepositoryInterface $orderRepository,
-        PurchasedFactory $downloadLinkFactory,
         SubscriberFactory $subscriberFactory
     ) {
         $this->helper = $helper;
         $this->checkoutSession = $checkoutSession;
         $this->historyFactory = $historyFactory;
         $this->logger = $logger;
-        $this->customerRepository = $customerRepository;
-        $this->orderRepository = $orderRepository;
-        $this->downloadLinkFactory = $downloadLinkFactory;
         $this->subscriberFactory = $subscriberFactory;
     }
 
@@ -84,115 +65,10 @@ class QuoteSubmitSuccess implements ObserverInterface
             return $this;
         }
 
-        $this->assignOrderToExistingCustomerByEmail($order);
         $this->saveComment($order);
         $this->subscribeToNewsletter($order);
 
         return $this;
-    }
-
-    /**
-     * Guest checkout with an email that already belongs to a customer on this website:
-     * link the order (and addresses / downloadable links) to that account.
-     */
-    private function assignOrderToExistingCustomerByEmail(Order $order): void
-    {
-        if (!$this->helper->isAssignOrderToCustomer()) {
-            return;
-        }
-
-        if ($order->getCustomerId()) {
-            return;
-        }
-
-        $customerEmail = trim((string)$order->getCustomerEmail());
-        if ($customerEmail === '') {
-            return;
-        }
-
-        try {
-            $websiteId = (int)$order->getStore()->getWebsiteId();
-            $customer = $this->customerRepository->get($customerEmail, $websiteId);
-        } catch (NoSuchEntityException $exception) {
-            return;
-        } catch (\Throwable $exception) {
-            $this->logger->error(
-                'Fastcheckout QuoteSubmitSuccess customer lookup error: ' . $exception->getMessage(),
-                ['exception' => $exception, 'order_id' => $order->getEntityId()]
-            );
-            return;
-        }
-
-        if (!$customer || !$customer->getId()) {
-            return;
-        }
-
-        $this->assignOrderToCustomer($order, $customer);
-    }
-
-    private function assignOrderToCustomer(Order $order, CustomerInterface $customer): void
-    {
-        $customerId = (int)$customer->getId();
-        if ($customerId <= 0 || $order->getCustomerId()) {
-            return;
-        }
-
-        try {
-            $order->setCustomerId($customerId);
-            $order->setCustomerGroupId($customer->getGroupId());
-            $order->setCustomerIsGuest(0);
-            $order->setCustomerFirstname($customer->getFirstname());
-            $order->setCustomerLastname($customer->getLastname());
-
-            if ($order->getShippingAddress()) {
-                $order->getShippingAddress()->setCustomerId($customerId);
-            }
-            if ($order->getBillingAddress()) {
-                $order->getBillingAddress()->setCustomerId($customerId);
-            }
-
-            $this->orderRepository->save($order);
-            $this->reassignDownloadableLinks($order, $customerId);
-        } catch (\Throwable $exception) {
-            $this->logger->error(
-                'Fastcheckout could not assign guest order to customer: ' . $exception->getMessage(),
-                [
-                    'exception' => $exception,
-                    'order_id' => $order->getEntityId(),
-                    'customer_id' => $customerId,
-                ]
-            );
-        }
-    }
-
-    /**
-     * Update customer_id on already-created downloadable purchased records.
-     * Does not invoke SaveDownloadableOrderItemObserver again.
-     */
-    private function reassignDownloadableLinks(Order $order, int $customerId): void
-    {
-        if ($customerId <= 0) {
-            return;
-        }
-
-        try {
-            foreach ($order->getAllItems() as $item) {
-                if ((string)$item->getProductType() !== 'downloadable') {
-                    continue;
-                }
-
-                $link = $this->downloadLinkFactory->create()->load($item->getId(), 'order_item_id');
-                if ($link && $link->getId() && (int)$link->getCustomerId() !== $customerId) {
-                    $link->setCustomerId($customerId);
-                    $link->save();
-                }
-            }
-        } catch (\Throwable $exception) {
-            $this->logger->error(
-                'Fastcheckout could not reassign downloadable links: ' . $exception->getMessage(),
-                ['exception' => $exception, 'order_id' => $order->getEntityId()]
-            );
-        }
     }
 
     private function saveComment(Order $order): void

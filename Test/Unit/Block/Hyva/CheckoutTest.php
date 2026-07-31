@@ -9,6 +9,7 @@ use Kkkonrad\Fastcheckout\Helper\Data as Helper;
 use Hyva\Theme\Model\ViewModelRegistry;
 use Magento\Catalog\Helper\Image as ImageHelper;
 use Magento\Catalog\Helper\Product\Configuration as ProductConfiguration;
+use Magento\Checkout\Model\CompositeConfigProvider;
 use Magento\Checkout\Model\Session as CheckoutSession;
 use Magento\Framework\Component\ComponentRegistrarInterface;
 use Magento\Framework\App\Config\ScopeConfigInterface;
@@ -135,6 +136,53 @@ class CheckoutTest extends TestCase
             ->willReturn('$100.00');
 
         $this->assertEquals('$100.00', $this->checkoutBlock->formatPrice(100));
+    }
+
+    /**
+     * The checkout page renders two instances of this block. CompositeConfigProvider
+     * is expensive, so it must run once per quote, not once per block.
+     */
+    public function testCheckoutConfigIsResolvedOncePerQuoteAcrossBlockInstances(): void
+    {
+        $this->quoteMock->method('getId')->willReturn(42);
+        $this->quoteMock->method('hasItems')->willReturn(true);
+
+        $configProvider = $this->createMock(CompositeConfigProvider::class);
+        $configProvider->expects($this->once())
+            ->method('getConfig')
+            ->willReturn(['quoteData' => ['entity_id' => 42]]);
+
+        $shell = $this->createBlockWithConfigProvider($configProvider);
+        $bridge = $this->createBlockWithConfigProvider($configProvider);
+
+        $this->assertSame(['quoteData' => ['entity_id' => 42]], $shell->getCheckoutConfig());
+        $this->assertSame(['quoteData' => ['entity_id' => 42]], $bridge->getCheckoutConfig());
+    }
+
+    private function createBlockWithConfigProvider(CompositeConfigProvider $configProvider): Checkout
+    {
+        return new Checkout(
+            $this->contextMock,
+            $this->checkoutSessionMock,
+            $this->pricingHelperMock,
+            $this->imageHelperMock,
+            $this->productConfigurationMock,
+            $this->viewModelRegistryMock,
+            $this->helperMock,
+            $configProvider,
+            null,
+            null,
+            null,
+            []
+        );
+    }
+
+    public function testSerializeForScriptEscapesScriptTerminator(): void
+    {
+        $json = $this->checkoutBlock->serializeForScript(['city' => '</script><img src=x>']);
+
+        $this->assertStringNotContainsString('</script>', $json);
+        $this->assertSame(['city' => '</script><img src=x>'], json_decode($json, true));
     }
 
     public function testGetCheckoutLayoutAssetsReturnsEmptyWhenDepsNull(): void

@@ -111,17 +111,17 @@ foreach ($shippingMethods as $carrierCode => $rates) {
     </div>
 </div>
 <script>
-    window.fastcheckoutInitialShippingRates = <?= /* @noEscape */ json_encode($jsRates) ?>;
-    window.fastcheckoutInitialShippingMethod = <?= /* @noEscape */ json_encode($selectedShipping) ?>;
+    window.fastcheckoutInitialShippingRates = <?= /* @noEscape */ $block->serializeForScript($jsRates) ?>;
+    window.fastcheckoutInitialShippingMethod = <?= /* @noEscape */ $block->serializeForScript($selectedShipping) ?>;
     window.fastcheckoutDefaultDestination = {
-        countryId: <?= /* @noEscape */ json_encode(
+        countryId: <?= /* @noEscape */ $block->serializeForScript(
             $shippingAddress && $shippingAddress->getCountryId()
                 ? (string)$shippingAddress->getCountryId()
                 : $block->getDefaultDestinationCountryId()
         ) ?>,
-        postcode: <?= /* @noEscape */ json_encode($shippingAddress ? (string)$shippingAddress->getPostcode() : '') ?>,
-        regionId: <?= /* @noEscape */ json_encode($shippingAddress ? (string)$shippingAddress->getRegionId() : '') ?>,
-        city: <?= /* @noEscape */ json_encode($shippingAddress ? (string)$shippingAddress->getCity() : '') ?>
+        postcode: <?= /* @noEscape */ $block->serializeForScript($shippingAddress ? (string)$shippingAddress->getPostcode() : '') ?>,
+        regionId: <?= /* @noEscape */ $block->serializeForScript($shippingAddress ? (string)$shippingAddress->getRegionId() : '') ?>,
+        city: <?= /* @noEscape */ $block->serializeForScript($shippingAddress ? (string)$shippingAddress->getCity() : '') ?>
     };
 </script>
 <?php $hyvaCsp->registerInlineScript() ?>
