@@ -3,9 +3,18 @@ define([
     'Magento_Checkout/js/model/quote',
     'Magento_Checkout/js/checkout-data',
     'Magento_Checkout/js/model/address-converter',
+    'Magento_Customer/js/model/address-list',
     'Magento_Customer/js/customer-data',
     'Kkkonrad_Fastcheckout/js/mixin/is-fastcheckout-active'
-], function (wrapper, quote, checkoutData, addressConverter, customerData, isFastcheckoutActive) {
+], function (
+    wrapper,
+    quote,
+    checkoutData,
+    addressConverter,
+    addressList,
+    customerData,
+    isFastcheckoutActive
+) {
     'use strict';
 
     function getAddressData(address) {
@@ -93,6 +102,33 @@ define([
         }
         customerData.set('checkout-data', address);
 
+        try {
+            if (typeof checkoutData.setNewCustomerShippingAddress === 'function') {
+                checkoutData.setNewCustomerShippingAddress(null);
+            }
+        } catch (e) {
+            // ignore
+        }
+
+        // Drop duplicate new-customer cards already pushed into addressList by
+        // Magento createShippingAddress (guest snapshot / stale checkout-data).
+        if (addressList && typeof addressList === 'function') {
+            addressList(
+                addressList().filter(function (item) {
+                    if (!item || typeof item.getType !== 'function') {
+                        return true;
+                    }
+                    if (item.getType() !== 'new-customer-address') {
+                        return true;
+                    }
+
+                    return !addressKeys.some(function (key) {
+                        return addressesMatch(item, addresses[key]);
+                    });
+                })
+            );
+        }
+
         quoteAddress = typeof quote.shippingAddress === 'function' ? quote.shippingAddress() : null;
         if (
             quoteAddress &&
@@ -106,6 +142,22 @@ define([
                 typeof resolver.getShippingAddressFromCustomerAddressList === 'function'
                 ? resolver.getShippingAddressFromCustomerAddressList()
                 : null;
+            if (savedAddress) {
+                quote.shippingAddress(savedAddress);
+                if (typeof checkoutData.setSelectedShippingAddress === 'function') {
+                    checkoutData.setSelectedShippingAddress(savedAddress.getKey());
+                }
+            }
+        } else if (
+            (!quoteAddress ||
+                (typeof quoteAddress.getType === 'function' &&
+                    quoteAddress.getType() === 'new-customer-address')) &&
+            resolver &&
+            typeof resolver.getShippingAddressFromCustomerAddressList === 'function'
+        ) {
+            // Prefer Magento default / single saved address when quote is empty
+            // or still points at a cleared new-customer entry.
+            savedAddress = resolver.getShippingAddressFromCustomerAddressList();
             if (savedAddress) {
                 quote.shippingAddress(savedAddress);
                 if (typeof checkoutData.setSelectedShippingAddress === 'function') {

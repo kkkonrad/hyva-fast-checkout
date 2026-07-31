@@ -92,6 +92,10 @@ var config = {
             // Country change must clear region_id / free-text region (stock Magento does not).
             'Magento_Ui/js/form/element/region': {
                 'Kkkonrad_Fastcheckout/js/mixin/region-field-mixin': true
+            },
+            // Stock validateDelay is 2000ms — feels like 3s to reload rates after country pick.
+            'Magento_Checkout/js/model/shipping-rates-validator': {
+                'Kkkonrad_Fastcheckout/js/mixin/shipping-rates-validator-mixin': true
             }
         }
     }

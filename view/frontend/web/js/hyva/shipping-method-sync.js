@@ -2,8 +2,9 @@ define([
     'jquery',
     'Magento_Checkout/js/model/quote',
     'Magento_Checkout/js/action/set-shipping-information',
-    'Magento_Checkout/js/model/shipping-rate-registry'
-], function ($, quote, setShippingInformationAction, rateRegistry) {
+    'Magento_Checkout/js/model/shipping-rate-registry',
+    'Magento_Checkout/js/checkout-data'
+], function ($, quote, setShippingInformationAction, rateRegistry, checkoutData) {
     'use strict';
 
     /**
@@ -341,6 +342,108 @@ define([
                         emptyMessage.style.display = '';
                     }
                 }
+            }
+
+            // If the current payment is no longer allowed for this shipping method,
+            // drop the selection. Do NOT auto-pick another method or restore the
+            // previous one when the shopper switches back — they must choose again.
+            clearInvalidPaymentAfterRemap();
+        }
+
+        /**
+         * After shipping→payment remap:
+         *  - payment still allowed for the *new* shipping method → keep it
+         *  - payment no longer allowed → uncheck, clear quote + checkout-data,
+         *    close panels. When the shopper later returns to a shipping method
+         *    that would allow the old payment again, they must re-select it
+         *    (no auto-restore).
+         */
+        function clearInvalidPaymentAfterRemap() {
+            var quoteCode = '',
+                current,
+                stillAllowed = false,
+                allowedInput = null,
+                pay;
+
+            if (quote && typeof quote.paymentMethod === 'function') {
+                current = quote.paymentMethod();
+                quoteCode = current && current.method ? String(current.method) : '';
+            }
+
+            if (quoteCode) {
+                allowedInput = document.querySelector(
+                    'input[name="payment_method"][value="' +
+                    quoteCode.replace(/"/g, '') + '"]:not([disabled])'
+                );
+                if (allowedInput) {
+                    pay = allowedInput.closest('[data-fastcheckout-payment-option]');
+                    if (!pay || pay.getAttribute('data-fastcheckout-payment-allowed') !== '0') {
+                        stillAllowed = true;
+                    }
+                }
+            }
+
+            if (stillAllowed && allowedInput) {
+                // Same payment remains valid for this shipping method — keep radio.
+                document.querySelectorAll('input[name="payment_method"]').forEach(function (input) {
+                    input.checked = String(input.value) === String(quoteCode) && !input.disabled;
+                });
+                return;
+            }
+
+            dropPaymentSelectionCompletely();
+        }
+
+        /**
+         * Uncheck radios, clear quote + Magento checkout-data, close KO panels.
+         * Used when the selected payment is not allowed for the current shipping method.
+         */
+        function dropPaymentSelectionCompletely() {
+            document.querySelectorAll('input[name="payment_method"]').forEach(function (input) {
+                input.checked = false;
+            });
+
+            if (quote && typeof quote.paymentMethod === 'function') {
+                try {
+                    quote.paymentMethod(null);
+                } catch (e) {
+                    // ignore
+                }
+            }
+
+            // Prevent Magento resolver / set-shipping-information from re-applying
+            // the previous payment when switching shipping methods back and forth.
+            try {
+                if (checkoutData && typeof checkoutData.setSelectedPaymentMethod === 'function') {
+                    checkoutData.setSelectedPaymentMethod(null);
+                }
+            } catch (e2) {
+                // ignore
+            }
+
+            if (
+                window.fastcheckoutHyvaPayment &&
+                typeof window.fastcheckoutHyvaPayment.clearUserPaymentSelection === 'function'
+            ) {
+                window.fastcheckoutHyvaPayment.clearUserPaymentSelection();
+            }
+
+            if (
+                window.fastcheckoutHyvaPayment &&
+                typeof window.fastcheckoutHyvaPayment.selectPaymentMethod === 'function'
+            ) {
+                window.setTimeout(function () {
+                    window.fastcheckoutHyvaPayment.selectPaymentMethod('');
+                }, 0);
+            } else {
+                document.querySelectorAll('.payment-method._active').forEach(function (el) {
+                    el.classList.remove('_active');
+                    el.removeAttribute('data-fastcheckout-active');
+                });
+                document.querySelectorAll('[data-fastcheckout-payment-method-ko-target]').forEach(function (el) {
+                    el.classList.add('hidden');
+                    el.style.display = 'none';
+                });
             }
         }
 
