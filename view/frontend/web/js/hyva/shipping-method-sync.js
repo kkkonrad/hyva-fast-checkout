@@ -351,19 +351,88 @@ define([
         }
 
         /**
+         * Allowed payment radios after the latest shipping→payment remap.
+         *
+         * @returns {string[]}
+         */
+        function getAllowedPaymentCodes() {
+            var codes = [];
+
+            document.querySelectorAll(
+                '[data-fastcheckout-payment-option][data-fastcheckout-payment-allowed="1"]'
+            ).forEach(function (el) {
+                var input = el.querySelector('input[name="payment_method"]'),
+                    code;
+
+                if (!input || input.disabled) {
+                    return;
+                }
+                code = String(input.value || '').trim();
+                if (code && codes.indexOf(code) === -1) {
+                    codes.push(code);
+                }
+            });
+
+            return codes;
+        }
+
+        /**
+         * Check radio + open KO panel / bind Magento renderer so place-order
+         * validation actually runs. Radio-only selection (SSR or Magento resolver)
+         * leaves the panel closed and methods like purchaseorder/banktransfer
+         * without an active renderer.
+         *
+         * @param {string} methodCode
+         */
+        function activatePaymentMethodUi(methodCode) {
+            methodCode = methodCode ? String(methodCode) : '';
+            if (!methodCode) {
+                return;
+            }
+
+            document.querySelectorAll('input[name="payment_method"]').forEach(function (input) {
+                input.checked = String(input.value) === methodCode && !input.disabled;
+            });
+
+            if (
+                !window.fastcheckoutHyvaPayment ||
+                typeof window.fastcheckoutHyvaPayment.selectPaymentMethod !== 'function'
+            ) {
+                return;
+            }
+
+            // Defer so KO remount after shipping-information can finish first.
+            window.setTimeout(function () {
+                if (
+                    window.fastcheckoutHyvaPayment &&
+                    typeof window.fastcheckoutHyvaPayment.rememberUserPaymentSelection === 'function'
+                ) {
+                    window.fastcheckoutHyvaPayment.rememberUserPaymentSelection(methodCode);
+                }
+                window.fastcheckoutHyvaPayment.selectPaymentMethod(methodCode);
+            }, 0);
+        }
+
+        /**
          * After shipping→payment remap:
-         *  - payment still allowed for the *new* shipping method → keep it
+         *  - payment still allowed for the *new* shipping method → keep it and
+         *    fully activate (open panel + Magento select) so validation works
          *  - payment no longer allowed → uncheck, clear quote + checkout-data,
-         *    close panels. When the shopper later returns to a shipping method
-         *    that would allow the old payment again, they must re-select it
-         *    (no auto-restore).
+         *    close panels
+         *  - if nothing is selected and exactly one payment is allowed for this
+         *    shipping method → auto-activate that single option (common mapping:
+         *    one payment per carrier)
+         *  - when multiple payments are allowed again after a clear, do not
+         *    auto-restore a previous multi-choice selection
          */
         function clearInvalidPaymentAfterRemap() {
             var quoteCode = '',
                 current,
                 stillAllowed = false,
                 allowedInput = null,
-                pay;
+                pay,
+                allowedCodes,
+                soleCode;
 
             if (quote && typeof quote.paymentMethod === 'function') {
                 current = quote.paymentMethod();
@@ -384,14 +453,20 @@ define([
             }
 
             if (stillAllowed && allowedInput) {
-                // Same payment remains valid for this shipping method — keep radio.
-                document.querySelectorAll('input[name="payment_method"]').forEach(function (input) {
-                    input.checked = String(input.value) === String(quoteCode) && !input.disabled;
-                });
+                // Same payment remains valid — radio alone is not enough after remap
+                // (panel was closed / renderer unbound). Fully re-activate.
+                activatePaymentMethodUi(quoteCode);
                 return;
             }
 
             dropPaymentSelectionCompletely();
+
+            allowedCodes = getAllowedPaymentCodes();
+            soleCode = allowedCodes.length === 1 ? allowedCodes[0] : '';
+            if (soleCode) {
+                // Single allowed payment for this shipping method: select + open.
+                activatePaymentMethodUi(soleCode);
+            }
         }
 
         /**
