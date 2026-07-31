@@ -1624,7 +1624,9 @@ define([
                             addressType = shippingAddress &&
                                 typeof shippingAddress.getType === 'function'
                                 ? shippingAddress.getType()
-                                : '';
+                                : '',
+                            isSavedCustomerAddress = addressType &&
+                                addressType !== 'new-customer-address';
 
                         // The quote address object survives a country change, so it can still
                         // carry the previous country's region_id. Everything downstream is built
@@ -1636,7 +1638,7 @@ define([
 
                         addressData = normalizeKoAddressData(shippingAddress);
 
-                        if (addressType && addressType !== 'new-customer-address') {
+                        if (isSavedCustomerAddress) {
                             if (
                                 checkoutData &&
                                 typeof checkoutData.setSelectedShippingAddress === 'function' &&
@@ -1644,9 +1646,15 @@ define([
                             ) {
                                 checkoutData.setSelectedShippingAddress(shippingAddress.getKey());
                             }
-                        } else {
-                            persistAddressToCheckoutData(addressData, 'shipping');
+                            // Do NOT push address-book data into checkoutProvider / form fields.
+                            // Magento's shipping-rates-validator listens to those fields and would
+                            // re-selectShippingAddress as a new-customer-address — first "Ship Here"
+                            // click only deselects the previous card. Rates use quote address
+                            // (customer-address processor) without form sync.
+                            return syncShippingAttributes();
                         }
+
+                        persistAddressToCheckoutData(addressData, 'shipping');
                         syncAddressDataToCheckoutProvider(addressData, 'shipping');
                         syncCheckoutProviderAddressAttributes();
 

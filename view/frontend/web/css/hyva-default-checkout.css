@@ -170,6 +170,69 @@
     line-height: 1.25rem;
 }
 
+/*
+ * Magento postcode validator writes to element.warn() and the frontend field
+ * template renders it as .message.warning (page-level flash banner styles).
+ * Restyle as a normal field validation line so it matches .field-error.
+ */
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) .control .message.warning,
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) .admin__field-control .message.warning {
+    display: block;
+    margin: 0.25rem 0 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    color: var(--color-red-600);
+    font-size: var(--text-sm);
+    font-weight: 400;
+    line-height: 1.25rem;
+}
+
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) .control .message.warning > span,
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) .admin__field-control .message.warning > span {
+    display: inline;
+    margin: 0;
+    padding: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+}
+
+/* Hide Luma/Blank warning icon pseudo-elements inside address fields */
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) .control .message.warning::before,
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) .control .message.warning::after,
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) .admin__field-control .message.warning::before,
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address
+) .admin__field-control .message.warning::after {
+    content: none !important;
+    display: none !important;
+}
+
 #fastcheckout-checkout :is(
     .fastcheckout-native-shipping-address,
     .payment-method-billing-address
