@@ -365,6 +365,9 @@ const syncFactoryModule = (function () {
                 return modules['Magento_Checkout/js/action/set-shipping-information'];
             }
             if (d === 'Magento_Checkout/js/model/shipping-rate-registry') return rateRegistry;
+            if (d === 'Magento_Checkout/js/checkout-data') {
+                return { setSelectedPaymentMethod: function () {} };
+            }
             throw new Error('dep ' + d);
         });
         result = factory.apply(null, args);

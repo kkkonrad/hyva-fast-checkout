@@ -3027,7 +3027,7 @@ define([
                             'input[required], select[required], textarea[required], ' +
                             '[aria-required="true"]'
                         )).forEach(function (field) {
-                            if (fields.indexOf(field) === -1) {
+                            if (fields.indexOf(field) === -1 && isElementVisibleForFocus(field)) {
                                 fields.push(field);
                             }
                         });

@@ -343,12 +343,23 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
         await expect(target).toBeVisible();
         await target.evaluate((root) => {
             const input = document.createElement('input');
+            const hidden = document.createElement('input');
+            const hiddenWrapper = document.createElement('div');
 
             input.id = 'fastcheckout-third-party-required';
             input.name = 'payment[third_party_required]';
+            input.className = 'required-entry';
             input.setAttribute('data-validate', "{'required':true}");
             input.setAttribute('data-msg-required', 'Pole testowego modułu jest wymagane.');
             root.appendChild(input);
+
+            hidden.id = 'fastcheckout-hidden-required';
+            hidden.className = 'required-entry';
+            hidden.setAttribute('aria-required', 'true');
+            hidden.setAttribute('data-validate', "{'required':true}");
+            hiddenWrapper.style.display = 'none';
+            hiddenWrapper.appendChild(hidden);
+            root.appendChild(hiddenWrapper);
         });
 
         const input = target.locator('#fastcheckout-third-party-required');
@@ -360,6 +371,10 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
         await expect(input).toHaveAttribute('aria-invalid', 'true');
         await expect(target.locator('#fastcheckout-third-party-required-error')).toHaveText(
             'Pole testowego modułu jest wymagane.'
+        );
+        await expect(target.locator('#fastcheckout-hidden-required')).not.toHaveAttribute(
+            'aria-invalid',
+            'true'
         );
         expect(submitRequests).toEqual([]);
     });
