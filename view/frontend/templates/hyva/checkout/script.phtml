@@ -132,6 +132,16 @@ foreach ($clientMessagePhrases as $phrase) {
         return checked ? checked.value : '';
     }
 
+    function hasInlinePaymentError(message) {
+        var paymentBridge = window.fastcheckoutHyvaPayment;
+
+        return Boolean(
+            paymentBridge &&
+            typeof paymentBridge.hasInlineError === 'function' &&
+            paymentBridge.hasInlineError(message, getSelectedPaymentMethod())
+        );
+    }
+
     function refreshPaymentReadiness() {
         var selectedMethod = getSelectedPaymentMethod();
         var paymentBridge = window.fastcheckoutHyvaPayment;
@@ -249,8 +259,15 @@ foreach ($clientMessagePhrases as $phrase) {
                     var message = (error && error.message)
                         ? translateClientMessage(error.message)
                         : translateClientMessage(String(error || 'The order was not placed.'));
-                    showError(message);
-                    window.dispatchEvent(new CustomEvent('fastcheckout:payment-error', { detail: { message: message } }));
+                    if (
+                        (error && error.fastcheckoutInlineHandled) ||
+                        hasInlinePaymentError(message)
+                    ) {
+                        showError('');
+                    } else {
+                        showError(message);
+                        window.dispatchEvent(new CustomEvent('fastcheckout:payment-error', { detail: { message: message } }));
+                    }
                     throw error;
                 });
         }
@@ -402,9 +419,9 @@ foreach ($clientMessagePhrases as $phrase) {
     window.addEventListener('fastcheckout:payment-error', function (event) {
         var message = event && event.detail && event.detail.message ? event.detail.message : '';
         if (message) {
-            showError(message);
-            setProcessing(false);
+            showError(hasInlinePaymentError(message) ? '' : message);
         }
+        setProcessing(false);
     });
 
     window.addEventListener('fastcheckout:shipping-error', function (event) {

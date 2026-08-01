@@ -606,8 +606,8 @@ define([
                     paymentMessageBridge.clear();
                 }
 
-                function handlePaymentError(error, messageContainer) {
-                    paymentMessageBridge.handleError(error, messageContainer);
+                function handlePaymentError(error, messageContainer, methodCode) {
+                    return paymentMessageBridge.handleError(error, messageContainer, methodCode);
                 }
 
                 subscribePaymentMessageContainer(globalMessageList);
@@ -4365,20 +4365,6 @@ define([
                 }
 
                 /**
-                 * Strip HTML from PayU secureFormError messages for the top banner.
-                 *
-                 * @param {*} message
-                 * @returns {String}
-                 */
-                function stripPaymentErrorHtml(message) {
-                    return String(message || '')
-                        .replace(/<[^>]*>/g, ' ')
-                        .replace(/&nbsp;/g, ' ')
-                        .replace(/\s+/g, ' ')
-                        .trim();
-                }
-
-                /**
                  * Run Magento payment renderer placeOrder so gateways can show their own
                  * validation (PayU Secure Form tokenize errors on secureFormError, etc.).
                  *
@@ -4432,17 +4418,20 @@ define([
                             }
                             settled = true;
                             cleanup();
-                            text = stripPaymentErrorHtml(message) ||
-                                translateFastcheckoutMessage(
-                                    'Please check the selected payment method and try again.'
-                                );
-                            err = new Error(text);
-                            handlePaymentError(
-                                err,
-                                component.messageContainer || getBridgeMessageContainer()
-                            );
-                            scrollActivePaymentIntoView();
-                            reject(err);
+                            window.setTimeout(function () {
+                                text = paymentMessageBridge.normalize(message) ||
+                                    translateFastcheckoutMessage(
+                                        'Please check the selected payment method and try again.'
+                                    );
+                                err = new Error(text);
+                                err.fastcheckoutInlineHandled = handlePaymentError(
+                                    err,
+                                    component && component.messageContainer || getBridgeMessageContainer(),
+                                    methodCode
+                                ) === true;
+                                scrollActivePaymentIntoView();
+                                reject(err);
+                            }, 0);
                         }
 
                         if (!component || typeof component.placeOrder !== 'function') {
@@ -5065,6 +5054,12 @@ define([
                     },
                     getActiveRenderer: getActiveRenderer,
                     isRendererReady: isPaymentRendererReady,
+                    hasInlineError: function (message, methodCode) {
+                        return paymentMessageBridge.hasInlineError(
+                            methodCode || getSelectedMethodCode(),
+                            message
+                        );
+                    },
                     refreshNativePaymentActions: refreshNativePaymentActions,
                     getActiveNativeSubmitActionName: getActiveNativeSubmitActionName,
                     getMessageContainer: getBridgeMessageContainer,

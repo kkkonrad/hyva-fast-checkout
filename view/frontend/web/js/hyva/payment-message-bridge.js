@@ -73,6 +73,47 @@ define([], function () {
             return String(message);
         }
 
+        function normalizeMessage(message) {
+            return getMessageText(message)
+                .replace(/<[^>]*>/g, ' ')
+                .replace(/&nbsp;/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+        }
+
+        function hasInlineError(methodCode, message) {
+            var target,
+                text = normalizeMessage(message);
+
+            if (!text) {
+                return false;
+            }
+
+            target = methodCode ? document.querySelector(
+                '[data-fastcheckout-payment-method-ko-target="' + String(methodCode).replace(/"/g, '') + '"]'
+            ) : document.querySelector(
+                '[data-fastcheckout-payment-method-ko-target]:not(.hidden)'
+            );
+            if (
+                !target ||
+                target.style.display === 'none' ||
+                (target.classList && target.classList.contains('hidden'))
+            ) {
+                return false;
+            }
+
+            return Array.prototype.some.call(target.querySelectorAll(
+                '.payu-msg, .message-error, .message.error, [role="alert"]'
+            ), function (element) {
+                var inlineText = normalizeMessage(element.innerText || element.textContent || '');
+
+                return inlineText && (
+                    inlineText.indexOf(text) !== -1 ||
+                    text.indexOf(inlineText) !== -1
+                );
+            });
+        }
+
         function dispatch(type, message) {
             var text = getMessageText(message);
 
@@ -181,7 +222,7 @@ define([], function () {
             );
         }
 
-        function handleError(error, messageContainer) {
+        function handleError(error, messageContainer, methodCode) {
             var container = subscribe(messageContainer) || getBridgeMessageContainer(),
                 message = error && error.message
                     ? translateMessage(error.message)
@@ -191,15 +232,19 @@ define([], function () {
                 fullScreenLoader.stopLoader(true);
             }
 
+            if (hasInlineError(methodCode, message)) {
+                return true;
+            }
+
             if (error && (error.responseText || error.status)) {
                 try {
                     errorProcessor.process(error, container);
-                    return;
+                    return false;
                 } catch (e) {}
             }
 
             if (hasMessages(container)) {
-                return;
+                return false;
             }
 
             if (container && typeof container.addErrorMessage === 'function') {
@@ -207,11 +252,15 @@ define([], function () {
             } else {
                 dispatch('error', message);
             }
+
+            return false;
         }
 
         return {
             translate: translateMessage,
             getText: getMessageText,
+            normalize: normalizeMessage,
+            hasInlineError: hasInlineError,
             dispatch: dispatch,
             subscribe: subscribe,
             getContainer: getBridgeMessageContainer,
