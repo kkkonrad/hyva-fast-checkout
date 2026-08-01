@@ -108,6 +108,11 @@ define([
             var component = String(rendererComponent || ''),
                 isThirdParty = (component !== '' && !/^(Magento_|Kkkonrad_)/.test(component)) ||
                     /paypal|braintree|mollie|payu|tpay|przelewy|stripe/i.test(String(methodCode || '')),
+                deferredNames,
+                exactFormName,
+                hasExactForm,
+                provider,
+                selectedChildren = {},
                 parent;
 
             if (!isThirdParty || !Object.keys(deferredPaymentListChildren).length || typeof layout !== 'function') {
@@ -119,8 +124,48 @@ define([
                 return;
             }
 
-            layout(deferredPaymentListChildren, parent);
-            deferredPaymentListChildren = {};
+            deferredNames = Object.keys(deferredPaymentListChildren);
+            exactFormName = String(methodCode || '').toLowerCase() + '-form';
+            hasExactForm = deferredNames.some(function (name) {
+                return name.toLowerCase() === exactFormName;
+            });
+            provider = String(methodCode || '').toLowerCase().split(/[_-]/)[0];
+
+            deferredNames.forEach(function (name) {
+                var lowerName = name.toLowerCase(),
+                    isForm = /-form$/.test(lowerName),
+                    matchesProvider = lowerName.indexOf(provider + '-') === 0 ||
+                        lowerName.indexOf(provider + '_') === 0;
+
+                if (lowerName === exactFormName || (!isForm && matchesProvider)) {
+                    selectedChildren[name] = deferredPaymentListChildren[name];
+                }
+            });
+
+            // Some gateways use a group renderer code rather than the final method code.
+            // In that case load only that provider's forms; unknown layouts retain the old fallback.
+            if (!hasExactForm) {
+                deferredNames.forEach(function (name) {
+                    var lowerName = name.toLowerCase();
+
+                    if (
+                        lowerName.indexOf(provider + '-') === 0 ||
+                        lowerName.indexOf(provider + '_') === 0
+                    ) {
+                        selectedChildren[name] = deferredPaymentListChildren[name];
+                    }
+                });
+            }
+            if (!Object.keys(selectedChildren).length) {
+                deferredNames.forEach(function (name) {
+                    selectedChildren[name] = deferredPaymentListChildren[name];
+                });
+            }
+
+            layout(selectedChildren, parent);
+            Object.keys(selectedChildren).forEach(function (name) {
+                delete deferredPaymentListChildren[name];
+            });
         }
 
         return {

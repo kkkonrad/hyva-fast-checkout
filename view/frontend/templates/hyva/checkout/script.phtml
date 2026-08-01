@@ -50,6 +50,8 @@ foreach ($clientMessagePhrases as $phrase) {
         $clientMessages,
         JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
     ) ?>;
+    var orderIsProcessing = false;
+    var isPaymentReady = true;
 
     function translateClientMessage(message) {
         var text = message === null || typeof message === 'undefined'
@@ -62,6 +64,8 @@ foreach ($clientMessagePhrases as $phrase) {
     }
 
     function setProcessing(isProcessing) {
+        isProcessing = !!isProcessing;
+        orderIsProcessing = isProcessing;
         document.body.classList.toggle('checkout-submitting', !!isProcessing);
         form.querySelectorAll('[data-fastcheckout-place-order-spinner]').forEach(function (el) {
             el.classList.toggle('hidden', !isProcessing);
@@ -88,8 +92,9 @@ foreach ($clientMessagePhrases as $phrase) {
                 btn.style.removeProperty('--fastcheckout-place-order-border');
             }
 
-            btn.disabled = !!isProcessing;
-            btn.classList.toggle('pointer-events-none', !!isProcessing);
+            btn.disabled = isProcessing || !isPaymentReady;
+            btn.classList.toggle('pointer-events-none', btn.disabled);
+            btn.setAttribute('aria-disabled', btn.disabled ? 'true' : 'false');
 
             if (label) {
                 label.textContent = isProcessing
@@ -127,6 +132,41 @@ foreach ($clientMessagePhrases as $phrase) {
         return checked ? checked.value : '';
     }
 
+    function refreshPaymentReadiness() {
+        var selectedMethod = getSelectedPaymentMethod();
+        var paymentBridge = window.fastcheckoutHyvaPayment;
+        var isWaiting = false;
+        var loader = form.querySelector('[data-fastcheckout-payment-loading]');
+
+        if (selectedMethod) {
+            try {
+                isPaymentReady = Boolean(
+                    paymentBridge &&
+                    typeof paymentBridge.isRendererReady === 'function' &&
+                    paymentBridge.isRendererReady(selectedMethod)
+                );
+            } catch (error) {
+                isPaymentReady = false;
+            }
+            isWaiting = !isPaymentReady;
+        } else {
+            isPaymentReady = true;
+        }
+
+        if (loader) {
+            loader.classList.toggle('hidden', !isWaiting);
+            loader.style.display = isWaiting ? 'flex' : 'none';
+            loader.style.pointerEvents = 'none';
+            loader.setAttribute('aria-hidden', isWaiting ? 'false' : 'true');
+        }
+
+        form.querySelectorAll('[data-fastcheckout-place-order], [data-fastcheckout-place-order-mobile]').forEach(function (btn) {
+            btn.disabled = orderIsProcessing || !isPaymentReady;
+            btn.classList.toggle('pointer-events-none', btn.disabled);
+            btn.setAttribute('aria-disabled', btn.disabled ? 'true' : 'false');
+        });
+    }
+
     function placeOrderViaKo() {
         var selectedMethod = getSelectedPaymentMethod();
         var paymentBridge = window.fastcheckoutHyvaPayment;
@@ -153,6 +193,18 @@ foreach ($clientMessagePhrases as $phrase) {
                 paymentBridge.focusFirstInvalidField();
             }
             return Promise.reject(new Error(payMsg));
+        }
+
+        if (
+            !paymentBridge ||
+            typeof paymentBridge.isRendererReady !== 'function' ||
+            !paymentBridge.isRendererReady(selectedMethod)
+        ) {
+            var readyMsg = translateClientMessage(
+                'The selected payment method is not ready. Please try again.'
+            );
+            showError(readyMsg);
+            return Promise.reject(new Error(readyMsg));
         }
 
         // Run the same native Magento/KO field validation as the payment
@@ -259,8 +311,22 @@ foreach ($clientMessagePhrases as $phrase) {
     form.addEventListener('change', function (event) {
         if (event.target && event.target.name === 'payment_method') {
             showPaymentSelectionError('');
+            window.setTimeout(refreshPaymentReadiness, 0);
         }
     });
+
+    document.addEventListener('fastcheckout:payment-components-started', refreshPaymentReadiness);
+    document.addEventListener('fastcheckout:payment-selection-changed', refreshPaymentReadiness);
+    document.addEventListener('fastcheckout:ready', refreshPaymentReadiness);
+
+    var paymentGrid = form.querySelector('[data-fastcheckout-payment-methods-grid]');
+    if (paymentGrid && typeof window.MutationObserver === 'function') {
+        new MutationObserver(refreshPaymentReadiness).observe(paymentGrid, {
+            childList: true,
+            subtree: true
+        });
+    }
+    refreshPaymentReadiness();
 
     // Coupon apply/cancel via Magento guest/customer coupon REST when available.
     // Messages are rendered server-side so Magento i18n (pl_PL etc.) applies.

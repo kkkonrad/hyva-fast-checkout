@@ -2270,6 +2270,63 @@ define([
                         );
                 }
 
+                function isPaymentRendererReady(methodCode) {
+                    var component = getRendererByMethod(methodCode),
+                        target,
+                        options,
+                        selectors;
+
+                    if (!component || !isPaymentPanelOpen(methodCode, methodCode)) {
+                        return false;
+                    }
+
+                    options = component.secureFormOptions;
+                    if (!options || typeof options !== 'object') {
+                        return true;
+                    }
+                    if (typeof component.useNewCard === 'function') {
+                        try {
+                            if (!component.useNewCard()) {
+                                return true;
+                            }
+                        } catch (error) {
+                            return false;
+                        }
+                    }
+
+                    selectors = [
+                        options.elementFormNumber,
+                        options.elementFormDate,
+                        options.elementFormCvv
+                    ].filter(function (selector) {
+                        return typeof selector === 'string' && selector !== '';
+                    });
+                    if (!selectors.length) {
+                        return true;
+                    }
+
+                    target = document.querySelector(
+                        '[data-fastcheckout-payment-method-ko-target="' + methodCode + '"]'
+                    );
+                    return !!target && selectors.every(function (selector) {
+                        var field = target.querySelector(selector);
+
+                        return !!field && (
+                            String(field.tagName).toLowerCase() === 'iframe' ||
+                            !!field.querySelector('iframe')
+                        );
+                    });
+                }
+
+                function activateDeferredPaymentChildren(methodCode) {
+                    window.setTimeout(function () {
+                        checkoutLayoutBridge.activateDeferredPaymentListChildren(
+                            methodCode,
+                            getRendererComponentForMethod(methodCode)
+                        );
+                    }, 0);
+                }
+
                 function updateActiveRendererClass(methodCode, activeCode) {
                     var root = document.getElementById('fastcheckout-ko-payment-root'),
                         activeElement = null,
@@ -2301,6 +2358,7 @@ define([
                         });
                         holdPaymentPanel(methodCode);
                         hidePaymentPlaceholders(methodCode);
+                        activateDeferredPaymentChildren(methodCode);
                         return true;
                     }
 
@@ -2361,6 +2419,10 @@ define([
                             element.removeAttribute('data-fastcheckout-active');
                         }
                     });
+
+                    if (opened || movedToTarget) {
+                        activateDeferredPaymentChildren(methodCode);
+                    }
 
                     return opened || movedToTarget;
                 }
@@ -2616,11 +2678,9 @@ define([
                     lastSetSelectedMethodCode = methodCode || '';
                     lastSetSelectedMethodAt = Date.now();
                     syncPaymentMethods();
-
-                    checkoutLayoutBridge.activateDeferredPaymentListChildren(
-                        methodCode,
-                        getRendererComponentForMethod(methodCode)
-                    );
+                    document.dispatchEvent(new CustomEvent('fastcheckout:payment-selection-changed', {
+                        detail: {method: methodCode || ''}
+                    }));
 
                     if (!methodCode) {
                         pendingSelectedMethodCode = '';
@@ -4643,7 +4703,8 @@ define([
 		                        var component,
 		                            paymentData,
                                     methodCode,
-                                    nativeSubmitAction;
+                                    nativeSubmitAction,
+                                    rendererNotReadyError;
 
                             clearPaymentMessages();
 
@@ -4651,7 +4712,16 @@ define([
 	                            setSelectedMethod(selectedMethod);
 	                        }
 
-	                        return ensureRendererForMethod(selectedMethod || getSelectedMethodCode()).then(function () {
+                            methodCode = selectedMethod || getSelectedMethodCode();
+                            if (!isPaymentRendererReady(methodCode)) {
+                                rendererNotReadyError = new Error(translateFastcheckoutMessage(
+                                    'The selected payment method is not ready. Please try again.'
+                                ));
+                                handlePaymentError(rendererNotReadyError, getBridgeMessageContainer());
+                                return Promise.reject(rendererNotReadyError);
+                            }
+
+	                        return ensureRendererForMethod(methodCode).then(function () {
                                 // Always push guest email into quote before REST place-order.
                                 try {
                                     if (customerEmailSync && typeof customerEmailSync.sync === 'function') {
@@ -4994,6 +5064,7 @@ define([
                             : [];
                     },
                     getActiveRenderer: getActiveRenderer,
+                    isRendererReady: isPaymentRendererReady,
                     refreshNativePaymentActions: refreshNativePaymentActions,
                     getActiveNativeSubmitActionName: getActiveNativeSubmitActionName,
                     getMessageContainer: getBridgeMessageContainer,
