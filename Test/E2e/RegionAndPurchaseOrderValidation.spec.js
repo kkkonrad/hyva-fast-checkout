@@ -379,6 +379,7 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
         );
         const poNumber = target.locator('input[name="payment[po_number]"]:visible');
         await expect(poNumber).toBeVisible();
+        const defaultTextColor = await poNumber.evaluate((input) => getComputedStyle(input).color);
         await poNumber.fill('');
 
         await page.evaluate(() => {
@@ -405,6 +406,7 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
         expect(errorId).toBeTruthy();
         await expect(target.locator('#' + errorId)).toBeVisible();
         await expect(target.locator('#' + errorId)).toHaveText('To jest wymagane pole.');
+        await expect(poNumber).toHaveCSS('color', defaultTextColor);
         await expect(
             page.locator('[data-fastcheckout-client-order-error]:not(.hidden)')
         ).toHaveCount(0);

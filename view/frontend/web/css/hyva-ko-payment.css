@@ -277,10 +277,10 @@
 }
 
 /* Styling for jQuery validation / Knockout error messages and invalid input states */
-.mage-error,
+.mage-error:not(input):not(select):not(textarea),
 .msg__error,
-.fastcheckout-payment-method-ko-container .mage-error,
-.fastcheckout-ko-payment-root .mage-error,
+.fastcheckout-payment-method-ko-container .mage-error:not(input):not(select):not(textarea),
+.fastcheckout-ko-payment-root .mage-error:not(input):not(select):not(textarea),
 .fastcheckout-payment-method-ko-container .msg__error,
 .fastcheckout-ko-payment-root .msg__error {
     display: block;
