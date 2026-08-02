@@ -5,7 +5,6 @@ namespace Kkkonrad\Fastcheckout\Plugin\Layout;
 
 use Magento\Framework\View\Model\Layout\Merge;
 use SimpleXMLElement;
-use DOMDocument;
 use DOMElement;
 
 class MergePlugin

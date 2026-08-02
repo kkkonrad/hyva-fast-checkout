@@ -15,12 +15,10 @@ define([
     'Kkkonrad_Fastcheckout/js/hyva/checkout-layout-bridge',
     'Kkkonrad_Fastcheckout/js/hyva/checkout-state-bridge',
     'Kkkonrad_Fastcheckout/js/hyva/payment-dom-bridge',
-    'Kkkonrad_Fastcheckout/js/hyva/place-order-hooks-bridge',
     'Kkkonrad_Fastcheckout/js/hyva/shipping-attributes-sync',
     'Kkkonrad_Fastcheckout/js/hyva/checkout-component-fallbacks',
     'Kkkonrad_Fastcheckout/js/hyva/payment-method-sync',
     'Kkkonrad_Fastcheckout/js/hyva/customer-email-sync',
-    'Kkkonrad_Fastcheckout/js/hyva/checkout-agreements-fallback',
     'Kkkonrad_Fastcheckout/js/hyva/shipping-method-sync',
     'Kkkonrad_Fastcheckout/js/hyva/shipping-error-bridge',
     'Kkkonrad_Fastcheckout/js/hyva/step-navigator-bridge'
@@ -41,12 +39,10 @@ define([
     createCheckoutLayoutBridge,
     createCheckoutStateBridge,
     createPaymentDomBridge,
-    createPlaceOrderHooksBridge,
     createShippingAttributesSync,
     createCheckoutComponentFallbacks,
     createPaymentMethodSync,
     createCustomerEmailSync,
-    checkoutAgreementsFallback,
     createShippingMethodSync,
     createShippingErrorBridge,
     createStepNavigatorBridge
@@ -121,7 +117,6 @@ define([
             'Magento_Ui/js/model/messageList',
             'Magento_Checkout/js/model/error-processor',
             'Magento_Checkout/js/model/full-screen-loader',
-            'Magento_Checkout/js/model/payment/place-order-hooks',
             'Magento_Checkout/js/model/step-navigator',
             'mage/translate',
             'mage/validation'
@@ -150,7 +145,6 @@ define([
             globalMessageList,
             errorProcessor,
             fullScreenLoader,
-            placeOrderHooks,
             stepNavigator,
             $t
         ) {
@@ -518,7 +512,10 @@ define([
                     )
                 });
                 var checkoutDataPersistence = createCheckoutDataPersistence({
-                    checkoutData: checkoutData
+                    checkoutData: checkoutData,
+                    quote: quote,
+                    normalizeAddress: normalizeKoAddressData,
+                    addressesMatch: addressesMatch
                 });
                 var checkoutTotalsSync = createCheckoutTotalsSync({
                     config: config,
@@ -554,14 +551,11 @@ define([
                         persistEmailToCheckoutData: persistEmailToCheckoutData
                     }
                 });
-                var placeOrderHooksBridge = createPlaceOrderHooksBridge({
-                    placeOrderHooks: placeOrderHooks
-                });
                 var shippingAttributesSync = createShippingAttributesSync({
                     checkoutData: checkoutData,
                     quote: quote,
                     getShippingMethodCode: getShippingMethodCode,
-                    collectStructuredFields: collectFastcheckoutStructuredFields,
+                    collectStructuredFields: formDataCollector.collectStructuredFields,
                     getShippingFormRoots: getFastcheckoutShippingFormRoots,
                     getCheckoutProvider: getCheckoutProvider,
                     normalizeAddressAttributeMap: normalizeAddressAttributeMap,
@@ -619,16 +613,8 @@ define([
 
                 shippingCompatibilityBridge.init();
 
-                function runStandardShippingViewSelectMethod(shippingMethod) {
-                    shippingCompatibilityBridge.runStandardShippingViewSelectMethod(shippingMethod);
-                }
-
                 function registerPaymentValidator(validator) {
                     paymentValidationRegistry.registerPaymentValidator(validator);
-                }
-
-                function registerPaymentDataAssigner(assigner) {
-                    paymentValidationRegistry.registerPaymentDataAssigner(assigner);
                 }
 
                 function registerShippingValidator(validator) {
@@ -1031,7 +1017,7 @@ define([
                 }
 
                 function persistAddressToCheckoutData(addressData, type) {
-                    checkoutDataPersistence.persistAddress(addressData, type);
+                    return checkoutDataPersistence.persistAddress(addressData, type);
                 }
 
                 function persistShippingMethodToCheckoutData(methodCode) {
@@ -1060,10 +1046,6 @@ define([
 
                 function getAddressAttributes(address, camelKey, snakeKey) {
                     return formDataCollector.getAddressAttributes(address, camelKey, snakeKey);
-                }
-
-                function collectFastcheckoutStructuredFields(roots, options) {
-                    return formDataCollector.collectStructuredFields(roots, options);
                 }
 
                 function getFastcheckoutShippingFormRoots() {
@@ -1583,6 +1565,24 @@ define([
                     },
                     rememberUserShippingSelection: rememberUserShippingSelection,
                     getShippingMethodCode: getShippingMethodCode,
+                    selectShippingMethod: function (shippingMethod) {
+                        var component = getShippingAddressComponent();
+
+                        if (component && typeof component.selectShippingMethod === 'function') {
+                            return component.selectShippingMethod(shippingMethod);
+                        }
+
+                        return selectShippingMethodAction(shippingMethod);
+                    },
+                    prepareForPlaceOrder: function (messageContainer) {
+                        return ensureShippingInformationForPlaceOrder().catch(function (error) {
+                            handlePaymentError(
+                                error,
+                                messageContainer || getBridgeMessageContainer()
+                            );
+                            return Promise.reject(error);
+                        });
+                    },
                     getUserSelectedShippingMethod: function () {
                         return shippingMethodSync && typeof shippingMethodSync.getUserSelectedShippingMethod === 'function'
                             ? shippingMethodSync.getUserSelectedShippingMethod()
@@ -1647,13 +1647,17 @@ define([
                         return syncShippingAttributes();
                     },
                     onSelectBillingAddressAction: function (billingAddress) {
-                        var addressData = normalizeKoAddressData(billingAddress);
+                        var addressData;
 
                         if (!billingAddress) {
                             return Promise.resolve(false);
                         }
 
-                        persistAddressToCheckoutData(addressData, 'billing');
+                        addressData = normalizeKoAddressData(billingAddress);
+                        if (!persistAddressToCheckoutData(addressData, 'billing')) {
+                            return Promise.resolve(false);
+                        }
+
                         syncAddressDataToCheckoutProvider(addressData, 'billing');
                         syncCheckoutProviderAddressAttributes();
 
@@ -1989,37 +1993,9 @@ define([
                 }
 
                 function patchRenderer(component) {
-                    if (!component || component.fastcheckoutHyvaPatched) {
-                        if (component && component.messageContainer) {
-                            subscribePaymentMessageContainer(component.messageContainer);
-                        }
-                        return;
-                    }
-
-                    component.fastcheckoutHyvaPatched = true;
-                    if (component.messageContainer) {
+                    if (component && component.messageContainer) {
                         subscribePaymentMessageContainer(component.messageContainer);
                     }
-                    component.selectPaymentMethod = function (selectedMethodCode) {
-                        syncQuoteCustomerData();
-                        var paymentData = typeof component.getData === 'function'
-                            ? component.getData()
-                            : { method: component.item ? component.item.method : null },
-                            rendererCode = getRendererCode(component, paymentData.method),
-                            selectedCode = selectedMethodCode || rendererCode;
-
-                        if (paymentData && paymentData.method && selectedCode) {
-                            paymentData = clonePaymentPayload(paymentData);
-                            paymentData.method = selectedCode;
-                            selectPaymentMethodAction(paymentData);
-                            persistPaymentMethodToCheckoutData(selectedCode);
-                            quote.paymentMethod({
-                                method: selectedCode,
-                                title: component.item ? component.item.title : null
-                            });
-                        }
-
-                    };
                 }
 
                 function patchRenderers() {
@@ -2122,8 +2098,6 @@ define([
                     if (!root || typeof root.querySelectorAll !== 'function') {
                         return;
                     }
-
-                    bindNativePaymentValidationFields(root);
 
                     Array.prototype.slice.call(root.querySelectorAll('.fastcheckout-native-place-order-hidden')).forEach(function (button) {
                         unmarkNativePlaceOrderHidden(button);
@@ -2504,7 +2478,10 @@ define([
                     
                     activeMethod = getMethod(activeCode) || { method: activeCode, title: method.title };
                     if (renderer && typeof renderer.selectPaymentMethod === 'function') {
-                        renderer.selectPaymentMethod(methodCode);
+                        // The renderer owns selection just like in Magento's stock checkout.
+                        // Gateways use this hook to initialize hosted fields, wallets and
+                        // method-specific state, so replacing it breaks otherwise compatible modules.
+                        renderer.selectPaymentMethod();
                     } else {
                         selectPaymentMethodAction(activeMethod);
                         persistPaymentMethodToCheckoutData(activeCode);
@@ -2814,346 +2791,6 @@ define([
                     var action = getRendererNativeSubmitAction(getActiveRenderer());
 
                     return action ? action.name : '';
-                }
-
-                function mergeActivePaymentFormData(paymentData) {
-                    var collected = collectFastcheckoutStructuredFields(getActivePaymentFormRoots(), { mode: 'payment' }),
-                        additionalData = collected.additionalData || {},
-                        extensionAttributes = collected.extensionAttributes || {};
-
-                    paymentData = paymentData || { method: getSelectedMethodCode() };
-
-                    if (Object.keys(additionalData).length) {
-                        paymentData.additional_data = $.extend(true, {}, paymentData.additional_data || {}, additionalData);
-                    }
-
-                    if (Object.keys(extensionAttributes).length) {
-                        paymentData.extension_attributes = $.extend(true, {}, paymentData.extension_attributes || {}, extensionAttributes);
-                    }
-
-                    if (collected.topLevel && collected.topLevel.po_number && !paymentData.po_number) {
-                        paymentData.po_number = collected.topLevel.po_number;
-                    }
-
-                    return paymentData;
-                }
-
-                function getScopedPurchaseOrderInput() {
-                    var selectedMethod = getSelectedMethodCode(),
-                        selectedTarget,
-                        roots = getActivePaymentFormRoots(),
-                        input = null;
-
-                    if (selectedMethod) {
-                        Array.prototype.slice.call(document.querySelectorAll(
-                            '[data-fastcheckout-payment-method-ko-target]'
-                        )).some(function (target) {
-                            if (!paymentMethodCodesEqual(
-                                target.getAttribute('data-fastcheckout-payment-method-ko-target'),
-                                selectedMethod
-                            )) {
-                                return false;
-                            }
-
-                            input = target.querySelector('input[name="payment[po_number]"], #po_number');
-                            if (input) {
-                                selectedTarget = target;
-                            }
-
-                            return !!input;
-                        });
-                        if (selectedTarget && input) {
-                            return input;
-                        }
-                    }
-
-                    roots.some(function (root) {
-                        input = root.querySelector('input[name="payment[po_number]"], #po_number');
-                        return !!input;
-                    });
-
-                    return input || document.querySelector('.payment-method._active input[name="payment[po_number]"], .payment-method._active #po_number');
-                }
-
-                function getFieldValidationErrorElement(input) {
-                    var root,
-                        describedBy,
-                        errorElement;
-
-                    if (!input) {
-                        return null;
-                    }
-
-                    root = typeof input.getRootNode === 'function' ? input.getRootNode() : document;
-                    describedBy = input.getAttribute('aria-describedby');
-
-                    if (describedBy && root && typeof root.getElementById === 'function') {
-                        errorElement = root.getElementById(describedBy);
-                        if (errorElement) {
-                            return errorElement;
-                        }
-                    }
-
-                    if (input.id && root && typeof root.getElementById === 'function') {
-                        errorElement = root.getElementById(input.id + '-error');
-                        if (errorElement) {
-                            return errorElement;
-                        }
-                    }
-
-                    if (input.nextElementSibling && input.nextElementSibling.classList && input.nextElementSibling.classList.contains('mage-error')) {
-                        return input.nextElementSibling;
-                    }
-
-                    return null;
-                }
-
-                function getRequiredFieldMessage(input) {
-                    return input && input.getAttribute('data-msg-required')
-                        ? input.getAttribute('data-msg-required')
-                        : translateFastcheckoutMessage('This is a required field.');
-                }
-
-                function isNativeRequiredField(input) {
-                    var dataValidate = input && input.getAttribute('data-validate');
-
-                    return !!(
-                        input &&
-                        (
-                            input.required ||
-                            input.getAttribute('aria-required') === 'true' ||
-                            (
-                                dataValidate &&
-                                /(?:required(?:-entry|-number)?|validate-one-required(?:-by-name)?)['"]?\s*:\s*true/.test(
-                                    dataValidate
-                                )
-                            )
-                        )
-                    );
-                }
-
-                function isNativeFieldEmpty(input) {
-                    return !input || !String(input.value || '').trim();
-                }
-
-                function scheduleNativeFieldErrorMessage(input, message) {
-                    window.setTimeout(function () {
-                        if (isNativeRequiredField(input) && isNativeFieldEmpty(input)) {
-                            ensureNativeFieldErrorMessage(input, message);
-                        }
-                    }, 0);
-                    window.setTimeout(function () {
-                        if (isNativeRequiredField(input) && isNativeFieldEmpty(input)) {
-                            ensureNativeFieldErrorMessage(input, message);
-                        }
-                    }, 75);
-                }
-
-                function ensureNativeFieldErrorMessage(input, message) {
-                    var errorElement;
-
-                    if (!input) {
-                        return;
-                    }
-
-                    errorElement = getFieldValidationErrorElement(input);
-                    if (!errorElement) {
-                        errorElement = document.createElement('div');
-                        errorElement.id = input.id ? input.id + '-error' : 'fastcheckout-payment-field-error';
-                        errorElement.className = 'mage-error fastcheckout-validation-error';
-                        errorElement.setAttribute('data-fastcheckout-validation-fallback', 'true');
-
-                        if (input.parentNode) {
-                            input.parentNode.insertBefore(errorElement, input.nextSibling);
-                        }
-                    }
-
-                    errorElement.textContent = message || getRequiredFieldMessage(input);
-                    errorElement.style.display = 'block';
-                    errorElement.style.visibility = 'visible';
-                    errorElement.classList.add('mage-error');
-
-                    input.classList.add('mage-error');
-                    input.setAttribute('aria-invalid', 'true');
-                    if (errorElement.id) {
-                        input.setAttribute('aria-describedby', errorElement.id);
-                    }
-                }
-
-                function clearNativeFieldErrorFallback(input) {
-                    var errorElement = getFieldValidationErrorElement(input);
-
-                    if (errorElement && errorElement.getAttribute('data-fastcheckout-validation-fallback') === 'true') {
-                        errorElement.remove();
-                    }
-                }
-
-                /**
-                 * KO inserts payment forms after Magento's global validation bootstrap.
-                 * Bind their declared validation rules when a renderer is annotated.
-                 */
-                function bindNativePaymentValidationFields(root) {
-                    if (!root || typeof root.querySelectorAll !== 'function') {
-                        return;
-                    }
-
-                    Array.prototype.slice.call(root.querySelectorAll(
-                        'input[data-validate], select[data-validate], textarea[data-validate], ' +
-                        'input[required], select[required], textarea[required], ' +
-                        '[aria-required="true"]'
-                    )).forEach(function (input) {
-                        if (input.getAttribute('data-fastcheckout-validation-bound') === 'true') {
-                            return;
-                        }
-
-                        input.setAttribute('data-fastcheckout-validation-bound', 'true');
-                        input.addEventListener('blur', function () {
-                            validateNativeMagentoField(input);
-                        });
-                        input.addEventListener('input', function () {
-                            if (
-                                input.getAttribute('aria-invalid') === 'true' &&
-                                !isNativeFieldEmpty(input)
-                            ) {
-                                validateNativeMagentoField(input);
-                            }
-                        });
-                    });
-                }
-
-                // Use Magento's validation plugin, but scope it to the active KO renderer form.
-                function validateNativeMagentoField(input) {
-                    var form,
-                        isValid;
-
-                    if (!input) {
-                        return true;
-                    }
-
-                    form = input.form || input.closest('form');
-                    if (form && typeof $(form).validation === 'function') {
-                        $(form).validation();
-                        if (typeof $(input).valid === 'function') {
-                            isValid = $(input).valid();
-                        } else {
-                            isValid = $(form).validation('isValid');
-                        }
-
-                        if (isValid && isNativeRequiredField(input) && isNativeFieldEmpty(input)) {
-                            isValid = false;
-                        }
-
-                        if (!isValid) {
-                            ensureNativeFieldErrorMessage(input, getRequiredFieldMessage(input));
-                            scheduleNativeFieldErrorMessage(input, getRequiredFieldMessage(input));
-                        } else {
-                            input.classList.remove('mage-error');
-                            input.setAttribute('aria-invalid', 'false');
-                            clearNativeFieldErrorFallback(input);
-                        }
-
-                        return isValid;
-                    }
-
-                    if (
-                        $.validator &&
-                        typeof $.validator.validateSingleElement === 'function'
-                    ) {
-                        isValid = $.validator.validateSingleElement(input);
-                        if (!isValid) {
-                            scheduleNativeFieldErrorMessage(input, getRequiredFieldMessage(input));
-                        }
-
-                        return isValid;
-                    }
-
-                    if (isNativeRequiredField(input) && isNativeFieldEmpty(input)) {
-                        ensureNativeFieldErrorMessage(input, getRequiredFieldMessage(input));
-                        return false;
-                    }
-
-                    input.removeAttribute('aria-invalid');
-                    clearNativeFieldErrorFallback(input);
-                    return true;
-                }
-
-                function validateActivePaymentFields() {
-                    var fields = [],
-                        isValid = true;
-
-                    getActivePaymentFormRoots().forEach(function (root) {
-                        Array.prototype.slice.call(root.querySelectorAll(
-                            'input[data-validate], select[data-validate], textarea[data-validate], ' +
-                            'input[required], select[required], textarea[required], ' +
-                            '[aria-required="true"]'
-                        )).forEach(function (field) {
-                            if (fields.indexOf(field) === -1 && isElementVisibleForFocus(field)) {
-                                fields.push(field);
-                            }
-                        });
-                    });
-
-                    fields.forEach(function (field) {
-                        if (!validateNativeMagentoField(field)) {
-                            isValid = false;
-                        }
-                    });
-
-                    return isValid;
-                }
-
-                function validatePurchaseOrderWithNativeValidation() {
-                    return validateNativeMagentoField(getScopedPurchaseOrderInput());
-                }
-
-                function assignCheckoutAgreementsFallback(paymentData) {
-                    return checkoutAgreementsFallback.assign(paymentData);
-                }
-
-                function annotatePaymentDataWithFastcheckoutSelection(paymentData) {
-                    var selectedMethod;
-
-                    paymentData = paymentData || { method: getSelectedMethodCode() };
-                    selectedMethod = getSelectedMethodCode();
-
-                    if (
-                        paymentData.method &&
-                        selectedMethod &&
-                        !paymentMethodCodesEqual(paymentData.method, selectedMethod)
-                    ) {
-                        paymentData.fastcheckout_selected_method = selectedMethod;
-                        paymentData.fastcheckoutSelectedMethod = selectedMethod;
-                        paymentData.additional_data = paymentData.additional_data || {};
-                        paymentData.additional_data.fastcheckout_selected_method = selectedMethod;
-                    }
-
-                    return paymentData;
-                }
-
-                function validateCheckoutAgreementsFallback(hideError) {
-                    return checkoutAgreementsFallback.validate(hideError);
-                }
-
-                function applyPaymentDataAssigners(paymentData) {
-                    paymentData = paymentData || { method: getSelectedMethodCode() };
-
-                    loadPaymentValidationComponents();
-                    loadOptionalValidationComponents();
-
-                    paymentValidationRegistry.applyPaymentDataAssigners(paymentData);
-                    paymentData = mergeActivePaymentFormData(paymentData);
-                    paymentData = annotatePaymentDataWithFastcheckoutSelection(paymentData);
-
-                    return assignCheckoutAgreementsFallback(paymentData);
-                }
-
-                function validateAdditionalValidators(hideError) {
-                    loadPaymentValidationComponents();
-                    loadOptionalValidationComponents();
-
-                    return paymentValidationRegistry.validateAdditionalValidators(hideError, function () {
-                        return validateCheckoutAgreementsFallback(hideError);
-                    });
                 }
 
                 /**
@@ -4356,14 +3993,6 @@ define([
                 loadOptionalValidationComponents();
                 loadPaymentValidationComponents();
 
-                function clonePaymentPayload(paymentData) {
-                    return placeOrderHooksBridge.clonePaymentPayload(paymentData);
-                }
-
-                function runPlaceOrderAfterRequestListeners() {
-                    placeOrderHooksBridge.runAfterRequestListeners();
-                }
-
                 /**
                  * Run Magento payment renderer placeOrder so gateways can show their own
                  * validation (PayU Secure Form tokenize errors on secureFormError, etc.).
@@ -4514,16 +4143,9 @@ define([
                                 }, 0);
                             }
 
-                            // Keep promise open until redirect or a renderer error; do not
-                            // resolve early or the outer submit handler may continue wrongly.
-                            window.setTimeout(function () {
-                                // If tokenize already failed, fail() settled the promise.
-                                if (settled) {
-                                    return;
-                                }
-                                // No error yet — order may still be placing / redirecting.
-                                cleanup();
-                            }, 30000);
+                            // Keep the observers until an error or document navigation.
+                            // Slow hosted fields can report validation after 30 seconds;
+                            // the browser releases these subscriptions with the page.
                         } catch (placeErr) {
                             fail(placeErr && placeErr.message ? placeErr.message : placeErr);
                         }
@@ -4531,7 +4153,6 @@ define([
                 }
 
                 window.fastcheckoutHyvaPayment = $.extend(window.fastcheckoutHyvaPayment || {}, {
-                        registerDataAssigner: registerPaymentDataAssigner,
                         registerValidator: registerPaymentValidator,
                         clearUserPaymentSelection: function () {
                             if (paymentMethodSync.clearUserPaymentSelection) {
@@ -4552,75 +4173,6 @@ define([
                             }
                             return true;
                         },
-
-	                    getActivePaymentData: function () {
-	                        var component = getActiveRenderer();
-
-	                        if (component && typeof component.getData === 'function') {
-	                            return applyPaymentDataAssigners(component.getData());
-                        }
-
-                        return applyPaymentDataAssigners({
-                            method: getSelectedMethodCode(),
-	                            additional_data: {}
-	                        });
-	                    },
-
-	                    getPurchaseOrderNumber: function (paymentData) {
-	                        var poNumber = '';
-
-	                        if (paymentData) {
-	                            poNumber = paymentData.po_number || paymentData.poNumber || '';
-	                            if (!poNumber && paymentData.additional_data) {
-	                                poNumber = paymentData.additional_data.po_number || paymentData.additional_data.poNumber || '';
-	                            }
-	                            if (!poNumber && paymentData.additionalData) {
-	                                poNumber = paymentData.additionalData.po_number || paymentData.additionalData.poNumber || '';
-	                            }
-	                        }
-
-		                        if (!poNumber) {
-		                            var poInput = getScopedPurchaseOrderInput();
-		                            if (poInput) {
-		                                poNumber = poInput.value || '';
-		                            }
-		                        }
-
-		                        return String(poNumber || '').trim();
-	                    },
-
-	                    getPaymentAdditionalData: function (paymentData) {
-	                        var additionalData = {};
-
-	                        if (paymentData && paymentData.additional_data && typeof paymentData.additional_data === 'object') {
-	                            $.extend(true, additionalData, paymentData.additional_data);
-	                        }
-
-	                        if (paymentData && paymentData.additionalData && typeof paymentData.additionalData === 'object') {
-	                            $.extend(true, additionalData, paymentData.additionalData);
-	                        }
-
-	                        if ((paymentData && paymentData.method === 'purchaseorder') || getSelectedMethodCode() === 'purchaseorder') {
-	                            additionalData.po_number = this.getPurchaseOrderNumber(paymentData);
-	                        }
-
-	                        return additionalData;
-	                    },
-
-	                    getPaymentExtensionAttributes: function (paymentData) {
-	                        var extensionAttributes = {};
-
-	                        if (paymentData && paymentData.extension_attributes && typeof paymentData.extension_attributes === 'object') {
-	                            $.extend(true, extensionAttributes, paymentData.extension_attributes);
-	                        }
-
-	                        if (paymentData && paymentData.extensionAttributes && typeof paymentData.extensionAttributes === 'object') {
-	                            $.extend(true, extensionAttributes, paymentData.extensionAttributes);
-	                        }
-
-	                        return extensionAttributes;
-	                    },
-
                         onSelectPaymentMethodAction: function (paymentMethod) {
                             var methodCode = getPaymentMethodCode(paymentMethod),
                                 input,
@@ -4711,12 +4263,10 @@ define([
                             return originalAction(callbacks, deferred);
                         },
 
-		                    placeOrder: function (unused, selectedMethod) {
-		                        var component,
-		                            paymentData,
-                                    methodCode,
-                                    nativeSubmitAction,
-                                    rendererNotReadyError;
+	                    placeOrder: function (unused, selectedMethod) {
+	                        var component,
+	                            methodCode,
+	                            rendererNotReadyError;
 
                             clearPaymentMessages();
 
@@ -4743,110 +4293,27 @@ define([
                                     // non-fatal
                                 }
 
-                                // Push shipping form → quote → server (set-shipping-information).
-                                // Magento placeOrder validates the server-side shipping address;
-                                // client-only KO address is not enough.
-                                return ensureShippingInformationForPlaceOrder().catch(function (shipErr) {
-                                    handlePaymentError(
-                                        shipErr,
-                                        getBridgeMessageContainer()
+                                if (!ensureQuoteBillingAddressForPlaceOrder()) {
+                                    throw new Error(
+                                        translateFastcheckoutMessage(
+                                            'Please check the billing address and try again.'
+                                        )
                                     );
-                                    return Promise.reject(shipErr);
-                                }).then(function () {
-                                    if (!ensureQuoteBillingAddressForPlaceOrder()) {
-                                        throw new Error(
-                                            translateFastcheckoutMessage(
-                                                'Please check the billing address and try again.'
-                                            )
-                                        );
-                                    }
-                                    return prepareCheckoutState();
-                                });
+                                }
+
+                                return prepareCheckoutState();
                             }).then(function () {
 		                            component = getActiveRenderer();
-                                if (component) {
-                                    refreshNativePaymentActions();
+                                if (!component || typeof component.placeOrder !== 'function') {
+                                    rendererNotReadyError = new Error(translateFastcheckoutMessage(
+                                        'The selected payment method is not ready. Please try again.'
+                                    ));
+                                    handlePaymentError(rendererNotReadyError, getBridgeMessageContainer());
+                                    return Promise.reject(rendererNotReadyError);
                                 }
-		                            paymentData = component && typeof component.getData === 'function'
-		                                ? applyPaymentDataAssigners(component.getData())
-		                                : this.getActivePaymentData();
-                                methodCode = paymentData && paymentData.method ? paymentData.method : (selectedMethod || getSelectedMethodCode());
-                                nativeSubmitAction = getRendererNativeSubmitAction(component);
 
-		                            if (!component || typeof component.placeOrder !== 'function') {
-	                                    if (methodCode === 'purchaseorder' && !validatePurchaseOrderWithNativeValidation()) {
-	                                        var fallbackPoValidationError = new Error(translateFastcheckoutMessage('Please check the selected payment method and try again.'));
-	                                        handlePaymentError(fallbackPoValidationError, getBridgeMessageContainer());
-	                                        return Promise.reject(fallbackPoValidationError);
-	                                    }
-                                        if (methodCode === 'purchaseorder' && !validateAdditionalValidators(false)) {
-                                            var fallbackPoAdditionalValidationError = new Error(translateFastcheckoutMessage('Please check the selected payment method and try again.'));
-                                            handlePaymentError(fallbackPoAdditionalValidationError, getBridgeMessageContainer());
-                                            return Promise.reject(fallbackPoAdditionalValidationError);
-                                        }
-		                                    if (methodCode !== 'purchaseorder' && !this.validate()) {
-		                                        var validationError = new Error(translateFastcheckoutMessage('Please check the selected payment method and try again.'));
-		                                        handlePaymentError(validationError, getBridgeMessageContainer());
-		                                        return Promise.reject(validationError);
-	                                    }
-                                        // Native Magento place-order action (REST).
-                                        return new Promise(function (resolve, reject) {
-                                            require([
-                                                'Magento_Checkout/js/action/place-order',
-                                                'Magento_Checkout/js/model/quote'
-                                            ], function (placeOrderAction, quoteModel) {
-                                                var pm = paymentData || { method: methodCode };
-                                                if (quoteModel && typeof quoteModel.paymentMethod === 'function') {
-                                                    quoteModel.paymentMethod(pm);
-                                                }
-                                                placeOrderAction(pm).done(function (orderResult) {
-                                                    window.fastcheckoutLastPlaceOrderResult = orderResult || {};
-                                                    runPlaceOrderAfterRequestListeners();
-                                                    resolve(orderResult);
-                                                }).fail(function (response) {
-                                                    var err = new Error(
-                                                        (response && response.responseJSON && response.responseJSON.message) ||
-                                                        translateFastcheckoutMessage('The order was not placed.')
-                                                    );
-                                                    runPlaceOrderAfterRequestListeners();
-                                                    handlePaymentError(err, getBridgeMessageContainer());
-                                                    reject(err);
-                                                });
-                                            }, function () {
-                                                reject(new Error(translateFastcheckoutMessage('Checkout session is not ready. Please refresh the page and try again.')));
-                                            });
-                                        });
-	                            }
-
-	                                if (methodCode === 'purchaseorder' && !validatePurchaseOrderWithNativeValidation()) {
-	                                    var poValidationError = new Error(translateFastcheckoutMessage('Please check the selected payment method and try again.'));
-	                                    handlePaymentError(poValidationError, component.messageContainer || getBridgeMessageContainer());
-	                                    return Promise.reject(poValidationError);
-	                                }
-	                                    if (methodCode === 'purchaseorder' && !validateAdditionalValidators(false)) {
-	                                        var poAdditionalValidationError = new Error(translateFastcheckoutMessage('Please check the selected payment method and try again.'));
-	                                        handlePaymentError(poAdditionalValidationError, component.messageContainer || getBridgeMessageContainer());
-	                                        return Promise.reject(poAdditionalValidationError);
-	                                    }
-                                    if (methodCode === 'purchaseorder') {
-                                        return new Promise(function (resolve, reject) {
-                                            require(['Magento_Checkout/js/action/place-order'], function (placeOrderAction) {
-                                                placeOrderAction(paymentData || { method: methodCode }).done(function (orderResult) {
-                                                    window.fastcheckoutLastPlaceOrderResult = orderResult || {};
-                                                    runPlaceOrderAfterRequestListeners();
-                                                    resolve(orderResult);
-                                                }).fail(function (response) {
-                                                    var err = new Error(
-                                                        (response && response.responseJSON && response.responseJSON.message) ||
-                                                        translateFastcheckoutMessage('The order was not placed.')
-                                                    );
-                                                    runPlaceOrderAfterRequestListeners();
-                                                    handlePaymentError(err, component.messageContainer || getBridgeMessageContainer());
-                                                    reject(err);
-                                                });
-                                            }, reject);
-                                        });
-                                    }
+                                refreshNativePaymentActions();
+                                methodCode = getRendererCode(component, selectedMethod || getSelectedMethodCode());
 
                             // Magento payment renderers set isPlaceOrderActionAllowed from
                             // quote.billingAddress(). Unchecking same-as-shipping nulls it;
@@ -4865,12 +4332,10 @@ define([
                             }
                             allowPlaceOrderOnActivePayment();
 
-                            // Gateways with their own placeOrder (PayU Secure Form, Braintree,
-                            // Mollie, …) must run that method so field-level / tokenize errors
-                            // surface (e.g. PayU secureFormError). Bypassing to Magento REST
-                            // only shows a generic banner and never validates card iframes.
+                            // The active Magento renderer is the only place-order entry point.
+                            // It owns validate(), additional validators, tokenization and redirects.
                             return invokeRendererPlaceOrder(component, methodCode);
-		                        }.bind(this));
+		                        });
 		                    },
 
 	                    onPlaceOrderAction: function (paymentData, messageContainer, originalAction) {
@@ -4897,66 +4362,16 @@ define([
 
 	                    validate: function () {
 	                        var component = getActiveRenderer(),
-	                            methodCode = getSelectedMethodCode(),
-	                            billingValid,
-	                            paymentValid;
+	                            billingValid;
 
                             // Separate billing form (same-as-shipping unchecked) must validate
-                            // together with payment method fields on place order.
+                            // before the renderer starts order placement.
                             billingValid = validateBillingAddressForm();
-                            paymentValid = validateActivePaymentFields();
 
-                            if (methodCode === 'purchaseorder') {
-                                paymentValid = validatePurchaseOrderWithNativeValidation() &&
-                                    validateAdditionalValidators(false);
-
-                                return billingValid && paymentValid;
-                            }
-
-                            // A standard Magento renderer owns component.validate() and
-                            // additionalValidators inside placeOrder(). Fastcheckout only
-                            // blocks invalid checkout/billing and visible active fields first.
-                            if (component && typeof component.placeOrder === 'function') {
-                                return billingValid && paymentValid;
-                            }
-
-                            // Hosted card renderers can expose field validation separately from validate().
-                            if (
-                                component &&
-                                (
-                                    typeof component.validateCardType === 'function' ||
-                                    typeof component.validateExpirationDate === 'function' ||
-                                    typeof component.validateCvvNumber === 'function'
-                                )
-                            ) {
-                                var isCardNumberValid = typeof component.validateCardType === 'function'
-                                        ? component.validateCardType()
-                                        : true,
-                                    isExpirationDateValid = typeof component.validateExpirationDate === 'function'
-                                        ? component.validateExpirationDate()
-                                        : true,
-                                    isCvvValid = typeof component.validateCvvNumber === 'function'
-                                        ? component.validateCvvNumber()
-                                        : true;
-
-                                if (
-                                    !isCardNumberValid ||
-                                    !isExpirationDateValid ||
-                                    !isCvvValid
-                                ) {
-                                    paymentValid = false;
-                                }
-                            }
-
-	                        if (paymentValid && component && typeof component.validate === 'function') {
-	                            paymentValid = component.validate() !== false;
-                            }
-
-                            if (paymentValid) {
-                                paymentValid = validateAdditionalValidators(false);
-                            }
-
-                            return billingValid && paymentValid;
+                            // Renderer.validate() and Magento additional validators are called
+                            // by renderer.placeOrder(), exactly as in the stock checkout.
+                            return billingValid && !!component &&
+                                typeof component.placeOrder === 'function';
                     },
 
                     /**

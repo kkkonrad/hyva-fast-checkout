@@ -42,24 +42,88 @@ function assert(condition, message) {
     }
 }
 
+function createRequest() {
+    const callbacks = [];
+
+    return {
+        always: function (callback) {
+            callbacks.push(callback);
+            return this;
+        },
+        settle: function () {
+            callbacks.splice(0).forEach((callback) => callback());
+        }
+    };
+}
+
 const calls = [];
 const storage = createStorageMixin({
     post: function () {
-        calls.push(Array.prototype.slice.call(arguments));
+        const request = createRequest();
 
-        return {};
+        calls.push({ args: Array.prototype.slice.call(arguments), request });
+
+        return request;
     }
 });
 
-storage.post(
+const firstEstimate = storage.post(
     'rest/default/V1/guest-carts/test/estimate-shipping-methods',
-    '{}',
+    JSON.stringify({
+        address: {
+            country_id: 'PL',
+            region_id: 1024,
+            postcode: '00-001',
+            city: 'Warszawa',
+            street: ['Testowa 1', ''],
+            custom_attributes: []
+        }
+    }),
     false,
     'application/json',
     {},
     false
 );
-assert(calls[0][5] === true, 'Fastcheckout estimate must override synchronous XHR');
+assert(calls[0].args[5] === true, 'Fastcheckout estimate must override synchronous XHR');
+
+const duplicateEstimate = storage.post(
+    'rest/default/V1/guest-carts/test/estimate-shipping-methods',
+    JSON.stringify({
+        address: {
+            country_id: 'PL',
+            region_id: 1024,
+            postcode: '00-001',
+            city: 'Warszawa',
+            street: ['Testowa 1', ''],
+            email: 'customer@example.com'
+        }
+    }),
+    false,
+    'application/json',
+    {},
+    false
+);
+assert(duplicateEstimate === firstEstimate, 'Concurrent estimate for the same destination must reuse its XHR');
+assert(calls.length === 1, 'Concurrent duplicate estimate must not make another request');
+
+firstEstimate.settle();
+storage.post(
+    'rest/default/V1/guest-carts/test/estimate-shipping-methods',
+    JSON.stringify({
+        address: {
+            country_id: 'PL',
+            region_id: 1024,
+            postcode: '00-001',
+            city: 'Warszawa',
+            street: ['Testowa 1', '']
+        }
+    }),
+    false,
+    'application/json',
+    {},
+    false
+);
+assert(calls.length === 2, 'Settled estimate must not block a later refresh');
 
 storage.post(
     'rest/default/V1/guest-carts/test/shipping-information',
@@ -69,7 +133,7 @@ storage.post(
     {},
     false
 );
-assert(calls[1][5] === false, 'Unrelated request mode must stay unchanged');
+assert(calls[2].args[5] === false, 'Unrelated request mode must stay unchanged');
 
 fastcheckoutActive = false;
 storage.post(
@@ -80,6 +144,6 @@ storage.post(
     {},
     false
 );
-assert(calls[2][5] === false, 'Standard checkout behavior must stay unchanged');
+assert(calls[3].args[5] === false, 'Standard checkout behavior must stay unchanged');
 
-console.log('ALL PASS: Fastcheckout estimate-shipping-methods always uses async XHR');
+console.log('ALL PASS: Fastcheckout estimate requests are asynchronous and deduplicated while pending');

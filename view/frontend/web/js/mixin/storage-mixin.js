@@ -5,6 +5,8 @@ define([
 ], function ($, wrapper, isFastcheckoutActive) {
     'use strict';
 
+    var pendingEstimateRequests = Object.create(null);
+
     /**
      * Fastcheckout uses Magento KO/REST quote pipeline natively.
      * This mixin keeps guest-email injection for place-order payloads —
@@ -164,12 +166,64 @@ define([
         return wasString || typeof data === 'string' ? JSON.stringify(payload) : payload;
     }
 
+    function compactObject(value) {
+        if (!value || (Array.isArray(value) && !value.length)) {
+            return '';
+        }
+        if (typeof value === 'object' && !Object.keys(value).length) {
+            return '';
+        }
+
+        return JSON.stringify(value);
+    }
+
+    function streetKey(street) {
+        if (Array.isArray(street)) {
+            return street.map(function (line) {
+                return String(line || '').trim();
+            });
+        }
+        if (street && typeof street === 'object') {
+            return Object.keys(street).sort().map(function (key) {
+                return String(street[key] || '').trim();
+            });
+        }
+
+        return [String(street || '').trim()];
+    }
+
+    function estimateRequestKey(url, data) {
+        var payload = parsePayload(data),
+            address = payload.address;
+
+        if (payload.addressId !== undefined && payload.addressId !== null) {
+            return url + '|address-id|' + String(payload.addressId);
+        }
+        if (!address || typeof address !== 'object') {
+            return '';
+        }
+
+        return url + '|' + JSON.stringify([
+            String(address.country_id || address.countryId || ''),
+            String(address.region_id || address.regionId || ''),
+            String(address.region || ''),
+            String(address.postcode || ''),
+            String(address.city || ''),
+            streetKey(address.street),
+            compactObject(address.custom_attributes || address.customAttributes),
+            compactObject(address.extension_attributes || address.extensionAttributes)
+        ]);
+    }
+
     return function (storage) {
         if (!storage) {
             return storage;
         }
 
         storage.post = wrapper.wrap(storage.post, function (originalPost, url, data, global, contentType, headers, async) {
+            var estimateKey,
+                request;
+
             url = normalizeUrl(url);
 
             if (isFastcheckoutActive()) {
@@ -182,10 +236,29 @@ define([
                 // coordination and can always use the non-blocking request mode.
                 if (url && url.indexOf('/estimate-shipping-methods') !== -1) {
                     async = true;
+                    estimateKey = estimateRequestKey(url, data);
+                    if (estimateKey && pendingEstimateRequests[estimateKey]) {
+                        return pendingEstimateRequests[estimateKey];
+                    }
                 }
             }
 
-            return originalPost(url, data, global, contentType, headers, async);
+            request = originalPost(url, data, global, contentType, headers, async);
+            if (estimateKey && request) {
+                pendingEstimateRequests[estimateKey] = request;
+
+                if (typeof request.always === 'function') {
+                    request.always(function () {
+                        if (pendingEstimateRequests[estimateKey] === request) {
+                            delete pendingEstimateRequests[estimateKey];
+                        }
+                    });
+                } else {
+                    delete pendingEstimateRequests[estimateKey];
+                }
+            }
+
+            return request;
         });
 
         return storage;

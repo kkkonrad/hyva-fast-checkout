@@ -1,4 +1,5 @@
 define([
+    'jquery',
     'mage/utils/wrapper',
     'Magento_Checkout/js/model/quote',
     'Magento_Customer/js/model/customer',
@@ -6,7 +7,7 @@ define([
     'Magento_Checkout/js/checkout-data',
     'Kkkonrad_Fastcheckout/js/hyva/guest-address-snapshot',
     'Kkkonrad_Fastcheckout/js/mixin/is-fastcheckout-active'
-], function (wrapper, quote, customer, customerData, checkoutData, guestAddressSnapshot, isFastcheckoutActive) {
+], function ($, wrapper, quote, customer, customerData, checkoutData, guestAddressSnapshot, isFastcheckoutActive) {
     'use strict';
 
     /**
@@ -203,15 +204,33 @@ define([
                 }
             }
 
-            result = originalAction(paymentData, messageContainer);
+            function submit() {
+                result = originalAction(paymentData, messageContainer);
 
-            if (isFastcheckoutActive() && result && typeof result.done === 'function') {
-                result.done(function () {
-                    afterSuccessfulPlaceOrder();
-                });
+                if (isFastcheckoutActive() && result && typeof result.done === 'function') {
+                    result.done(function () {
+                        afterSuccessfulPlaceOrder();
+                    });
+                }
+
+                return result;
             }
 
-            return result;
+            if (isFastcheckoutActive()) {
+                document.dispatchEvent(new CustomEvent('fastcheckout:order-submit-started'));
+            }
+
+            if (
+                isFastcheckoutActive() &&
+                window.fastcheckoutHyvaShipping &&
+                typeof window.fastcheckoutHyvaShipping.prepareForPlaceOrder === 'function'
+            ) {
+                return $.when(
+                    window.fastcheckoutHyvaShipping.prepareForPlaceOrder(messageContainer)
+                ).then(submit);
+            }
+
+            return submit();
         });
     };
 });

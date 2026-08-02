@@ -52,6 +52,7 @@ foreach ($clientMessagePhrases as $phrase) {
     ) ?>;
     var orderIsProcessing = false;
     var isPaymentReady = true;
+    var paymentReadinessTimer = null;
 
     function translateClientMessage(message) {
         var text = message === null || typeof message === 'undefined'
@@ -193,6 +194,14 @@ foreach ($clientMessagePhrases as $phrase) {
             btn.classList.toggle('pointer-events-none', btn.disabled);
             btn.setAttribute('aria-disabled', btn.disabled ? 'true' : 'false');
         });
+
+        if (paymentReadinessTimer) {
+            window.clearTimeout(paymentReadinessTimer);
+            paymentReadinessTimer = null;
+        }
+        if (isWaiting) {
+            paymentReadinessTimer = window.setTimeout(refreshPaymentReadiness, 100);
+        }
     }
 
     function placeOrderViaKo() {
@@ -226,6 +235,7 @@ foreach ($clientMessagePhrases as $phrase) {
         if (
             !paymentBridge ||
             typeof paymentBridge.isRendererReady !== 'function' ||
+            typeof paymentBridge.placeOrder !== 'function' ||
             !paymentBridge.isRendererReady(selectedMethod)
         ) {
             var readyMsg = translateClientMessage(
@@ -254,86 +264,36 @@ foreach ($clientMessagePhrases as $phrase) {
             ));
         }
 
-        setProcessing(true);
-
-        // Prefer the payment bridge placeOrder (KO renderer path).
-        if (paymentBridge && typeof paymentBridge.placeOrder === 'function') {
-            return Promise.resolve(paymentBridge.placeOrder(null, selectedMethod))
-                .then(function (result) {
-                    // A successful order starts Magento's redirect flow. Keep the
-                    // button busy until the current document is replaced so there
-                    // is no idle-button flash between REST success and navigation.
-                    if (result && result.redirectUrl) {
-                        window.location.replace(result.redirectUrl);
-                        return result;
-                    }
-                    if (paymentBridge.afterPlaceOrder) {
-                        paymentBridge.afterPlaceOrder();
-                    }
+        return Promise.resolve(paymentBridge.placeOrder(null, selectedMethod))
+            .then(function (result) {
+                // A successful order starts Magento's redirect flow. Keep the
+                // button busy until the current document is replaced so there
+                // is no idle-button flash between REST success and navigation.
+                if (result && result.redirectUrl) {
+                    window.location.replace(result.redirectUrl);
                     return result;
-                })
-                .catch(function (error) {
-                    setProcessing(false);
-                    var message = (error && error.message)
-                        ? translateClientMessage(error.message)
-                        : translateClientMessage(String(error || 'The order was not placed.'));
-                    if (
-                        (error && error.fastcheckoutInlineHandled) ||
-                        hasInlinePaymentError(message)
-                    ) {
-                        showError('');
-                    } else {
-                        showError(message);
-                        window.dispatchEvent(new CustomEvent('fastcheckout:payment-error', { detail: { message: message } }));
-                    }
-                    throw error;
-                });
-        }
-
-        // Fallback: Magento place-order action via RequireJS
-        return new Promise(function (resolve, reject) {
-            if (typeof require !== 'function') {
-                setProcessing(false);
-                reject(new Error(translateClientMessage('Checkout is not ready.')));
-                return;
-            }
-            require([
-                'Magento_Checkout/js/action/place-order',
-                'Magento_Checkout/js/model/quote',
-                'Magento_Checkout/js/model/error-processor',
-                'Magento_Checkout/js/model/full-screen-loader'
-            ], function (placeOrderAction, quote, errorProcessor, fullScreenLoader) {
-                var payment = quote.paymentMethod && quote.paymentMethod();
-                if (!payment || !payment.method) {
-                    payment = { method: selectedMethod };
                 }
-                fullScreenLoader.startLoader();
-                placeOrderAction(payment).done(function (result) {
-                    fullScreenLoader.stopLoader();
-                    // Preserve the button loader through the success-page redirect.
-                    if (window.checkoutConfig && window.checkoutConfig.defaultSuccessPageUrl) {
-                        window.location.replace(window.checkoutConfig.defaultSuccessPageUrl);
-                    } else {
-                        window.location.replace('/checkout/onepage/success');
-                    }
-                    resolve(result);
-                }).fail(function (response) {
-                    fullScreenLoader.stopLoader();
-                    setProcessing(false);
-                    try {
-                        errorProcessor.process(response);
-                    } catch (e) { /* ignore */ }
-                    var message = (response && response.responseJSON && response.responseJSON.message)
-                        ? translateClientMessage(response.responseJSON.message)
-                        : translateClientMessage('The order was not placed.');
-                    showError(message);
-                    reject(new Error(message));
-                });
-            }, function () {
+                if (paymentBridge.afterPlaceOrder) {
+                    paymentBridge.afterPlaceOrder();
+                }
+                return result;
+            })
+            .catch(function (error) {
                 setProcessing(false);
-                reject(new Error(translateClientMessage('Checkout is not ready.')));
+                var message = (error && error.message)
+                    ? translateClientMessage(error.message)
+                    : translateClientMessage(String(error || 'The order was not placed.'));
+                if (
+                    (error && error.fastcheckoutInlineHandled) ||
+                    hasInlinePaymentError(message)
+                ) {
+                    showError('');
+                } else {
+                    showError(message);
+                    window.dispatchEvent(new CustomEvent('fastcheckout:payment-error', { detail: { message: message } }));
+                }
+                throw error;
             });
-        });
     }
 
     form.addEventListener('submit', function (event) {
@@ -346,13 +306,16 @@ foreach ($clientMessagePhrases as $phrase) {
     form.addEventListener('change', function (event) {
         if (event.target && event.target.name === 'payment_method') {
             showPaymentSelectionError('');
-            window.setTimeout(refreshPaymentReadiness, 0);
+            refreshPaymentReadiness();
         }
     });
 
     document.addEventListener('fastcheckout:payment-components-started', refreshPaymentReadiness);
     document.addEventListener('fastcheckout:payment-selection-changed', refreshPaymentReadiness);
     document.addEventListener('fastcheckout:ready', refreshPaymentReadiness);
+    document.addEventListener('fastcheckout:order-submit-started', function () {
+        setProcessing(true);
+    });
 
     var paymentGrid = form.querySelector('[data-fastcheckout-payment-methods-grid]');
     if (paymentGrid && typeof window.MutationObserver === 'function') {

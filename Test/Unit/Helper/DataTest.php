@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Kkkonrad\Fastcheckout\Test\Unit\Helper;
 
+use Hyva\Theme\Service\HyvaThemes;
 use Kkkonrad\Fastcheckout\Helper\Data;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\Helper\Context;
 use Magento\Framework\Json\Helper\Data as JsonHelper;
+use Magento\Framework\Module\Manager as ModuleManager;
 use Magento\Framework\View\DesignInterface;
+use Magento\Framework\View\Design\ThemeInterface;
 use Magento\Theme\Model\ThemeFactory;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -201,7 +204,8 @@ class DataTest extends TestCase
             $context,
             $this->createMock(JsonHelper::class),
             $this->createMock(DesignInterface::class),
-            $this->createMock(ThemeFactory::class)
+            $this->createMock(ThemeFactory::class),
+            $this->createMock(HyvaThemes::class)
         );
 
         $this->assertFalse($helper->canUseHyvaNativeCheckout());
@@ -209,6 +213,37 @@ class DataTest extends TestCase
         $this->assertGreaterThan(0, $afterFirst);
         $this->assertFalse($helper->canUseHyvaNativeCheckout());
         $this->assertSame($afterFirst, $calls, 'canUseHyvaNativeCheckout must not re-read config on subsequent calls');
+    }
+
+    public function testCanUseHyvaNativeCheckoutDelegatesChildThemeDetectionToHyvaService(): void
+    {
+        $context = $this->createMock(Context::class);
+        $scopeConfig = $this->createMock(ScopeConfigInterface::class);
+        $scopeConfig->method('getValue')->willReturnMap([
+            [Data::XML_PATH_ENABLE, 'store', null, true],
+        ]);
+        $moduleManager = $this->createMock(ModuleManager::class);
+        $moduleManager->method('isOutputEnabled')->with('Kkkonrad_Fastcheckout')->willReturn(true);
+        $context->method('getScopeConfig')->willReturn($scopeConfig);
+        $context->method('getModuleManager')->willReturn($moduleManager);
+        $context->method('getLogger')->willReturn($this->createMock(LoggerInterface::class));
+
+        $theme = $this->createMock(ThemeInterface::class);
+        $theme->method('getFullPath')->willReturn('frontend/Acme/storefront');
+        $design = $this->createMock(DesignInterface::class);
+        $design->method('getDesignTheme')->willReturn($theme);
+        $hyvaThemes = $this->createMock(HyvaThemes::class);
+        $hyvaThemes->expects($this->once())->method('isHyvaTheme')->with($theme)->willReturn(true);
+
+        $helper = new Data(
+            $context,
+            $this->createMock(JsonHelper::class),
+            $design,
+            $this->createMock(ThemeFactory::class),
+            $hyvaThemes
+        );
+
+        $this->assertTrue($helper->canUseHyvaNativeCheckout());
     }
 
     private function createHelper(
@@ -226,7 +261,8 @@ class DataTest extends TestCase
             $context,
             $jsonHelper,
             $this->createMock(DesignInterface::class),
-            $this->createMock(ThemeFactory::class)
+            $this->createMock(ThemeFactory::class),
+            $this->createMock(HyvaThemes::class)
         );
     }
 }

@@ -109,3 +109,15 @@ cd app/code/Kkkonrad/Fastcheckout/Test/E2e
 npm ci
 npx playwright test
 ```
+
+Testy składające rzeczywiste zamówienia są domyślnie pomijane. Można je
+uruchomić świadomie przez `FC_PLACE_REAL_ORDER=1`. Test ciepłego startu formularza
+adresu wymaga gotowości w ciągu 1000 ms od `DOMContentLoaded`; dla innego
+środowiska limit można ustawić przez `FC_ADDRESS_READY_BUDGET_MS`.
+
+Test PayU Cards uruchamia się osobno na sklepie integracyjnym:
+
+```bash
+FC_PAYU_E2E=1 FC_PAYU_BASE_URL=https://m10625.app-on-demand.net/ \
+    npx playwright test PayuCompatibility.spec.js
+```

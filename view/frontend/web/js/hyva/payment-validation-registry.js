@@ -6,10 +6,8 @@ define([], function () {
 
         var config = deps.config || {},
             additionalValidators = deps.additionalValidators,
-            optionalValidationComponentsRequested = false,
-            paymentDataAssigners = [];
+            optionalValidationComponentsRequested = false;
 
-        window.fastcheckoutPaymentDataAssigners = window.fastcheckoutPaymentDataAssigners || [];
         window.fastcheckoutPaymentValidators = window.fastcheckoutPaymentValidators || [];
         window.fastcheckoutCustomShippingValidators = window.fastcheckoutCustomShippingValidators || [];
 
@@ -42,26 +40,6 @@ define([], function () {
             registerAdditionalValidatorOnce(validator);
         }
 
-        function registerPaymentDataAssignerOnce(assigner) {
-            if (typeof assigner !== 'function' || paymentDataAssigners.indexOf(assigner) !== -1) {
-                return;
-            }
-
-            paymentDataAssigners.push(assigner);
-        }
-
-        function registerPaymentDataAssigner(assigner) {
-            if (typeof assigner !== 'function') {
-                return;
-            }
-
-            if (window.fastcheckoutPaymentDataAssigners.indexOf(assigner) === -1) {
-                window.fastcheckoutPaymentDataAssigners.push(assigner);
-            }
-
-            registerPaymentDataAssignerOnce(assigner);
-        }
-
         function registerShippingValidator(validator) {
             if (typeof validator !== 'function' || window.fastcheckoutCustomShippingValidators.indexOf(validator) !== -1) {
                 return;
@@ -86,11 +64,9 @@ define([], function () {
             }
 
             require([
-                'Magento_CheckoutAgreements/js/model/agreement-validator',
-                'Magento_CheckoutAgreements/js/model/agreements-assigner'
-            ], function (agreementValidator, agreementsAssigner) {
+                'Magento_CheckoutAgreements/js/model/agreement-validator'
+            ], function (agreementValidator) {
                 registerAdditionalValidatorOnce(agreementValidator);
-                registerPaymentDataAssignerOnce(agreementsAssigner);
             }, function (error) {
                 if (window.console && typeof window.console.warn === 'function') {
                     window.console.warn('Kkkonrad Fastcheckout: optional checkout agreements validators could not be loaded.', error);
@@ -144,49 +120,14 @@ define([], function () {
             );
         }
 
-        function applyPaymentDataAssigners(paymentData) {
-            paymentDataAssigners.forEach(function (assigner) {
-                try {
-                    assigner(paymentData);
-                } catch (e) {
-                    if (window.console && typeof window.console.warn === 'function') {
-                        window.console.warn('Kkkonrad Fastcheckout: payment data assigner failed.', e);
-                    }
-                }
-            });
-        }
-
-        function validateAdditionalValidators(hideError, fallbackValidator) {
-            var isValid = true;
-
-            if (!additionalValidators || typeof additionalValidators.validate !== 'function') {
-                return typeof fallbackValidator === 'function' ? fallbackValidator() : true;
-            }
-
-            try {
-                isValid = additionalValidators.validate(!!hideError);
-            } catch (e) {
-                if (window.console && typeof window.console.warn === 'function') {
-                    window.console.warn('Kkkonrad Fastcheckout: additional checkout validation failed.', e);
-                }
-                return false;
-            }
-
-            return isValid && (typeof fallbackValidator === 'function' ? fallbackValidator() : true);
-        }
-
-        window.fastcheckoutPaymentDataAssigners.forEach(registerPaymentDataAssignerOnce);
         window.fastcheckoutPaymentValidators.forEach(registerAdditionalValidatorOnce);
 
         return {
             registerPaymentValidator: registerPaymentValidator,
-            registerPaymentDataAssigner: registerPaymentDataAssigner,
             registerShippingValidator: registerShippingValidator,
             loadOptionalValidationComponents: loadOptionalValidationComponents,
             loadShippingRatesValidationComponents: loadShippingRatesValidationComponents,
-            loadPaymentValidationComponents: loadPaymentValidationComponents,
-            applyPaymentDataAssigners: applyPaymentDataAssigners,
-            validateAdditionalValidators: validateAdditionalValidators
+            loadPaymentValidationComponents: loadPaymentValidationComponents
         };
     };
 });

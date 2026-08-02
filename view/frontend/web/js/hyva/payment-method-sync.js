@@ -10,7 +10,6 @@ define([], function () {
                 : function () {},
             lastPersistedPaymentMethodCode = '',
             lockedUserPaymentMethodCode = '',
-            lockedUserPaymentAt = 0,
             paymentSelectionGeneration = 0,
             applyingFromBridge = false;
 
@@ -37,7 +36,6 @@ define([], function () {
             methodCode = methodCode || '';
             if (!methodCode) {
                 lockedUserPaymentMethodCode = '';
-                lockedUserPaymentAt = 0;
                 paymentSelectionGeneration += 1;
                 return paymentSelectionGeneration;
             }
@@ -47,7 +45,6 @@ define([], function () {
                 paymentSelectionGeneration += 1;
             }
             lockedUserPaymentMethodCode = methodCode;
-            lockedUserPaymentAt = Date.now();
 
             return paymentSelectionGeneration;
         }
@@ -64,19 +61,12 @@ define([], function () {
          * Keep a fresh shopper choice authoritative while asynchronous KO renderer
          * callbacks for an older method are still completing.
          */
-        function isUserPaymentSelectionFresh(maxAgeMs) {
-            maxAgeMs = typeof maxAgeMs === 'number' ? maxAgeMs : 15000;
-
-            return !!(
-                lockedUserPaymentMethodCode &&
-                lockedUserPaymentAt &&
-                Date.now() - lockedUserPaymentAt < maxAgeMs
-            );
+        function isUserPaymentSelectionFresh() {
+            return !!lockedUserPaymentMethodCode;
         }
 
         function clearUserPaymentSelection() {
             lockedUserPaymentMethodCode = '';
-            lockedUserPaymentAt = 0;
             paymentSelectionGeneration += 1;
         }
 
