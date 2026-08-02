@@ -403,6 +403,9 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
             '.fastcheckout-native-shipping-address [aria-invalid="true"]'
         ).first();
         await expect(invalid).toBeVisible();
+        await expect(page.locator(
+            '[data-fastcheckout-client-order-error]:visible'
+        )).toHaveCount(0);
         await expect.poll(async () => invalid.evaluate((element) => {
             const rect = element.getBoundingClientRect();
 

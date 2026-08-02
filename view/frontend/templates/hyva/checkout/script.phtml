@@ -106,6 +106,9 @@ foreach ($clientMessagePhrases as $phrase) {
 
     function showError(message) {
         message = translateClientMessage(message);
+        if (message && hasVisibleInlineValidationError(message)) {
+            message = '';
+        }
         form.querySelectorAll('[data-fastcheckout-client-order-error]').forEach(function (el) {
             if (message) {
                 el.textContent = message;
@@ -140,6 +143,21 @@ foreach ($clientMessagePhrases as $phrase) {
             typeof paymentBridge.hasInlineError === 'function' &&
             paymentBridge.hasInlineError(message, getSelectedPaymentMethod())
         );
+    }
+
+    function hasVisibleInlineValidationError(message) {
+        if (hasInlinePaymentError(message)) {
+            return true;
+        }
+
+        return Array.prototype.some.call(form.querySelectorAll(
+            '[aria-invalid="true"], .admin__field-error, .field-error, label.mage-error, div.mage-error'
+        ), function (element) {
+            return element.offsetParent !== null && (
+                element.matches('[aria-invalid="true"]') ||
+                String(element.textContent || '').trim() !== ''
+            );
+        });
     }
 
     function refreshPaymentReadiness() {
