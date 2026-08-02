@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Kkkonrad\Fastcheckout\Plugin\Tpay;
 
+use Kkkonrad\Fastcheckout\Helper\Data as Helper;
 use Psr\Log\LoggerInterface;
 
 class PatchTpayChannelsScript
@@ -11,9 +12,13 @@ class PatchTpayChannelsScript
     /** @var LoggerInterface */
     private $logger;
 
-    public function __construct(LoggerInterface $logger)
+    /** @var Helper */
+    private $helper;
+
+    public function __construct(LoggerInterface $logger, Helper $helper)
     {
         $this->logger = $logger;
+        $this->helper = $helper;
     }
 
     /**
@@ -25,7 +30,7 @@ class PatchTpayChannelsScript
      */
     public function afterShowChannels($subject, ?string $result): ?string
     {
-        if (empty($result)) {
+        if (empty($result) || !$this->helper->canUseHyvaNativeCheckout()) {
             return $result;
         }
 

@@ -52,6 +52,7 @@ foreach ($clientMessagePhrases as $phrase) {
     ) ?>;
     var orderIsProcessing = false;
     var isPaymentReady = true;
+    var paymentReadinessTimer = null;
 
     function translateClientMessage(message) {
         var text = message === null || typeof message === 'undefined'
@@ -193,6 +194,14 @@ foreach ($clientMessagePhrases as $phrase) {
             btn.classList.toggle('pointer-events-none', btn.disabled);
             btn.setAttribute('aria-disabled', btn.disabled ? 'true' : 'false');
         });
+
+        if (paymentReadinessTimer) {
+            window.clearTimeout(paymentReadinessTimer);
+            paymentReadinessTimer = null;
+        }
+        if (isWaiting) {
+            paymentReadinessTimer = window.setTimeout(refreshPaymentReadiness, 100);
+        }
     }
 
     function placeOrderViaKo() {
@@ -346,7 +355,7 @@ foreach ($clientMessagePhrases as $phrase) {
     form.addEventListener('change', function (event) {
         if (event.target && event.target.name === 'payment_method') {
             showPaymentSelectionError('');
-            window.setTimeout(refreshPaymentReadiness, 0);
+            refreshPaymentReadiness();
         }
     });
 

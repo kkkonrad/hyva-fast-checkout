@@ -518,7 +518,10 @@ define([
                     )
                 });
                 var checkoutDataPersistence = createCheckoutDataPersistence({
-                    checkoutData: checkoutData
+                    checkoutData: checkoutData,
+                    quote: quote,
+                    normalizeAddress: normalizeKoAddressData,
+                    addressesMatch: addressesMatch
                 });
                 var checkoutTotalsSync = createCheckoutTotalsSync({
                     config: config,
@@ -1031,7 +1034,7 @@ define([
                 }
 
                 function persistAddressToCheckoutData(addressData, type) {
-                    checkoutDataPersistence.persistAddress(addressData, type);
+                    return checkoutDataPersistence.persistAddress(addressData, type);
                 }
 
                 function persistShippingMethodToCheckoutData(methodCode) {
@@ -1647,31 +1650,17 @@ define([
                         return syncShippingAttributes();
                     },
                     onSelectBillingAddressAction: function (billingAddress) {
-                        var addressData,
-                            shippingAddress;
+                        var addressData;
 
                         if (!billingAddress) {
                             return Promise.resolve(false);
                         }
 
                         addressData = normalizeKoAddressData(billingAddress);
-                        shippingAddress = quote && typeof quote.shippingAddress === 'function'
-                            ? quote.shippingAddress()
-                            : null;
-
-                        // Magento briefly applies shipping as billing during bootstrap.
-                        // Preserve the separately saved billing form until its resolver runs.
-                        if (
-                            checkoutData &&
-                            typeof checkoutData.getSelectedBillingAddress === 'function' &&
-                            checkoutData.getSelectedBillingAddress() === 'new-customer-billing-address' &&
-                            shippingAddress &&
-                            addressesMatch(normalizeKoAddressData(shippingAddress), addressData)
-                        ) {
+                        if (!persistAddressToCheckoutData(addressData, 'billing')) {
                             return Promise.resolve(false);
                         }
 
-                        persistAddressToCheckoutData(addressData, 'billing');
                         syncAddressDataToCheckoutProvider(addressData, 'billing');
                         syncCheckoutProviderAddressAttributes();
 

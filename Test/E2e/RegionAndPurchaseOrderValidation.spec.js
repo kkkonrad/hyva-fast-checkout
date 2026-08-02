@@ -137,6 +137,59 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
         }))).toBe(true);
     });
 
+    test('slow payment renderer keeps place order disabled until it is ready', async ({ page }) => {
+        await openCheckoutWithProduct(page);
+        await fillPolishShippingAddress(page);
+
+        const shippingMethod = page.locator(
+            'input[name="shipping_method"][value="tablerate_bestway"]:visible:not(:disabled)'
+        );
+        await expect(shippingMethod).toBeVisible({ timeout: 30_000 });
+        await shippingMethod.evaluate((input) => input.click());
+
+        const purchaseOrder = page.locator(
+            'input[name="payment_method"][value="purchaseorder"]:visible:not(:disabled)'
+        );
+        await expect(purchaseOrder).toBeVisible({ timeout: 30_000 });
+        await purchaseOrder.evaluate((input) => input.click());
+        await expect.poll(() => page.evaluate(() => (
+            window.fastcheckoutHyvaPayment.isRendererReady('purchaseorder')
+        )), { timeout: 30_000 }).toBe(true);
+
+        const placeOrderButtons = page.locator(
+            '[data-fastcheckout-place-order], [data-fastcheckout-place-order-mobile]'
+        );
+        await expect(placeOrderButtons).toHaveCount(2);
+        await page.evaluate(() => {
+            const bridge = window.fastcheckoutHyvaPayment;
+
+            window.fastcheckoutOriginalRendererReady = bridge.isRendererReady;
+            window.fastcheckoutTestRendererReady = false;
+            bridge.isRendererReady = (methodCode) => (
+                methodCode === 'purchaseorder'
+                    ? window.fastcheckoutTestRendererReady
+                    : window.fastcheckoutOriginalRendererReady(methodCode)
+            );
+            document.dispatchEvent(new CustomEvent('fastcheckout:payment-selection-changed', {
+                detail: { method: 'purchaseorder' }
+            }));
+        });
+        await expect.poll(() => placeOrderButtons.evaluateAll((buttons) => (
+            buttons.every((button) => button.disabled)
+        ))).toBe(true);
+
+        await page.evaluate(() => {
+            window.fastcheckoutTestRendererReady = true;
+        });
+        await expect.poll(() => placeOrderButtons.evaluateAll((buttons) => (
+            buttons.every((button) => !button.disabled)
+        ))).toBe(true);
+        await page.evaluate(() => {
+            window.fastcheckoutHyvaPayment.isRendererReady =
+                window.fastcheckoutOriginalRendererReady;
+        });
+    });
+
     test('country change never sends an empty string as region_id', async ({ page }) => {
         await openCheckoutWithProduct(page);
         await fillPolishShippingAddress(page);
@@ -686,25 +739,40 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
         ).first();
         await expect(paymentMethod).toBeVisible({ timeout: 30_000 });
         const paymentCode = await paymentMethod.inputValue();
-        await page.locator('input[name="payment_method"]').evaluateAll((inputs) => {
-            inputs.forEach((input) => {
-                input.checked = false;
-                input.disabled = true;
-            });
-        });
-        await page.evaluate(() => {
-            window.fastcheckoutPaymentValidationScrollTarget = '';
-            const scrollIntoView = Element.prototype.scrollIntoView;
+        await page.evaluate(() => new Promise((resolve) => {
+            const settings = window.checkoutConfig.fastcheckoutSettings;
+            const shippingCode = document.querySelector(
+                'input[name="shipping_method"]:checked'
+            )?.value;
 
-            Element.prototype.scrollIntoView = function (options) {
-                if (this.matches('[data-fastcheckout-payment-selection-error]')) {
-                    window.fastcheckoutPaymentValidationScrollTarget =
-                        options && options.behavior;
-                }
+            settings.shippingPaymentMapping = [];
+            window.fastcheckoutHyvaShipping.applyPaymentRemapForShipping(shippingCode);
+            window.fastcheckoutHyvaPayment?.clearUserPaymentSelection();
+            window.fastcheckoutHyvaPayment?.selectPaymentMethod('');
+            window.require([
+                'Magento_Checkout/js/model/quote',
+                'Magento_Checkout/js/checkout-data'
+            ], (quote, checkoutData) => {
+                quote.paymentMethod(null);
+                checkoutData.setSelectedPaymentMethod(null);
+                document.querySelectorAll('input[name="payment_method"]').forEach((input) => {
+                    input.checked = false;
+                    input.disabled = true;
+                });
+                window.fastcheckoutPaymentValidationScrollTarget = '';
+                const scrollIntoView = Element.prototype.scrollIntoView;
 
-                return scrollIntoView.call(this, options);
-            };
-        });
+                Element.prototype.scrollIntoView = function (options) {
+                    if (this.matches('[data-fastcheckout-payment-selection-error]')) {
+                        window.fastcheckoutPaymentValidationScrollTarget =
+                            options && options.behavior;
+                    }
+
+                    return scrollIntoView.call(this, options);
+                };
+                resolve();
+            }, resolve);
+        }));
 
         await page.locator('[data-fastcheckout-place-order]:visible').evaluate(
             (button) => button.click()

@@ -5,6 +5,9 @@ define([], function () {
         deps = deps || {};
 
         var checkoutData = deps.checkoutData,
+            quote = deps.quote,
+            normalizeAddress = deps.normalizeAddress,
+            addressesMatch = deps.addressesMatch,
             fallbackWarningShown = false;
 
         function getStoreCode() {
@@ -94,12 +97,46 @@ define([], function () {
             });
         }
 
+        function shouldPreserveSeparateBilling(addressData) {
+            var persisted,
+                shipping;
+
+            if (
+                !checkoutData ||
+                typeof checkoutData.getSelectedBillingAddress !== 'function' ||
+                checkoutData.getSelectedBillingAddress() !== 'new-customer-billing-address' ||
+                typeof checkoutData.getNewCustomerBillingAddress !== 'function' ||
+                !quote ||
+                typeof quote.shippingAddress !== 'function' ||
+                typeof normalizeAddress !== 'function' ||
+                typeof addressesMatch !== 'function'
+            ) {
+                return false;
+            }
+
+            persisted = checkoutData.getNewCustomerBillingAddress();
+            shipping = quote.shippingAddress();
+            if (!persisted || !shipping) {
+                return false;
+            }
+
+            shipping = normalizeAddress(shipping);
+
+            return addressesMatch(shipping, normalizeAddress(addressData)) &&
+                !addressesMatch(shipping, normalizeAddress(persisted));
+        }
+
         function persistAddress(addressData, type) {
             if (!addressData) {
-                return;
+                return false;
             }
 
             if (type === 'billing') {
+                // Magento briefly applies shipping as billing during bootstrap.
+                // Do not overwrite a separately persisted billing form with that transient state.
+                if (shouldPreserveSeparateBilling(addressData)) {
+                    return false;
+                }
                 safeSet('setBillingAddressFromData', addressData, function (value) {
                     updateFallback(function (data) {
                         data.billingAddressFromData = value;
@@ -110,7 +147,7 @@ define([], function () {
                         data.newCustomerBillingAddress = value;
                     });
                 });
-                return;
+                return true;
             }
 
             safeSet('setShippingAddressFromData', addressData, function (value) {
@@ -123,6 +160,8 @@ define([], function () {
                     data.newCustomerShippingAddress = setAddressByStore(data.newCustomerShippingAddress, value);
                 });
             });
+
+            return true;
         }
 
         function persistShippingMethod(methodCode) {
