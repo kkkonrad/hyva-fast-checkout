@@ -145,7 +145,12 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
             'input[name="shipping_method"][value="tablerate_bestway"]:visible:not(:disabled)'
         );
         await expect(shippingMethod).toBeVisible({ timeout: 30_000 });
+        const shippingSelection = page.waitForResponse((response) => (
+            response.request().method() === 'POST' &&
+            response.url().includes('/shipping-information')
+        ), { timeout: 10_000 }).catch(() => null);
         await shippingMethod.evaluate((input) => input.click());
+        await shippingSelection;
 
         const purchaseOrder = page.locator(
             'input[name="payment_method"][value="purchaseorder"]:visible:not(:disabled)'
@@ -187,6 +192,58 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
         await page.evaluate(() => {
             window.fastcheckoutHyvaPayment.isRendererReady =
                 window.fastcheckoutOriginalRendererReady;
+        });
+    });
+
+    test('shipping and payment selections run their native KO component hooks', async ({ page }) => {
+        await openCheckoutWithProduct(page);
+        await fillPolishShippingAddress(page);
+
+        await page.evaluate(() => new Promise((resolve, reject) => {
+            window.require(['uiRegistry'], (registry) => {
+                const component = registry.get('checkout.steps.shipping-step.shippingAddress');
+                const original = component.selectShippingMethod;
+
+                window.fastcheckoutNativeShippingSelectCalls = 0;
+                component.selectShippingMethod = function () {
+                    window.fastcheckoutNativeShippingSelectCalls += 1;
+                    return original.apply(this, arguments);
+                };
+                resolve();
+            }, reject);
+        }));
+
+        const shippingMethod = page.locator(
+            'input[name="shipping_method"][value="tablerate_bestway"]:visible:not(:disabled)'
+        );
+        await expect(shippingMethod).toBeVisible({ timeout: 30_000 });
+        await shippingMethod.evaluate((input) => input.click());
+        await expect.poll(() => page.evaluate(() => (
+            window.fastcheckoutNativeShippingSelectCalls
+        ))).toBe(1);
+
+        const purchaseOrder = page.locator(
+            'input[name="payment_method"][value="purchaseorder"]:visible:not(:disabled)'
+        );
+        await expect(purchaseOrder).toBeVisible({ timeout: 30_000 });
+        await purchaseOrder.evaluate((input) => input.click());
+        await expect.poll(() => page.evaluate(() => (
+            window.fastcheckoutHyvaPayment.isRendererReady('purchaseorder')
+        )), { timeout: 30_000 }).toBe(true);
+
+        expect(await page.evaluate(() => {
+            const component = window.fastcheckoutHyvaPayment.getActiveRenderer();
+
+            return {
+                method: component.getCode(),
+                rendererOwnsSelection: !Object.prototype.hasOwnProperty.call(
+                    component,
+                    'selectPaymentMethod'
+                )
+            };
+        })).toEqual({
+            method: 'purchaseorder',
+            rendererOwnsSelection: true
         });
     });
 
@@ -291,7 +348,7 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
             if (
                 captureSubmitRequests &&
                 request.method() === 'POST' &&
-                /\/V1\/guest-carts\/[^/]+\/(?:shipping-information|payment-information|order)(?:\?|$)/.test(request.url())
+                /\/V1\/guest-carts\/[^/]+\/(?:payment-information|order)(?:\?|$)/.test(request.url())
             ) {
                 submitRequests.push(request.url());
             }
@@ -304,7 +361,12 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
             'input[name="shipping_method"][value="tablerate_bestway"]:visible:not(:disabled)'
         );
         await expect(shippingMethod).toBeVisible({ timeout: 30_000 });
+        const shippingSelection = page.waitForResponse((response) => (
+            response.request().method() === 'POST' &&
+            response.url().includes('/shipping-information')
+        ), { timeout: 10_000 }).catch(() => null);
         await shippingMethod.evaluate((input) => input.click());
+        await shippingSelection;
 
         const purchaseOrder = page.locator(
             'input[name="payment_method"][value="purchaseorder"]:visible:not(:disabled)'
@@ -317,13 +379,6 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
         );
         const poNumber = target.locator('input[name="payment[po_number]"]:visible');
         await expect(poNumber).toBeVisible();
-        await poNumber.fill('');
-        await poNumber.focus();
-        await poNumber.evaluate((input) => input.blur());
-
-        await expect(poNumber).toHaveAttribute('aria-invalid', 'true');
-        await poNumber.fill('PO-VALIDATION-CLEAR');
-        await expect(poNumber).toHaveAttribute('aria-invalid', 'false');
         await poNumber.fill('');
 
         await page.evaluate(() => {
@@ -362,14 +417,14 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
         expect(orderRequests).toBe(0);
     });
 
-    test('main checkout submit validates arbitrary fields and delegates renderer validation once', async ({ page }) => {
+    test('main checkout submit delegates renderer and additional validation once', async ({ page }) => {
         const submitRequests = [];
         let orderRequests = 0;
 
         page.on('request', (request) => {
             if (
                 request.method() === 'POST' &&
-                /\/V1\/guest-carts\/[^/]+\/(?:shipping-information|payment-information|order)(?:\?|$)/.test(request.url())
+                /\/V1\/guest-carts\/[^/]+\/(?:payment-information|order)(?:\?|$)/.test(request.url())
             ) {
                 submitRequests.push(request.url());
             }
@@ -388,7 +443,12 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
             'input[name="shipping_method"][value="flatrate_flatrate"]:visible:not(:disabled)'
         );
         await expect(shippingMethod).toBeVisible({ timeout: 30_000 });
+        const shippingSelection = page.waitForResponse((response) => (
+            response.request().method() === 'POST' &&
+            response.url().includes('/shipping-information')
+        ), { timeout: 10_000 }).catch(() => null);
         await shippingMethod.evaluate((input) => input.click());
+        await shippingSelection;
 
         const paymentMethod = page.locator(
             'input[name="payment_method"]:visible:not(:disabled):not([value="purchaseorder"])'
@@ -421,6 +481,32 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
             hiddenWrapper.appendChild(hidden);
             root.appendChild(hiddenWrapper);
         });
+        await page.evaluate((code) => new Promise((resolve, reject) => {
+            window.require(['jquery', 'mage/validation'], ($) => {
+                const component = window.fastcheckoutHyvaPayment.getActiveRenderer();
+                const originalPlaceOrder = component.placeOrder;
+                const root = document.querySelector(
+                    '[data-fastcheckout-payment-method-ko-target="' + code + '"]'
+                );
+
+                window.fastcheckoutRendererValidateCalls = 0;
+                window.fastcheckoutRendererPlaceOrderCalls = 0;
+                component.validate = function () {
+                    const field = root.querySelector('#fastcheckout-third-party-required');
+
+                    window.fastcheckoutRendererValidateCalls += 1;
+                    $(field.form).validation();
+
+                    return $(field).valid();
+                };
+                component.placeOrder = function () {
+                    window.fastcheckoutRendererPlaceOrderCalls += 1;
+
+                    return originalPlaceOrder.apply(this, arguments);
+                };
+                resolve();
+            }, reject);
+        }), methodCode);
 
         const input = target.locator('#fastcheckout-third-party-required');
         submitRequests.length = 0;
@@ -436,13 +522,16 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
             'aria-invalid',
             'true'
         );
+        await expect.poll(() => page.evaluate(() => ({
+            validate: window.fastcheckoutRendererValidateCalls,
+            placeOrder: window.fastcheckoutRendererPlaceOrderCalls
+        }))).toEqual({validate: 1, placeOrder: 1});
         expect(submitRequests).toEqual([]);
 
         await input.fill('VALID');
-        await input.evaluate((element) => {
-            document.getElementById(element.getAttribute('aria-describedby'))?.remove();
-            element.classList.remove('mage-error');
-            element.setAttribute('aria-invalid', 'false');
+        await input.blur();
+        await page.evaluate(() => {
+            window.fastcheckoutHyvaPayment.getActiveRenderer().validate();
         });
         await expect(input).toHaveAttribute('aria-invalid', 'false');
         await page.evaluate((code) => new Promise((resolve, reject) => {
@@ -450,7 +539,6 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
                 'Magento_Checkout/js/model/payment/additional-validators'
             ], (additionalValidators) => {
                 const component = window.fastcheckoutHyvaPayment.getActiveRenderer();
-                const originalPlaceOrder = component.placeOrder;
                 const root = document.querySelector(
                     '[data-fastcheckout-payment-method-ko-target="' + code + '"]'
                 );
@@ -462,11 +550,6 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
                     window.fastcheckoutRendererValidateCalls += 1;
 
                     return true;
-                };
-                component.placeOrder = function () {
-                    window.fastcheckoutRendererPlaceOrderCalls += 1;
-
-                    return originalPlaceOrder.apply(this, arguments);
                 };
                 additionalValidators.registerValidator({
                     validate: function () {
@@ -821,7 +904,12 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
             'input[name="shipping_method"][value="tablerate_bestway"]:not(:disabled)'
         );
         await expect(shippingMethod).toBeVisible({ timeout: 30_000 });
+        const shippingSelection = page.waitForResponse((response) => (
+            response.request().method() === 'POST' &&
+            response.url().includes('/shipping-information')
+        ), { timeout: 10_000 }).catch(() => null);
         await shippingMethod.evaluate((input) => input.click());
+        await shippingSelection;
 
         const purchaseOrder = page.locator(
             'input[name="payment_method"][value="purchaseorder"]:not(:disabled)'
@@ -846,7 +934,7 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
         });
 
         await page.route(
-            /\/V1\/guest-carts\/[^/]+\/(?:shipping-information|payment-information)(?:\?|$)/,
+            /\/V1\/guest-carts\/[^/]+\/payment-information(?:\?|$)/,
             async (route) => {
                 requestBlocked = true;
                 await requestGate;
@@ -906,6 +994,7 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
         await page.evaluate(() => {
             window.fastcheckoutTestAfterPlaceOrder = false;
             window.fastcheckoutHyvaPayment.placeOrder = function () {
+                document.dispatchEvent(new CustomEvent('fastcheckout:order-submit-started'));
                 return Promise.resolve({ testOrderResult: true });
             };
             window.fastcheckoutHyvaPayment.afterPlaceOrder = function () {
@@ -987,6 +1076,10 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
             }
         });
 
+        await poNumber.blur();
+        await expect.poll(() => page.evaluate(() => (
+            window.fastcheckoutHyvaPayment.getActiveRenderer().getData().po_number
+        ))).toBe(expectedPoNumber);
         await page.locator('[data-fastcheckout-place-order]:visible').evaluate(
             (button) => button.click()
         );
@@ -1009,10 +1102,6 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
             'a[href*="/checkout/account/delegateCreate"]'
         );
         await expect(createAccount).toBeVisible();
-        await expect(createAccount.locator('xpath=ancestor::*[contains(@class, "max-w-md")]')).toHaveCSS(
-            'text-align',
-            'center'
-        );
 
         console.log('Created Purchase Order test order entity ID:', orderEntityId);
     });

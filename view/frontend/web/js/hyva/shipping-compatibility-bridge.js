@@ -12,7 +12,6 @@ define(['jquery'], function ($) {
             getBridgeMessageContainer = deps.getBridgeMessageContainer,
             getCheckoutErrorsComponent = deps.getCheckoutErrorsComponent,
             hasConfiguredEmailComponent = deps.hasConfiguredEmailComponent === true,
-            standardShippingViewSelectMethod = null,
             standardShippingInformationComponent = null,
             standardEmailComponent = null,
             initialRegionValidationState = window.fastcheckoutInitialRegionValidationState || {
@@ -213,12 +212,6 @@ define(['jquery'], function ($) {
                 if (typeof validateMethod !== 'function') {
                     return;
                 }
-
-                standardShippingViewSelectMethod = ShippingView &&
-                    ShippingView.prototype &&
-                    typeof ShippingView.prototype.selectShippingMethod === 'function'
-                    ? ShippingView.prototype.selectShippingMethod
-                    : null;
 
                 validator = function () {
                     var component,
@@ -445,30 +438,6 @@ define(['jquery'], function ($) {
             });
         }
 
-        function runStandardShippingViewSelectMethod(shippingMethod) {
-            var component;
-
-            if (!standardShippingViewSelectMethod || !shippingMethod || typeof shippingMethod !== 'object' || window.fastcheckoutKoShippingViewSelectActive) {
-                return;
-            }
-
-            component = prepareShippingViewCompatibilityComponent();
-            if (!component) {
-                return;
-            }
-
-            window.fastcheckoutKoShippingViewSelectActive = true;
-            try {
-                standardShippingViewSelectMethod.call(component, shippingMethod);
-            } catch (e) {
-                if (window.console && typeof window.console.warn === 'function') {
-                    window.console.warn('Kkkonrad Fastcheckout: standard shipping view method selection could not run.', e);
-                }
-            } finally {
-                window.fastcheckoutKoShippingViewSelectActive = false;
-            }
-        }
-
         function init() {
             registerInitialRegionValidationGuard();
             registerShippingViewCompatibilityValidator();
@@ -480,7 +449,6 @@ define(['jquery'], function ($) {
             init: init,
             prepareShippingViewCompatibilityComponent: prepareShippingViewCompatibilityComponent,
             syncEmailCompatibilityComponent: syncEmailCompatibilityComponent,
-            runStandardShippingViewSelectMethod: runStandardShippingViewSelectMethod,
             getShippingInformationComponent: function () {
                 return standardShippingInformationComponent;
             }

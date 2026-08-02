@@ -74,11 +74,41 @@ class NativePipelineOwnershipTest extends TestCase
     public function testPlaceOrderScriptDoesNotCallMagewirePlaceOrder(): void
     {
         $js = file_get_contents($this->moduleRoot() . '/view/frontend/templates/hyva/checkout/script.phtml');
+        $bridge = file_get_contents($this->moduleRoot() . '/view/frontend/web/js/hyva/checkout-bridge.js');
+        $placeOrderMixin = file_get_contents(
+            $this->moduleRoot() . '/view/frontend/web/js/mixin/place-order-mixin.js'
+        );
         $this->assertNotFalse($js);
+        $this->assertNotFalse($bridge);
+        $this->assertNotFalse($placeOrderMixin);
         $this->assertStringNotContainsString("call('placeOrder'", $js);
         $this->assertStringNotContainsString('$wire.call', $js);
         $this->assertStringContainsString('placeOrderViaKo', $js);
-        $this->assertStringContainsString("Magento_Checkout/js/action/place-order", $js);
+        $this->assertStringNotContainsString("Magento_Checkout/js/action/place-order", $js);
+        $this->assertStringNotContainsString("Magento_Checkout/js/action/place-order", $bridge);
+        $this->assertStringContainsString('component.placeOrder({}, fakeEvent)', $bridge);
+        $this->assertStringContainsString('prepareForPlaceOrder', $placeOrderMixin);
+        $this->assertStringNotContainsString('validateActivePaymentFields', $bridge);
+        $this->assertStringNotContainsString('getPurchaseOrderNumber', $bridge);
+        $this->assertFileDoesNotExist(
+            $this->moduleRoot() . '/view/frontend/web/js/hyva/checkout-agreements-fallback.js'
+        );
+    }
+
+    public function testNativePaymentRendererOwnsSelection(): void
+    {
+        $js = file_get_contents($this->moduleRoot() . '/view/frontend/web/js/hyva/checkout-bridge.js');
+        $this->assertNotFalse($js);
+        $this->assertStringNotContainsString('component.selectPaymentMethod = function', $js);
+        $this->assertStringContainsString('renderer.selectPaymentMethod();', $js);
+    }
+
+    public function testShippingViewOwnsShopperSelection(): void
+    {
+        $js = file_get_contents($this->moduleRoot() . '/view/frontend/web/js/mixin/shipping-view-mixin.js');
+        $this->assertNotFalse($js);
+        $this->assertStringContainsString('shipping.selectShippingMethod(found);', $js);
+        $this->assertStringContainsString('self.selectShippingMethod(found);', $js);
     }
 
     public function testLegacyMagewireComponentWasRemoved(): void

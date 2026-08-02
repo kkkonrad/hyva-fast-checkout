@@ -308,7 +308,16 @@ define([
             window.fastcheckoutLockShippingRatesList = true;
             window.fastcheckoutSelectingShippingMethod = true;
             try {
-                selectShippingMethodAction(found);
+                if (shipping && typeof shipping.selectShippingMethod === 'function') {
+                    shipping.selectShippingMethod(found);
+                } else if (
+                    window.fastcheckoutHyvaShippingListInstance &&
+                    typeof window.fastcheckoutHyvaShippingListInstance.selectShippingMethod === 'function'
+                ) {
+                    window.fastcheckoutHyvaShippingListInstance.selectShippingMethod(found);
+                } else {
+                    selectShippingMethodAction(found);
+                }
             } finally {
                 window.fastcheckoutSuppressShippingSync = false;
             }
@@ -542,7 +551,7 @@ define([
                             shipping.rememberUserShippingSelection(value);
                         }
 
-                        selectShippingMethodAction(found);
+                        self.selectShippingMethod(found);
                         if (typeof self.bumpSelectionRevision === 'function') {
                             self.bumpSelectionRevision();
                         }
