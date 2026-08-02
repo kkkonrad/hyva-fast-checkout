@@ -21,7 +21,6 @@
  */
 define([
     'ko',
-    'uiRegistry',
     'Magento_Checkout/js/model/shipping-service',
     'Magento_Checkout/js/action/select-shipping-method',
     'Magento_Checkout/js/model/quote',
@@ -29,7 +28,6 @@ define([
     'Magento_Catalog/js/price-utils'
 ], function (
     ko,
-    registry,
     shippingService,
     selectShippingMethodAction,
     quote,
@@ -59,57 +57,42 @@ define([
             clearTimeout(shippingRatesValidator.validateAddressTimeout);
             shippingRatesValidator.validateAddressTimeout = 0;
         }
-        if (shippingService && shippingService.isLoading) {
-            shippingService.isLoading(true);
-        }
         if (typeof shippingRatesValidator.validateFields === 'function') {
             shippingRatesValidator.validateFields();
         }
     }
 
     function bindFastDestinationEstimate() {
-        var countryName =
-                'checkout.steps.shipping-step.shippingAddress.shipping-address-fieldset.country_id',
-            regionName =
-                'checkout.steps.shipping-step.shippingAddress.shipping-address-fieldset.region_id',
-            regionTextName =
-                'checkout.steps.shipping-step.shippingAddress.shipping-address-fieldset.region';
-
-        if (destinationEstimateBound || !registry) {
+        if (
+            destinationEstimateBound ||
+            typeof document === 'undefined' ||
+            !document.addEventListener
+        ) {
             return;
         }
         destinationEstimateBound = true;
 
-        function watch(name) {
-            function attach(field) {
-                if (!field || typeof field.value !== 'function' || !field.value.subscribe) {
-                    return;
-                }
-                // Magento's rates-validator schedules validateFields in 2000ms.
-                // That listener may run after ours in the same turn — yield once,
-                // cancel its timer, then estimate immediately (no delay).
-                field.value.subscribe(function () {
-                    window.setTimeout(scheduleFastDestinationEstimate, 0);
-                });
+        document.addEventListener('change', function (event) {
+            var field = event && event.target;
+
+            if (
+                !event.isTrusted ||
+                !field ||
+                typeof field.matches !== 'function' ||
+                !field.matches(
+                    '.fastcheckout-native-shipping-address [name="country_id"], ' +
+                    '.fastcheckout-native-shipping-address [name="region_id"], ' +
+                    '.fastcheckout-native-shipping-address [name="region"]'
+                )
+            ) {
+                return;
             }
 
-            try {
-                var existing = registry.get(name);
-                if (existing) {
-                    attach(existing);
-                    return;
-                }
-            } catch (e) {
-                // not registered yet
-            }
-            if (typeof registry.async === 'function') {
-                registry.async(name)(attach);
-            }
-        }
-
-        watch(countryName);
-        watch(regionName);
-        watch(regionTextName);
+            // Magento's own value listener schedules validateFields in 2000ms.
+            // A real form change can run immediately; provider hydration emits no
+            // DOM change and therefore cannot start a validation/loader loop.
+            window.setTimeout(scheduleFastDestinationEstimate, 0);
+        }, true);
     }
 
     function isInPostModuleAvailable() {

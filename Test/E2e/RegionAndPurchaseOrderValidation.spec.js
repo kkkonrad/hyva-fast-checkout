@@ -67,6 +67,12 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
                 resolve(address.lastname || '');
             }, () => resolve(''));
         }))).toBe('Testowy');
+        await page.waitForTimeout(500);
+        await expect.poll(() => page.evaluate(() => new Promise((resolve) => {
+            window.require(['Magento_Checkout/js/model/shipping-service'], (service) => {
+                resolve(!service.isLoading());
+            }, () => resolve(false));
+        }))).toBe(true);
 
         let releaseEstimate;
         let estimateBlocked = false;
@@ -86,6 +92,7 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
 
             window.fastcheckoutEstimateXhrModes = [];
             window.fastcheckoutEstimateFormStates = [];
+            window.fastcheckoutShippingLoadingTransitions = [];
             XMLHttpRequest.prototype.open = function (method, url, async) {
                 if (String(url || '').includes('/estimate-shipping-methods')) {
                     window.fastcheckoutEstimateXhrModes.push(
@@ -100,6 +107,27 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
 
                 return originalOpen.apply(this, arguments);
             };
+
+            (function subscribeToShippingLoading() {
+                if (!window.require || !window.require.defined ||
+                    !window.require.defined('Magento_Checkout/js/model/shipping-service')) {
+                    window.setTimeout(subscribeToShippingLoading, 10);
+                    return;
+                }
+
+                const service = window.require('Magento_Checkout/js/model/shipping-service');
+                const record = (value) => {
+                    const transitions = window.fastcheckoutShippingLoadingTransitions;
+                    const normalized = Boolean(value);
+
+                    if (!transitions.length || transitions[transitions.length - 1] !== normalized) {
+                        transitions.push(normalized);
+                    }
+                };
+
+                record(service.isLoading());
+                service.isLoading.subscribe(record);
+            }());
         });
         await page.route('**/estimate-shipping-methods', async (route) => {
             if (estimateBlocked) {
@@ -135,6 +163,10 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
                 resolve(!service.isLoading());
             }, () => resolve(false));
         }))).toBe(true);
+        expect(
+            (await page.evaluate(() => window.fastcheckoutShippingLoadingTransitions))
+                .filter(Boolean)
+        ).toHaveLength(1);
     });
 
     test('slow payment renderer keeps place order disabled until it is ready', async ({ page }) => {
