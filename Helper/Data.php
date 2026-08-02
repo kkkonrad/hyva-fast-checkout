@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Kkkonrad\Fastcheckout\Helper;
 
+use Hyva\Theme\Service\HyvaThemes;
 use Magento\Framework\App\Helper\Context;
 use Magento\Framework\Json\Helper\Data as JsonHelper;
 use Magento\Framework\App\Helper\AbstractHelper;
@@ -29,6 +30,7 @@ class Data extends AbstractHelper
     public $jsonHelper;
     protected $design;
     protected $themeFactory;
+    private HyvaThemes $hyvaThemes;
 
     /**
      * Per-request memo of canUseHyvaNativeCheckout() (theme/config checks are not free).
@@ -41,12 +43,14 @@ class Data extends AbstractHelper
         Context $context,
         JsonHelper $jsonHelper,
         DesignInterface $design,
-        ThemeFactory $themeFactory
+        ThemeFactory $themeFactory,
+        HyvaThemes $hyvaThemes
     ) {
         parent::__construct($context);
         $this->jsonHelper = $jsonHelper;
         $this->design = $design;
         $this->themeFactory = $themeFactory;
+        $this->hyvaThemes = $hyvaThemes;
     }
 
     public function isEnable()
@@ -281,46 +285,33 @@ class Data extends AbstractHelper
             return $this->canUseHyvaNativeCheckoutCache = false;
         }
 
-        $themePath = '';
+        $theme = null;
         try {
             $theme = $this->design ? $this->design->getDesignTheme() : null;
-            $themePath = $theme ? (string)$theme->getFullPath() : '';
-        } catch (\Exception $e) {
-            $themePath = '';
+            if ($theme && $this->hyvaThemes->isHyvaTheme($theme)) {
+                return $this->canUseHyvaNativeCheckoutCache = true;
+            }
+        } catch (\Throwable $e) {
+            $theme = null;
         }
 
-        if (!$this->isHyvaThemePath($themePath) && $this->themeFactory !== null) {
+        if ($this->themeFactory !== null) {
             try {
                 $themeId = (int)$this->scopeConfig->getValue(
                     'design/theme/theme_id',
                     ScopeInterface::SCOPE_STORE
                 );
                 if ($themeId > 0) {
-                    $themePath = (string)$this->themeFactory->create()
-                        ->load($themeId)
-                        ->getFullPath();
+                    $theme = $this->themeFactory->create()->load($themeId);
+                    return $this->canUseHyvaNativeCheckoutCache =
+                        $this->hyvaThemes->isHyvaTheme($theme);
                 }
-            } catch (\Exception $e) {
-                $themePath = '';
+            } catch (\Throwable $e) {
+                // Fall through to the safe non-Hyva result.
             }
         }
 
-        return $this->canUseHyvaNativeCheckoutCache = $this->isHyvaThemePath($themePath);
-    }
-
-    /**
-     * Theme paths look like "frontend/<vendor>/<theme>". Hyvä ships under the Hyva
-     * vendor, child themes keep it in the theme segment (e.g. frontend/Acme/hyva-child).
-     */
-    private function isHyvaThemePath($themePath)
-    {
-        foreach (explode('/', (string)$themePath) as $segment) {
-            if (stripos($segment, 'hyva') === 0) {
-                return true;
-            }
-        }
-
-        return false;
+        return $this->canUseHyvaNativeCheckoutCache = false;
     }
 
 }

@@ -453,6 +453,92 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
         expect(orderRequests).toBe(0);
     });
 
+    test('late renderer errors stay observed until navigation', async ({ page }) => {
+        let orderRequests = 0;
+
+        page.on('request', (request) => {
+            if (
+                request.method() === 'POST' &&
+                /\/V1\/guest-carts\/[^/]+\/(?:payment-information|order)(?:\?|$)/.test(request.url())
+            ) {
+                orderRequests += 1;
+            }
+        });
+
+        await openCheckoutWithProduct(page);
+        await fillPolishShippingAddress(page);
+
+        const shippingMethod = page.locator(
+            'input[name="shipping_method"][value="flatrate_flatrate"]:visible:not(:disabled)'
+        );
+        await expect(shippingMethod).toBeVisible({ timeout: 30_000 });
+        await shippingMethod.evaluate((input) => input.click());
+
+        const paymentMethod = page.locator(
+            'input[name="payment_method"][value="cashondelivery"]:visible:not(:disabled)'
+        );
+        await expect(paymentMethod).toBeVisible({ timeout: 30_000 });
+        const methodCode = await paymentMethod.getAttribute('value');
+        await paymentMethod.evaluate((input) => input.click());
+
+        const target = page.locator(
+            '[data-fastcheckout-payment-method-ko-target="' + methodCode + '"]'
+        );
+        await expect(target).toBeVisible();
+        await page.evaluate((code) => new Promise((resolve, reject) => {
+            window.require(['knockout'], (ko) => {
+                const component = window.fastcheckoutHyvaPayment.getActiveRenderer();
+                const root = document.querySelector(
+                    '[data-fastcheckout-payment-method-ko-target="' + code + '"]'
+                );
+                const inlineError = document.createElement('p');
+                const nativeSetTimeout = window.setTimeout.bind(window);
+
+                inlineError.className = 'payu-msg';
+                inlineError.setAttribute('role', 'alert');
+                inlineError.setAttribute('data-test-late-renderer-error', 'true');
+                root.appendChild(inlineError);
+
+                // Compress the removed legacy 30-second cleanup so this test fails
+                // quickly if it is reintroduced.
+                window.setTimeout = function (callback, delay) {
+                    return nativeSetTimeout(callback, delay === 30000 ? 20 : delay);
+                };
+                component.secureFormError = ko.observable('');
+                component.secureFormError.subscribe((message) => {
+                    inlineError.textContent = message || '';
+                });
+                component.validate = () => true;
+                component.placeOrder = function () {
+                    window.fastcheckoutLateRendererPlaceOrderCalls =
+                        (window.fastcheckoutLateRendererPlaceOrderCalls || 0) + 1;
+                    nativeSetTimeout(() => {
+                        this.secureFormError('Spóźniony błąd walidacji renderera.');
+                    }, 60);
+
+                    return false;
+                };
+                resolve();
+            }, reject);
+        }), methodCode);
+
+        orderRequests = 0;
+        const submit = page.locator('[data-fastcheckout-place-order]:visible');
+        await submit.evaluate((button) => button.click());
+
+        await expect(target.locator('[data-test-late-renderer-error]')).toHaveText(
+            'Spóźniony błąd walidacji renderera.'
+        );
+        await expect.poll(() => page.evaluate(() => (
+            window.fastcheckoutLateRendererPlaceOrderCalls || 0
+        ))).toBe(1);
+        await expect(submit).toBeEnabled();
+        await expect(page.locator(
+            '[data-fastcheckout-client-order-error]:visible'
+        )).toHaveCount(0);
+        expect(orderRequests).toBe(0);
+    });
+
     test('shipping address validation scrolls smoothly to the first error', async ({ page }) => {
         await openCheckoutWithProduct(page);
         await page.setViewportSize({ width: 390, height: 844 });
@@ -599,9 +685,11 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
             'input[name="payment_method"]:visible:not(:disabled)'
         ).first();
         await expect(paymentMethod).toBeVisible({ timeout: 30_000 });
+        const paymentCode = await paymentMethod.inputValue();
         await page.locator('input[name="payment_method"]').evaluateAll((inputs) => {
             inputs.forEach((input) => {
                 input.checked = false;
+                input.disabled = true;
             });
         });
         await page.evaluate(() => {
@@ -640,7 +728,14 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
 
             return rect.top >= 0 && rect.bottom <= window.innerHeight;
         })).toBe(true);
-        await paymentMethod.evaluate((input) => input.click());
+        await page.evaluate((code) => {
+            const input = Array.from(document.querySelectorAll('input[name="payment_method"]'))
+                .find((candidate) => candidate.value === code);
+
+            input.disabled = false;
+            input.checked = true;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+        }, paymentCode);
         await expect(error).toBeHidden();
     });
 

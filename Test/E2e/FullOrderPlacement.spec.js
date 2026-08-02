@@ -266,6 +266,10 @@ async function placeGuestOrder(page, billingMode) {
 }
 
 test('guest places order with same-as-shipping billing', async ({ page }) => {
+  test.skip(
+    process.env.FC_PLACE_REAL_ORDER !== '1',
+    'Set FC_PLACE_REAL_ORDER=1 to create a real test order.'
+  );
   test.setTimeout(150_000);
   const net = attachNetCapture(page);
   await addProductAndOpenCheckout(page);
@@ -288,6 +292,10 @@ test('guest places order with same-as-shipping billing', async ({ page }) => {
 });
 
 test('guest places order with separate billing address', async ({ page }) => {
+  test.skip(
+    process.env.FC_PLACE_REAL_ORDER !== '1',
+    'Set FC_PLACE_REAL_ORDER=1 to create a real test order.'
+  );
   test.setTimeout(150_000);
   const net = attachNetCapture(page);
   await addProductAndOpenCheckout(page);

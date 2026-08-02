@@ -1647,9 +1647,27 @@ define([
                         return syncShippingAttributes();
                     },
                     onSelectBillingAddressAction: function (billingAddress) {
-                        var addressData = normalizeKoAddressData(billingAddress);
+                        var addressData,
+                            shippingAddress;
 
                         if (!billingAddress) {
+                            return Promise.resolve(false);
+                        }
+
+                        addressData = normalizeKoAddressData(billingAddress);
+                        shippingAddress = quote && typeof quote.shippingAddress === 'function'
+                            ? quote.shippingAddress()
+                            : null;
+
+                        // Magento briefly applies shipping as billing during bootstrap.
+                        // Preserve the separately saved billing form until its resolver runs.
+                        if (
+                            checkoutData &&
+                            typeof checkoutData.getSelectedBillingAddress === 'function' &&
+                            checkoutData.getSelectedBillingAddress() === 'new-customer-billing-address' &&
+                            shippingAddress &&
+                            addressesMatch(normalizeKoAddressData(shippingAddress), addressData)
+                        ) {
                             return Promise.resolve(false);
                         }
 
@@ -4514,16 +4532,9 @@ define([
                                 }, 0);
                             }
 
-                            // Keep promise open until redirect or a renderer error; do not
-                            // resolve early or the outer submit handler may continue wrongly.
-                            window.setTimeout(function () {
-                                // If tokenize already failed, fail() settled the promise.
-                                if (settled) {
-                                    return;
-                                }
-                                // No error yet — order may still be placing / redirecting.
-                                cleanup();
-                            }, 30000);
+                            // Keep the observers until an error or document navigation.
+                            // Slow hosted fields can report validation after 30 seconds;
+                            // the browser releases these subscriptions with the page.
                         } catch (placeErr) {
                             fail(placeErr && placeErr.message ? placeErr.message : placeErr);
                         }
@@ -4711,11 +4722,10 @@ define([
                             return originalAction(callbacks, deferred);
                         },
 
-		                    placeOrder: function (unused, selectedMethod) {
-		                        var component,
-		                            paymentData,
+	                    placeOrder: function (unused, selectedMethod) {
+	                        var component,
+	                            paymentData,
                                     methodCode,
-                                    nativeSubmitAction,
                                     rendererNotReadyError;
 
                             clearPaymentMessages();
@@ -4767,13 +4777,12 @@ define([
                                 if (component) {
                                     refreshNativePaymentActions();
                                 }
-		                            paymentData = component && typeof component.getData === 'function'
-		                                ? applyPaymentDataAssigners(component.getData())
-		                                : this.getActivePaymentData();
+	                            paymentData = component && typeof component.getData === 'function'
+	                                ? applyPaymentDataAssigners(component.getData())
+	                                : this.getActivePaymentData();
                                 methodCode = paymentData && paymentData.method ? paymentData.method : (selectedMethod || getSelectedMethodCode());
-                                nativeSubmitAction = getRendererNativeSubmitAction(component);
 
-		                            if (!component || typeof component.placeOrder !== 'function') {
+	                            if (!component || typeof component.placeOrder !== 'function') {
 	                                    if (methodCode === 'purchaseorder' && !validatePurchaseOrderWithNativeValidation()) {
 	                                        var fallbackPoValidationError = new Error(translateFastcheckoutMessage('Please check the selected payment method and try again.'));
 	                                        handlePaymentError(fallbackPoValidationError, getBridgeMessageContainer());

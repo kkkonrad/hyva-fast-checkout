@@ -12,6 +12,9 @@ async function addProduct(page) {
 }
 
 test('measures shipping form startup after a full reload', async ({ page }) => {
+    const addressReadyBudgetMs = Number(
+        process.env.FC_ADDRESS_READY_BUDGET_MS || 1000
+    );
     await page.addInitScript(() => {
         const marks = {
             init: performance.now(),
@@ -228,6 +231,9 @@ test('measures shipping form startup after a full reload', async ({ page }) => {
     });
 
     console.log(JSON.stringify({
+        addressReadyBudgetMs,
+        addressReadyAfterDomContentLoaded:
+            browser.marks.addressReady - browser.marks.domContentLoaded,
         initialDomContentLoadedElapsed,
         initialFirstInputElapsed,
         initialBrowser,
@@ -244,8 +250,13 @@ test('measures shipping form startup after a full reload', async ({ page }) => {
     }, null, 2));
 
     expect(browser.marks.firstInput).not.toBeNull();
+    expect(browser.marks.domContentLoaded).not.toBeNull();
+    expect(browser.marks.addressReady).not.toBeNull();
     expect(browser.marks.paymentUiStarted).not.toBeNull();
     expect(browser.marks.paymentUiStarted).toBeGreaterThanOrEqual(
         browser.marks.firstInput
     );
+    expect(
+        browser.marks.addressReady - browser.marks.domContentLoaded
+    ).toBeLessThanOrEqual(addressReadyBudgetMs);
 });
