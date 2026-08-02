@@ -313,11 +313,6 @@
     color: inherit !important;
 }
 
-#fastcheckout-checkout .payu-card-form-container .payu-card-form,
-.fastcheckout-payment-method-ko-container .payu-card-form {
-    min-height: 2.5rem;
-}
-
 /* InPost Paczkomaty / Locker Widget Styles */
 .inpost-carrier-wrapper {
     margin-top: 0.75rem;
