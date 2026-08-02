@@ -70,6 +70,10 @@ define([], function () {
                 return translateMessage(message.message);
             }
 
+            if (message.responseJSON && message.responseJSON.message) {
+                return translateMessage(message.responseJSON.message);
+            }
+
             return String(message);
         }
 
@@ -114,6 +118,35 @@ define([], function () {
             });
         }
 
+        function watchErrors(messageContainer, callback) {
+            if (
+                !messageContainer ||
+                typeof callback !== 'function' ||
+                typeof messageContainer.errorMessages !== 'function' ||
+                typeof messageContainer.errorMessages.subscribe !== 'function'
+            ) {
+                return null;
+            }
+
+            return messageContainer.errorMessages.subscribe(function (messages) {
+                if (messages && messages.length) {
+                    callback(messages[messages.length - 1]);
+                }
+            });
+        }
+
+        function observeFailure(result, callback) {
+            if (!result || typeof callback !== 'function') {
+                return;
+            }
+
+            if (typeof result.fail === 'function') {
+                result.fail(callback);
+            } else if (typeof result.catch === 'function') {
+                result.catch(callback);
+            }
+        }
+
         function dispatch(type, message) {
             var text = getMessageText(message);
 
@@ -144,16 +177,9 @@ define([], function () {
 
             messageContainer.fastcheckoutHyvaSubscribed = true;
 
-            if (
-                typeof messageContainer.errorMessages === 'function' &&
-                typeof messageContainer.errorMessages.subscribe === 'function'
-            ) {
-                messageContainer.errorMessages.subscribe(function (messages) {
-                    if (messages && messages.length) {
-                        dispatch('error', messages[messages.length - 1]);
-                    }
-                });
-            }
+            watchErrors(messageContainer, function (message) {
+                dispatch('error', message);
+            });
 
             if (
                 typeof messageContainer.successMessages === 'function' &&
@@ -267,6 +293,8 @@ define([], function () {
             getCheckoutErrorsComponent: getCheckoutErrorsComponent,
             clear: clear,
             hasMessages: hasMessages,
+            watchErrors: watchErrors,
+            observeFailure: observeFailure,
             handleError: handleError
         };
     };

@@ -53,4 +53,36 @@ assert.strictEqual(
 );
 assert.strictEqual(added, 1);
 
+let errorListener;
+let observedError = '';
+const errorMessages = function () { return []; };
+errorMessages.subscribe = (listener) => {
+    errorListener = listener;
+    return {dispose: () => { errorListener = null; }};
+};
+const errorSubscription = bridge.watchErrors(
+    {errorMessages},
+    (error) => { observedError = bridge.getText(error); }
+);
+errorListener([{message: 'Błąd z messageContainer'}]);
+assert.strictEqual(observedError, 'Błąd z messageContainer');
+errorSubscription.dispose();
+assert.strictEqual(errorListener, null);
+
+let deferredFailure;
+let promiseFailure;
+bridge.observeFailure(
+    {fail: (listener) => { deferredFailure = listener; }},
+    (error) => { observedError = bridge.getText(error); }
+);
+deferredFailure({responseJSON: {message: 'Błąd Deferred'}});
+assert.strictEqual(observedError, 'Błąd Deferred');
+
+bridge.observeFailure(
+    {catch: (listener) => { promiseFailure = listener; }},
+    (error) => { observedError = bridge.getText(error); }
+);
+promiseFailure(new Error('Błąd Promise'));
+assert.strictEqual(observedError, 'Błąd Promise');
+
 console.log('payment message bridge: OK');

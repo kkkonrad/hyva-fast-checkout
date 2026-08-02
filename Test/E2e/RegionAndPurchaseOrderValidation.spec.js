@@ -309,8 +309,9 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
         expect(orderRequests).toBe(0);
     });
 
-    test('main checkout submit validates fields declared by an arbitrary payment renderer', async ({ page }) => {
+    test('main checkout submit validates arbitrary fields and delegates renderer validation once', async ({ page }) => {
         const submitRequests = [];
+        let orderRequests = 0;
 
         page.on('request', (request) => {
             if (
@@ -319,13 +320,19 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
             ) {
                 submitRequests.push(request.url());
             }
+            if (
+                request.method() === 'POST' &&
+                /\/V1\/guest-carts\/[^/]+\/(?:payment-information|order)(?:\?|$)/.test(request.url())
+            ) {
+                orderRequests += 1;
+            }
         });
 
         await openCheckoutWithProduct(page);
         await fillPolishShippingAddress(page);
 
         const shippingMethod = page.locator(
-            'input[name="shipping_method"][value="tablerate_bestway"]:visible:not(:disabled)'
+            'input[name="shipping_method"][value="flatrate_flatrate"]:visible:not(:disabled)'
         );
         await expect(shippingMethod).toBeVisible({ timeout: 30_000 });
         await shippingMethod.evaluate((input) => input.click());
@@ -377,6 +384,73 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
             'true'
         );
         expect(submitRequests).toEqual([]);
+
+        await input.fill('VALID');
+        await input.evaluate((element) => {
+            document.getElementById(element.getAttribute('aria-describedby'))?.remove();
+            element.classList.remove('mage-error');
+            element.setAttribute('aria-invalid', 'false');
+        });
+        await expect(input).toHaveAttribute('aria-invalid', 'false');
+        await page.evaluate((code) => new Promise((resolve, reject) => {
+            window.require([
+                'Magento_Checkout/js/model/payment/additional-validators'
+            ], (additionalValidators) => {
+                const component = window.fastcheckoutHyvaPayment.getActiveRenderer();
+                const originalPlaceOrder = component.placeOrder;
+                const root = document.querySelector(
+                    '[data-fastcheckout-payment-method-ko-target="' + code + '"]'
+                );
+
+                window.fastcheckoutRendererValidateCalls = 0;
+                window.fastcheckoutRendererAdditionalValidatorCalls = 0;
+                window.fastcheckoutRendererPlaceOrderCalls = 0;
+                component.validate = function () {
+                    window.fastcheckoutRendererValidateCalls += 1;
+
+                    return true;
+                };
+                component.placeOrder = function () {
+                    window.fastcheckoutRendererPlaceOrderCalls += 1;
+
+                    return originalPlaceOrder.apply(this, arguments);
+                };
+                additionalValidators.registerValidator({
+                    validate: function () {
+                        let error = root.querySelector('[data-test-renderer-contract-error]');
+
+                        window.fastcheckoutRendererAdditionalValidatorCalls += 1;
+                        if (!error) {
+                            error = document.createElement('p');
+                            error.className = 'field-error';
+                            error.setAttribute('role', 'alert');
+                            error.setAttribute('data-test-renderer-contract-error', 'true');
+                            error.textContent = 'Błąd walidacji renderera.';
+                            root.appendChild(error);
+                        }
+
+                        return false;
+                    }
+                });
+                resolve();
+            }, reject);
+        }), methodCode);
+
+        orderRequests = 0;
+        await page.locator('[data-fastcheckout-place-order]:visible').evaluate(
+            (button) => button.click()
+        );
+
+        await expect(target.locator('[data-test-renderer-contract-error]')).toBeVisible();
+        await expect.poll(() => page.evaluate(() => ({
+            validate: window.fastcheckoutRendererValidateCalls,
+            additional: window.fastcheckoutRendererAdditionalValidatorCalls,
+            placeOrder: window.fastcheckoutRendererPlaceOrderCalls
+        }))).toEqual({validate: 1, additional: 1, placeOrder: 1});
+        await expect(page.locator(
+            '[data-fastcheckout-client-order-error]:visible'
+        )).toHaveCount(0);
+        expect(orderRequests).toBe(0);
     });
 
     test('shipping address validation scrolls smoothly to the first error', async ({ page }) => {

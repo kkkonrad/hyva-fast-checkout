@@ -4376,6 +4376,8 @@ define([
                     return new Promise(function (resolve, reject) {
                         var settled = false,
                             errorSub = null,
+                            messageErrorSub = null,
+                            placeOrderResult,
                             fakeEvent = {
                                 preventDefault: function () {},
                                 stopPropagation: function () {},
@@ -4391,6 +4393,15 @@ define([
                                 }
                             }
                             errorSub = null;
+
+                            if (messageErrorSub && typeof messageErrorSub.dispose === 'function') {
+                                try {
+                                    messageErrorSub.dispose();
+                                } catch (e) {
+                                    // ignore
+                                }
+                            }
+                            messageErrorSub = null;
                         }
 
                         function scrollActivePaymentIntoView() {
@@ -4409,7 +4420,7 @@ define([
                             }
                         }
 
-                        function fail(message) {
+                        function fail(message, inlineHandled) {
                             var text,
                                 err;
 
@@ -4422,13 +4433,14 @@ define([
                                 text = paymentMessageBridge.normalize(message) ||
                                     translateFastcheckoutMessage(
                                         'Please check the selected payment method and try again.'
-                                    );
+                                );
                                 err = new Error(text);
-                                err.fastcheckoutInlineHandled = handlePaymentError(
-                                    err,
-                                    component && component.messageContainer || getBridgeMessageContainer(),
-                                    methodCode
-                                ) === true;
+                                err.fastcheckoutInlineHandled = inlineHandled === true ||
+                                    handlePaymentError(
+                                        err,
+                                        component && component.messageContainer || getBridgeMessageContainer(),
+                                        methodCode
+                                    ) === true;
                                 scrollActivePaymentIntoView();
                                 reject(err);
                             }, 0);
@@ -4442,6 +4454,10 @@ define([
                         }
 
                         subscribePaymentMessageContainer(component.messageContainer);
+                        messageErrorSub = paymentMessageBridge.watchErrors(
+                            component.messageContainer,
+                            fail
+                        );
 
                         // PayU Secure Form (and similar) publish field errors here after tokenize.
                         if (
@@ -4462,19 +4478,6 @@ define([
                         }
 
                         try {
-                            // Renderer-owned validation first (PayU: agreement / stored card).
-                            // Do not run the generic DOM field scan — it hits hidden billing
-                            // forms of other methods and never sees Secure Form iframes.
-                            if (
-                                typeof component.validate === 'function' &&
-                                component.validate() === false
-                            ) {
-                                fail(translateFastcheckoutMessage(
-                                    'Please check the selected payment method and try again.'
-                                ));
-                                return;
-                            }
-
                             if (
                                 typeof component.isPlaceOrderActionAllowed === 'function' &&
                                 !component.isPlaceOrderActionAllowed() &&
@@ -4486,12 +4489,32 @@ define([
                                 return;
                             }
 
-                            // Magento / PayU placeOrder typically returns false even on success
-                            // start (async tokenize). Success redirects; failures set
-                            // secureFormError or messageContainer.
-                            component.placeOrder({}, fakeEvent);
+                            // The renderer owns component.validate() and Magento's additional
+                            // validators, exactly as it does in the standard checkout.
+                            placeOrderResult = component.placeOrder({}, fakeEvent);
+                            paymentMessageBridge.observeFailure(placeOrderResult, fail);
 
-                            // Keep promise open until redirect or secureFormError; do not
+                            // Magento's default renderer returns false for synchronous inline
+                            // validation failures. Some hosted gateways also return false while
+                            // asynchronous tokenization has started, so only reject when the
+                            // active renderer actually painted an error.
+                            if (placeOrderResult === false) {
+                                window.setTimeout(function () {
+                                    if (
+                                        !settled &&
+                                        focusFirstInvalidCheckoutField()
+                                    ) {
+                                        fail(
+                                            translateFastcheckoutMessage(
+                                                'Please check the selected payment method and try again.'
+                                            ),
+                                            true
+                                        );
+                                    }
+                                }, 0);
+                            }
+
+                            // Keep promise open until redirect or a renderer error; do not
                             // resolve early or the outer submit handler may continue wrongly.
                             window.setTimeout(function () {
                                 // If tokenize already failed, fail() settled the promise.
@@ -4842,20 +4865,6 @@ define([
                             }
                             allowPlaceOrderOnActivePayment();
 
-                            // Agreements / additional validators still apply before gateways run.
-                            if (!validateAdditionalValidators(false)) {
-                                var agreementsError = new Error(
-                                    translateFastcheckoutMessage(
-                                        'Please check the selected payment method and try again.'
-                                    )
-                                );
-                                handlePaymentError(
-                                    agreementsError,
-                                    component.messageContainer || getBridgeMessageContainer()
-                                );
-                                return Promise.reject(agreementsError);
-                            }
-
                             // Gateways with their own placeOrder (PayU Secure Form, Braintree,
                             // Mollie, …) must run that method so field-level / tokenize errors
                             // surface (e.g. PayU secureFormError). Bypassing to Magento REST
@@ -4901,6 +4910,13 @@ define([
                                 paymentValid = validatePurchaseOrderWithNativeValidation() &&
                                     validateAdditionalValidators(false);
 
+                                return billingValid && paymentValid;
+                            }
+
+                            // A standard Magento renderer owns component.validate() and
+                            // additionalValidators inside placeOrder(). Fastcheckout only
+                            // blocks invalid checkout/billing and visible active fields first.
+                            if (component && typeof component.placeOrder === 'function') {
                                 return billingValid && paymentValid;
                             }
 
