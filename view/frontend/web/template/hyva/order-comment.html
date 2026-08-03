@@ -1,11 +1,12 @@
 <!--
 /**
  * Magento-style order comment field (Fastcheckout; not present in core OPC).
+ * Label / placeholder are PHP-translated via the component (see order-comment.js).
  */
 -->
 <div class="fastcheckout-native-comment field">
     <label class="label" for="fastcheckout-comment">
-        <span data-bind="i18n: 'Order Comment'"></span>
+        <span data-bind="text: label"></span>
     </label>
     <div class="control">
         <textarea id="fastcheckout-comment"
@@ -15,6 +16,6 @@
                   data-fastcheckout-comment
                   data-bind="value: comment,
                              valueUpdate: 'input',
-                             attr: { placeholder: $t('Optional comment for this order') }"></textarea>
+                             attr: { placeholder: placeholder }"></textarea>
     </div>
 </div>

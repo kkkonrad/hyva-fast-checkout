@@ -16,6 +16,10 @@
 
     <form class="form form-discount" id="discount-form"
           data-bind="submit: function () { return false; }">
+        <!--
+          Input + button share one row. Validation errors (.mage-error) must not
+          stretch the Apply button — they sit under the input column only.
+        -->
         <div class="fastcheckout-native-discount-row">
             <div class="field">
                 <label class="label" for="discount-code">

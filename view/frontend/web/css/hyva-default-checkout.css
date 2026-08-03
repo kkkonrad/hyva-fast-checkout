@@ -1118,13 +1118,16 @@
 #fastcheckout-checkout .fastcheckout-native-discount-row {
     display: flex;
     flex-direction: column;
+    flex-wrap: wrap;
     gap: 0.5rem;
+    align-items: stretch;
 }
 
 @media (min-width: 640px) {
     #fastcheckout-checkout .fastcheckout-native-discount-row {
         flex-direction: row;
-        align-items: stretch;
+        /* Top-align so .mage-error under the input does not stretch Apply. */
+        align-items: flex-start;
     }
 }
 
@@ -1136,6 +1139,7 @@
 
 #fastcheckout-checkout .fastcheckout-native-discount .control {
     width: 100%;
+    position: relative;
 }
 
 #fastcheckout-checkout .fastcheckout-native-discount .input-text,
@@ -1147,9 +1151,27 @@
 #fastcheckout-checkout .fastcheckout-native-discount .actions-toolbar {
     display: flex;
     flex: 0 0 auto;
+    flex-direction: row;
     margin: 0;
     padding: 0;
     gap: 0.5rem;
+    align-items: center;
+    align-self: stretch;
+    /* Hyvä .actions-toolbar adds a top border/separator for form footers — not wanted
+       next to the coupon input. */
+    border: 0 !important;
+    border-block-start-width: 0 !important;
+    border-block-start-color: transparent !important;
+    margin-block-start: 0 !important;
+    padding-block-start: 0 !important;
+    box-shadow: none;
+}
+
+@media (min-width: 640px) {
+    #fastcheckout-checkout .fastcheckout-native-discount .actions-toolbar {
+        /* Sit next to the input baseline, not next to the error line. */
+        align-self: flex-start;
+    }
 }
 
 #fastcheckout-checkout .fastcheckout-native-discount .actions-toolbar .primary {
@@ -1160,6 +1182,11 @@
 #fastcheckout-checkout .fastcheckout-native-discount .action.action-cancel {
     width: 100%;
     white-space: nowrap;
+    flex-shrink: 0;
+    /* Match typical Hyvä form-input height so the button does not look tall. */
+    min-height: 2.75rem;
+    height: 2.75rem;
+    box-sizing: border-box;
 }
 
 @media (min-width: 640px) {
@@ -1168,6 +1195,39 @@
         width: auto;
         min-width: 6rem;
     }
+}
+
+/*
+ * Validation message under the field only — never style input.mage-error
+ * (Magento adds that class to the invalid control itself).
+ */
+#fastcheckout-checkout .fastcheckout-native-discount div.mage-error,
+#fastcheckout-checkout .fastcheckout-native-discount label.mage-error,
+#fastcheckout-checkout .fastcheckout-native-discount .field-error,
+#fastcheckout-checkout .fastcheckout-native-discount #discount-code-error {
+    display: block;
+    width: 100%;
+    margin: 0.25rem 0 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #dc2626;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 400;
+}
+
+/* Keep the invalid input looking like a normal form control. */
+#fastcheckout-checkout .fastcheckout-native-discount input.mage-error,
+#fastcheckout-checkout .fastcheckout-native-discount .input-text.mage-error {
+    display: block;
+    width: 100%;
+    margin: 0;
+    font-size: inherit;
+    line-height: inherit;
+    font-weight: inherit;
+    color: inherit;
+    /* border-color handled by theme form-input / error state if present */
 }
 
 /* SalesRule message region under the form */

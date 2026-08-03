@@ -127,7 +127,9 @@ $showSubscribe = $block->isShowSubscribe();
                     <div id="fastcheckout-ko-comment-root"
                          class="fastcheckout-ko-comment-root hidden"
                          data-bind="scope: 'fastcheckout.order-comment'"
-                         data-fastcheckout-native-comment>
+                         data-fastcheckout-native-comment
+                         data-label="<?= $escaper->escapeHtmlAttr(__('Order Comment')) ?>"
+                         data-placeholder="<?= $escaper->escapeHtmlAttr(__('Optional comment for this order')) ?>">
                         <!-- ko template: getTemplate() --><!-- /ko -->
                     </div>
                     <div data-fastcheckout-comment-ssr>

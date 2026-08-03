@@ -1079,9 +1079,17 @@ define([
                             'fastcheckout.order-comment': {
                                 component: 'Kkkonrad_Fastcheckout/js/view/order-comment',
                                 config: {
-                                    template: 'Kkkonrad_Fastcheckout/hyva/order-comment'
+                                    template: 'Kkkonrad_Fastcheckout/hyva/order-comment',
+                                    // PHP-translated via data-* on #fastcheckout-ko-comment-root
+                                    // (read in component initialize); keep English defaults here.
+                                    label: root.getAttribute('data-label') || 'Order Comment',
+                                    placeholder: root.getAttribute('data-placeholder') ||
+                                        'Optional comment for this order'
                                 },
-                                template: 'Kkkonrad_Fastcheckout/hyva/order-comment'
+                                template: 'Kkkonrad_Fastcheckout/hyva/order-comment',
+                                label: root.getAttribute('data-label') || 'Order Comment',
+                                placeholder: root.getAttribute('data-placeholder') ||
+                                    'Optional comment for this order'
                             }
                         }
                     });
