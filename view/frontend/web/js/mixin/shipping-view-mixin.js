@@ -43,18 +43,18 @@ define([
     // (~2s here); address edits outside this window still show their spinner.
     var SELECTION_LOADER_MUTE_MS = 3000;
 
-    // Magento stock bindHandler closes over validateDelay=2000 (meant to coalesce
-    // postcode keystrokes, not to fix a Fastcheckout race). Country/region are
-    // discrete selects — re-estimate immediately (no artificial wait).
+    // Magento stock bindHandler closes over validateDelay (~2s). Country select
+    // should re-estimate immediately; postcode + region_id use 1500ms debounce
+    // (shipping-rates-validator-mixin) — do not force-run them here.
     // setTimeout(0) only yields so Magento's own value listener can schedule first;
-    // we then cancel that 2000ms timer and run validateFields now.
+    // we then cancel that timer and run validateFields now for country only.
     var destinationEstimateBound = false;
 
     function scheduleFastDestinationEstimate() {
         if (!shippingRatesValidator) {
             return;
         }
-        // Cancel Magento's pending 2000ms validateFields timeout.
+        // Cancel Magento's pending validateFields timeout (debounce still in flight).
         if (shippingRatesValidator.validateAddressTimeout) {
             clearTimeout(shippingRatesValidator.validateAddressTimeout);
             shippingRatesValidator.validateAddressTimeout = 0;
@@ -81,18 +81,16 @@ define([
                 !event.isTrusted ||
                 !field ||
                 typeof field.matches !== 'function' ||
+                // Only country is immediate; region_id shares postcode's 1500ms debounce.
                 !field.matches(
-                    '.fastcheckout-native-shipping-address [name="country_id"], ' +
-                    '.fastcheckout-native-shipping-address [name="region_id"], ' +
-                    '.fastcheckout-native-shipping-address [name="region"]'
+                    '.fastcheckout-native-shipping-address [name="country_id"]'
                 )
             ) {
                 return;
             }
 
-            // Magento's own value listener schedules validateFields in 2000ms.
-            // A real form change can run immediately; provider hydration emits no
-            // DOM change and therefore cannot start a validation/loader loop.
+            // Magento's own value listener schedules validateFields with debounce.
+            // Country change runs immediately; provider hydration emits no DOM change.
             window.setTimeout(scheduleFastDestinationEstimate, 0);
         }, true);
     }
