@@ -289,7 +289,11 @@
     max-width: 100%;
 }
 
-/* Styling for jQuery validation / Knockout error messages and invalid input states */
+/*
+ * Inline validation labels sit under the control. Prefer margin-bottom so the
+ * gap is below the message (before the next field / action), not only above it.
+ * Inputs with class mage-error are excluded — they are the control, not the text.
+ */
 .mage-error:not(input):not(select):not(textarea),
 .msg__error,
 .fastcheckout-payment-method-ko-container .mage-error:not(input):not(select):not(textarea),
@@ -297,7 +301,7 @@
 .fastcheckout-payment-method-ko-container .msg__error,
 .fastcheckout-ko-payment-root .msg__error {
     display: block;
-    margin-top: 0.25rem;
+    margin: 0 0 0.25rem;
     color: var(--color-red-600) !important;
     font-size: var(--text-sm) !important;
 }
@@ -327,9 +331,15 @@
 #fastcheckout-checkout .payu-msg .msg__error,
 .fastcheckout-payment-method-ko-container .payu-msg .msg__error,
 #fastcheckout-checkout .payment__payu-agreement .payu-msg .msg__error {
-    margin: 0.25rem 0 0;
+    margin: 0 0 0.25rem;
     color: inherit !important;
     display: block;
+}
+
+#fastcheckout-checkout .payu-msg .msg__error:last-child,
+.fastcheckout-payment-method-ko-container .payu-msg .msg__error:last-child,
+#fastcheckout-checkout .payment__payu-agreement .payu-msg .msg__error:last-child {
+    margin-bottom: 0;
 }
 
 /* InPost Paczkomaty / Locker Widget Styles */
