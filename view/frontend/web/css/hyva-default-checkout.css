@@ -1115,7 +1115,20 @@
     display: none; /* placeholder on input is enough; matches previous compact card */
 }
 
+/*
+ * Coupon input + Apply share one control size (Hyvä form-input box model).
+ * .btn uses 2px border + different padding; override so both match exactly.
+ */
 #fastcheckout-checkout .fastcheckout-native-discount-row {
+    --fc-discount-control-py: var(--form-py, 0.5rem);
+    --fc-discount-control-px: var(--form-px, 0.75rem);
+    --fc-discount-control-radius: var(--form-radius, var(--radius-lg, 0.5rem));
+    --fc-discount-control-border: 1px;
+    /* line-height 1.5 × 1rem font + vertical padding + borders */
+    --fc-discount-control-height: calc(
+        1.5rem + (2 * var(--fc-discount-control-py)) + (2 * var(--fc-discount-control-border))
+    );
+
     display: flex;
     flex-direction: column;
     flex-wrap: wrap;
@@ -1146,6 +1159,16 @@
 #fastcheckout-checkout .fastcheckout-native-discount input[type='text'] {
     width: 100%;
     box-sizing: border-box;
+    height: var(--fc-discount-control-height);
+    min-height: var(--fc-discount-control-height);
+    max-height: var(--fc-discount-control-height);
+    padding-block: var(--fc-discount-control-py);
+    padding-inline: var(--fc-discount-control-px);
+    border-width: var(--fc-discount-control-border);
+    border-style: solid;
+    border-radius: var(--fc-discount-control-radius);
+    font-size: 1rem;
+    line-height: 1.5;
 }
 
 #fastcheckout-checkout .fastcheckout-native-discount .actions-toolbar {
@@ -1165,35 +1188,52 @@
     margin-block-start: 0 !important;
     padding-block-start: 0 !important;
     box-shadow: none;
+    /* Same outer height as the input (not the field+error column). */
+    height: var(--fc-discount-control-height);
+    min-height: var(--fc-discount-control-height);
 }
 
 @media (min-width: 640px) {
     #fastcheckout-checkout .fastcheckout-native-discount .actions-toolbar {
-        /* Sit next to the input baseline, not next to the error line. */
         align-self: flex-start;
     }
 }
 
 #fastcheckout-checkout .fastcheckout-native-discount .actions-toolbar .primary {
     margin: 0;
+    display: flex;
+    height: 100%;
 }
 
 #fastcheckout-checkout .fastcheckout-native-discount .action.action-apply,
 #fastcheckout-checkout .fastcheckout-native-discount .action.action-cancel {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     width: 100%;
     white-space: nowrap;
     flex-shrink: 0;
-    /* Match typical Hyvä form-input height so the button does not look tall. */
-    min-height: 2.75rem;
-    height: 2.75rem;
     box-sizing: border-box;
+    /* Match form-input height exactly (override .btn 2px border + loose min-height). */
+    height: var(--fc-discount-control-height) !important;
+    min-height: var(--fc-discount-control-height) !important;
+    max-height: var(--fc-discount-control-height) !important;
+    padding-block: var(--fc-discount-control-py) !important;
+    padding-inline: var(--fc-discount-control-px) !important;
+    border-width: var(--fc-discount-control-border) !important;
+    border-style: solid !important;
+    border-radius: var(--fc-discount-control-radius) !important;
+    font-size: 1rem !important;
+    line-height: 1.5 !important;
+    font-weight: 500;
 }
 
 @media (min-width: 640px) {
     #fastcheckout-checkout .fastcheckout-native-discount .action.action-apply,
     #fastcheckout-checkout .fastcheckout-native-discount .action.action-cancel {
         width: auto;
-        min-width: 6rem;
+        /* Same visual “control” width scale as height (compact Apply next to field). */
+        min-width: var(--fc-discount-control-height);
     }
 }
 
