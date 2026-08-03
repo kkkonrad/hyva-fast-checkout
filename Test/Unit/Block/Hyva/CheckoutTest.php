@@ -514,6 +514,7 @@ XML
         );
 
         try {
+            // Discount is mounted separately in the summary column (native SalesRule).
             $this->assertSame([
                 'place-order-captcha' => [
                     'component' => 'Magento_Checkout/js/view/checkout/placeOrderCaptcha',
@@ -523,19 +524,19 @@ XML
                 'afterMethods' => [
                     'component' => 'uiComponent',
                     'displayArea' => 'afterMethods',
-                    'children' => [
-                        'discount' => [
-                            'component' => 'Magento_SalesRule/js/view/payment/discount',
-                            'children' => [
-                                'captcha' => [
-                                    'component' => 'Magento_SalesRule/js/view/payment/captcha',
-                                    'displayArea' => 'captcha'
-                                ]
-                            ]
-                        ]
-                    ]
+                    'children' => []
                 ]
             ], $block->getPaymentRegionChildren());
+
+            $this->assertSame([
+                'component' => 'Magento_SalesRule/js/view/payment/discount',
+                'children' => [
+                    'captcha' => [
+                        'component' => 'Magento_SalesRule/js/view/payment/captcha',
+                        'displayArea' => 'captcha'
+                    ]
+                ]
+            ], $block->getPaymentDiscountComponent());
         } finally {
             @unlink($layoutDir . '/checkout_index_index.xml');
             @rmdir($layoutDir);

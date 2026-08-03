@@ -160,12 +160,17 @@ define([
                 }
 
                 commentEl = document.querySelector(
-                    '[name="fastcheckout_comment"], #fastcheckout-comment, [data-fastcheckout-comment]'
+                    '#fastcheckout-ko-comment-root [data-fastcheckout-comment], ' +
+                    '#fastcheckout-comment, ' +
+                    '[name="fastcheckout_comment"], ' +
+                    '[data-fastcheckout-comment]'
                 );
                 subscribeEl = document.querySelector(
                     '[name="fastcheckout_subscribe"], #fastcheckout-subscribe, [data-fastcheckout-subscribe]'
                 );
-                comment = commentEl && 'value' in commentEl ? String(commentEl.value || '') : '';
+                comment = commentEl && 'value' in commentEl
+                    ? String(commentEl.value || '')
+                    : String(window.fastcheckoutOrderComment || '');
                 subscribe = !!(subscribeEl && (subscribeEl.checked || subscribeEl.value === '1'));
 
                 try {

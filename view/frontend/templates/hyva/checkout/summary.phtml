@@ -2,6 +2,9 @@
 /**
  * Order summary, coupon and place-order controls.
  *
+ * Coupon uses Magento_SalesRule payment/discount (native KO).
+ * Comment uses a Magento-UI-style KO field (core OPC has no storefront comment).
+ *
  * @var \Kkkonrad\Fastcheckout\Block\Hyva\Checkout $block
  * @var \Magento\Framework\Escaper $escaper
  * @var array $items
@@ -15,49 +18,62 @@ $showSubscribe = $block->isShowSubscribe();
 <div class="fc-container-4 space-y-6 min-w-0 w-full">
     <?php if ($showDiscount): ?>
     <div class="card relative" data-fastcheckout-coupon-card>
-        <h2 class="text-xl font-semibold text-gray-900 border-b border-gray-200 pb-4 mb-4">
-            <?= $escaper->escapeHtml(__('Apply Discount Code')) ?>
-        </h2>
+        <div id="fastcheckout-ko-discount-root"
+             class="fastcheckout-ko-discount-root hidden"
+             data-bind="scope: 'checkout.steps.billing-step.payment.afterMethods.discount'"
+             data-fastcheckout-native-discount>
+            <!-- ko template: getTemplate() --><!-- /ko -->
+        </div>
 
-        <div class="flex flex-col sm:flex-row gap-2">
-            <input class="form-input w-full sm:flex-1"
-                   type="text"
-                   id="fastcheckout-coupon-code"
-                   data-fastcheckout-coupon-input
-                   value="<?= $escaper->escapeHtmlAttr($couponCode) ?>"
-                   placeholder="<?= $escaper->escapeHtmlAttr(__('Enter discount code')) ?>"/>
-
-            <div class="flex gap-2 w-full sm:w-auto">
-                <button class="btn btn-primary flex-1 sm:flex-initial"
-                        type="button"
-                        data-fastcheckout-coupon-apply>
-                    <?= $escaper->escapeHtml(__('Apply')) ?>
-                </button>
-                <?php if ($couponCode !== ''): ?>
-                    <button class="btn btn-secondary text-red-600 border-red-200 hover:bg-red-50 flex-1 sm:flex-initial"
-                            type="button"
-                            data-fastcheckout-coupon-cancel>
-                        <?= $escaper->escapeHtml(__('Cancel')) ?>
+        <div data-fastcheckout-discount-ssr>
+            <h2 class="text-xl font-semibold text-gray-900 border-b border-gray-200 pb-4 mb-4">
+                <?= $escaper->escapeHtml(__('Apply Discount Code')) ?>
+            </h2>
+            <div class="flex flex-col sm:flex-row gap-2">
+                <input class="form-input w-full sm:flex-1"
+                       type="text"
+                       id="fastcheckout-coupon-code"
+                       value="<?= $escaper->escapeHtmlAttr($couponCode) ?>"
+                       placeholder="<?= $escaper->escapeHtmlAttr(__('Enter discount code')) ?>"
+                       disabled
+                       aria-disabled="true"/>
+                <div class="flex gap-2 w-full sm:w-auto">
+                    <button class="btn btn-primary flex-1 sm:flex-initial" type="button" disabled>
+                        <?= $escaper->escapeHtml(__('Apply')) ?>
                     </button>
-                <?php endif; ?>
+                </div>
             </div>
         </div>
-        <div class="mt-3 hidden text-sm" data-fastcheckout-coupon-message role="status"></div>
     </div>
     <?php endif; ?>
 
     <div class="card sticky top-6 space-y-6" data-fastcheckout-totals-card>
         <div class="relative space-y-6">
-            <div>
-                <div class="flex items-center justify-between border-b border-gray-200 pb-3 mb-4">
-                    <h2 class="text-xl font-semibold text-gray-900">
-                        <?= $escaper->escapeHtml(__('Order Summary')) ?>
-                    </h2>
-                    <span class="text-xs bg-gray-100 text-gray-800 px-2 py-0.5 rounded-full font-semibold">
-                        <?= $escaper->escapeHtml(__('%1 item(s)', $block->getItemsQty())) ?>
-                    </span>
-                </div>
+            <div class="flex items-center justify-between border-b border-gray-200 pb-3 mb-4">
+                <h2 class="text-xl font-semibold text-gray-900">
+                    <?= $escaper->escapeHtml(__('Order Summary')) ?>
+                </h2>
+                <span class="text-xs bg-gray-100 text-gray-800 px-2 py-0.5 rounded-full font-semibold"
+                      data-fastcheckout-summary-item-count>
+                    <?= $escaper->escapeHtml(__('%1 item(s)', $block->getItemsQty())) ?>
+                </span>
+            </div>
 
+            <?php
+            /**
+             * Native Magento KO summary (cart items + totals, Magento_Tax templates).
+             * Mounted by checkout-bridge startNativeSummaryComponents().
+             * SSR below is progressive enhancement until KO binds.
+             */
+            ?>
+            <div id="fastcheckout-ko-summary-root"
+                 class="fastcheckout-ko-summary-root hidden"
+                 data-bind="scope: 'checkout.sidebar.summary'"
+                 data-fastcheckout-native-summary>
+                <!-- ko template: getTemplate() --><!-- /ko -->
+            </div>
+
+            <div data-fastcheckout-summary-ssr>
                 <ul class="space-y-3 max-h-60 overflow-y-auto pr-1">
                     <?php foreach ($items as $item): ?>
                         <li class="flex gap-3 py-1">
@@ -86,37 +102,47 @@ $showSubscribe = $block->isShowSubscribe();
                                     × <?= (float)$item->getQty() ?>
                                 </div>
                             </div>
-                            <div class="text-sm font-semibold text-gray-900 shrink-0">
+                            <div class="text-sm font-semibold text-gray-900 shrink-0 text-right">
                                 <?= /* @noEscape */ $block->formatPrice($block->getItemRowTotal($item)) ?>
                             </div>
                         </li>
                     <?php endforeach; ?>
                 </ul>
-            </div>
 
-            <div class="border-t border-gray-200 pt-4 space-y-2" data-fastcheckout-summary-totals>
-                <?php foreach ($block->getSummaryTotals() as $total): ?>
-                    <div class="flex justify-between text-sm <?= !empty($total['strong']) ? 'font-bold text-base pt-2 border-t border-gray-100' : 'text-gray-700' ?>"
-                         data-fastcheckout-total-row="<?= $escaper->escapeHtmlAttr($total['code']) ?>">
-                        <span><?= $escaper->escapeHtml($total['label']) ?></span>
-                        <span data-fastcheckout-total-value="<?= $escaper->escapeHtmlAttr($total['code']) ?>">
-                            <?= /* @noEscape */ $block->formatPrice($total['value']) ?>
-                        </span>
-                    </div>
-                <?php endforeach; ?>
+                <div class="border-t border-gray-200 pt-4 space-y-2" data-fastcheckout-summary-totals>
+                    <?php foreach ($block->getSummaryTotals() as $total): ?>
+                        <div class="flex justify-between text-sm <?= !empty($total['strong']) ? 'font-bold text-base pt-2 border-t border-gray-100' : 'text-gray-700' ?>"
+                             data-fastcheckout-total-row="<?= $escaper->escapeHtmlAttr($total['code']) ?>">
+                            <span><?= $escaper->escapeHtml($total['label']) ?></span>
+                            <span data-fastcheckout-total-value="<?= $escaper->escapeHtmlAttr($total['code']) ?>">
+                                <?= /* @noEscape */ $block->formatPrice($total['value']) ?>
+                            </span>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
             </div>
 
             <?php if ($showComment): ?>
                 <div class="border-t border-gray-200 pt-4">
-                    <label class="block text-sm font-medium text-gray-700 mb-1" for="fastcheckout-comment">
-                        <?= $escaper->escapeHtml(__('Order Comment')) ?>
-                    </label>
-                    <textarea id="fastcheckout-comment"
-                              name="fastcheckout_comment"
-                              data-fastcheckout-comment
-                              class="form-input w-full"
-                              rows="2"
-                              placeholder="<?= $escaper->escapeHtmlAttr(__('Optional comment for this order')) ?>"></textarea>
+                    <div id="fastcheckout-ko-comment-root"
+                         class="fastcheckout-ko-comment-root hidden"
+                         data-bind="scope: 'fastcheckout.order-comment'"
+                         data-fastcheckout-native-comment
+                         data-label="<?= $escaper->escapeHtmlAttr(__('Order Comment')) ?>"
+                         data-placeholder="<?= $escaper->escapeHtmlAttr(__('Optional comment for this order')) ?>">
+                        <!-- ko template: getTemplate() --><!-- /ko -->
+                    </div>
+                    <div data-fastcheckout-comment-ssr>
+                        <label class="block text-sm font-medium text-gray-700 mb-1" for="fastcheckout-comment-ssr">
+                            <?= $escaper->escapeHtml(__('Order Comment')) ?>
+                        </label>
+                        <textarea id="fastcheckout-comment-ssr"
+                                  name="fastcheckout_comment"
+                                  data-fastcheckout-comment
+                                  class="form-input w-full"
+                                  rows="2"
+                                  placeholder="<?= $escaper->escapeHtmlAttr(__('Optional comment for this order')) ?>"></textarea>
+                    </div>
                 </div>
             <?php endif; ?>
 
@@ -135,10 +161,23 @@ $showSubscribe = $block->isShowSubscribe();
                 </div>
             <?php endif; ?>
 
-            <div class="hidden md:block pt-2">
-                <button class="btn btn-primary w-full py-3 flex items-center justify-center gap-2"
+            <?php
+            /**
+             * Magento payment renderer place-order toolbar is relocated here
+             * (checkout-bridge mountNativePlaceOrderToolbar). Styling matches FC primary.
+             * SSR fallback submit button until the active method toolbar is mounted.
+             */
+            ?>
+            <div class="pt-2 fastcheckout-place-order-section">
+                <div id="fastcheckout-place-order-host"
+                     class="fastcheckout-place-order-host hidden md:block"
+                     data-fastcheckout-place-order-host>
+                </div>
+                <?php /* SSR fallback only — hidden completely once Magento toolbar mounts (see checkout-bridge setPlaceOrderSsrVisible). Avoid bare "flex" so Tailwind hidden can apply before JS runs. */ ?>
+                <button class="btn btn-primary w-full items-center justify-center gap-2 hidden md:flex fastcheckout-place-order-btn"
                         type="submit"
-                        data-fastcheckout-place-order>
+                        data-fastcheckout-place-order
+                        data-fastcheckout-place-order-ssr>
                     <span class="place-order-spinner hidden" data-fastcheckout-place-order-spinner aria-hidden="true">
                         <svg class="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>

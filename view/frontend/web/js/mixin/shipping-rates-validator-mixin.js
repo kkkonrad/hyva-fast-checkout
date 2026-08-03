@@ -1,29 +1,28 @@
 /**
- * Magento stock validateDelay is 2000ms (coalesce postcode/city keystrokes).
- * That is unrelated to Fastcheckout races — and makes country/region feel slow.
+ * Magento stock bindHandler sets shippingService.isLoading(true) on every keystroke
+ * (list "reloads"/spinner immediately), then debounces validateFields (stock 2000ms).
  *
- * Strategy:
- *  - country / region / region_id: 0ms (discrete selects)
- *  - typed fields (postcode, city, street…): short debounce only, so each digit
- *    of a postcode does not fire its own estimate XHR
+ * Fastcheckout:
+ *  - country_id: 0ms (estimate after selection)
+ *  - postcode + region_id (+ other typed fields): 1500ms debounce
+ *  - isLoading only when the debounced estimate actually runs (not per key)
  *
- * shipping-view-mixin also cancels any leftover Magento 2000ms timeout when
- * country/region change (handlers already closed over the stock delay).
+ * We wrap bindHandler so Magento still registers observed elements, but replace
+ * the value callback with one that defers both loader and validateFields.
  */
 define([
-    'Magento_Checkout/js/model/quote'
-], function (quote) {
+    'Magento_Checkout/js/model/quote',
+    'Magento_Checkout/js/model/shipping-service'
+], function (quote, shippingService) {
     'use strict';
 
     var FAST_FIELDS = {
-        country_id: true,
-        region_id: true,
-        region: true
+        country_id: true
     };
 
-    /** Coalesce typing only — not a race workaround. */
-    var TYPED_DELAY_MS = 250;
+    var DEBOUNCE_MS = 1500;
     var FAST_DELAY_MS = 0;
+    var postcodeElementName = 'postcode';
 
     function fieldIndex(element) {
         if (!element) {
@@ -37,9 +36,17 @@ define([
         }
         if (element.dataScope) {
             var parts = String(element.dataScope).split('.');
+
             return parts[parts.length - 1] || '';
         }
         return '';
+    }
+
+    function delayForField(index) {
+        if (FAST_FIELDS[index]) {
+            return FAST_DELAY_MS;
+        }
+        return DEBOUNCE_MS;
     }
 
     function matchesCurrentQuote(element) {
@@ -66,8 +73,6 @@ define([
         }
 
         value = String(element.value() == null ? '' : element.value()).trim();
-        // region_id_input is the hidden free-text alternative when the selected
-        // country uses a directory region select. Clearing it changes no address.
         if (
             index === 'region_id_input' &&
             !value &&
@@ -91,18 +96,16 @@ define([
             return validator;
         }
 
-        // Default for handlers that capture validateDelay at bind time.
-        validator.validateDelay = TYPED_DELAY_MS;
-
+        validator.validateDelay = DEBOUNCE_MS;
         originalBindHandler = validator.bindHandler.bind(validator);
 
         validator.bindHandler = function (element, delay) {
-            var index = fieldIndex(element),
+            var self = validator,
+                index = fieldIndex(element),
+                useDelay = delayForField(index),
                 originalOn;
 
-            // Fastcheckout initializes native carrier validators after the shipping
-            // component. Core does not deduplicate initFields(), so the same field
-            // otherwise gets multiple value subscriptions and loader cycles.
+            // Core does not dedupe initFields — multiple carrier validators re-bind.
             if (element && element.fastcheckoutRatesValidatorBound) {
                 return;
             }
@@ -110,20 +113,23 @@ define([
                 element.fastcheckoutRatesValidatorBound = true;
             }
 
-            if (FAST_FIELDS[index]) {
-                delay = FAST_DELAY_MS;
-            } else if (typeof delay === 'undefined' || delay === null || delay >= 1000) {
-                delay = TYPED_DELAY_MS;
+            // Honour explicit delay only for country (callers may pass 0).
+            if (FAST_FIELDS[index] && typeof delay === 'number' && delay === 0) {
+                useDelay = 0;
             }
 
-            originalOn = element && element.on;
-            if (typeof originalOn !== 'function') {
-                return originalBindHandler(element, delay);
+            // Groups: Magento recurses into children — keep stock path.
+            if (element && element.component && String(element.component).indexOf('/group') !== -1) {
+                return originalBindHandler(element, useDelay);
             }
 
-            // Provider hydration can emit value changes for the address already on
-            // quote. Ignore those no-op writes; selecting/typing a new destination
-            // still differs from quote and follows Magento's native validation path.
+            if (!element || typeof element.on !== 'function') {
+                return originalBindHandler(element, useDelay);
+            }
+
+            originalOn = element.on.bind(element);
+
+            // Hijack only while Magento bindHandler registers element.on('value', …).
             element.on = function (eventName, callback) {
                 if (eventName !== 'value' || typeof callback !== 'function') {
                     return originalOn.apply(this, arguments);
@@ -134,12 +140,38 @@ define([
                         return;
                     }
 
-                    return callback.apply(this, arguments);
+                    // Zip format warning — same debounce as rates.
+                    clearTimeout(self.validateZipCodeTimeout);
+                    self.validateZipCodeTimeout = setTimeout(function () {
+                        if (typeof self.postcodeValidation !== 'function') {
+                            return;
+                        }
+                        if (index === postcodeElementName) {
+                            self.postcodeValidation(element);
+                        }
+                    }, useDelay);
+
+                    // Do NOT call shippingService.isLoading(true) here — that is what
+                    // made the shipping list flash "reload" on every keystroke.
+                    clearTimeout(self.validateAddressTimeout);
+                    self.validateAddressTimeout = setTimeout(function () {
+                        try {
+                            if (shippingService && typeof shippingService.isLoading === 'function') {
+                                shippingService.isLoading(true);
+                            }
+                        } catch (eLoad) {
+                            // non-fatal
+                        }
+                        if (typeof self.validateFields === 'function') {
+                            self.validateFields();
+                        }
+                    }, useDelay);
                 });
             };
 
             try {
-                return originalBindHandler(element, delay);
+                // Magento registers observedElements + our replaced value handler.
+                return originalBindHandler(element, useDelay);
             } finally {
                 element.on = originalOn;
             }

@@ -1,0 +1,12 @@
+<!--
+/**
+ * Fastcheckout shell for Magento stock summary (cart_items + totals).
+ * Omits the Luma "Order Summary" title — FC provides the card heading.
+ * Children (incl. Magento_Tax overrides) keep their native templates.
+ */
+-->
+<div class="fastcheckout-native-summary" data-bind="blockLoader: isLoading">
+    <!-- ko foreach: elems() -->
+        <!-- ko template: getTemplate() --><!-- /ko -->
+    <!-- /ko -->
+</div>

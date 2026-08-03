@@ -8,7 +8,12 @@ const assert = require('node:assert');
 const message = 'Pusty numer karty Pusta data ważności karty Pusty CVV';
 let createBridge;
 const inlineNodes = [{
-    innerText: 'Błąd karty:\nPusty numer karty\nPusta data ważności karty\nPusty CVV'
+    innerText: 'Błąd karty:\nPusty numer karty\nPusta data ważności karty\nPusty CVV',
+    textContent: 'Błąd karty:\nPusty numer karty\nPusta data ważności karty\nPusty CVV',
+    nodeType: 1,
+    classList: { contains: () => false },
+    offsetParent: {},
+    closest: () => null
 }];
 let targetHidden = false;
 let added = 0;
@@ -19,11 +24,22 @@ vm.runInNewContext(
         'utf8'
     ),
     {
-        window: {},
+        window: {
+            getComputedStyle: () => ({
+                display: 'block',
+                visibility: 'visible',
+                opacity: '1',
+                position: 'static'
+            })
+        },
         document: {
-            querySelector: () => ({
+            querySelector: () => (targetHidden ? {
+                style: {display: 'none'},
+                classList: {contains: () => true},
+                querySelectorAll: () => inlineNodes
+            } : {
                 style: {display: 'block'},
-                classList: {contains: () => targetHidden},
+                classList: {contains: () => false},
                 querySelectorAll: () => inlineNodes
             })
         },
@@ -44,6 +60,15 @@ assert.strictEqual(
     'an error already rendered in payment content must not be duplicated'
 );
 assert.strictEqual(added, 0);
+assert.ok(
+    bridge.getInlineErrorText('payu_gateway_card').indexOf('Pusty numer karty') !== -1,
+    'getInlineErrorText must surface PayU .payu-msg content'
+);
+assert.strictEqual(
+    bridge.hasInlineError('payu_gateway_card', ''),
+    true,
+    'any visible payment error counts as inline when no specific message is provided'
+);
 
 targetHidden = true;
 assert.strictEqual(
@@ -52,6 +77,11 @@ assert.strictEqual(
     'the external message must remain as fallback when inline content is hidden'
 );
 assert.strictEqual(added, 1);
+assert.strictEqual(
+    bridge.getInlineErrorText('payu_gateway_card'),
+    '',
+    'hidden payment targets must not report inline errors'
+);
 
 let errorListener;
 let observedError = '';

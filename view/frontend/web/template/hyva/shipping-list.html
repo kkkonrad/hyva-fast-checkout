@@ -46,8 +46,15 @@
                         </span>
                     </div>
                 </div>
-                <div class="text-sm font-bold text-gray-900 shrink-0 pl-3"
-                     data-bind="text: $parent.formatPrice(method.amount)">
+                <div class="text-sm font-bold text-gray-900 shrink-0 pl-3 text-right">
+                    <span data-bind="text: $parent.formatShippingPrice(method)"></span>
+                    <!-- ko if: $parent.showShippingPriceExclSecondary(method) -->
+                    <span class="block text-xs font-normal text-gray-500 mt-0.5"
+                          data-bind="attr: {'data-label': $t('Excl. Tax')}">
+                        <span data-bind="i18n: 'Excl. Tax'"></span>:
+                        <span data-bind="text: $parent.formatShippingPriceExclSecondary(method)"></span>
+                    </span>
+                    <!-- /ko -->
                 </div>
             </label>
             <!-- InPost widget container placeholder -->

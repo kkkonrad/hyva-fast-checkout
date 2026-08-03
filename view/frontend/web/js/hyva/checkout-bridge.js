@@ -146,8 +146,12 @@ define([
             errorProcessor,
             fullScreenLoader,
             stepNavigator,
-            $t
+            $t,
+            mageValidation
         ) {
+            // mageValidation is loaded for side effects (validators); keep the param.
+            void mageValidation;
+
             checkoutCompatibility.ensureQuoteAddressCacheKeys(quote);
             checkoutCompatibility.ensureCheckoutDataInPostFallback(checkoutData);
 
@@ -935,6 +939,177 @@ define([
                  * user interaction is required and the payment area is ready while the
                  * shopper fills the form.
                  */
+                /**
+                 * Mount Magento stock sidebar summary (cart items + tax-aware totals)
+                 * into #fastcheckout-ko-summary-root. Layout includes Magento_Tax overrides.
+                 */
+                function startNativeSummaryComponents() {
+                    var summaryConfig;
+
+                    if (window.fastcheckoutNativeSummaryComponentsStarted) {
+                        return;
+                    }
+
+                    summaryConfig = checkoutLayoutBridge.checkoutSidebarSummary;
+                    if (!summaryConfig || !summaryConfig.component) {
+                        return;
+                    }
+
+                    window.fastcheckoutNativeSummaryComponentsStarted = true;
+
+                    // Ensure quote.totals is seeded before summary components read it.
+                    try {
+                        if (checkoutTotalsSync && typeof checkoutTotalsSync.syncFromConfig === 'function') {
+                            checkoutTotalsSync.syncFromConfig();
+                        }
+                    } catch (e) {
+                        // non-fatal
+                    }
+
+                    // Hyvä card already has the heading; keep Magento Tax total children.
+                    summaryConfig = $.extend(true, {}, summaryConfig);
+                    summaryConfig.config = $.extend(true, {}, summaryConfig.config || {}, {
+                        template: 'Kkkonrad_Fastcheckout/hyva/summary'
+                    });
+                    // uiLayout accepts template on the node and/or under config.
+                    summaryConfig.template = 'Kkkonrad_Fastcheckout/hyva/summary';
+
+                    app({
+                        components: {
+                            'checkout.sidebar.summary': summaryConfig
+                        }
+                    });
+
+                    window.setTimeout(function () {
+                        var ssr = document.querySelector('[data-fastcheckout-summary-ssr]');
+                        var root = document.getElementById('fastcheckout-ko-summary-root');
+
+                        if (root) {
+                            root.classList.remove('hidden');
+                            root.style.display = '';
+                        }
+                        if (ssr) {
+                            ssr.classList.add('hidden');
+                            ssr.setAttribute('aria-hidden', 'true');
+                        }
+                        window.dispatchEvent(
+                            new CustomEvent('fastcheckout:native-summary-started')
+                        );
+                    }, 0);
+                }
+
+                /**
+                 * Mount Magento_SalesRule payment discount (coupon) into the visible
+                 * Fastcheckout card. Stock OPC places it under payment.afterMethods.
+                 */
+                function startNativeDiscountComponent() {
+                    var discountConfig,
+                        root;
+
+                    if (window.fastcheckoutNativeDiscountStarted) {
+                        return;
+                    }
+
+                    root = document.getElementById('fastcheckout-ko-discount-root');
+                    if (!root) {
+                        return;
+                    }
+
+                    discountConfig = checkoutLayoutBridge.paymentDiscount;
+                    if (!discountConfig || !discountConfig.component) {
+                        // Fallback: still show a minimal native component when SalesRule
+                        // is present but layout extraction failed.
+                        discountConfig = {
+                            component: 'Magento_SalesRule/js/view/payment/discount',
+                            children: {
+                                errors: {
+                                    component: 'Magento_SalesRule/js/view/payment/discount-messages',
+                                    displayArea: 'messages',
+                                    sortOrder: 0
+                                }
+                            }
+                        };
+                    }
+
+                    window.fastcheckoutNativeDiscountStarted = true;
+
+                    discountConfig = $.extend(true, {}, discountConfig);
+                    discountConfig.config = $.extend(true, {}, discountConfig.config || {}, {
+                        template: 'Kkkonrad_Fastcheckout/hyva/payment/discount'
+                    });
+                    discountConfig.template = 'Kkkonrad_Fastcheckout/hyva/payment/discount';
+
+                    app({
+                        components: {
+                            'checkout.steps.billing-step.payment.afterMethods.discount': discountConfig
+                        }
+                    });
+
+                    window.setTimeout(function () {
+                        var ssr = document.querySelector('[data-fastcheckout-discount-ssr]');
+
+                        root.classList.remove('hidden');
+                        root.style.display = '';
+                        if (ssr) {
+                            ssr.classList.add('hidden');
+                            ssr.setAttribute('aria-hidden', 'true');
+                        }
+                        window.dispatchEvent(
+                            new CustomEvent('fastcheckout:native-discount-started')
+                        );
+                    }, 0);
+                }
+
+                /**
+                 * Order comment — Magento has no storefront OPC comment component;
+                 * mount a Magento-UI-style field that place-order still reads from DOM.
+                 */
+                function startOrderCommentComponent() {
+                    var root;
+
+                    if (window.fastcheckoutOrderCommentStarted) {
+                        return;
+                    }
+
+                    root = document.getElementById('fastcheckout-ko-comment-root');
+                    if (!root) {
+                        return;
+                    }
+
+                    window.fastcheckoutOrderCommentStarted = true;
+
+                    app({
+                        components: {
+                            'fastcheckout.order-comment': {
+                                component: 'Kkkonrad_Fastcheckout/js/view/order-comment',
+                                config: {
+                                    template: 'Kkkonrad_Fastcheckout/hyva/order-comment',
+                                    // PHP-translated via data-* on #fastcheckout-ko-comment-root
+                                    // (read in component initialize); keep English defaults here.
+                                    label: root.getAttribute('data-label') || 'Order Comment',
+                                    placeholder: root.getAttribute('data-placeholder') ||
+                                        'Optional comment for this order'
+                                },
+                                template: 'Kkkonrad_Fastcheckout/hyva/order-comment',
+                                label: root.getAttribute('data-label') || 'Order Comment',
+                                placeholder: root.getAttribute('data-placeholder') ||
+                                    'Optional comment for this order'
+                            }
+                        }
+                    });
+
+                    window.setTimeout(function () {
+                        var ssr = document.querySelector('[data-fastcheckout-comment-ssr]');
+
+                        root.classList.remove('hidden');
+                        root.style.display = '';
+                        if (ssr) {
+                            ssr.classList.add('hidden');
+                            ssr.setAttribute('aria-hidden', 'true');
+                        }
+                    }, 0);
+                }
+
                 function scheduleDeferredPaymentComponents() {
                     var queued = false,
                         startedAt = Date.now(),
@@ -955,6 +1130,12 @@ define([
                                 }
                             }
                         });
+                        // Summary / coupon / comment share the payment bootstrap window:
+                        // totals refresh after shipping-information; native Tax + SalesRule
+                        // components need the checkout registry.
+                        startNativeSummaryComponents();
+                        startNativeDiscountComponent();
+                        startOrderCommentComponent();
                         window.dispatchEvent(
                             new CustomEvent('fastcheckout:payment-components-started')
                         );
@@ -1010,6 +1191,30 @@ define([
                         }
                         registerCheckoutProviderAddressAttributeSync();
                     }, delay);
+                    window.setTimeout(function () {
+                        try {
+                            refreshNativePaymentActions();
+                        } catch (eRefreshPo) {
+                            // non-fatal during early boot
+                        }
+                    }, delay);
+                });
+
+                window.addEventListener('fastcheckout:payment-selection-changed', function () {
+                    window.setTimeout(function () {
+                        try {
+                            refreshNativePaymentActions();
+                        } catch (e) {
+                            // ignore
+                        }
+                    }, 50);
+                    window.setTimeout(function () {
+                        try {
+                            refreshNativePaymentActions();
+                        } catch (e2) {
+                            // ignore
+                        }
+                    }, 400);
                 });
 
                 function persistEmailToCheckoutData(email) {
@@ -2061,37 +2266,304 @@ define([
                     ));
                 }
 
-                function markNativePlaceOrderHidden(button) {
-                    if (!button || !button.classList) {
-                        return;
-                    }
-
-                    // Keep KO placeOrder controls out of form submit / Playwright :submit matches.
-                    if (!button.getAttribute('data-fastcheckout-original-type')) {
-                        button.setAttribute(
-                            'data-fastcheckout-original-type',
-                            button.getAttribute('type') || 'submit'
-                        );
-                    }
-                    button.setAttribute('type', 'button');
-                    button.setAttribute('tabindex', '-1');
-                    button.setAttribute('aria-hidden', 'true');
-                    button.setAttribute('disabled', 'disabled');
-                    button.classList.add('fastcheckout-native-place-order-hidden');
+                function getPlaceOrderHost() {
+                    return document.querySelector('[data-fastcheckout-place-order-host]') ||
+                        document.getElementById('fastcheckout-place-order-host');
                 }
 
-                function unmarkNativePlaceOrderHidden(button) {
-                    if (!button || !button.classList) {
+                function getPlaceOrderSsrButtons() {
+                    return Array.prototype.slice.call(
+                        document.querySelectorAll('[data-fastcheckout-place-order-ssr]')
+                    );
+                }
+
+                /**
+                 * Magento payment templates render .actions-toolbar with
+                 * button.action.primary.checkout (click: placeOrder). Host that
+                 * toolbar in the summary column and style it like FC primary.
+                 * Click still goes through Magento KO placeOrder after FC prep
+                 * (form submit → placeOrderViaKo → renderer.placeOrder).
+                 */
+                function wireNativePlaceOrderButton(button) {
+                    if (!button || button.getAttribute('data-fastcheckout-place-order-wired') === '1') {
                         return;
                     }
 
-                    var originalType = button.getAttribute('data-fastcheckout-original-type') || 'submit';
-                    button.setAttribute('type', originalType);
-                    button.removeAttribute('tabindex');
-                    button.removeAttribute('aria-hidden');
+                    button.setAttribute('data-fastcheckout-place-order-wired', '1');
+                    // Avoid double submit with the outer #co-checkout-form.
+                    button.setAttribute('type', 'button');
+                    button.classList.add(
+                        'btn',
+                        'btn-primary',
+                        'fastcheckout-place-order-btn',
+                        'fastcheckout-native-place-order-btn'
+                    );
                     button.removeAttribute('disabled');
-                    button.removeAttribute('data-fastcheckout-original-type');
-                    button.classList.remove('fastcheckout-native-place-order-hidden');
+                    button.removeAttribute('aria-hidden');
+                    button.removeAttribute('tabindex');
+
+                    // Capture phase: FC prep (shipping/billing) then Magento workflow.
+                    button.addEventListener('click', function (event) {
+                        var formEl = document.getElementById('co-checkout-form');
+
+                        // Let Magento KO click: placeOrder run only after FC prep.
+                        event.preventDefault();
+                        event.stopPropagation();
+                        if (typeof event.stopImmediatePropagation === 'function') {
+                            event.stopImmediatePropagation();
+                        }
+
+                        if (formEl && typeof formEl.requestSubmit === 'function') {
+                            formEl.requestSubmit();
+                        } else if (formEl) {
+                            formEl.dispatchEvent(
+                                new Event('submit', { bubbles: true, cancelable: true })
+                            );
+                        }
+                    }, true);
+                }
+
+                function resolveSelectedPaymentMethodCode() {
+                    var code = '',
+                        checked;
+
+                    try {
+                        code = getSelectedMethodCode() || '';
+                    } catch (e) {
+                        code = '';
+                    }
+
+                    if (code) {
+                        return String(code);
+                    }
+
+                    checked = document.querySelector(
+                        'input[name="payment_method"]:checked:not([disabled])'
+                    );
+                    if (checked && checked.value) {
+                        return String(checked.value);
+                    }
+
+                    return '';
+                }
+
+                function toolbarHasPlaceOrderButton(toolbar) {
+                    var buttons = getNativeCheckoutActionButtons(toolbar);
+
+                    if (!buttons.length) {
+                        return false;
+                    }
+
+                    return buttons.some(function (btn) {
+                        var handler = getKoClickHandlerName(btn);
+                        return !handler || handler === 'placeOrder';
+                    });
+                }
+
+                function findActivePlaceOrderToolbar() {
+                    var roots = getActivePaymentFormRoots(),
+                        found = null,
+                        methodCode = resolveSelectedPaymentMethodCode(),
+                        selectors = [],
+                        i;
+
+                    roots.some(function (root) {
+                        var toolbars = root.querySelectorAll('.actions-toolbar'),
+                            t;
+
+                        for (t = 0; t < toolbars.length; t += 1) {
+                            if (toolbarHasPlaceOrderButton(toolbars[t])) {
+                                found = toolbars[t];
+                                return true;
+                            }
+                        }
+
+                        return false;
+                    });
+
+                    // Prefer the KO target for the currently selected Fastcheckout radio.
+                    if (!found && methodCode) {
+                        document.querySelectorAll(
+                            '[data-fastcheckout-payment-method-ko-target="' +
+                            String(methodCode).replace(/"/g, '') +
+                            '"] .actions-toolbar'
+                        ).forEach(function (toolbar) {
+                            if (!found && toolbarHasPlaceOrderButton(toolbar)) {
+                                found = toolbar;
+                            }
+                        });
+                    }
+
+                    // Any place-order toolbar already in the summary host.
+                    if (!found) {
+                        document.querySelectorAll(
+                            '[data-fastcheckout-place-order-host] .actions-toolbar'
+                        ).forEach(function (toolbar) {
+                            if (!found && toolbarHasPlaceOrderButton(toolbar)) {
+                                found = toolbar;
+                            }
+                        });
+                    }
+
+                    // Match Magento payment[method] radio inside .payment-method to FC selection.
+                    if (!found && methodCode) {
+                        document.querySelectorAll(
+                            '.payment-method-content .actions-toolbar, ' +
+                            '#fastcheckout-ko-payment-root .actions-toolbar, ' +
+                            '[data-fastcheckout-payment-method-ko-target] .actions-toolbar'
+                        ).forEach(function (toolbar) {
+                            var methodEl,
+                                input;
+
+                            if (found || !toolbarHasPlaceOrderButton(toolbar)) {
+                                return;
+                            }
+
+                            methodEl = toolbar.closest('.payment-method');
+                            if (!methodEl) {
+                                // Toolbar may live under KO target without .payment-method wrapper.
+                                if (
+                                    toolbar.closest(
+                                        '[data-fastcheckout-payment-method-ko-target="' +
+                                        String(methodCode).replace(/"/g, '') + '"]'
+                                    )
+                                ) {
+                                    found = toolbar;
+                                }
+                                return;
+                            }
+                            input = methodEl.querySelector(
+                                'input[name="payment[method]"], input[type="radio"]'
+                            );
+                            if (
+                                input &&
+                                paymentMethodCodesEqual(
+                                    input.value || input.getAttribute('value') || input.id,
+                                    methodCode
+                                )
+                            ) {
+                                found = toolbar;
+                            }
+                        });
+                    }
+
+                    // Absolute last resort: any place-order toolbar (prefer one whose
+                    // Magento radio is checked / method is selected on quote).
+                    if (!found) {
+                        document.querySelectorAll('.actions-toolbar').forEach(function (toolbar) {
+                            var methodEl,
+                                input,
+                                isChecked = false;
+
+                            if (found || !toolbarHasPlaceOrderButton(toolbar)) {
+                                return;
+                            }
+                            if (toolbar.closest('[data-fastcheckout-place-order-host]')) {
+                                found = toolbar;
+                                return;
+                            }
+
+                            methodEl = toolbar.closest('.payment-method');
+                            input = methodEl
+                                ? methodEl.querySelector('input[type="radio"]')
+                                : null;
+                            if (input) {
+                                isChecked = !!input.checked ||
+                                    (methodCode &&
+                                        paymentMethodCodesEqual(
+                                            input.value || input.id,
+                                            methodCode
+                                        ));
+                            }
+                            if (isChecked || (!methodCode && !found)) {
+                                found = toolbar;
+                            }
+                        });
+                    }
+
+                    return found;
+                }
+
+                function setPlaceOrderSsrVisible(visible) {
+                    getPlaceOrderSsrButtons().forEach(function (btn) {
+                        if (!btn) {
+                            return;
+                        }
+                        if (visible) {
+                            btn.classList.remove('hidden', 'fastcheckout-ssr-place-order-hidden');
+                            // Desktop SSR only (summary.phtml uses hidden md:flex).
+                            btn.classList.add('md:flex');
+                            btn.removeAttribute('aria-hidden');
+                            btn.removeAttribute('tabindex');
+                            btn.style.removeProperty('display');
+                        } else {
+                            // Beat shared geometry CSS (display:flex !important) + Tailwind md:flex.
+                            btn.classList.add('hidden', 'fastcheckout-ssr-place-order-hidden');
+                            btn.classList.remove('md:flex', 'flex');
+                            btn.setAttribute('aria-hidden', 'true');
+                            btn.setAttribute('tabindex', '-1');
+                            btn.style.setProperty('display', 'none', 'important');
+                        }
+                    });
+                }
+
+                function mountNativePlaceOrderToolbar() {
+                    var host = getPlaceOrderHost(),
+                        toolbar = findActivePlaceOrderToolbar(),
+                        buttons;
+
+                    if (!host) {
+                        return false;
+                    }
+
+                    // Restore any previously hosted toolbars that belong to inactive methods
+                    // back into their payment content (leave host empty until we mount active).
+                    Array.prototype.slice.call(
+                        host.querySelectorAll('.actions-toolbar')
+                    ).forEach(function (hosted) {
+                        if (toolbar && hosted === toolbar) {
+                            return;
+                        }
+                        // Detach inactive hosted toolbars; payment panel re-renders on switch.
+                        if (hosted.parentNode === host) {
+                            hosted.parentNode.removeChild(hosted);
+                        }
+                    });
+
+                    if (!toolbar) {
+                        host.classList.add('hidden');
+                        setPlaceOrderSsrVisible(true);
+                        return false;
+                    }
+
+                    if (toolbar.parentNode !== host) {
+                        host.appendChild(toolbar);
+                    }
+
+                    host.classList.remove('hidden');
+                    // Host uses "hidden md:block" in markup — ensure it is shown on desktop.
+                    host.classList.remove('hidden');
+                    host.style.removeProperty('display');
+                    buttons = getNativeCheckoutActionButtons(toolbar);
+                    buttons.forEach(wireNativePlaceOrderButton);
+
+                    // Magento toolbar is live — hide FC SSR fallback completely (one Place Order).
+                    setPlaceOrderSsrVisible(false);
+
+                    toolbar.classList.remove('fastcheckout-actions-toolbar-hidden');
+                    toolbar.classList.add('fastcheckout-place-order-toolbar');
+
+                    // Magento binds enable/isPlaceOrderActionAllowed to billing —
+                    // re-allow after mount so the hosted button is clickable.
+                    try {
+                        if (typeof allowPlaceOrderOnActivePayment === 'function') {
+                            allowPlaceOrderOnActivePayment();
+                        }
+                    } catch (eAllow) {
+                        // non-fatal
+                    }
+
+                    return true;
                 }
 
                 function annotateNativePaymentActions(root) {
@@ -2099,33 +2571,38 @@ define([
                         return;
                     }
 
-                    Array.prototype.slice.call(root.querySelectorAll('.fastcheckout-native-place-order-hidden')).forEach(function (button) {
-                        unmarkNativePlaceOrderHidden(button);
-                    });
-                    Array.prototype.slice.call(root.querySelectorAll('.fastcheckout-actions-toolbar-hidden')).forEach(function (toolbar) {
-                        toolbar.classList.remove('fastcheckout-actions-toolbar-hidden');
-                    });
-
+                    // Custom gateway actions (not placeOrder) stay in the payment panel.
+                    // Stock placeOrder toolbars are relocated to the summary host.
                     Array.prototype.slice.call(root.querySelectorAll('.actions-toolbar')).forEach(function (toolbar) {
                         var actionButtons = getNativeCheckoutActionButtons(toolbar),
-                            visibleActionButtons;
+                            hasOnlyPlaceOrder,
+                            hasCustomAction;
 
-                        actionButtons.forEach(function (button) {
+                        if (!actionButtons.length) {
+                            return;
+                        }
+
+                        hasCustomAction = actionButtons.some(function (button) {
                             var handlerName = getKoClickHandlerName(button);
-
-                            if (!handlerName || handlerName === 'placeOrder') {
-                                markNativePlaceOrderHidden(button);
-                            }
+                            return handlerName && handlerName !== 'placeOrder';
+                        });
+                        hasOnlyPlaceOrder = actionButtons.every(function (button) {
+                            var handlerName = getKoClickHandlerName(button);
+                            return !handlerName || handlerName === 'placeOrder';
                         });
 
-                        visibleActionButtons = actionButtons.filter(function (button) {
-                            return !button.classList.contains('fastcheckout-native-place-order-hidden');
-                        });
-
-                        if (actionButtons.length && !visibleActionButtons.length) {
-                            toolbar.classList.add('fastcheckout-actions-toolbar-hidden');
+                        if (hasOnlyPlaceOrder && !hasCustomAction) {
+                            // Will be moved by mountNativePlaceOrderToolbar; keep visible for move.
+                            toolbar.classList.remove('fastcheckout-actions-toolbar-hidden');
+                            actionButtons.forEach(function (button) {
+                                button.classList.remove('fastcheckout-native-place-order-hidden');
+                                button.removeAttribute('disabled');
+                                button.removeAttribute('aria-hidden');
+                            });
                         }
                     });
+
+                    mountNativePlaceOrderToolbar();
                 }
 
                 function getRendererNativeSubmitAction(component) {
@@ -2785,6 +3262,7 @@ define([
                     getActivePaymentFormRoots().forEach(function (root) {
                         annotateNativePaymentActions(root);
                     });
+                    mountNativePlaceOrderToolbar();
                 }
 
                 function getActiveNativeSubmitActionName() {
@@ -4006,7 +4484,11 @@ define([
                         var settled = false,
                             errorSub = null,
                             messageErrorSub = null,
+                            asyncSafetyTimer = null,
                             placeOrderResult,
+                            defaultPaymentError = translateFastcheckoutMessage(
+                                'Please check the selected payment method and try again.'
+                            ),
                             fakeEvent = {
                                 preventDefault: function () {},
                                 stopPropagation: function () {},
@@ -4014,6 +4496,11 @@ define([
                             };
 
                         function cleanup() {
+                            if (asyncSafetyTimer) {
+                                window.clearTimeout(asyncSafetyTimer);
+                                asyncSafetyTimer = null;
+                            }
+
                             if (errorSub && typeof errorSub.dispose === 'function') {
                                 try {
                                     errorSub.dispose();
@@ -4033,15 +4520,38 @@ define([
                             messageErrorSub = null;
                         }
 
+                        function getVisiblePaymentInlineError() {
+                            if (
+                                paymentMessageBridge &&
+                                typeof paymentMessageBridge.getInlineErrorText === 'function'
+                            ) {
+                                return paymentMessageBridge.getInlineErrorText(methodCode) || '';
+                            }
+
+                            return '';
+                        }
+
                         function scrollActivePaymentIntoView() {
-                            var target;
+                            var target,
+                                inlineError;
 
                             try {
                                 target = document.querySelector(
                                     '[data-fastcheckout-payment-method-ko-target="' +
                                     String(methodCode || '').replace(/"/g, '') + '"]'
                                 ) || document.querySelector('.payment-method._active');
-                                if (target && typeof target.scrollIntoView === 'function') {
+
+                                // Prefer the painted gateway error so PayU .payu-msg is not
+                                // left below the fold under long agreement copy.
+                                if (target && typeof target.querySelector === 'function') {
+                                    inlineError = target.querySelector(
+                                        '.payu-msg, .msg__error, .message-error, .message.error, .field-error, [role="alert"]'
+                                    );
+                                }
+
+                                if (inlineError && typeof inlineError.scrollIntoView === 'function') {
+                                    inlineError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                } else if (target && typeof target.scrollIntoView === 'function') {
                                     target.scrollIntoView({ behavior: 'smooth', block: 'center' });
                                 }
                             } catch (e) {
@@ -4060,19 +4570,107 @@ define([
                             cleanup();
                             window.setTimeout(function () {
                                 text = paymentMessageBridge.normalize(message) ||
-                                    translateFastcheckoutMessage(
-                                        'Please check the selected payment method and try again.'
-                                );
+                                    getVisiblePaymentInlineError() ||
+                                    defaultPaymentError;
                                 err = new Error(text);
+                                // Always run handlePaymentError so the full-screen loader is
+                                // stopped; it skips the top banner when inline PayU errors exist.
                                 err.fastcheckoutInlineHandled = inlineHandled === true ||
                                     handlePaymentError(
                                         err,
                                         component && component.messageContainer || getBridgeMessageContainer(),
                                         methodCode
-                                    ) === true;
+                                    ) === true ||
+                                    !!getVisiblePaymentInlineError();
                                 scrollActivePaymentIntoView();
                                 reject(err);
                             }, 0);
+                        }
+
+                        function isGatewayAsyncInProgress() {
+                            try {
+                                // PayU (and similar) flip isPlaceOrderActionAllowed(false) while
+                                // tokenization / deferred placeOrder runs.
+                                return typeof component.isPlaceOrderActionAllowed === 'function' &&
+                                    component.isPlaceOrderActionAllowed() === false;
+                            } catch (e) {
+                                return false;
+                            }
+                        }
+
+                        /**
+                         * Magento renderers return false both for sync validation failures and
+                         * while async tokenization has started. Never leave the promise hanging:
+                         * settle from painted inline errors, component.validate(), focusable
+                         * fields, or a short async safety timeout for gateways like PayU.
+                         */
+                        function settleFalsePlaceOrderResult() {
+                            var inlineText;
+
+                            if (settled) {
+                                return;
+                            }
+
+                            inlineText = getVisiblePaymentInlineError();
+                            if (inlineText) {
+                                fail(inlineText, true);
+                                return;
+                            }
+
+                            if (
+                                component.secureFormError &&
+                                typeof component.secureFormError === 'function' &&
+                                component.secureFormError()
+                            ) {
+                                fail(component.secureFormError(), true);
+                                return;
+                            }
+
+                            if (focusFirstInvalidCheckoutField()) {
+                                fail(defaultPaymentError, true);
+                                return;
+                            }
+
+                            if (typeof component.validate === 'function' && !component.validate()) {
+                                // PayU agreement / stored-card checks fail without secureFormError.
+                                // Agreement text is already in the template when payuAgreement is false.
+                                inlineText = getVisiblePaymentInlineError();
+                                fail(inlineText || defaultPaymentError, !!inlineText);
+                                return;
+                            }
+
+                            if (isGatewayAsyncInProgress()) {
+                                // Tokenize in progress — secureFormError / deferred will settle.
+                                // Safety net if the gateway never reports (network hang, SDK drop).
+                                asyncSafetyTimer = window.setTimeout(function () {
+                                    var lateInline;
+
+                                    if (settled) {
+                                        return;
+                                    }
+
+                                    lateInline = getVisiblePaymentInlineError();
+                                    if (lateInline) {
+                                        fail(lateInline, true);
+                                        return;
+                                    }
+
+                                    if (
+                                        component.secureFormError &&
+                                        typeof component.secureFormError === 'function' &&
+                                        component.secureFormError()
+                                    ) {
+                                        fail(component.secureFormError(), true);
+                                        return;
+                                    }
+
+                                    fail(defaultPaymentError, false);
+                                }, 15000);
+                                return;
+                            }
+
+                            // Synchronous false with nothing painted (e.g. additionalValidators).
+                            fail(defaultPaymentError, false);
                         }
 
                         if (!component || typeof component.placeOrder !== 'function') {
@@ -4124,36 +4722,98 @@ define([
                             paymentMessageBridge.observeFailure(placeOrderResult, fail);
 
                             // Magento's default renderer returns false for synchronous inline
-                            // validation failures. Some hosted gateways also return false while
-                            // asynchronous tokenization has started, so only reject when the
-                            // active renderer actually painted an error.
+                            // validation failures. Hosted gateways also return false while
+                            // asynchronous tokenization has started.
                             if (placeOrderResult === false) {
-                                window.setTimeout(function () {
-                                    if (
-                                        !settled &&
-                                        focusFirstInvalidCheckoutField()
-                                    ) {
-                                        fail(
-                                            translateFastcheckoutMessage(
-                                                'Please check the selected payment method and try again.'
-                                            ),
-                                            true
-                                        );
-                                    }
-                                }, 0);
+                                // Let KO paint agreement / secureFormError nodes before reading DOM.
+                                window.setTimeout(settleFalsePlaceOrderResult, 50);
                             }
 
-                            // Keep the observers until an error or document navigation.
-                            // Slow hosted fields can report validation after 30 seconds;
-                            // the browser releases these subscriptions with the page.
+                            // Keep the observers until an error, safety timeout, or navigation.
                         } catch (placeErr) {
                             fail(placeErr && placeErr.message ? placeErr.message : placeErr);
                         }
                     });
                 }
 
+                /**
+                 * Ensure quote.shippingAddress has countryId so Magento
+                 * PaymentMethodManagement::set does not throw "shipping address is missing".
+                 * Seeds from the shipping form, default destination, or checkoutConfig.
+                 *
+                 * @returns {Boolean}
+                 */
+                function ensureShippingCountryOnQuote() {
+                    var shipping = quote && typeof quote.shippingAddress === 'function'
+                            ? quote.shippingAddress()
+                            : null,
+                        country = '',
+                        formCountry,
+                        field;
+
+                    if (shipping) {
+                        country = String(shipping.countryId || shipping.country_id || '').trim();
+                    }
+                    if (country) {
+                        return true;
+                    }
+
+                    field = document.querySelector(
+                        '.fastcheckout-native-shipping-address select[name="country_id"], ' +
+                        'select[name="country_id"]'
+                    );
+                    formCountry = field && field.value ? String(field.value).trim() : '';
+                    country = formCountry ||
+                        String(
+                            (window.fastcheckoutDefaultDestination &&
+                                window.fastcheckoutDefaultDestination.countryId) ||
+                            (window.checkoutConfig && window.checkoutConfig.defaultCountryId) ||
+                            ''
+                        ).trim();
+
+                    if (!country) {
+                        return false;
+                    }
+
+                    if (shipping && typeof shipping === 'object') {
+                        shipping.countryId = country;
+                        shipping.country_id = country;
+                        try {
+                            quote.shippingAddress(shipping);
+                        } catch (e) {
+                            // ignore
+                        }
+                        return true;
+                    }
+
+                    // No quote address object yet — try building from form/default seed.
+                    try {
+                        if (typeof ensureQuoteShippingAddressForPlaceOrder === 'function') {
+                            ensureQuoteShippingAddressForPlaceOrder();
+                        }
+                    } catch (e2) {
+                        // ignore
+                    }
+
+                    shipping = quote && typeof quote.shippingAddress === 'function'
+                        ? quote.shippingAddress()
+                        : null;
+                    if (shipping) {
+                        shipping.countryId = shipping.countryId || country;
+                        shipping.country_id = shipping.country_id || country;
+                        try {
+                            quote.shippingAddress(shipping);
+                        } catch (e3) {
+                            // ignore
+                        }
+                    }
+
+                    return !!(shipping && (shipping.countryId || shipping.country_id));
+                }
+
                 window.fastcheckoutHyvaPayment = $.extend(window.fastcheckoutHyvaPayment || {}, {
                         registerValidator: registerPaymentValidator,
+                        ensureShippingCountryOnQuote: ensureShippingCountryOnQuote,
                         clearUserPaymentSelection: function () {
                             if (paymentMethodSync.clearUserPaymentSelection) {
                                 paymentMethodSync.clearUserPaymentSelection();

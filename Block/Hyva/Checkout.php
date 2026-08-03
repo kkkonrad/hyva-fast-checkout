@@ -695,6 +695,10 @@ class Checkout extends Template
      * Return direct children declared under the standard Magento payment component
      * for regions used outside the payment renderer list.
      *
+     * Discount (coupon form) is extracted separately via getPaymentDiscountComponent()
+     * and mounted in the Fastcheckout summary column — strip it here so it is not
+     * left only in the hidden payment root.
+     *
      * @return array
      */
     public function getPaymentRegionChildren()
@@ -707,7 +711,39 @@ class Checkout extends Template
             }
         }
 
+        if (
+            isset($result['afterMethods']['children']['discount']) &&
+            is_array($result['afterMethods']['children']['discount'])
+        ) {
+            // Deep-copy before mutating so the processed layout cache stays intact.
+            $result['afterMethods'] = $this->deepCopyArray($result['afterMethods']);
+            unset($result['afterMethods']['children']['discount']);
+        }
+
         return $result;
+    }
+
+    /**
+     * Magento_SalesRule payment discount (coupon) component from native jsLayout.
+     * Mounted in the Fastcheckout summary column with FC styling.
+     *
+     * @return array
+     */
+    public function getPaymentDiscountComponent(): array
+    {
+        $discount = $this->getPaymentComponent()
+            ['children']['afterMethods']['children']['discount'] ?? [];
+
+        return is_array($discount) ? $discount : [];
+    }
+
+    /**
+     * @param array $value
+     * @return array
+     */
+    private function deepCopyArray(array $value): array
+    {
+        return json_decode(json_encode($value), true) ?: [];
     }
 
     /**
@@ -858,6 +894,21 @@ class Checkout extends Template
         unset($children['shipping-step'], $children['billing-step']);
 
         return $children;
+    }
+
+    /**
+     * Native Magento checkout sidebar summary (cart items + totals) from processed
+     * jsLayout, including Magento_Tax component overrides. Used by Fastcheckout to
+     * mount stock KO summary instead of a PHP-only totals renderer.
+     *
+     * @return array
+     */
+    public function getCheckoutSidebarSummary(): array
+    {
+        $summary = $this->getProcessedCheckoutLayout()
+            ['components']['checkout']['children']['sidebar']['children']['summary'] ?? [];
+
+        return is_array($summary) ? $summary : [];
     }
 
     /**
@@ -1374,7 +1425,9 @@ class Checkout extends Template
      */
     public function getItemRowTotal(Item $item)
     {
-        if ($this->displayCartPriceInclTax()) {
+        // Magento cart "both" still has a primary amount; prefer incl when configured
+        // for incl/both (standard Magento item price renderer shows incl first for both).
+        if ($this->displayCartPriceInclTax() || $this->displayCartBothPrices()) {
             $rowTotal = $item->getRowTotalInclTax();
         } else {
             $rowTotal = $item->getRowTotal();
@@ -1388,9 +1441,10 @@ class Checkout extends Template
     }
 
     /**
-     * Get summary totals dynamically collected, sorted, and translated based on store configuration
+     * Get summary totals dynamically collected, sorted, and translated based on store configuration.
+     * Honors Magento tax/cart_display for subtotal, shipping and grand total (excl/incl/both).
      *
-     * @return array
+     * @return array<int, array{code: string, label: string|\Magento\Framework\Phrase, value: float, strong: bool}>
      */
     public function getSummaryTotals()
     {
@@ -1402,28 +1456,266 @@ class Checkout extends Template
         if (!$quote->getTotalsCollectedFlag()) {
             $quote->collectTotals();
         }
-        
+
         $totals = [];
-        foreach ($quote->getTotals() as $code => $total) {
-            $value = (float)$total->getValue();
-            
-            // Skip zero values for optional segments (like tax, discount, fees),
-            // but always show subtotal and grand total even if zero.
-            if ($value == 0.0 && !in_array($code, ['subtotal', 'grand_total'])) {
-                continue;
-            }
-            
-            $totals[] = [
-                'code' => $code,
-                'label' => $total->getTitle(),
-                'value' => $value,
-                'strong' => ($total->getArea() === 'footer' || $code === 'grand_total'),
-            ];
+        $taxTotalValue = 0.0;
+        $quoteTotals = $quote->getTotals();
+        if (isset($quoteTotals['tax'])) {
+            $taxTotalValue = (float)$quoteTotals['tax']->getValue();
         }
-        
+
+        foreach ($quoteTotals as $code => $total) {
+            foreach ($this->buildSummaryTotalRows((string)$code, $total, $taxTotalValue) as $row) {
+                $value = (float)$row['value'];
+                // Skip zero values for optional segments (like tax, discount, fees),
+                // but always show subtotal and grand total even if zero.
+                if ($value == 0.0 && !in_array($row['code'], ['subtotal', 'subtotal_excl', 'subtotal_incl', 'grand_total', 'grand_total_excl', 'grand_total_incl'], true)) {
+                    continue;
+                }
+                $totals[] = $row;
+            }
+        }
+
         $this->summaryTotalsCache = $totals;
 
         return $this->summaryTotalsCache;
+    }
+
+    /**
+     * Expand one Magento quote total into one or more display rows per tax cart settings.
+     *
+     * @param string $code
+     * @param \Magento\Quote\Model\Quote\Address\Total|\Magento\Framework\DataObject $total
+     * @param float $taxTotalValue
+     * @return array<int, array{code: string, label: string|\Magento\Framework\Phrase, value: float, strong: bool}>
+     */
+    public function buildSummaryTotalRows(string $code, $total, float $taxTotalValue = 0.0): array
+    {
+        $title = $total->getTitle();
+        $strong = ($total->getArea() === 'footer' || $code === 'grand_total');
+        $value = (float)$total->getValue();
+        $taxConfig = $this->getTaxConfig();
+
+        if ($code === 'subtotal') {
+            // Magento Tax::fetch for both/incl sets value=INCL and value_excl_tax=excl
+            // (see Magento\Tax\Model\Sales\Total\Quote\Tax). Cart uses getValueExclTax().
+            $excl = $this->resolveSubtotalExclTax($total);
+            $incl = $this->resolveSubtotalInclTax($total);
+            if ($taxConfig && $taxConfig->displayCartSubtotalBoth()) {
+                return [
+                    [
+                        'code' => 'subtotal_excl',
+                        'label' => __('%1 (Excl. Tax)', $title),
+                        'value' => $excl,
+                        'strong' => false,
+                    ],
+                    [
+                        'code' => 'subtotal_incl',
+                        'label' => __('%1 (Incl. Tax)', $title),
+                        'value' => $incl,
+                        'strong' => false,
+                    ],
+                ];
+            }
+            if ($taxConfig && $taxConfig->displayCartSubtotalInclTax()) {
+                return [[
+                    'code' => 'subtotal',
+                    'label' => $title,
+                    'value' => $incl,
+                    'strong' => false,
+                ]];
+            }
+
+            return [[
+                'code' => 'subtotal',
+                'label' => $title,
+                'value' => $excl,
+                'strong' => false,
+            ]];
+        }
+
+        if ($code === 'shipping') {
+            // Shipping total keeps getValue() as excl; incl is shipping_incl_tax
+            // (Magento\Tax\Block\Checkout\Shipping::getShippingExcludeTax / IncludeTax).
+            $excl = $this->resolveShippingExclTax($total);
+            $incl = $this->resolveShippingInclTax($total);
+            if ($taxConfig && $taxConfig->displayCartShippingBoth()) {
+                return [
+                    [
+                        'code' => 'shipping_excl',
+                        'label' => __('%1 (Excl. Tax)', $title),
+                        'value' => $excl,
+                        'strong' => false,
+                    ],
+                    [
+                        'code' => 'shipping_incl',
+                        'label' => __('%1 (Incl. Tax)', $title),
+                        'value' => $incl,
+                        'strong' => false,
+                    ],
+                ];
+            }
+            if ($taxConfig && $taxConfig->displayCartShippingInclTax()) {
+                return [[
+                    'code' => 'shipping',
+                    'label' => $title,
+                    'value' => $incl,
+                    'strong' => false,
+                ]];
+            }
+
+            return [[
+                'code' => 'shipping',
+                'label' => $title,
+                'value' => $excl,
+                'strong' => false,
+            ]];
+        }
+
+        if ($code === 'grand_total') {
+            $grandIncl = $value;
+            if ($taxConfig && $taxConfig->displayCartTaxWithGrandTotal() && $grandIncl != 0.0) {
+                $grandExcl = max($grandIncl - $taxTotalValue, 0.0);
+
+                return [
+                    [
+                        'code' => 'grand_total_incl',
+                        'label' => __('Grand Total Incl. Tax'),
+                        'value' => $grandIncl,
+                        'strong' => true,
+                    ],
+                    [
+                        'code' => 'grand_total_excl',
+                        'label' => __('Grand Total Excl. Tax'),
+                        'value' => $grandExcl,
+                        'strong' => true,
+                    ],
+                ];
+            }
+
+            return [[
+                'code' => 'grand_total',
+                'label' => $title,
+                'value' => $grandIncl,
+                'strong' => true,
+            ]];
+        }
+
+        return [[
+            'code' => $code,
+            'label' => $title,
+            'value' => $value,
+            'strong' => $strong,
+        ]];
+    }
+
+    /**
+     * Magento Tax\Model\Config from the injected TaxHelper (null-safe).
+     *
+     * @return \Magento\Tax\Model\Config|null
+     */
+    public function getTaxConfig()
+    {
+        $helper = $this->getTaxHelper();
+        if (!$helper || !method_exists($helper, 'getConfig')) {
+            return null;
+        }
+
+        return $helper->getConfig();
+    }
+
+    /**
+     * Subtotal excluding tax.
+     * Magento Tax::fetch (both/incl) sets value=INCL and value_excl_tax=excl.
+     * Excl-only collectors leave value=excl without value_excl_tax.
+     *
+     * @param \Magento\Quote\Model\Quote\Address\Total|\Magento\Framework\DataObject $total
+     * @return float
+     */
+    public function resolveSubtotalExclTax($total): float
+    {
+        if (method_exists($total, 'getValueExclTax')) {
+            $excl = $total->getValueExclTax();
+            if ($excl !== null && $excl !== '') {
+                return (float)$excl;
+            }
+        }
+        $excl = $total->getData('value_excl_tax');
+        if ($excl !== null && $excl !== '') {
+            return (float)$excl;
+        }
+
+        // Excl-only mode: getValue() is excl. Both/incl always sets value_excl_tax above.
+        return (float)$total->getValue();
+    }
+
+    /**
+     * Subtotal including tax.
+     * Magento both/incl: value and value_incl_tax are INCL.
+     *
+     * @param \Magento\Quote\Model\Quote\Address\Total|\Magento\Framework\DataObject $total
+     * @return float
+     */
+    public function resolveSubtotalInclTax($total): float
+    {
+        if (method_exists($total, 'getValueInclTax')) {
+            $incl = $total->getValueInclTax();
+            if ($incl !== null && $incl !== '') {
+                return (float)$incl;
+            }
+        }
+        $incl = $total->getData('value_incl_tax');
+        if ($incl === null || $incl === '') {
+            $incl = $total->getData('subtotal_incl_tax');
+        }
+        if ($incl === null || $incl === '') {
+            $quote = $this->getQuote();
+            $address = $quote ? $quote->getShippingAddress() : null;
+            if ($address && $address->getSubtotalInclTax() !== null && $address->getSubtotalInclTax() !== '') {
+                $incl = $address->getSubtotalInclTax();
+            }
+        }
+        if ($incl !== null && $incl !== '') {
+            return (float)$incl;
+        }
+
+        // Both/incl Magento fetch stores INCL in value when value_incl_tax missing.
+        return (float)$total->getValue();
+    }
+
+    /**
+     * Shipping excl tax — Magento total value stays excl for shipping.
+     *
+     * @param \Magento\Quote\Model\Quote\Address\Total|\Magento\Framework\DataObject $total
+     * @return float
+     */
+    public function resolveShippingExclTax($total): float
+    {
+        return (float)$total->getValue();
+    }
+
+    /**
+     * @param \Magento\Quote\Model\Quote\Address\Total|\Magento\Framework\DataObject $total
+     * @return float
+     */
+    public function resolveShippingInclTax($total): float
+    {
+        $incl = null;
+        if (method_exists($total, 'getShippingInclTax')) {
+            $incl = $total->getShippingInclTax();
+        }
+        if ($incl === null || $incl === '') {
+            $incl = $total->getData('shipping_incl_tax');
+        }
+        if ($incl === null || $incl === '') {
+            $quote = $this->getQuote();
+            $address = $quote ? $quote->getShippingAddress() : null;
+            if ($address) {
+                $incl = $address->getShippingInclTax();
+            }
+        }
+
+        return $incl !== null && $incl !== '' ? (float)$incl : (float)$total->getValue();
     }
 
     /**
@@ -1435,7 +1727,7 @@ class Checkout extends Template
     }
 
     /**
-     * @return \Magento\Tax\Helper\Data
+     * @return \Magento\Tax\Helper\Data|null
      */
     public function getTaxHelper()
     {
@@ -1443,10 +1735,132 @@ class Checkout extends Template
     }
 
     /**
-     * @return bool
+     * Magento tax/cart/display/price = Including Tax
      */
     public function displayCartPriceInclTax(): bool
     {
-        return (bool)$this->getTaxHelper()->displayCartPriceInclTax();
+        $helper = $this->getTaxHelper();
+
+        return $helper ? (bool)$helper->displayCartPriceInclTax() : false;
+    }
+
+    /**
+     * Magento tax/cart/display/price = Excluding Tax
+     */
+    public function displayCartPriceExclTax(): bool
+    {
+        $helper = $this->getTaxHelper();
+
+        return $helper ? (bool)$helper->displayCartPriceExclTax() : true;
+    }
+
+    /**
+     * Magento tax/cart/display/price = Including and Excluding Tax
+     */
+    public function displayCartBothPrices(): bool
+    {
+        $helper = $this->getTaxHelper();
+
+        return $helper ? (bool)$helper->displayCartBothPrices() : false;
+    }
+
+    /**
+     * Magento tax/cart/display/shipping = Excluding Tax
+     */
+    public function displayShippingPriceExclTax(): bool
+    {
+        $helper = $this->getTaxHelper();
+
+        return $helper ? (bool)$helper->displayShippingPriceExcludingTax() : true;
+    }
+
+    /**
+     * Magento tax/cart/display/shipping = Including and Excluding Tax
+     */
+    public function displayShippingBothPrices(): bool
+    {
+        $helper = $this->getTaxHelper();
+
+        return $helper ? (bool)$helper->displayShippingBothPrices() : false;
+    }
+
+    /**
+     * @param Item $item
+     * @return float
+     */
+    public function getItemRowTotalExclTax(Item $item): float
+    {
+        return (float)($item->getRowTotal() ?? 0);
+    }
+
+    /**
+     * @param Item $item
+     * @return float
+     */
+    public function getItemRowTotalInclTax(Item $item): float
+    {
+        $incl = $item->getRowTotalInclTax();
+        if ($incl === null || $incl === '') {
+            return $this->getItemRowTotalExclTax($item);
+        }
+
+        return (float)$incl;
+    }
+
+    /**
+     * Rate amount excluding tax (Magento TaxHelper::getShippingPrice).
+     *
+     * @param \Magento\Quote\Model\Quote\Address\Rate|\Magento\Framework\DataObject $rate
+     * @return float
+     */
+    public function getShippingRateAmountExclTax($rate): float
+    {
+        return $this->getShippingRateAmountWithTaxFlag($rate, false);
+    }
+
+    /**
+     * Rate amount including tax (Magento TaxHelper::getShippingPrice).
+     *
+     * @param \Magento\Quote\Model\Quote\Address\Rate|\Magento\Framework\DataObject $rate
+     * @return float
+     */
+    public function getShippingRateAmountInclTax($rate): float
+    {
+        return $this->getShippingRateAmountWithTaxFlag($rate, true);
+    }
+
+    /**
+     * Primary shipping price amount for the current Magento display setting.
+     *
+     * @param \Magento\Quote\Model\Quote\Address\Rate|\Magento\Framework\DataObject $rate
+     * @return float
+     */
+    public function getShippingRateDisplayAmount($rate): float
+    {
+        if ($this->displayShippingPriceExclTax()) {
+            return $this->getShippingRateAmountExclTax($rate);
+        }
+
+        return $this->getShippingRateAmountInclTax($rate);
+    }
+
+    /**
+     * @param \Magento\Quote\Model\Quote\Address\Rate|\Magento\Framework\DataObject $rate
+     * @param bool $includingTax
+     * @return float
+     */
+    private function getShippingRateAmountWithTaxFlag($rate, bool $includingTax): float
+    {
+        $price = (float)($rate && method_exists($rate, 'getPrice') ? $rate->getPrice() : 0);
+        $helper = $this->getTaxHelper();
+        if (!$helper) {
+            return $price;
+        }
+
+        $quote = $this->getQuote();
+        $address = $quote ? $quote->getShippingAddress() : null;
+        $ctc = $quote ? $quote->getCustomerTaxClassId() : null;
+
+        return (float)$helper->getShippingPrice($price, $includingTax, $address, $ctc);
     }
 }

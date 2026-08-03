@@ -24,6 +24,8 @@ $shippingAddressChildren = $block->getShippingAddressChildren();
 $shippingAddress = $block->getShippingAddressComponentConfig();
 $checkoutProvider = $block->getCheckoutProviderConfig();
 $checkoutStepChildren = $block->getCheckoutStepChildren();
+$checkoutSidebarSummary = $block->getCheckoutSidebarSummary();
+$paymentDiscount = $block->getPaymentDiscountComponent();
 $layoutScripts = $block->getCheckoutLayoutScripts();
 
 if (
@@ -36,6 +38,8 @@ if (
     empty($shippingListChildren) &&
     empty($shippingAddressChildren) &&
     empty($checkoutStepChildren) &&
+    empty($checkoutSidebarSummary) &&
+    empty($paymentDiscount) &&
     empty($layoutScripts['modules']) &&
     empty($layoutScripts['external'])
 ) {
@@ -55,6 +59,8 @@ $mageInitConfig = [
     'shippingAddress' => $shippingAddress,
     'checkoutProvider' => $checkoutProvider,
     'checkoutStepChildren' => $checkoutStepChildren,
+    'checkoutSidebarSummary' => $checkoutSidebarSummary,
+    'paymentDiscount' => $paymentDiscount,
     'layoutScripts' => $layoutScripts['modules'] ?? [],
     'layoutExternalScripts' => $layoutScripts['external'] ?? [],
     'scope' => 'fastcheckoutHyvaPaymentRenderers'
@@ -146,10 +152,54 @@ foreach ($layoutAssets['css'] as $cssAsset) {
     // Keep a single serialized checkoutConfig in the HTML. The bridge receives
     // the same object by reference instead of embedding the large payload twice.
     config.checkoutConfig = window.checkoutConfig;
-    var staticBaseUrl = '<?= $escaper->escapeJs($block->getViewFileUrl('/')) ?>';
+    // Prefer the same static base detection as requirejs-base.js (theme/locale from a
+    // published CSS link). getViewFileUrl('/') can omit the trailing slash or resolve
+    // to frontend/_view/... which breaks text! template loads (Magento_Tax summary).
+    var staticBaseUrlFallback = '<?= $escaper->escapeJs($block->getViewFileUrl('/')) ?>';
     var started = false;
 
-    window.LOCALE = window.LOCALE || '<?= $escaper->escapeJs($block->getLocaleCode()) ?>';
+    /**
+     * RequireJS baseUrl must end with "/" and point at frontend/<Vendor>/<theme>/<locale>/.
+     *
+     * @returns {String}
+     */
+    function resolveStaticBaseUrl() {
+        var asset = document.querySelector('link[href*="/frontend/"], script[src*="/frontend/"]');
+        var href = asset && (asset.href || asset.src) || '';
+        var match = href.match(/^(.*\/frontend\/[^/]+\/[^/]+\/[^/]+\/)/);
+        var existing;
+        var base;
+
+        if (match) {
+            return match[1];
+        }
+
+        try {
+            existing = window.require && window.require.s &&
+                window.require.s.contexts._ &&
+                window.require.s.contexts._.config &&
+                window.require.s.contexts._.config.baseUrl;
+        } catch (e) {
+            existing = '';
+        }
+
+        if (existing && /\/frontend\/[^/]+\/[^/]+\/[^/]+\/?$/.test(existing) && existing.indexOf('/_view/') === -1) {
+            return existing.replace(/\/?$/, '/');
+        }
+
+        base = String(staticBaseUrlFallback || '').replace(/\/?$/, '/');
+        if (base.indexOf('/_view/') !== -1) {
+            // Last resort: leave whatever requirejs-base already set (if any).
+            return existing ? String(existing).replace(/\/?$/, '/') : base;
+        }
+
+        return base;
+    }
+
+    // Magento stock sets LOCALE via LocaleFormatter::getLocaleJs() (BCP 47: pl-PL).
+    // Underscore form (pl_PL) breaks Number#toLocaleString / priceUtils.formatPriceLocale
+    // and cascades into Magento_Tax summary template render failures.
+    window.LOCALE = window.LOCALE || '<?= $escaper->escapeJs(str_replace('_', '-', $block->getLocaleCode())) ?>';
     window.BASE_URL = window.BASE_URL || '<?= $escaper->escapeJs($block->getBaseUrl()) ?>';
 
     function initFullCheckoutBridge() {
@@ -182,7 +232,7 @@ foreach ($layoutAssets['css'] as $cssAsset) {
         started = true;
         window.fastcheckoutShippingBootstrapRequested = true;
         window.require.config({
-            baseUrl: staticBaseUrl
+            baseUrl: resolveStaticBaseUrl()
         });
 
         window.require(

@@ -12,8 +12,14 @@ const path = require('path');
 const vm = require('vm');
 
 const root = path.resolve(__dirname, '../../..');
-const scratch = process.env.FC_SCRATCH || '/tmp/grok-goal-2db32d4062a8/implementer';
+const scratch = process.env.FC_SCRATCH || '/tmp/grok-goal-72df722486d6/implementer';
 const logLines = [];
+
+try {
+    fs.mkdirSync(scratch, { recursive: true });
+} catch (e) {
+    // ignore — write may still succeed if the dir already exists
+}
 
 function log(msg) {
     logLines.push(msg);

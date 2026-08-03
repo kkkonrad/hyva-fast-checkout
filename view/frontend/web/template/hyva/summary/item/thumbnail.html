@@ -1,0 +1,18 @@
+<!--
+/**
+ * Fixed 56×56 thumbnail to match previous Fastcheckout SSR product image.
+ */
+-->
+<span class="product-image-container fastcheckout-summary-thumb">
+    <span class="product-image-wrapper">
+        <img class="product-image-photo"
+             data-bind="attr: {
+                 src: getSrc($parents[1]),
+                 alt: getAlt($parents[1]),
+                 title: getAlt($parents[1]),
+                 width: 56,
+                 height: 56
+             }"
+             loading="lazy"/>
+    </span>
+</span>
