@@ -1298,6 +1298,80 @@
     background: #fef2f2;
 }
 
+/*
+ * Magento payment place-order toolbar hosted in the summary card.
+ * Markup: .actions-toolbar > .primary > button.action.primary.checkout
+ */
+#fastcheckout-checkout .fastcheckout-place-order-host,
+#fastcheckout-checkout .fastcheckout-place-order-section {
+    width: 100%;
+}
+
+#fastcheckout-checkout .fastcheckout-place-order-host .actions-toolbar,
+#fastcheckout-checkout .fastcheckout-place-order-toolbar {
+    display: block !important;
+    width: 100%;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-block-start-width: 0 !important;
+    margin-block-start: 0 !important;
+    padding-block-start: 0 !important;
+    box-shadow: none !important;
+    flex-direction: column;
+    gap: 0;
+}
+
+#fastcheckout-checkout .fastcheckout-place-order-host .actions-toolbar .primary,
+#fastcheckout-checkout .fastcheckout-place-order-toolbar .primary {
+    display: block;
+    width: 100%;
+    margin: 0;
+    float: none;
+}
+
+#fastcheckout-checkout .fastcheckout-place-order-host .action.primary.checkout,
+#fastcheckout-checkout .fastcheckout-place-order-host .fastcheckout-native-place-order-btn,
+#fastcheckout-checkout .fastcheckout-place-order-toolbar .action.primary.checkout {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100% !important;
+    min-height: 3rem;
+    padding: 0.75rem 1rem !important;
+    margin: 0 !important;
+    border-radius: var(--radius-lg, 0.5rem);
+    border-width: 0 !important;
+    font-size: 1rem;
+    font-weight: 500;
+    line-height: 1.5;
+    cursor: pointer;
+    /* Match Hyvä .btn-primary */
+    background-color: var(--color-primary) !important;
+    color: var(--color-on-primary, #fff) !important;
+    box-shadow: none;
+}
+
+#fastcheckout-checkout .fastcheckout-place-order-host .action.primary.checkout:hover,
+#fastcheckout-checkout .fastcheckout-place-order-host .fastcheckout-native-place-order-btn:hover {
+    background-color: var(--color-primary-lighter, var(--color-primary)) !important;
+}
+
+#fastcheckout-checkout .fastcheckout-place-order-host .action.primary.checkout.disabled,
+#fastcheckout-checkout .fastcheckout-place-order-host .action.primary.checkout:disabled,
+#fastcheckout-checkout .fastcheckout-place-order-host .fastcheckout-native-place-order-btn:disabled,
+#fastcheckout-checkout .fastcheckout-place-order-host .action.primary.checkout[data-fastcheckout-processing='true'] {
+    opacity: 1;
+    cursor: wait;
+    pointer-events: none;
+}
+
+#fastcheckout-checkout .fastcheckout-place-order-host .action.primary.checkout span {
+    color: inherit;
+    font: inherit;
+}
+
 /* Order comment (Magento-style field) */
 #fastcheckout-checkout .fastcheckout-ko-comment-root,
 #fastcheckout-checkout .fastcheckout-native-comment {

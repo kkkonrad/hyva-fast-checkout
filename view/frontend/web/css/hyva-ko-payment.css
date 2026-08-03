@@ -34,6 +34,19 @@
 }
 
 /*
+ * Magento place-order toolbar lives in the summary host after relocate.
+ * Hide leftover empty toolbars still inside payment panels.
+ */
+#fastcheckout-checkout .payment-method-content > .actions-toolbar:not(.fastcheckout-place-order-toolbar) {
+    /* Hosted toolbar is moved out; any remaining pure place-order toolbar is hidden
+       until mount runs (avoids double buttons in the payment card). */
+}
+
+#fastcheckout-checkout .payment-method-content > .actions-toolbar.fastcheckout-place-order-source-hidden {
+    display: none !important;
+}
+
+/*
  * Magento payment templates put .payment-method-billing-address at the top of
  * .payment-method-content. Reorder with flex so method-specific content
  * (instructions, card fields, PO number, etc.) comes first, then billing,

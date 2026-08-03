@@ -72,8 +72,13 @@ foreach ($clientMessagePhrases as $phrase) {
             el.classList.toggle('hidden', !isProcessing);
             el.setAttribute('aria-hidden', isProcessing ? 'false' : 'true');
         });
-        form.querySelectorAll('[data-fastcheckout-place-order], [data-fastcheckout-place-order-mobile]').forEach(function (btn) {
-            var label = btn.querySelector('[data-fastcheckout-place-order-label]');
+        form.querySelectorAll(
+            '[data-fastcheckout-place-order], ' +
+            '[data-fastcheckout-place-order-mobile], ' +
+            '.fastcheckout-native-place-order-btn, ' +
+            '[data-fastcheckout-place-order-host] .action.primary.checkout'
+        ).forEach(function (btn) {
+            var label = btn.querySelector('[data-fastcheckout-place-order-label], span');
 
             if (isProcessing) {
                 var buttonStyle = window.getComputedStyle(btn);
@@ -97,10 +102,15 @@ foreach ($clientMessagePhrases as $phrase) {
             btn.classList.toggle('pointer-events-none', btn.disabled);
             btn.setAttribute('aria-disabled', btn.disabled ? 'true' : 'false');
 
-            if (label) {
+            if (label && label.hasAttribute && label.hasAttribute('data-fastcheckout-ready-text')) {
                 label.textContent = isProcessing
                     ? label.getAttribute('data-fastcheckout-processing-text')
                     : label.getAttribute('data-fastcheckout-ready-text');
+            } else if (label && isProcessing) {
+                // Magento place-order span: keep label, rely on aria-busy / opacity.
+                btn.classList.add('opacity-90');
+            } else if (label) {
+                btn.classList.remove('opacity-90');
             }
         });
     }
@@ -189,7 +199,12 @@ foreach ($clientMessagePhrases as $phrase) {
             loader.setAttribute('aria-hidden', isWaiting ? 'false' : 'true');
         }
 
-        form.querySelectorAll('[data-fastcheckout-place-order], [data-fastcheckout-place-order-mobile]').forEach(function (btn) {
+        form.querySelectorAll(
+            '[data-fastcheckout-place-order], ' +
+            '[data-fastcheckout-place-order-mobile], ' +
+            '.fastcheckout-native-place-order-btn, ' +
+            '[data-fastcheckout-place-order-host] .action.primary.checkout'
+        ).forEach(function (btn) {
             btn.disabled = orderIsProcessing || !isPaymentReady;
             btn.classList.toggle('pointer-events-none', btn.disabled);
             btn.setAttribute('aria-disabled', btn.disabled ? 'true' : 'false');

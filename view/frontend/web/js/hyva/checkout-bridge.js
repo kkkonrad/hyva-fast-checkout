@@ -1187,6 +1187,30 @@ define([
                         }
                         registerCheckoutProviderAddressAttributeSync();
                     }, delay);
+                    window.setTimeout(function () {
+                        try {
+                            refreshNativePaymentActions();
+                        } catch (eRefreshPo) {
+                            // non-fatal during early boot
+                        }
+                    }, delay);
+                });
+
+                window.addEventListener('fastcheckout:payment-selection-changed', function () {
+                    window.setTimeout(function () {
+                        try {
+                            refreshNativePaymentActions();
+                        } catch (e) {
+                            // ignore
+                        }
+                    }, 50);
+                    window.setTimeout(function () {
+                        try {
+                            refreshNativePaymentActions();
+                        } catch (e2) {
+                            // ignore
+                        }
+                    }, 400);
                 });
 
                 function persistEmailToCheckoutData(email) {
@@ -2238,37 +2262,284 @@ define([
                     ));
                 }
 
-                function markNativePlaceOrderHidden(button) {
-                    if (!button || !button.classList) {
-                        return;
-                    }
-
-                    // Keep KO placeOrder controls out of form submit / Playwright :submit matches.
-                    if (!button.getAttribute('data-fastcheckout-original-type')) {
-                        button.setAttribute(
-                            'data-fastcheckout-original-type',
-                            button.getAttribute('type') || 'submit'
-                        );
-                    }
-                    button.setAttribute('type', 'button');
-                    button.setAttribute('tabindex', '-1');
-                    button.setAttribute('aria-hidden', 'true');
-                    button.setAttribute('disabled', 'disabled');
-                    button.classList.add('fastcheckout-native-place-order-hidden');
+                function getPlaceOrderHost() {
+                    return document.querySelector('[data-fastcheckout-place-order-host]') ||
+                        document.getElementById('fastcheckout-place-order-host');
                 }
 
-                function unmarkNativePlaceOrderHidden(button) {
-                    if (!button || !button.classList) {
+                function getPlaceOrderSsrButtons() {
+                    return Array.prototype.slice.call(
+                        document.querySelectorAll('[data-fastcheckout-place-order-ssr]')
+                    );
+                }
+
+                /**
+                 * Magento payment templates render .actions-toolbar with
+                 * button.action.primary.checkout (click: placeOrder). Host that
+                 * toolbar in the summary column and style it like FC primary.
+                 * Click still goes through Magento KO placeOrder after FC prep
+                 * (form submit → placeOrderViaKo → renderer.placeOrder).
+                 */
+                function wireNativePlaceOrderButton(button) {
+                    if (!button || button.getAttribute('data-fastcheckout-place-order-wired') === '1') {
                         return;
                     }
 
-                    var originalType = button.getAttribute('data-fastcheckout-original-type') || 'submit';
-                    button.setAttribute('type', originalType);
-                    button.removeAttribute('tabindex');
-                    button.removeAttribute('aria-hidden');
+                    button.setAttribute('data-fastcheckout-place-order-wired', '1');
+                    // Avoid double submit with the outer #co-checkout-form.
+                    button.setAttribute('type', 'button');
+                    button.classList.add(
+                        'btn',
+                        'btn-primary',
+                        'fastcheckout-native-place-order-btn'
+                    );
                     button.removeAttribute('disabled');
-                    button.removeAttribute('data-fastcheckout-original-type');
-                    button.classList.remove('fastcheckout-native-place-order-hidden');
+                    button.removeAttribute('aria-hidden');
+                    button.removeAttribute('tabindex');
+
+                    // Capture phase: FC prep (shipping/billing) then Magento workflow.
+                    button.addEventListener('click', function (event) {
+                        var formEl = document.getElementById('co-checkout-form');
+
+                        // Let Magento KO click: placeOrder run only after FC prep.
+                        event.preventDefault();
+                        event.stopPropagation();
+                        if (typeof event.stopImmediatePropagation === 'function') {
+                            event.stopImmediatePropagation();
+                        }
+
+                        if (formEl && typeof formEl.requestSubmit === 'function') {
+                            formEl.requestSubmit();
+                        } else if (formEl) {
+                            formEl.dispatchEvent(
+                                new Event('submit', { bubbles: true, cancelable: true })
+                            );
+                        }
+                    }, true);
+                }
+
+                function resolveSelectedPaymentMethodCode() {
+                    var code = '',
+                        checked;
+
+                    try {
+                        code = getSelectedMethodCode() || '';
+                    } catch (e) {
+                        code = '';
+                    }
+
+                    if (code) {
+                        return String(code);
+                    }
+
+                    checked = document.querySelector(
+                        'input[name="payment_method"]:checked:not([disabled])'
+                    );
+                    if (checked && checked.value) {
+                        return String(checked.value);
+                    }
+
+                    return '';
+                }
+
+                function toolbarHasPlaceOrderButton(toolbar) {
+                    var buttons = getNativeCheckoutActionButtons(toolbar);
+
+                    if (!buttons.length) {
+                        return false;
+                    }
+
+                    return buttons.some(function (btn) {
+                        var handler = getKoClickHandlerName(btn);
+                        return !handler || handler === 'placeOrder';
+                    });
+                }
+
+                function findActivePlaceOrderToolbar() {
+                    var roots = getActivePaymentFormRoots(),
+                        found = null,
+                        methodCode = resolveSelectedPaymentMethodCode(),
+                        selectors = [],
+                        i;
+
+                    roots.some(function (root) {
+                        var toolbars = root.querySelectorAll('.actions-toolbar'),
+                            t;
+
+                        for (t = 0; t < toolbars.length; t += 1) {
+                            if (toolbarHasPlaceOrderButton(toolbars[t])) {
+                                found = toolbars[t];
+                                return true;
+                            }
+                        }
+
+                        return false;
+                    });
+
+                    // Prefer the KO target for the currently selected Fastcheckout radio.
+                    if (!found && methodCode) {
+                        document.querySelectorAll(
+                            '[data-fastcheckout-payment-method-ko-target="' +
+                            String(methodCode).replace(/"/g, '') +
+                            '"] .actions-toolbar'
+                        ).forEach(function (toolbar) {
+                            if (!found && toolbarHasPlaceOrderButton(toolbar)) {
+                                found = toolbar;
+                            }
+                        });
+                    }
+
+                    // Any place-order toolbar already in the summary host.
+                    if (!found) {
+                        document.querySelectorAll(
+                            '[data-fastcheckout-place-order-host] .actions-toolbar'
+                        ).forEach(function (toolbar) {
+                            if (!found && toolbarHasPlaceOrderButton(toolbar)) {
+                                found = toolbar;
+                            }
+                        });
+                    }
+
+                    // Match Magento payment[method] radio inside .payment-method to FC selection.
+                    if (!found && methodCode) {
+                        document.querySelectorAll(
+                            '.payment-method-content .actions-toolbar, ' +
+                            '#fastcheckout-ko-payment-root .actions-toolbar, ' +
+                            '[data-fastcheckout-payment-method-ko-target] .actions-toolbar'
+                        ).forEach(function (toolbar) {
+                            var methodEl,
+                                input;
+
+                            if (found || !toolbarHasPlaceOrderButton(toolbar)) {
+                                return;
+                            }
+
+                            methodEl = toolbar.closest('.payment-method');
+                            if (!methodEl) {
+                                // Toolbar may live under KO target without .payment-method wrapper.
+                                if (
+                                    toolbar.closest(
+                                        '[data-fastcheckout-payment-method-ko-target="' +
+                                        String(methodCode).replace(/"/g, '') + '"]'
+                                    )
+                                ) {
+                                    found = toolbar;
+                                }
+                                return;
+                            }
+                            input = methodEl.querySelector(
+                                'input[name="payment[method]"], input[type="radio"]'
+                            );
+                            if (
+                                input &&
+                                paymentMethodCodesEqual(
+                                    input.value || input.getAttribute('value') || input.id,
+                                    methodCode
+                                )
+                            ) {
+                                found = toolbar;
+                            }
+                        });
+                    }
+
+                    // Absolute last resort: any place-order toolbar (prefer one whose
+                    // Magento radio is checked / method is selected on quote).
+                    if (!found) {
+                        document.querySelectorAll('.actions-toolbar').forEach(function (toolbar) {
+                            var methodEl,
+                                input,
+                                isChecked = false;
+
+                            if (found || !toolbarHasPlaceOrderButton(toolbar)) {
+                                return;
+                            }
+                            if (toolbar.closest('[data-fastcheckout-place-order-host]')) {
+                                found = toolbar;
+                                return;
+                            }
+
+                            methodEl = toolbar.closest('.payment-method');
+                            input = methodEl
+                                ? methodEl.querySelector('input[type="radio"]')
+                                : null;
+                            if (input) {
+                                isChecked = !!input.checked ||
+                                    (methodCode &&
+                                        paymentMethodCodesEqual(
+                                            input.value || input.id,
+                                            methodCode
+                                        ));
+                            }
+                            if (isChecked || (!methodCode && !found)) {
+                                found = toolbar;
+                            }
+                        });
+                    }
+
+                    return found;
+                }
+
+                function mountNativePlaceOrderToolbar() {
+                    var host = getPlaceOrderHost(),
+                        toolbar = findActivePlaceOrderToolbar(),
+                        ssrButtons = getPlaceOrderSsrButtons(),
+                        buttons;
+
+                    if (!host) {
+                        return false;
+                    }
+
+                    // Restore any previously hosted toolbars that belong to inactive methods
+                    // back into their payment content (leave host empty until we mount active).
+                    Array.prototype.slice.call(
+                        host.querySelectorAll('.actions-toolbar')
+                    ).forEach(function (hosted) {
+                        if (toolbar && hosted === toolbar) {
+                            return;
+                        }
+                        // Detach inactive hosted toolbars; payment panel re-renders on switch.
+                        if (hosted.parentNode === host) {
+                            hosted.parentNode.removeChild(hosted);
+                        }
+                    });
+
+                    if (!toolbar) {
+                        host.classList.add('hidden');
+                        ssrButtons.forEach(function (btn) {
+                            btn.classList.remove('hidden');
+                            btn.classList.add('md:flex');
+                        });
+                        return false;
+                    }
+
+                    if (toolbar.parentNode !== host) {
+                        host.appendChild(toolbar);
+                    }
+
+                    host.classList.remove('hidden');
+                    buttons = getNativeCheckoutActionButtons(toolbar);
+                    buttons.forEach(wireNativePlaceOrderButton);
+
+                    // Magento toolbar is live — hide FC SSR fallback on desktop.
+                    ssrButtons.forEach(function (btn) {
+                        btn.classList.add('hidden');
+                        btn.classList.remove('md:flex');
+                    });
+
+                    toolbar.classList.remove('fastcheckout-actions-toolbar-hidden');
+                    toolbar.classList.add('fastcheckout-place-order-toolbar');
+
+                    // Magento binds enable/isPlaceOrderActionAllowed to billing —
+                    // re-allow after mount so the hosted button is clickable.
+                    try {
+                        if (typeof allowPlaceOrderOnActivePayment === 'function') {
+                            allowPlaceOrderOnActivePayment();
+                        }
+                    } catch (eAllow) {
+                        // non-fatal
+                    }
+
+                    return true;
                 }
 
                 function annotateNativePaymentActions(root) {
@@ -2276,33 +2547,38 @@ define([
                         return;
                     }
 
-                    Array.prototype.slice.call(root.querySelectorAll('.fastcheckout-native-place-order-hidden')).forEach(function (button) {
-                        unmarkNativePlaceOrderHidden(button);
-                    });
-                    Array.prototype.slice.call(root.querySelectorAll('.fastcheckout-actions-toolbar-hidden')).forEach(function (toolbar) {
-                        toolbar.classList.remove('fastcheckout-actions-toolbar-hidden');
-                    });
-
+                    // Custom gateway actions (not placeOrder) stay in the payment panel.
+                    // Stock placeOrder toolbars are relocated to the summary host.
                     Array.prototype.slice.call(root.querySelectorAll('.actions-toolbar')).forEach(function (toolbar) {
                         var actionButtons = getNativeCheckoutActionButtons(toolbar),
-                            visibleActionButtons;
+                            hasOnlyPlaceOrder,
+                            hasCustomAction;
 
-                        actionButtons.forEach(function (button) {
+                        if (!actionButtons.length) {
+                            return;
+                        }
+
+                        hasCustomAction = actionButtons.some(function (button) {
                             var handlerName = getKoClickHandlerName(button);
-
-                            if (!handlerName || handlerName === 'placeOrder') {
-                                markNativePlaceOrderHidden(button);
-                            }
+                            return handlerName && handlerName !== 'placeOrder';
+                        });
+                        hasOnlyPlaceOrder = actionButtons.every(function (button) {
+                            var handlerName = getKoClickHandlerName(button);
+                            return !handlerName || handlerName === 'placeOrder';
                         });
 
-                        visibleActionButtons = actionButtons.filter(function (button) {
-                            return !button.classList.contains('fastcheckout-native-place-order-hidden');
-                        });
-
-                        if (actionButtons.length && !visibleActionButtons.length) {
-                            toolbar.classList.add('fastcheckout-actions-toolbar-hidden');
+                        if (hasOnlyPlaceOrder && !hasCustomAction) {
+                            // Will be moved by mountNativePlaceOrderToolbar; keep visible for move.
+                            toolbar.classList.remove('fastcheckout-actions-toolbar-hidden');
+                            actionButtons.forEach(function (button) {
+                                button.classList.remove('fastcheckout-native-place-order-hidden');
+                                button.removeAttribute('disabled');
+                                button.removeAttribute('aria-hidden');
+                            });
                         }
                     });
+
+                    mountNativePlaceOrderToolbar();
                 }
 
                 function getRendererNativeSubmitAction(component) {
@@ -2962,6 +3238,7 @@ define([
                     getActivePaymentFormRoots().forEach(function (root) {
                         annotateNativePaymentActions(root);
                     });
+                    mountNativePlaceOrderToolbar();
                 }
 
                 function getActiveNativeSubmitActionName() {

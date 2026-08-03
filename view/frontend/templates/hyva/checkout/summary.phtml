@@ -161,10 +161,22 @@ $showSubscribe = $block->isShowSubscribe();
                 </div>
             <?php endif; ?>
 
-            <div class="hidden md:block pt-2">
-                <button class="btn btn-primary w-full py-3 flex items-center justify-center gap-2"
+            <?php
+            /**
+             * Magento payment renderer place-order toolbar is relocated here
+             * (checkout-bridge mountNativePlaceOrderToolbar). Styling matches FC primary.
+             * SSR fallback submit button until the active method toolbar is mounted.
+             */
+            ?>
+            <div class="pt-2 fastcheckout-place-order-section">
+                <div id="fastcheckout-place-order-host"
+                     class="fastcheckout-place-order-host hidden md:block"
+                     data-fastcheckout-place-order-host>
+                </div>
+                <button class="btn btn-primary w-full py-3 flex items-center justify-center gap-2 hidden md:flex"
                         type="submit"
-                        data-fastcheckout-place-order>
+                        data-fastcheckout-place-order
+                        data-fastcheckout-place-order-ssr>
                     <span class="place-order-spinner hidden" data-fastcheckout-place-order-spinner aria-hidden="true">
                         <svg class="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
