@@ -7,14 +7,31 @@ const PRODUCT_PATH = process.env.FC_PAYU_PRODUCT_PATH || 'aim-analog-watch.html'
 
 async function openCheckoutWithProduct(page) {
     if (process.env.FC_PAYU_LOCAL_BRIDGE === '1') {
-        const bridge = await readFile(resolve(
-            process.cwd(),
-            '../../view/frontend/web/js/hyva/checkout-bridge.js'
-        ), 'utf8');
+        const webRoot = resolve(process.cwd(), '../../view/frontend/web');
+        const localAssets = [
+            {
+                pattern: /\/Kkkonrad_Fastcheckout\/js\/hyva\/checkout-bridge(?:\.min)?\.js/,
+                file: 'js/hyva/checkout-bridge.js',
+                type: 'application/javascript'
+            },
+            {
+                pattern: /\/Kkkonrad_Fastcheckout\/js\/hyva\/payment-message-bridge(?:\.min)?\.js/,
+                file: 'js/hyva/payment-message-bridge.js',
+                type: 'application/javascript'
+            },
+            {
+                pattern: /\/Kkkonrad_Fastcheckout\/css\/hyva-ko-payment(?:\.min)?\.css/,
+                file: 'css/hyva-ko-payment.css',
+                type: 'text/css'
+            }
+        ];
 
-        await page.route(/\/Kkkonrad_Fastcheckout\/js\/hyva\/checkout-bridge(?:\.min)?\.js/, (route) => (
-            route.fulfill({ contentType: 'application/javascript', body: bridge })
-        ));
+        for (const asset of localAssets) {
+            const body = await readFile(resolve(webRoot, asset.file), 'utf8');
+            await page.route(asset.pattern, (route) => (
+                route.fulfill({ contentType: asset.type, body })
+            ));
+        }
     }
 
     await page.goto(new URL('customer/account/login/', BASE).href, {

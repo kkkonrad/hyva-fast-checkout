@@ -17,7 +17,8 @@ define([
             shippingAddressChildren = $.extend(true, {}, config.shippingAddressChildren || {}),
             shippingAddress = $.extend(true, {}, config.shippingAddress || {}),
             checkoutProvider = $.extend(true, {}, config.checkoutProvider || {}),
-            checkoutStepChildren = $.extend(true, {}, config.checkoutStepChildren || {});
+            checkoutStepChildren = $.extend(true, {}, config.checkoutStepChildren || {}),
+            checkoutSidebarSummary = $.extend(true, {}, config.checkoutSidebarSummary || {});
 
         function containsDeferredPaymentComponent(name, node) {
             var serialized = name + ' ' + JSON.stringify(node || {});
@@ -176,6 +177,7 @@ define([
             shippingAddress: shippingAddress,
             checkoutProvider: checkoutProvider,
             checkoutStepChildren: checkoutStepChildren,
+            checkoutSidebarSummary: checkoutSidebarSummary,
             activateDeferredPaymentListChildren: activateDeferredPaymentListChildren,
             aliasAdditionalCheckoutStepRegistryPaths: aliasAdditionalCheckoutStepRegistryPaths,
             aliasStandardShippingRegistryPaths: aliasStandardShippingRegistryPaths

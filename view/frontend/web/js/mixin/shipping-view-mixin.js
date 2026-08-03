@@ -25,14 +25,16 @@ define([
     'Magento_Checkout/js/action/select-shipping-method',
     'Magento_Checkout/js/model/quote',
     'Magento_Checkout/js/model/shipping-rates-validator',
-    'Magento_Catalog/js/price-utils'
+    'Magento_Catalog/js/price-utils',
+    'Kkkonrad_Fastcheckout/js/hyva/shipping-price-display'
 ], function (
     ko,
     shippingService,
     selectShippingMethodAction,
     quote,
     shippingRatesValidator,
-    priceUtils
+    priceUtils,
+    shippingPriceDisplay
 ) {
     'use strict';
 
@@ -707,6 +709,55 @@ define([
 
             formatPrice: function (price) {
                 return priceUtils.formatPrice(price, quote.getPriceFormat());
+            },
+
+            /**
+             * Magento tax display (excl / incl / both) for a shipping rate row.
+             *
+             * @param {Object} method
+             * @returns {{primary: number, secondary: number|null, showSecondary: boolean}}
+             */
+            getShippingDisplayPrices: function (method) {
+                return shippingPriceDisplay.getShippingDisplayPrices(
+                    method,
+                    window.checkoutConfig || {}
+                );
+            },
+
+            /**
+             * Formatted primary shipping price for the current Magento tax setting.
+             *
+             * @param {Object} method
+             * @returns {String}
+             */
+            formatShippingPrice: function (method) {
+                var display = this.getShippingDisplayPrices(method);
+
+                return this.formatPrice(display.primary);
+            },
+
+            /**
+             * @param {Object} method
+             * @returns {Boolean}
+             */
+            showShippingPriceExclSecondary: function (method) {
+                return this.getShippingDisplayPrices(method).showSecondary;
+            },
+
+            /**
+             * Secondary excl-tax label when Magento shipping display is "both".
+             *
+             * @param {Object} method
+             * @returns {String}
+             */
+            formatShippingPriceExclSecondary: function (method) {
+                var display = this.getShippingDisplayPrices(method);
+
+                if (!display.showSecondary || display.secondary == null) {
+                    return '';
+                }
+
+                return this.formatPrice(display.secondary);
             }
         });
     };

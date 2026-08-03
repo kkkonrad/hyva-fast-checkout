@@ -14,16 +14,19 @@ $shippingAddress = $block->getQuote() ? $block->getQuote()->getShippingAddress()
 $jsRates = [];
 foreach ($shippingMethods as $carrierCode => $rates) {
     foreach ($rates as $rate) {
-        $price = (float)$rate->getPrice();
+        $priceExcl = $block->getShippingRateAmountExclTax($rate);
+        $priceIncl = $block->getShippingRateAmountInclTax($rate);
+        // Magento estimate payload uses amount ≈ primary/base; KO list reads
+        // price_excl_tax / price_incl_tax when Magento tax display is set.
         $jsRates[] = [
             'carrier_code' => (string)$rate->getCarrier(),
             'method_code' => (string)$rate->getMethod(),
             'carrier_title' => (string)$rate->getCarrierTitle(),
             'method_title' => (string)$rate->getMethodTitle(),
-            'amount' => $price,
-            'base_amount' => $price,
-            'price_excl_tax' => $price,
-            'price_incl_tax' => $price,
+            'amount' => $priceExcl,
+            'base_amount' => $priceExcl,
+            'price_excl_tax' => $priceExcl,
+            'price_incl_tax' => $priceIncl,
             'available' => !$rate->getErrorMessage(),
             'error_message' => (string)$rate->getErrorMessage(),
         ];
@@ -95,8 +98,16 @@ foreach ($shippingMethods as $carrierCode => $rates) {
                                                 </span>
                                             </div>
                                         </div>
-                                        <div class="text-sm font-bold text-gray-900 shrink-0 pl-3">
-                                            <?= /* @noEscape */ $block->formatPrice($rate->getPrice()) ?>
+                                        <div class="text-sm font-bold text-gray-900 shrink-0 pl-3 text-right">
+                                            <?= /* @noEscape */ $block->formatPrice($block->getShippingRateDisplayAmount($rate)) ?>
+                                            <?php if ($block->displayShippingBothPrices()
+                                                && $block->getShippingRateAmountExclTax($rate) != $block->getShippingRateAmountInclTax($rate)
+                                            ): ?>
+                                                <span class="block text-xs font-normal text-gray-500 mt-0.5">
+                                                    <?= $escaper->escapeHtml(__('Excl. Tax')) ?>:
+                                                    <?= /* @noEscape */ $block->formatPrice($block->getShippingRateAmountExclTax($rate)) ?>
+                                                </span>
+                                            <?php endif; ?>
                                         </div>
                                     </label>
                                     <div id="label_method_<?= $escaper->escapeHtmlAttr($rate->getMethod() . '_' . $rate->getCarrier()) ?>"></div>

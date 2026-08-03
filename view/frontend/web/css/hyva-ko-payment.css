@@ -291,12 +291,15 @@
 
 /*
  * PayU Secure Form publishes tokenize errors into .payu-msg / .msg__error via
- * secureFormError(). Keep them clearly visible under the card fields.
+ * secureFormError(). Agreement failures use the same class. Keep both clearly
+ * visible under the card fields / terms block.
  */
 #fastcheckout-checkout .payu-msg,
 .fastcheckout-payment-method-ko-container .payu-msg,
-.fastcheckout-ko-payment-root .payu-msg {
-    display: block;
+.fastcheckout-ko-payment-root .payu-msg,
+#fastcheckout-checkout .payment__payu-agreement .payu-msg,
+.fastcheckout-payment-method-ko-container .payment__payu-agreement .payu-msg {
+    display: block !important;
     margin: 0.75rem 0 0;
     padding: 0.75rem 1rem;
     border: 1px solid #fecaca;
@@ -305,12 +308,15 @@
     color: var(--color-red-600, #dc2626);
     font-size: 0.875rem;
     line-height: 1.4;
+    font-weight: 500;
 }
 
 #fastcheckout-checkout .payu-msg .msg__error,
-.fastcheckout-payment-method-ko-container .payu-msg .msg__error {
+.fastcheckout-payment-method-ko-container .payu-msg .msg__error,
+#fastcheckout-checkout .payment__payu-agreement .payu-msg .msg__error {
     margin: 0.25rem 0 0;
     color: inherit !important;
+    display: block;
 }
 
 /* InPost Paczkomaty / Locker Widget Styles */

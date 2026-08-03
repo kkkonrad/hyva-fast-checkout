@@ -52,6 +52,41 @@ class NativePipelineOwnershipTest extends TestCase
         $this->assertStringContainsString('summary.phtml', $phtml);
     }
 
+    public function testOrderSummaryMountsNativeMagentoSidebarSummary(): void
+    {
+        $summary = file_get_contents(
+            $this->moduleRoot() . '/view/frontend/templates/hyva/checkout/summary.phtml'
+        );
+        $bridge = file_get_contents(
+            $this->moduleRoot() . '/view/frontend/web/js/hyva/checkout-bridge.js'
+        );
+        $block = file_get_contents($this->moduleRoot() . '/Block/Hyva/Checkout.php');
+        $require = file_get_contents(
+            $this->moduleRoot() . '/view/frontend/requirejs-config.js'
+        );
+
+        $this->assertNotFalse($summary);
+        $this->assertNotFalse($bridge);
+        $this->assertNotFalse($block);
+        $this->assertNotFalse($require);
+
+        $this->assertStringContainsString("scope: 'checkout.sidebar.summary'", $summary);
+        $this->assertStringContainsString('data-fastcheckout-native-summary', $summary);
+        $this->assertStringContainsString('data-fastcheckout-summary-ssr', $summary);
+        $this->assertStringContainsString('function getCheckoutSidebarSummary', $block);
+        $this->assertStringContainsString('startNativeSummaryComponents', $bridge);
+        $this->assertStringContainsString("'checkout.sidebar.summary'", $bridge);
+        $this->assertStringContainsString('Kkkonrad_Fastcheckout/hyva/summary', $bridge);
+        $this->assertStringContainsString('summary-total-mixin', $require);
+        $this->assertStringContainsString('summary-cart-items-mixin', $require);
+        $this->assertFileExists(
+            $this->moduleRoot() . '/view/frontend/web/template/hyva/summary.html'
+        );
+        $this->assertFileExists(
+            $this->moduleRoot() . '/view/frontend/web/js/mixin/summary-total-mixin.js'
+        );
+    }
+
     public function testStorageMixinDoesNotRouteRestToMagewire(): void
     {
         $js = file_get_contents($this->moduleRoot() . '/view/frontend/web/js/mixin/storage-mixin.js');
@@ -87,11 +122,56 @@ class NativePipelineOwnershipTest extends TestCase
         $this->assertStringNotContainsString("Magento_Checkout/js/action/place-order", $js);
         $this->assertStringNotContainsString("Magento_Checkout/js/action/place-order", $bridge);
         $this->assertStringContainsString('component.placeOrder({}, fakeEvent)', $bridge);
+        $this->assertStringContainsString('function invokeRendererPlaceOrder', $bridge);
+        $this->assertStringContainsString('return invokeRendererPlaceOrder(component, methodCode)', $bridge);
+        $this->assertStringContainsString('settleFalsePlaceOrderResult', $bridge);
         $this->assertStringContainsString('prepareForPlaceOrder', $placeOrderMixin);
         $this->assertStringNotContainsString('validateActivePaymentFields', $bridge);
         $this->assertStringNotContainsString('getPurchaseOrderNumber', $bridge);
         $this->assertFileDoesNotExist(
             $this->moduleRoot() . '/view/frontend/web/js/hyva/checkout-agreements-fallback.js'
+        );
+    }
+
+    public function testPaymentRegistrationModulesLoadRendererListPushers(): void
+    {
+        $bridge = file_get_contents($this->moduleRoot() . '/view/frontend/web/js/hyva/checkout-bridge.js');
+        $paymentList = file_get_contents($this->moduleRoot() . '/view/frontend/web/js/hyva/payment-list.js');
+        $this->assertNotFalse($bridge);
+        $this->assertNotFalse($paymentList);
+        $this->assertStringContainsString('function loadPaymentRegistrationModules()', $bridge);
+        $this->assertStringContainsString('loadPaymentRegistrationModules();', $bridge);
+        $this->assertStringContainsString(
+            "Magento_OfflinePayments/js/view/payment/offline-payments",
+            $bridge
+        );
+        $this->assertStringContainsString(
+            "Magento_Payment/js/view/payment/payments",
+            $bridge
+        );
+        $this->assertStringContainsString('config.rendererComponents', $bridge);
+        $this->assertStringContainsString('syncRenderers', $paymentList);
+        // Stateful gateways (PayU Secure Form) must not be destroyed on temporary remap.
+        $this->assertStringContainsString('removeRenderer: function ()', $paymentList);
+        $this->assertMatchesRegularExpression(
+            '/removeRenderer:\s*function\s*\(\)\s*\{\s*return this;\s*\}/',
+            $paymentList
+        );
+    }
+
+    public function testSolePaymentRemapActivatesPanelWithoutRestoringMultiChoice(): void
+    {
+        $sync = file_get_contents($this->moduleRoot() . '/view/frontend/web/js/hyva/shipping-method-sync.js');
+        $this->assertNotFalse($sync);
+        $this->assertStringContainsString('function activatePaymentMethodUi(methodCode)', $sync);
+        $this->assertStringContainsString('function clearInvalidPaymentAfterRemap()', $sync);
+        $this->assertStringContainsString('soleCode = allowedCodes.length === 1', $sync);
+        $this->assertStringContainsString('activatePaymentMethodUi(soleCode)', $sync);
+        $this->assertStringContainsString('dropPaymentSelectionCompletely()', $sync);
+        // Multi-method path must clear rather than auto-restore a previous choice.
+        $this->assertStringContainsString(
+            'when multiple payments are allowed again after a clear, do not',
+            $sync
         );
     }
 

@@ -791,3 +791,157 @@
     min-width: 0;
     box-sizing: border-box;
 }
+
+/*
+ * Native Magento KO summary (checkout.sidebar.summary) inside Fastcheckout card.
+ * Stock Tax templates (subtotal/shipping/grand-total/tax) keep Magento tax display.
+ */
+#fastcheckout-checkout .fastcheckout-ko-summary-root,
+#fastcheckout-checkout .fastcheckout-native-summary {
+    display: block;
+    width: 100%;
+}
+
+#fastcheckout-checkout .fastcheckout-native-summary .opc-block-summary,
+#fastcheckout-checkout .fastcheckout-native-summary .title {
+    display: none;
+}
+
+#fastcheckout-checkout .fastcheckout-native-summary .block.items-in-cart {
+    margin: 0 0 1rem;
+    border: 0;
+    background: transparent;
+}
+
+#fastcheckout-checkout .fastcheckout-native-summary .block.items-in-cart .title {
+    display: block !important;
+    margin: 0 0 0.75rem;
+    padding: 0;
+    border: 0;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #4b5563;
+    text-transform: none;
+}
+
+#fastcheckout-checkout .fastcheckout-native-summary .minicart-items-wrapper {
+    max-height: 15rem;
+    overflow-y: auto;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+#fastcheckout-checkout .fastcheckout-native-summary .minicart-items {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+#fastcheckout-checkout .fastcheckout-native-summary .product-item {
+    display: flex;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+    border: 0;
+    margin: 0;
+}
+
+#fastcheckout-checkout .fastcheckout-native-summary .product-item-name,
+#fastcheckout-checkout .fastcheckout-native-summary .product-item-details {
+    font-size: 0.875rem;
+    color: #1f2937;
+}
+
+#fastcheckout-checkout .fastcheckout-native-summary .product-image-container,
+#fastcheckout-checkout .fastcheckout-native-summary .product-image-wrapper {
+    width: 3.5rem !important;
+    height: 3.5rem !important;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.375rem;
+    overflow: hidden;
+    background: #f9fafb;
+}
+
+#fastcheckout-checkout .fastcheckout-native-summary .product-image-photo {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+#fastcheckout-checkout .fastcheckout-native-summary .table-totals,
+#fastcheckout-checkout .fastcheckout-native-summary table.data.table {
+    width: 100%;
+    border: 0;
+    border-collapse: collapse;
+    margin: 0;
+}
+
+#fastcheckout-checkout .fastcheckout-native-summary .table-totals caption,
+#fastcheckout-checkout .fastcheckout-native-summary .table-caption {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+}
+
+#fastcheckout-checkout .fastcheckout-native-summary .table-totals tbody tr {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.75rem;
+    padding: 0.35rem 0;
+    border: 0;
+    font-size: 0.875rem;
+    color: #374151;
+}
+
+#fastcheckout-checkout .fastcheckout-native-summary .table-totals th.mark,
+#fastcheckout-checkout .fastcheckout-native-summary .table-totals td.amount {
+    display: block;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font-weight: 400;
+    text-align: left;
+}
+
+#fastcheckout-checkout .fastcheckout-native-summary .table-totals td.amount {
+    text-align: right;
+    font-weight: 600;
+    color: #111827;
+    white-space: nowrap;
+}
+
+#fastcheckout-checkout .fastcheckout-native-summary .table-totals tr.grand.totals th.mark,
+#fastcheckout-checkout .fastcheckout-native-summary .table-totals tr.grand.totals td.amount,
+#fastcheckout-checkout .fastcheckout-native-summary .table-totals tr.grand.totals strong {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #111827;
+}
+
+#fastcheckout-checkout .fastcheckout-native-summary .table-totals tr.grand.totals {
+    margin-top: 0.5rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #f3f4f6;
+}
+
+#fastcheckout-checkout .fastcheckout-native-summary .price-including-tax,
+#fastcheckout-checkout .fastcheckout-native-summary .price-excluding-tax {
+    display: block;
+}
+
+#fastcheckout-checkout .fastcheckout-native-summary .price-excluding-tax {
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: #6b7280;
+    margin-top: 0.125rem;
+}
+
+#fastcheckout-checkout .fastcheckout-native-summary .actions-toolbar {
+    display: none;
+}

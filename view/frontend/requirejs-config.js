@@ -96,6 +96,13 @@ var config = {
             // Stock validateDelay is 2000ms — feels like 3s to reload rates after country pick.
             'Magento_Checkout/js/model/shipping-rates-validator': {
                 'Kkkonrad_Fastcheckout/js/mixin/shipping-rates-validator-mixin': true
+            },
+            // Fastcheckout has no OPC step navigator — show full summary/tax rows always.
+            'Magento_Checkout/js/view/summary/abstract-total': {
+                'Kkkonrad_Fastcheckout/js/mixin/summary-total-mixin': true
+            },
+            'Magento_Checkout/js/view/summary/cart-items': {
+                'Kkkonrad_Fastcheckout/js/mixin/summary-cart-items-mixin': true
             }
         }
     }

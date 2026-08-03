@@ -935,6 +935,65 @@ define([
                  * user interaction is required and the payment area is ready while the
                  * shopper fills the form.
                  */
+                /**
+                 * Mount Magento stock sidebar summary (cart items + tax-aware totals)
+                 * into #fastcheckout-ko-summary-root. Layout includes Magento_Tax overrides.
+                 */
+                function startNativeSummaryComponents() {
+                    var summaryConfig;
+
+                    if (window.fastcheckoutNativeSummaryComponentsStarted) {
+                        return;
+                    }
+
+                    summaryConfig = checkoutLayoutBridge.checkoutSidebarSummary;
+                    if (!summaryConfig || !summaryConfig.component) {
+                        return;
+                    }
+
+                    window.fastcheckoutNativeSummaryComponentsStarted = true;
+
+                    // Ensure quote.totals is seeded before summary components read it.
+                    try {
+                        if (checkoutTotalsSync && typeof checkoutTotalsSync.syncFromConfig === 'function') {
+                            checkoutTotalsSync.syncFromConfig();
+                        }
+                    } catch (e) {
+                        // non-fatal
+                    }
+
+                    // Hyvä card already has the heading; keep Magento Tax total children.
+                    summaryConfig = $.extend(true, {}, summaryConfig);
+                    summaryConfig.config = $.extend(true, {}, summaryConfig.config || {}, {
+                        template: 'Kkkonrad_Fastcheckout/hyva/summary'
+                    });
+                    // uiLayout accepts template on the node and/or under config.
+                    summaryConfig.template = 'Kkkonrad_Fastcheckout/hyva/summary';
+
+                    app({
+                        components: {
+                            'checkout.sidebar.summary': summaryConfig
+                        }
+                    });
+
+                    window.setTimeout(function () {
+                        var ssr = document.querySelector('[data-fastcheckout-summary-ssr]');
+                        var root = document.getElementById('fastcheckout-ko-summary-root');
+
+                        if (root) {
+                            root.classList.remove('hidden');
+                            root.style.display = '';
+                        }
+                        if (ssr) {
+                            ssr.classList.add('hidden');
+                            ssr.setAttribute('aria-hidden', 'true');
+                        }
+                        window.dispatchEvent(
+                            new CustomEvent('fastcheckout:native-summary-started')
+                        );
+                    }, 0);
+                }
+
                 function scheduleDeferredPaymentComponents() {
                     var queued = false,
                         startedAt = Date.now(),
@@ -955,6 +1014,9 @@ define([
                                 }
                             }
                         });
+                        // Summary shares the payment bootstrap window: totals refresh
+                        // after shipping-information; native Tax components need registry.
+                        startNativeSummaryComponents();
                         window.dispatchEvent(
                             new CustomEvent('fastcheckout:payment-components-started')
                         );
@@ -4006,7 +4068,11 @@ define([
                         var settled = false,
                             errorSub = null,
                             messageErrorSub = null,
+                            asyncSafetyTimer = null,
                             placeOrderResult,
+                            defaultPaymentError = translateFastcheckoutMessage(
+                                'Please check the selected payment method and try again.'
+                            ),
                             fakeEvent = {
                                 preventDefault: function () {},
                                 stopPropagation: function () {},
@@ -4014,6 +4080,11 @@ define([
                             };
 
                         function cleanup() {
+                            if (asyncSafetyTimer) {
+                                window.clearTimeout(asyncSafetyTimer);
+                                asyncSafetyTimer = null;
+                            }
+
                             if (errorSub && typeof errorSub.dispose === 'function') {
                                 try {
                                     errorSub.dispose();
@@ -4033,15 +4104,38 @@ define([
                             messageErrorSub = null;
                         }
 
+                        function getVisiblePaymentInlineError() {
+                            if (
+                                paymentMessageBridge &&
+                                typeof paymentMessageBridge.getInlineErrorText === 'function'
+                            ) {
+                                return paymentMessageBridge.getInlineErrorText(methodCode) || '';
+                            }
+
+                            return '';
+                        }
+
                         function scrollActivePaymentIntoView() {
-                            var target;
+                            var target,
+                                inlineError;
 
                             try {
                                 target = document.querySelector(
                                     '[data-fastcheckout-payment-method-ko-target="' +
                                     String(methodCode || '').replace(/"/g, '') + '"]'
                                 ) || document.querySelector('.payment-method._active');
-                                if (target && typeof target.scrollIntoView === 'function') {
+
+                                // Prefer the painted gateway error so PayU .payu-msg is not
+                                // left below the fold under long agreement copy.
+                                if (target && typeof target.querySelector === 'function') {
+                                    inlineError = target.querySelector(
+                                        '.payu-msg, .msg__error, .message-error, .message.error, .field-error, [role="alert"]'
+                                    );
+                                }
+
+                                if (inlineError && typeof inlineError.scrollIntoView === 'function') {
+                                    inlineError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                } else if (target && typeof target.scrollIntoView === 'function') {
                                     target.scrollIntoView({ behavior: 'smooth', block: 'center' });
                                 }
                             } catch (e) {
@@ -4060,19 +4154,107 @@ define([
                             cleanup();
                             window.setTimeout(function () {
                                 text = paymentMessageBridge.normalize(message) ||
-                                    translateFastcheckoutMessage(
-                                        'Please check the selected payment method and try again.'
-                                );
+                                    getVisiblePaymentInlineError() ||
+                                    defaultPaymentError;
                                 err = new Error(text);
+                                // Always run handlePaymentError so the full-screen loader is
+                                // stopped; it skips the top banner when inline PayU errors exist.
                                 err.fastcheckoutInlineHandled = inlineHandled === true ||
                                     handlePaymentError(
                                         err,
                                         component && component.messageContainer || getBridgeMessageContainer(),
                                         methodCode
-                                    ) === true;
+                                    ) === true ||
+                                    !!getVisiblePaymentInlineError();
                                 scrollActivePaymentIntoView();
                                 reject(err);
                             }, 0);
+                        }
+
+                        function isGatewayAsyncInProgress() {
+                            try {
+                                // PayU (and similar) flip isPlaceOrderActionAllowed(false) while
+                                // tokenization / deferred placeOrder runs.
+                                return typeof component.isPlaceOrderActionAllowed === 'function' &&
+                                    component.isPlaceOrderActionAllowed() === false;
+                            } catch (e) {
+                                return false;
+                            }
+                        }
+
+                        /**
+                         * Magento renderers return false both for sync validation failures and
+                         * while async tokenization has started. Never leave the promise hanging:
+                         * settle from painted inline errors, component.validate(), focusable
+                         * fields, or a short async safety timeout for gateways like PayU.
+                         */
+                        function settleFalsePlaceOrderResult() {
+                            var inlineText;
+
+                            if (settled) {
+                                return;
+                            }
+
+                            inlineText = getVisiblePaymentInlineError();
+                            if (inlineText) {
+                                fail(inlineText, true);
+                                return;
+                            }
+
+                            if (
+                                component.secureFormError &&
+                                typeof component.secureFormError === 'function' &&
+                                component.secureFormError()
+                            ) {
+                                fail(component.secureFormError(), true);
+                                return;
+                            }
+
+                            if (focusFirstInvalidCheckoutField()) {
+                                fail(defaultPaymentError, true);
+                                return;
+                            }
+
+                            if (typeof component.validate === 'function' && !component.validate()) {
+                                // PayU agreement / stored-card checks fail without secureFormError.
+                                // Agreement text is already in the template when payuAgreement is false.
+                                inlineText = getVisiblePaymentInlineError();
+                                fail(inlineText || defaultPaymentError, !!inlineText);
+                                return;
+                            }
+
+                            if (isGatewayAsyncInProgress()) {
+                                // Tokenize in progress — secureFormError / deferred will settle.
+                                // Safety net if the gateway never reports (network hang, SDK drop).
+                                asyncSafetyTimer = window.setTimeout(function () {
+                                    var lateInline;
+
+                                    if (settled) {
+                                        return;
+                                    }
+
+                                    lateInline = getVisiblePaymentInlineError();
+                                    if (lateInline) {
+                                        fail(lateInline, true);
+                                        return;
+                                    }
+
+                                    if (
+                                        component.secureFormError &&
+                                        typeof component.secureFormError === 'function' &&
+                                        component.secureFormError()
+                                    ) {
+                                        fail(component.secureFormError(), true);
+                                        return;
+                                    }
+
+                                    fail(defaultPaymentError, false);
+                                }, 15000);
+                                return;
+                            }
+
+                            // Synchronous false with nothing painted (e.g. additionalValidators).
+                            fail(defaultPaymentError, false);
                         }
 
                         if (!component || typeof component.placeOrder !== 'function') {
@@ -4124,28 +4306,14 @@ define([
                             paymentMessageBridge.observeFailure(placeOrderResult, fail);
 
                             // Magento's default renderer returns false for synchronous inline
-                            // validation failures. Some hosted gateways also return false while
-                            // asynchronous tokenization has started, so only reject when the
-                            // active renderer actually painted an error.
+                            // validation failures. Hosted gateways also return false while
+                            // asynchronous tokenization has started.
                             if (placeOrderResult === false) {
-                                window.setTimeout(function () {
-                                    if (
-                                        !settled &&
-                                        focusFirstInvalidCheckoutField()
-                                    ) {
-                                        fail(
-                                            translateFastcheckoutMessage(
-                                                'Please check the selected payment method and try again.'
-                                            ),
-                                            true
-                                        );
-                                    }
-                                }, 0);
+                                // Let KO paint agreement / secureFormError nodes before reading DOM.
+                                window.setTimeout(settleFalsePlaceOrderResult, 50);
                             }
 
-                            // Keep the observers until an error or document navigation.
-                            // Slow hosted fields can report validation after 30 seconds;
-                            // the browser releases these subscriptions with the page.
+                            // Keep the observers until an error, safety timeout, or navigation.
                         } catch (placeErr) {
                             fail(placeErr && placeErr.message ? placeErr.message : placeErr);
                         }

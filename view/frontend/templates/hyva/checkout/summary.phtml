@@ -48,16 +48,31 @@ $showSubscribe = $block->isShowSubscribe();
 
     <div class="card sticky top-6 space-y-6" data-fastcheckout-totals-card>
         <div class="relative space-y-6">
-            <div>
-                <div class="flex items-center justify-between border-b border-gray-200 pb-3 mb-4">
-                    <h2 class="text-xl font-semibold text-gray-900">
-                        <?= $escaper->escapeHtml(__('Order Summary')) ?>
-                    </h2>
-                    <span class="text-xs bg-gray-100 text-gray-800 px-2 py-0.5 rounded-full font-semibold">
-                        <?= $escaper->escapeHtml(__('%1 item(s)', $block->getItemsQty())) ?>
-                    </span>
-                </div>
+            <div class="flex items-center justify-between border-b border-gray-200 pb-3 mb-4">
+                <h2 class="text-xl font-semibold text-gray-900">
+                    <?= $escaper->escapeHtml(__('Order Summary')) ?>
+                </h2>
+                <span class="text-xs bg-gray-100 text-gray-800 px-2 py-0.5 rounded-full font-semibold"
+                      data-fastcheckout-summary-item-count>
+                    <?= $escaper->escapeHtml(__('%1 item(s)', $block->getItemsQty())) ?>
+                </span>
+            </div>
 
+            <?php
+            /**
+             * Native Magento KO summary (cart items + totals, Magento_Tax templates).
+             * Mounted by checkout-bridge startNativeSummaryComponents().
+             * SSR below is progressive enhancement until KO binds.
+             */
+            ?>
+            <div id="fastcheckout-ko-summary-root"
+                 class="fastcheckout-ko-summary-root hidden"
+                 data-bind="scope: 'checkout.sidebar.summary'"
+                 data-fastcheckout-native-summary>
+                <!-- ko template: getTemplate() --><!-- /ko -->
+            </div>
+
+            <div data-fastcheckout-summary-ssr>
                 <ul class="space-y-3 max-h-60 overflow-y-auto pr-1">
                     <?php foreach ($items as $item): ?>
                         <li class="flex gap-3 py-1">
@@ -86,24 +101,24 @@ $showSubscribe = $block->isShowSubscribe();
                                     × <?= (float)$item->getQty() ?>
                                 </div>
                             </div>
-                            <div class="text-sm font-semibold text-gray-900 shrink-0">
+                            <div class="text-sm font-semibold text-gray-900 shrink-0 text-right">
                                 <?= /* @noEscape */ $block->formatPrice($block->getItemRowTotal($item)) ?>
                             </div>
                         </li>
                     <?php endforeach; ?>
                 </ul>
-            </div>
 
-            <div class="border-t border-gray-200 pt-4 space-y-2" data-fastcheckout-summary-totals>
-                <?php foreach ($block->getSummaryTotals() as $total): ?>
-                    <div class="flex justify-between text-sm <?= !empty($total['strong']) ? 'font-bold text-base pt-2 border-t border-gray-100' : 'text-gray-700' ?>"
-                         data-fastcheckout-total-row="<?= $escaper->escapeHtmlAttr($total['code']) ?>">
-                        <span><?= $escaper->escapeHtml($total['label']) ?></span>
-                        <span data-fastcheckout-total-value="<?= $escaper->escapeHtmlAttr($total['code']) ?>">
-                            <?= /* @noEscape */ $block->formatPrice($total['value']) ?>
-                        </span>
-                    </div>
-                <?php endforeach; ?>
+                <div class="border-t border-gray-200 pt-4 space-y-2" data-fastcheckout-summary-totals>
+                    <?php foreach ($block->getSummaryTotals() as $total): ?>
+                        <div class="flex justify-between text-sm <?= !empty($total['strong']) ? 'font-bold text-base pt-2 border-t border-gray-100' : 'text-gray-700' ?>"
+                             data-fastcheckout-total-row="<?= $escaper->escapeHtmlAttr($total['code']) ?>">
+                            <span><?= $escaper->escapeHtml($total['label']) ?></span>
+                            <span data-fastcheckout-total-value="<?= $escaper->escapeHtmlAttr($total['code']) ?>">
+                                <?= /* @noEscape */ $block->formatPrice($total['value']) ?>
+                            </span>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
             </div>
 
             <?php if ($showComment): ?>

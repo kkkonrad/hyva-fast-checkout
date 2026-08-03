@@ -85,37 +85,101 @@ define([], function () {
                 .trim();
         }
 
-        function hasInlineError(methodCode, message) {
-            var target,
-                text = normalizeMessage(message);
-
-            if (!text) {
-                return false;
-            }
-
-            target = methodCode ? document.querySelector(
+        function getPaymentInlineErrorTarget(methodCode) {
+            var target = methodCode ? document.querySelector(
                 '[data-fastcheckout-payment-method-ko-target="' + String(methodCode).replace(/"/g, '') + '"]'
             ) : document.querySelector(
                 '[data-fastcheckout-payment-method-ko-target]:not(.hidden)'
             );
+
             if (
                 !target ||
                 target.style.display === 'none' ||
                 (target.classList && target.classList.contains('hidden'))
             ) {
+                return null;
+            }
+
+            return target;
+        }
+
+        /**
+         * Collect visible inline payment errors (PayU .payu-msg, Magento messages, alerts).
+         *
+         * @param {String} [methodCode]
+         * @returns {String}
+         */
+        function getInlineErrorText(methodCode) {
+            var target = getPaymentInlineErrorTarget(methodCode),
+                texts = [],
+                seen = {};
+
+            if (!target) {
+                return '';
+            }
+
+            Array.prototype.forEach.call(target.querySelectorAll(
+                '.payu-msg, .msg__error, .message-error, .message.error, .field-error, [role="alert"]'
+            ), function (element) {
+                var inlineText,
+                    style,
+                    hiddenParent;
+
+                if (!element || element.nodeType !== 1) {
+                    return;
+                }
+
+                // Skip nested .msg__error when the parent .payu-msg is already collected.
+                if (
+                    element.classList &&
+                    element.classList.contains('msg__error') &&
+                    element.closest &&
+                    element.closest('.payu-msg')
+                ) {
+                    return;
+                }
+
+                style = window.getComputedStyle ? window.getComputedStyle(element) : null;
+                if (
+                    style &&
+                    (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0')
+                ) {
+                    return;
+                }
+
+                if (element.offsetParent === null && style && style.position !== 'fixed') {
+                    return;
+                }
+
+                hiddenParent = element.closest && element.closest('.hidden, [hidden]');
+                if (hiddenParent) {
+                    return;
+                }
+
+                inlineText = normalizeMessage(element.innerText || element.textContent || '');
+                if (inlineText && !seen[inlineText]) {
+                    seen[inlineText] = true;
+                    texts.push(inlineText);
+                }
+            });
+
+            return texts.join(' ').trim();
+        }
+
+        function hasInlineError(methodCode, message) {
+            var text = normalizeMessage(message),
+                inlineText = getInlineErrorText(methodCode);
+
+            if (!inlineText) {
                 return false;
             }
 
-            return Array.prototype.some.call(target.querySelectorAll(
-                '.payu-msg, .message-error, .message.error, [role="alert"]'
-            ), function (element) {
-                var inlineText = normalizeMessage(element.innerText || element.textContent || '');
+            // Any visible gateway error counts when the caller has no specific message yet.
+            if (!text) {
+                return true;
+            }
 
-                return inlineText && (
-                    inlineText.indexOf(text) !== -1 ||
-                    text.indexOf(inlineText) !== -1
-                );
-            });
+            return inlineText.indexOf(text) !== -1 || text.indexOf(inlineText) !== -1;
         }
 
         function watchErrors(messageContainer, callback) {
@@ -287,6 +351,7 @@ define([], function () {
             getText: getMessageText,
             normalize: normalizeMessage,
             hasInlineError: hasInlineError,
+            getInlineErrorText: getInlineErrorText,
             dispatch: dispatch,
             subscribe: subscribe,
             getContainer: getBridgeMessageContainer,
