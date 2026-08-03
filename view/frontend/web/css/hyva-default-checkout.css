@@ -805,16 +805,10 @@
     gap: 0;
 }
 
-/* Magento layout lists totals before cart_items; previous SSR was items then totals. */
-#fastcheckout-checkout .fastcheckout-native-summary > .block.items-in-cart,
-#fastcheckout-checkout .fastcheckout-native-summary > .fastcheckout-summary-items {
-    order: 1;
-}
-
-#fastcheckout-checkout .fastcheckout-native-summary > .table-totals,
-#fastcheckout-checkout .fastcheckout-native-summary > .data.table {
-    order: 2;
-}
+/*
+ * Keep Magento template / layout order (no flex order hacks):
+ * totals → itemsBefore (e.g. PayU) → cart_items → itemsAfter (e.g. Przelewy24).
+ */
 
 #fastcheckout-checkout .fastcheckout-native-summary .opc-block-summary,
 #fastcheckout-checkout .fastcheckout-native-summary .title,
@@ -1027,11 +1021,12 @@
 #fastcheckout-checkout .fastcheckout-native-summary .table-totals,
 #fastcheckout-checkout .fastcheckout-native-summary table.data.table {
     width: 100%;
-    border: 0;
+    border: 0 !important;
     border-collapse: collapse;
     margin: 0;
-    padding-top: 1rem;
-    border-top: 1px solid #e5e7eb; /* border-t border-gray-200 like SSR */
+    padding-top: 0;
+    /* No border-top: card heading already has border-b under "Order Summary". */
+    border-top: 0 !important;
 }
 
 #fastcheckout-checkout .fastcheckout-native-summary .table-totals tbody tr {
@@ -1070,10 +1065,12 @@
     color: #111827;
 }
 
+/* No border-top on grand total — card heading already has the only separator
+ * under "Order Summary". A second line here looked like a double border. */
 #fastcheckout-checkout .fastcheckout-native-summary .table-totals tr.grand.totals {
-    margin-top: 0.5rem;
-    padding-top: 0.75rem;
-    border-top: 1px solid #f3f4f6;
+    margin-top: 0.35rem;
+    padding-top: 0.35rem;
+    border-top: 0 !important;
 }
 
 #fastcheckout-checkout .fastcheckout-native-summary .price-including-tax,
@@ -1296,40 +1293,6 @@
 
 #fastcheckout-checkout .fastcheckout-native-discount[data-coupon-applied='1'] .action-cancel:hover {
     background: #fef2f2;
-}
-
-/*
- * Przelewy24 instalment simulator under the native summary.
- * Space each trigger / mini-widget block (and optional JS wrapper).
- */
-#fastcheckout-checkout #przelewy24-instalment-trigger,
-#fastcheckout-checkout #installment-mini-totals,
-#fastcheckout-checkout [id^='przelewy24-instalment-']:not(#przelewy24-instalment-calculator-modal),
-#fastcheckout-checkout .fc-przelewy24-instalment-block,
-.fc-przelewy24-instalment-block {
-    display: block;
-    width: 100%;
-    box-sizing: border-box;
-    margin: 0 0 1rem;
-}
-
-#fastcheckout-checkout .fc-przelewy24-instalment-block > #przelewy24-instalment-trigger,
-#fastcheckout-checkout .fc-przelewy24-instalment-block > #installment-mini-totals,
-#fastcheckout-checkout .fc-przelewy24-instalment-block > [id^='przelewy24-instalment-'] {
-    /* outer wrapper owns vertical rhythm when JS wrap is present */
-    margin-block: 0 !important;
-}
-
-/* Stacked SDK rows inside the mini widget (e.g. multiple "Oblicz" offers) */
-#fastcheckout-checkout #installment-mini-totals > *,
-#fastcheckout-checkout .fc-przelewy24-instalment-block #installment-mini-totals > * {
-    display: block;
-    margin: 0 0 0.75rem;
-}
-
-#fastcheckout-checkout #installment-mini-totals > *:last-child,
-#fastcheckout-checkout .fc-przelewy24-instalment-block #installment-mini-totals > *:last-child {
-    margin-bottom: 0;
 }
 
 /*

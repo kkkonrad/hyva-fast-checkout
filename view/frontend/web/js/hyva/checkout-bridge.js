@@ -119,8 +119,7 @@ define([
             'Magento_Checkout/js/model/full-screen-loader',
             'Magento_Checkout/js/model/step-navigator',
             'mage/translate',
-            'mage/validation',
-            'Kkkonrad_Fastcheckout/js/hyva/template-hint-blocks'
+            'mage/validation'
         ], function (
             ko,
             app,
@@ -148,19 +147,10 @@ define([
             fullScreenLoader,
             stepNavigator,
             $t,
-            mageValidation,
-            templateHintBlocks
+            mageValidation
         ) {
-            // Przelewy24 instalment trigger/widgets: one spaced wrapper per block.
-            // (mageValidation is required for side effects; keep param so require order matches.)
+            // mageValidation is loaded for side effects (validators); keep the param.
             void mageValidation;
-            try {
-                if (templateHintBlocks && typeof templateHintBlocks.start === 'function') {
-                    templateHintBlocks.start();
-                }
-            } catch (hintErr) {
-                // non-fatal
-            }
 
             checkoutCompatibility.ensureQuoteAddressCacheKeys(quote);
             checkoutCompatibility.ensureCheckoutDataInPostFallback(checkoutData);
