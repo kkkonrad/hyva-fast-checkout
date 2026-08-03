@@ -224,7 +224,7 @@ define([
             return list;
         }
 
-        function applyPaymentRemapForShipping(methodCode) {
+        function applyPaymentRemapForShipping(methodCode, options) {
             var settings = (window.checkoutConfig && window.checkoutConfig.fastcheckoutSettings) || {},
                 mapping = normalizeShippingPaymentMapping(settings.shippingPaymentMapping),
                 hasMapping = mapping.length > 0,
@@ -232,6 +232,7 @@ define([
                 grid,
                 emptyMessage;
 
+            options = options || {};
             methodCode = methodCode ? String(methodCode) : '';
 
             if (!hasMapping) {
@@ -347,7 +348,11 @@ define([
             // If the current payment is no longer allowed for this shipping method,
             // drop the selection. Do NOT auto-pick another method or restore the
             // previous one when the shopper switches back — they must choose again.
-            clearInvalidPaymentAfterRemap();
+            // deferPaymentActivation: only update allowed flags / radios UI — used while
+            // set-shipping-information is still in flight (see pushNativeShippingSelection).
+            if (!options.deferPaymentActivation) {
+                clearInvalidPaymentAfterRemap();
+            }
         }
 
         /**
@@ -685,15 +690,23 @@ define([
                 applyRateToQuote(found);
             }
 
-            applyPaymentRemapForShipping(methodCode);
+            // Remap payment visibility immediately, but do NOT auto-activate sole
+            // payment yet — Magento_SalesRule POSTs set-payment-information on every
+            // select, and PaymentMethodManagement requires a server-side shipping
+            // address with country_id. Activating before set-shipping-information
+            // races and intermittently throws "shipping address is missing".
+            applyPaymentRemapForShipping(methodCode, { deferPaymentActivation: true });
             persistShippingMethod(methodCode);
 
             address = quote.shippingAddress && quote.shippingAddress();
             // If quote address is only a stub (country only), try not to block UI —
             // set-shipping-information may 400 without firstname/street; still keep
             // KO selection + payment remap so the shopper can finish the form.
+            // Keep payment activation deferred: SalesRule POSTs set-payment-information
+            // and Magento rejects when the *server* quote has no shipping country_id.
             if (!address || !quote.shippingMethod || !quote.shippingMethod()) {
                 pushInFlight = false;
+                applyPaymentRemapForShipping(methodCode, { deferPaymentActivation: true });
                 window.setTimeout(function () {
                     window.fastcheckoutLockShippingRatesList = false;
                     window.fastcheckoutSelectingShippingMethod = false;
@@ -708,26 +721,43 @@ define([
                 pushInFlight = false;
                 window.fastcheckoutLockShippingRatesList = false;
                 window.fastcheckoutSelectingShippingMethod = false;
-                applyPaymentRemapForShipping(methodCode);
+                window.fastcheckoutServerShippingCountryReady = false;
+                applyPaymentRemapForShipping(methodCode, { deferPaymentActivation: true });
                 return Promise.resolve(true);
             }
 
-            return Promise.resolve(deferred).then(function (result) {
+            // Publish before any await so set-payment can wait for this request.
+            window.fastcheckoutServerShippingCountryReady = false;
+            window.fastcheckoutShippingInformationPromise = Promise.resolve(deferred).then(function (result) {
                 pushInFlight = false;
                 lastPushedAt = Date.now();
-                // Re-apply payment remap after shipping-information settles (mapping may
-                // depend on server-side payment list, but DOM rows are already seeded).
+                window.fastcheckoutShippingInformationSettledAt = Date.now();
+                // Server quote now has shipping country_id — safe for PaymentMethodManagement.
+                window.fastcheckoutServerShippingCountryReady = true;
+                // Full remap including sole-payment activate — server address is ready.
                 applyPaymentRemapForShipping(methodCode);
+                // Re-POST set-payment-information if an earlier select was deferred
+                // (select-payment no-ops when the method is already on the quote).
+                if (typeof window.fastcheckoutFlushPendingPaymentInformation === 'function') {
+                    try {
+                        window.fastcheckoutFlushPendingPaymentInformation();
+                    } catch (flushErr) {
+                        // non-fatal
+                    }
+                }
                 return result;
             }, function (error) {
                 pushInFlight = false;
+                window.fastcheckoutShippingInformationSettledAt = Date.now();
+                window.fastcheckoutServerShippingCountryReady = false;
                 if (lastPushedCode === methodCode) {
                     lastPushedCode = '';
                     lastPushedAt = 0;
                 }
-                // Still show mapped payments even if set-shipping-information fails
-                // (e.g. incomplete address) so the shopper can proceed with UI.
-                applyPaymentRemapForShipping(methodCode);
+                // Show mapped payments but do NOT auto-activate sole method: activating
+                // would POST set-payment-information against a server quote with no
+                // shipping country and Magento shows "Brak adresu wysyłki".
+                applyPaymentRemapForShipping(methodCode, { deferPaymentActivation: true });
                 return Promise.reject(error);
             }).then(function (result) {
                 window.setTimeout(function () {
@@ -742,6 +772,8 @@ define([
                 }, 250);
                 return Promise.reject(error);
             });
+
+            return window.fastcheckoutShippingInformationPromise;
         }
 
         function persistSelectionNow(methodCode) {

@@ -4320,8 +4320,84 @@ define([
                     });
                 }
 
+                /**
+                 * Ensure quote.shippingAddress has countryId so Magento
+                 * PaymentMethodManagement::set does not throw "shipping address is missing".
+                 * Seeds from the shipping form, default destination, or checkoutConfig.
+                 *
+                 * @returns {Boolean}
+                 */
+                function ensureShippingCountryOnQuote() {
+                    var shipping = quote && typeof quote.shippingAddress === 'function'
+                            ? quote.shippingAddress()
+                            : null,
+                        country = '',
+                        formCountry,
+                        field;
+
+                    if (shipping) {
+                        country = String(shipping.countryId || shipping.country_id || '').trim();
+                    }
+                    if (country) {
+                        return true;
+                    }
+
+                    field = document.querySelector(
+                        '.fastcheckout-native-shipping-address select[name="country_id"], ' +
+                        'select[name="country_id"]'
+                    );
+                    formCountry = field && field.value ? String(field.value).trim() : '';
+                    country = formCountry ||
+                        String(
+                            (window.fastcheckoutDefaultDestination &&
+                                window.fastcheckoutDefaultDestination.countryId) ||
+                            (window.checkoutConfig && window.checkoutConfig.defaultCountryId) ||
+                            ''
+                        ).trim();
+
+                    if (!country) {
+                        return false;
+                    }
+
+                    if (shipping && typeof shipping === 'object') {
+                        shipping.countryId = country;
+                        shipping.country_id = country;
+                        try {
+                            quote.shippingAddress(shipping);
+                        } catch (e) {
+                            // ignore
+                        }
+                        return true;
+                    }
+
+                    // No quote address object yet — try building from form/default seed.
+                    try {
+                        if (typeof ensureQuoteShippingAddressForPlaceOrder === 'function') {
+                            ensureQuoteShippingAddressForPlaceOrder();
+                        }
+                    } catch (e2) {
+                        // ignore
+                    }
+
+                    shipping = quote && typeof quote.shippingAddress === 'function'
+                        ? quote.shippingAddress()
+                        : null;
+                    if (shipping) {
+                        shipping.countryId = shipping.countryId || country;
+                        shipping.country_id = shipping.country_id || country;
+                        try {
+                            quote.shippingAddress(shipping);
+                        } catch (e3) {
+                            // ignore
+                        }
+                    }
+
+                    return !!(shipping && (shipping.countryId || shipping.country_id));
+                }
+
                 window.fastcheckoutHyvaPayment = $.extend(window.fastcheckoutHyvaPayment || {}, {
                         registerValidator: registerPaymentValidator,
+                        ensureShippingCountryOnQuote: ensureShippingCountryOnQuote,
                         clearUserPaymentSelection: function () {
                             if (paymentMethodSync.clearUserPaymentSelection) {
                                 paymentMethodSync.clearUserPaymentSelection();

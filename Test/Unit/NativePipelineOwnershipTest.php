@@ -79,12 +79,32 @@ class NativePipelineOwnershipTest extends TestCase
         $this->assertStringContainsString('Kkkonrad_Fastcheckout/hyva/summary', $bridge);
         $this->assertStringContainsString('summary-total-mixin', $require);
         $this->assertStringContainsString('summary-cart-items-mixin', $require);
+        $this->assertStringContainsString('summary-item-details-mixin', $require);
+        $this->assertStringContainsString('summary-item-thumbnail-mixin', $require);
         $this->assertFileExists(
             $this->moduleRoot() . '/view/frontend/web/template/hyva/summary.html'
         );
         $this->assertFileExists(
+            $this->moduleRoot() . '/view/frontend/web/template/hyva/summary/cart-items.html'
+        );
+        $this->assertFileExists(
+            $this->moduleRoot() . '/view/frontend/web/template/hyva/summary/item/details.html'
+        );
+        $this->assertFileExists(
+            $this->moduleRoot() . '/view/frontend/web/template/hyva/summary/item/thumbnail.html'
+        );
+        $this->assertFileExists(
             $this->moduleRoot() . '/view/frontend/web/js/mixin/summary-total-mixin.js'
         );
+
+        // RequireJS baseUrl must resolve Magento_Tax/template/... (not /_view/ or missing /).
+        $bridgeTpl = file_get_contents(
+            $this->moduleRoot() . '/view/frontend/templates/hyva/knockout/checkout-bridge.phtml'
+        );
+        $this->assertNotFalse($bridgeTpl);
+        $this->assertStringContainsString('function resolveStaticBaseUrl', $bridgeTpl);
+        $this->assertStringContainsString('/_view/', $bridgeTpl);
+        $this->assertStringContainsString('resolveStaticBaseUrl()', $bridgeTpl);
     }
 
     public function testStorageMixinDoesNotRouteRestToMagewire(): void

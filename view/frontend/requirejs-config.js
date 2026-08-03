@@ -103,6 +103,12 @@ var config = {
             },
             'Magento_Checkout/js/view/summary/cart-items': {
                 'Kkkonrad_Fastcheckout/js/mixin/summary-cart-items-mixin': true
+            },
+            'Magento_Checkout/js/view/summary/item/details': {
+                'Kkkonrad_Fastcheckout/js/mixin/summary-item-details-mixin': true
+            },
+            'Magento_Checkout/js/view/summary/item/details/thumbnail': {
+                'Kkkonrad_Fastcheckout/js/mixin/summary-item-thumbnail-mixin': true
             }
         }
     }
