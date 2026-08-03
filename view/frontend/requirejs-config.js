@@ -109,6 +109,9 @@ var config = {
             },
             'Magento_Checkout/js/view/summary/item/details/thumbnail': {
                 'Kkkonrad_Fastcheckout/js/mixin/summary-item-thumbnail-mixin': true
+            },
+            'Magento_SalesRule/js/view/payment/discount': {
+                'Kkkonrad_Fastcheckout/js/mixin/payment-discount-mixin': true
             }
         }
     }

@@ -326,76 +326,8 @@ foreach ($clientMessagePhrases as $phrase) {
     }
     refreshPaymentReadiness();
 
-    // Coupon apply/cancel via Magento guest/customer coupon REST when available.
-    // Messages are rendered server-side so Magento i18n (pl_PL etc.) applies.
-    var couponMessages = {
-        enterCode: <?= /* @noEscape */ json_encode((string)__('Please enter a discount code.')) ?>,
-        applied: <?= /* @noEscape */ json_encode((string)__('Coupon applied.')) ?>,
-        removed: <?= /* @noEscape */ json_encode((string)__('Coupon removed.')) ?>,
-        applyFailed: <?= /* @noEscape */ json_encode((string)__('Could not apply coupon.')) ?>,
-        moduleMissing: <?= /* @noEscape */ json_encode((string)__('Coupon module is not available.')) ?>
-    };
-
-    function applyCoupon(remove) {
-        var input = document.querySelector('[data-fastcheckout-coupon-input]');
-        var messageEl = document.querySelector('[data-fastcheckout-coupon-message]');
-        var code = input ? String(input.value || '').trim() : '';
-
-        if (!remove && !code) {
-            if (messageEl) {
-                messageEl.textContent = couponMessages.enterCode;
-                messageEl.classList.remove('hidden', 'text-green-700');
-                messageEl.classList.add('text-red-700');
-            }
-            return;
-        }
-
-        if (typeof require !== 'function') {
-            return;
-        }
-
-        require([
-            'Magento_SalesRule/js/action/set-coupon-code',
-            'Magento_SalesRule/js/action/cancel-coupon'
-        ], function (setCoupon, cancelCoupon) {
-            var action = remove ? cancelCoupon() : setCoupon(code);
-            Promise.resolve(action).then(function () {
-                if (messageEl) {
-                    messageEl.textContent = remove ? couponMessages.removed : couponMessages.applied;
-                    messageEl.classList.remove('hidden', 'text-red-700');
-                    messageEl.classList.add('text-green-700');
-                }
-                window.setTimeout(function () {
-                    window.location.reload();
-                }, 400);
-            }).catch(function (error) {
-                if (messageEl) {
-                    messageEl.textContent = (error && error.message) ? error.message : couponMessages.applyFailed;
-                    messageEl.classList.remove('hidden', 'text-green-700');
-                    messageEl.classList.add('text-red-700');
-                }
-            });
-        }, function () {
-            if (messageEl) {
-                messageEl.textContent = couponMessages.moduleMissing;
-                messageEl.classList.remove('hidden');
-            }
-        });
-    }
-
-    document.addEventListener('click', function (event) {
-        var target = event.target;
-        if (!target) {
-            return;
-        }
-        if (target.closest('[data-fastcheckout-coupon-apply]')) {
-            event.preventDefault();
-            applyCoupon(false);
-        } else if (target.closest('[data-fastcheckout-coupon-cancel]')) {
-            event.preventDefault();
-            applyCoupon(true);
-        }
-    });
+    // Coupon apply/cancel is handled by Magento_SalesRule payment/discount KO component
+    // mounted in #fastcheckout-ko-discount-root (see startNativeDiscountComponent).
 
     window.addEventListener('fastcheckout:payment-error', function (event) {
         var message = event && event.detail && event.detail.message ? event.detail.message : '';

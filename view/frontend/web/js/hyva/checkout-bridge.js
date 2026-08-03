@@ -994,6 +994,110 @@ define([
                     }, 0);
                 }
 
+                /**
+                 * Mount Magento_SalesRule payment discount (coupon) into the visible
+                 * Fastcheckout card. Stock OPC places it under payment.afterMethods.
+                 */
+                function startNativeDiscountComponent() {
+                    var discountConfig,
+                        root;
+
+                    if (window.fastcheckoutNativeDiscountStarted) {
+                        return;
+                    }
+
+                    root = document.getElementById('fastcheckout-ko-discount-root');
+                    if (!root) {
+                        return;
+                    }
+
+                    discountConfig = checkoutLayoutBridge.paymentDiscount;
+                    if (!discountConfig || !discountConfig.component) {
+                        // Fallback: still show a minimal native component when SalesRule
+                        // is present but layout extraction failed.
+                        discountConfig = {
+                            component: 'Magento_SalesRule/js/view/payment/discount',
+                            children: {
+                                errors: {
+                                    component: 'Magento_SalesRule/js/view/payment/discount-messages',
+                                    displayArea: 'messages',
+                                    sortOrder: 0
+                                }
+                            }
+                        };
+                    }
+
+                    window.fastcheckoutNativeDiscountStarted = true;
+
+                    discountConfig = $.extend(true, {}, discountConfig);
+                    discountConfig.config = $.extend(true, {}, discountConfig.config || {}, {
+                        template: 'Kkkonrad_Fastcheckout/hyva/payment/discount'
+                    });
+                    discountConfig.template = 'Kkkonrad_Fastcheckout/hyva/payment/discount';
+
+                    app({
+                        components: {
+                            'checkout.steps.billing-step.payment.afterMethods.discount': discountConfig
+                        }
+                    });
+
+                    window.setTimeout(function () {
+                        var ssr = document.querySelector('[data-fastcheckout-discount-ssr]');
+
+                        root.classList.remove('hidden');
+                        root.style.display = '';
+                        if (ssr) {
+                            ssr.classList.add('hidden');
+                            ssr.setAttribute('aria-hidden', 'true');
+                        }
+                        window.dispatchEvent(
+                            new CustomEvent('fastcheckout:native-discount-started')
+                        );
+                    }, 0);
+                }
+
+                /**
+                 * Order comment — Magento has no storefront OPC comment component;
+                 * mount a Magento-UI-style field that place-order still reads from DOM.
+                 */
+                function startOrderCommentComponent() {
+                    var root;
+
+                    if (window.fastcheckoutOrderCommentStarted) {
+                        return;
+                    }
+
+                    root = document.getElementById('fastcheckout-ko-comment-root');
+                    if (!root) {
+                        return;
+                    }
+
+                    window.fastcheckoutOrderCommentStarted = true;
+
+                    app({
+                        components: {
+                            'fastcheckout.order-comment': {
+                                component: 'Kkkonrad_Fastcheckout/js/view/order-comment',
+                                config: {
+                                    template: 'Kkkonrad_Fastcheckout/hyva/order-comment'
+                                },
+                                template: 'Kkkonrad_Fastcheckout/hyva/order-comment'
+                            }
+                        }
+                    });
+
+                    window.setTimeout(function () {
+                        var ssr = document.querySelector('[data-fastcheckout-comment-ssr]');
+
+                        root.classList.remove('hidden');
+                        root.style.display = '';
+                        if (ssr) {
+                            ssr.classList.add('hidden');
+                            ssr.setAttribute('aria-hidden', 'true');
+                        }
+                    }, 0);
+                }
+
                 function scheduleDeferredPaymentComponents() {
                     var queued = false,
                         startedAt = Date.now(),
@@ -1014,9 +1118,12 @@ define([
                                 }
                             }
                         });
-                        // Summary shares the payment bootstrap window: totals refresh
-                        // after shipping-information; native Tax components need registry.
+                        // Summary / coupon / comment share the payment bootstrap window:
+                        // totals refresh after shipping-information; native Tax + SalesRule
+                        // components need the checkout registry.
                         startNativeSummaryComponents();
+                        startNativeDiscountComponent();
+                        startOrderCommentComponent();
                         window.dispatchEvent(
                             new CustomEvent('fastcheckout:payment-components-started')
                         );

@@ -18,7 +18,8 @@ define([
             shippingAddress = $.extend(true, {}, config.shippingAddress || {}),
             checkoutProvider = $.extend(true, {}, config.checkoutProvider || {}),
             checkoutStepChildren = $.extend(true, {}, config.checkoutStepChildren || {}),
-            checkoutSidebarSummary = $.extend(true, {}, config.checkoutSidebarSummary || {});
+            checkoutSidebarSummary = $.extend(true, {}, config.checkoutSidebarSummary || {}),
+            paymentDiscount = $.extend(true, {}, config.paymentDiscount || {});
 
         function containsDeferredPaymentComponent(name, node) {
             var serialized = name + ' ' + JSON.stringify(node || {});
@@ -178,6 +179,7 @@ define([
             checkoutProvider: checkoutProvider,
             checkoutStepChildren: checkoutStepChildren,
             checkoutSidebarSummary: checkoutSidebarSummary,
+            paymentDiscount: paymentDiscount,
             activateDeferredPaymentListChildren: activateDeferredPaymentListChildren,
             aliasAdditionalCheckoutStepRegistryPaths: aliasAdditionalCheckoutStepRegistryPaths,
             aliasStandardShippingRegistryPaths: aliasStandardShippingRegistryPaths

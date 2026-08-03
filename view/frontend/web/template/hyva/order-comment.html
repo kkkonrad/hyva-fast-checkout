@@ -1,0 +1,20 @@
+<!--
+/**
+ * Magento-style order comment field (Fastcheckout; not present in core OPC).
+ */
+-->
+<div class="fastcheckout-native-comment field">
+    <label class="label" for="fastcheckout-comment">
+        <span data-bind="i18n: 'Order Comment'"></span>
+    </label>
+    <div class="control">
+        <textarea id="fastcheckout-comment"
+                  name="fastcheckout_comment"
+                  class="input-text form-input"
+                  rows="2"
+                  data-fastcheckout-comment
+                  data-bind="value: comment,
+                             valueUpdate: 'input',
+                             attr: { placeholder: $t('Optional comment for this order') }"></textarea>
+    </div>
+</div>

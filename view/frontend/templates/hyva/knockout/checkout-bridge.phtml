@@ -25,6 +25,7 @@ $shippingAddress = $block->getShippingAddressComponentConfig();
 $checkoutProvider = $block->getCheckoutProviderConfig();
 $checkoutStepChildren = $block->getCheckoutStepChildren();
 $checkoutSidebarSummary = $block->getCheckoutSidebarSummary();
+$paymentDiscount = $block->getPaymentDiscountComponent();
 $layoutScripts = $block->getCheckoutLayoutScripts();
 
 if (
@@ -38,6 +39,7 @@ if (
     empty($shippingAddressChildren) &&
     empty($checkoutStepChildren) &&
     empty($checkoutSidebarSummary) &&
+    empty($paymentDiscount) &&
     empty($layoutScripts['modules']) &&
     empty($layoutScripts['external'])
 ) {
@@ -58,6 +60,7 @@ $mageInitConfig = [
     'checkoutProvider' => $checkoutProvider,
     'checkoutStepChildren' => $checkoutStepChildren,
     'checkoutSidebarSummary' => $checkoutSidebarSummary,
+    'paymentDiscount' => $paymentDiscount,
     'layoutScripts' => $layoutScripts['modules'] ?? [],
     'layoutExternalScripts' => $layoutScripts['external'] ?? [],
     'scope' => 'fastcheckoutHyvaPaymentRenderers'

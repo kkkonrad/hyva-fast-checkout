@@ -1091,3 +1091,136 @@
 #fastcheckout-checkout .fastcheckout-native-summary .actions-toolbar {
     display: none;
 }
+
+/*
+ * Native Magento_SalesRule discount (coupon) + order comment in FC cards.
+ */
+#fastcheckout-checkout .fastcheckout-ko-discount-root,
+#fastcheckout-checkout .fastcheckout-native-discount {
+    display: block;
+    width: 100%;
+}
+
+#fastcheckout-checkout .fastcheckout-native-discount-title {
+    margin: 0 0 1rem;
+    padding: 0 0 1rem;
+    border-bottom: 1px solid #e5e7eb;
+    font-size: 1.25rem;
+    line-height: 1.75rem;
+    font-weight: 600;
+    color: #111827;
+}
+
+#fastcheckout-checkout .fastcheckout-native-discount .label {
+    display: none; /* placeholder on input is enough; matches previous compact card */
+}
+
+#fastcheckout-checkout .fastcheckout-native-discount-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+@media (min-width: 640px) {
+    #fastcheckout-checkout .fastcheckout-native-discount-row {
+        flex-direction: row;
+        align-items: stretch;
+    }
+}
+
+#fastcheckout-checkout .fastcheckout-native-discount .field {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+}
+
+#fastcheckout-checkout .fastcheckout-native-discount .control {
+    width: 100%;
+}
+
+#fastcheckout-checkout .fastcheckout-native-discount .input-text,
+#fastcheckout-checkout .fastcheckout-native-discount input[type='text'] {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+#fastcheckout-checkout .fastcheckout-native-discount .actions-toolbar {
+    display: flex;
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 0;
+    gap: 0.5rem;
+}
+
+#fastcheckout-checkout .fastcheckout-native-discount .actions-toolbar .primary {
+    margin: 0;
+}
+
+#fastcheckout-checkout .fastcheckout-native-discount .action.action-apply,
+#fastcheckout-checkout .fastcheckout-native-discount .action.action-cancel {
+    width: 100%;
+    white-space: nowrap;
+}
+
+@media (min-width: 640px) {
+    #fastcheckout-checkout .fastcheckout-native-discount .action.action-apply,
+    #fastcheckout-checkout .fastcheckout-native-discount .action.action-cancel {
+        width: auto;
+        min-width: 6rem;
+    }
+}
+
+/* SalesRule message region under the form */
+#fastcheckout-checkout .fastcheckout-native-discount .message,
+#fastcheckout-checkout .fastcheckout-native-discount .messages {
+    margin: 0 0 0.75rem;
+    font-size: 0.875rem;
+}
+
+#fastcheckout-checkout .fastcheckout-native-discount .message-success,
+#fastcheckout-checkout .fastcheckout-native-discount .message.success {
+    color: #15803d;
+}
+
+#fastcheckout-checkout .fastcheckout-native-discount .message-error,
+#fastcheckout-checkout .fastcheckout-native-discount .message.error {
+    color: #b91c1c;
+}
+
+/* Applied coupon: keep cancel button red-tinted like previous Cancel */
+#fastcheckout-checkout .fastcheckout-native-discount[data-coupon-applied='1'] .action-cancel {
+    color: #dc2626;
+    border-color: #fecaca;
+    background: #fff;
+}
+
+#fastcheckout-checkout .fastcheckout-native-discount[data-coupon-applied='1'] .action-cancel:hover {
+    background: #fef2f2;
+}
+
+/* Order comment (Magento-style field) */
+#fastcheckout-checkout .fastcheckout-ko-comment-root,
+#fastcheckout-checkout .fastcheckout-native-comment {
+    display: block;
+    width: 100%;
+}
+
+#fastcheckout-checkout .fastcheckout-native-comment .label {
+    display: block;
+    margin: 0 0 0.25rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #374151;
+}
+
+#fastcheckout-checkout .fastcheckout-native-comment .control {
+    width: 100%;
+}
+
+#fastcheckout-checkout .fastcheckout-native-comment .input-text,
+#fastcheckout-checkout .fastcheckout-native-comment textarea {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 4rem;
+    resize: vertical;
+}

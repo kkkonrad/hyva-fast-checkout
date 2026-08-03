@@ -81,6 +81,19 @@ class NativePipelineOwnershipTest extends TestCase
         $this->assertStringContainsString('summary-cart-items-mixin', $require);
         $this->assertStringContainsString('summary-item-details-mixin', $require);
         $this->assertStringContainsString('summary-item-thumbnail-mixin', $require);
+        $this->assertStringContainsString('payment-discount-mixin', $require);
+        $this->assertStringContainsString('startNativeDiscountComponent', $bridge);
+        $this->assertStringContainsString('startOrderCommentComponent', $bridge);
+        $this->assertStringContainsString('getPaymentDiscountComponent', $block);
+        $this->assertFileExists(
+            $this->moduleRoot() . '/view/frontend/web/template/hyva/payment/discount.html'
+        );
+        $this->assertFileExists(
+            $this->moduleRoot() . '/view/frontend/web/template/hyva/order-comment.html'
+        );
+        $this->assertFileExists(
+            $this->moduleRoot() . '/view/frontend/web/js/view/order-comment.js'
+        );
         $this->assertFileExists(
             $this->moduleRoot() . '/view/frontend/web/template/hyva/summary.html'
         );

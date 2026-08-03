@@ -695,6 +695,10 @@ class Checkout extends Template
      * Return direct children declared under the standard Magento payment component
      * for regions used outside the payment renderer list.
      *
+     * Discount (coupon form) is extracted separately via getPaymentDiscountComponent()
+     * and mounted in the Fastcheckout summary column — strip it here so it is not
+     * left only in the hidden payment root.
+     *
      * @return array
      */
     public function getPaymentRegionChildren()
@@ -707,7 +711,39 @@ class Checkout extends Template
             }
         }
 
+        if (
+            isset($result['afterMethods']['children']['discount']) &&
+            is_array($result['afterMethods']['children']['discount'])
+        ) {
+            // Deep-copy before mutating so the processed layout cache stays intact.
+            $result['afterMethods'] = $this->deepCopyArray($result['afterMethods']);
+            unset($result['afterMethods']['children']['discount']);
+        }
+
         return $result;
+    }
+
+    /**
+     * Magento_SalesRule payment discount (coupon) component from native jsLayout.
+     * Mounted in the Fastcheckout summary column with FC styling.
+     *
+     * @return array
+     */
+    public function getPaymentDiscountComponent(): array
+    {
+        $discount = $this->getPaymentComponent()
+            ['children']['afterMethods']['children']['discount'] ?? [];
+
+        return is_array($discount) ? $discount : [];
+    }
+
+    /**
+     * @param array $value
+     * @return array
+     */
+    private function deepCopyArray(array $value): array
+    {
+        return json_decode(json_encode($value), true) ?: [];
     }
 
     /**
