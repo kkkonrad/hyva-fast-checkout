@@ -1299,9 +1299,52 @@
 }
 
 /*
+ * Przelewy24 instalment simulator under the native summary.
+ * Space each trigger / mini-widget block (and optional JS wrapper).
+ */
+#fastcheckout-checkout #przelewy24-instalment-trigger,
+#fastcheckout-checkout #installment-mini-totals,
+#fastcheckout-checkout [id^='przelewy24-instalment-']:not(#przelewy24-instalment-calculator-modal),
+#fastcheckout-checkout .fc-przelewy24-instalment-block,
+.fc-przelewy24-instalment-block {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    margin: 0 0 1rem;
+}
+
+#fastcheckout-checkout .fc-przelewy24-instalment-block > #przelewy24-instalment-trigger,
+#fastcheckout-checkout .fc-przelewy24-instalment-block > #installment-mini-totals,
+#fastcheckout-checkout .fc-przelewy24-instalment-block > [id^='przelewy24-instalment-'] {
+    /* outer wrapper owns vertical rhythm when JS wrap is present */
+    margin-block: 0 !important;
+}
+
+/* Stacked SDK rows inside the mini widget (e.g. multiple "Oblicz" offers) */
+#fastcheckout-checkout #installment-mini-totals > *,
+#fastcheckout-checkout .fc-przelewy24-instalment-block #installment-mini-totals > * {
+    display: block;
+    margin: 0 0 0.75rem;
+}
+
+#fastcheckout-checkout #installment-mini-totals > *:last-child,
+#fastcheckout-checkout .fc-przelewy24-instalment-block #installment-mini-totals > *:last-child {
+    margin-bottom: 0;
+}
+
+/*
  * Magento payment place-order toolbar hosted in the summary card.
  * Markup: .actions-toolbar > .primary > button.action.primary.checkout
+ *
+ * One fixed control size for SSR fallback AND Magento-hosted button so the
+ * button does not jump taller→shorter when the native toolbar mounts.
  */
+#fastcheckout-checkout {
+    --fc-place-order-height: 3rem; /* 48px */
+    --fc-place-order-py: 0.75rem;
+    --fc-place-order-px: 1rem;
+}
+
 #fastcheckout-checkout .fastcheckout-place-order-host,
 #fastcheckout-checkout .fastcheckout-place-order-section {
     width: 100%;
@@ -1330,6 +1373,11 @@
     float: none;
 }
 
+/* Shared geometry: SSR, mobile sticky, Magento host button */
+#fastcheckout-checkout .fastcheckout-place-order-btn,
+#fastcheckout-checkout [data-fastcheckout-place-order],
+#fastcheckout-checkout [data-fastcheckout-place-order-ssr],
+#fastcheckout-checkout [data-fastcheckout-place-order-mobile],
 #fastcheckout-checkout .fastcheckout-place-order-host .action.primary.checkout,
 #fastcheckout-checkout .fastcheckout-place-order-host .fastcheckout-native-place-order-btn,
 #fastcheckout-checkout .fastcheckout-place-order-toolbar .action.primary.checkout {
@@ -1338,21 +1386,50 @@
     justify-content: center;
     gap: 0.5rem;
     width: 100% !important;
-    min-height: 3rem;
-    padding: 0.75rem 1rem !important;
+    box-sizing: border-box !important;
+    height: var(--fc-place-order-height) !important;
+    min-height: var(--fc-place-order-height) !important;
+    max-height: var(--fc-place-order-height) !important;
+    padding: var(--fc-place-order-py) var(--fc-place-order-px) !important;
     margin: 0 !important;
-    border-radius: var(--radius-lg, 0.5rem);
+    border-radius: var(--radius-lg, 0.5rem) !important;
+    /* Override Hyvä .btn 2px border so SSR and Magento match */
     border-width: 0 !important;
-    font-size: 1rem;
-    font-weight: 500;
-    line-height: 1.5;
+    border-style: solid !important;
+    font-size: 1rem !important;
+    font-weight: 500 !important;
+    line-height: 1.5 !important;
     cursor: pointer;
-    /* Match Hyvä .btn-primary */
     background-color: var(--color-primary) !important;
     color: var(--color-on-primary, #fff) !important;
-    box-shadow: none;
+    box-shadow: none !important;
 }
 
+/*
+ * When Magento toolbar is mounted, SSR fallback must stay fully hidden.
+ * Shared geometry above uses display:flex !important, which beats Tailwind .hidden.
+ */
+#fastcheckout-checkout [data-fastcheckout-place-order-ssr].hidden,
+#fastcheckout-checkout [data-fastcheckout-place-order-ssr].fastcheckout-ssr-place-order-hidden,
+#fastcheckout-checkout .fastcheckout-place-order-btn.fastcheckout-ssr-place-order-hidden,
+/* CSS sibling fallback: host already has the Magento toolbar */
+#fastcheckout-checkout .fastcheckout-place-order-host:has(.actions-toolbar) ~ [data-fastcheckout-place-order-ssr],
+#fastcheckout-checkout .fastcheckout-place-order-host:has(.action.primary.checkout) ~ [data-fastcheckout-place-order-ssr] {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    max-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    border: 0 !important;
+}
+
+#fastcheckout-checkout .fastcheckout-place-order-btn:hover,
+#fastcheckout-checkout [data-fastcheckout-place-order]:hover,
+#fastcheckout-checkout [data-fastcheckout-place-order-mobile]:hover,
 #fastcheckout-checkout .fastcheckout-place-order-host .action.primary.checkout:hover,
 #fastcheckout-checkout .fastcheckout-place-order-host .fastcheckout-native-place-order-btn:hover {
     background-color: var(--color-primary-lighter, var(--color-primary)) !important;
@@ -1361,15 +1438,19 @@
 #fastcheckout-checkout .fastcheckout-place-order-host .action.primary.checkout.disabled,
 #fastcheckout-checkout .fastcheckout-place-order-host .action.primary.checkout:disabled,
 #fastcheckout-checkout .fastcheckout-place-order-host .fastcheckout-native-place-order-btn:disabled,
-#fastcheckout-checkout .fastcheckout-place-order-host .action.primary.checkout[data-fastcheckout-processing='true'] {
+#fastcheckout-checkout .fastcheckout-place-order-host .action.primary.checkout[data-fastcheckout-processing='true'],
+#fastcheckout-checkout [data-fastcheckout-place-order][data-fastcheckout-processing='true'],
+#fastcheckout-checkout [data-fastcheckout-place-order-mobile][data-fastcheckout-processing='true'] {
     opacity: 1;
     cursor: wait;
     pointer-events: none;
 }
 
-#fastcheckout-checkout .fastcheckout-place-order-host .action.primary.checkout span {
+#fastcheckout-checkout .fastcheckout-place-order-host .action.primary.checkout span,
+#fastcheckout-checkout .fastcheckout-place-order-btn span {
     color: inherit;
     font: inherit;
+    line-height: inherit;
 }
 
 /* Order comment (Magento-style field) */

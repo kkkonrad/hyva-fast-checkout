@@ -173,7 +173,8 @@ $showSubscribe = $block->isShowSubscribe();
                      class="fastcheckout-place-order-host hidden md:block"
                      data-fastcheckout-place-order-host>
                 </div>
-                <button class="btn btn-primary w-full py-3 flex items-center justify-center gap-2 hidden md:flex"
+                <?php /* SSR fallback only — hidden completely once Magento toolbar mounts (see checkout-bridge setPlaceOrderSsrVisible). Avoid bare "flex" so Tailwind hidden can apply before JS runs. */ ?>
+                <button class="btn btn-primary w-full items-center justify-center gap-2 hidden md:flex fastcheckout-place-order-btn"
                         type="submit"
                         data-fastcheckout-place-order
                         data-fastcheckout-place-order-ssr>

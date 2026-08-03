@@ -119,7 +119,8 @@ define([
             'Magento_Checkout/js/model/full-screen-loader',
             'Magento_Checkout/js/model/step-navigator',
             'mage/translate',
-            'mage/validation'
+            'mage/validation',
+            'Kkkonrad_Fastcheckout/js/hyva/template-hint-blocks'
         ], function (
             ko,
             app,
@@ -146,8 +147,21 @@ define([
             errorProcessor,
             fullScreenLoader,
             stepNavigator,
-            $t
+            $t,
+            mageValidation,
+            templateHintBlocks
         ) {
+            // Przelewy24 instalment trigger/widgets: one spaced wrapper per block.
+            // (mageValidation is required for side effects; keep param so require order matches.)
+            void mageValidation;
+            try {
+                if (templateHintBlocks && typeof templateHintBlocks.start === 'function') {
+                    templateHintBlocks.start();
+                }
+            } catch (hintErr) {
+                // non-fatal
+            }
+
             checkoutCompatibility.ensureQuoteAddressCacheKeys(quote);
             checkoutCompatibility.ensureCheckoutDataInPostFallback(checkoutData);
 
@@ -2291,6 +2305,7 @@ define([
                     button.classList.add(
                         'btn',
                         'btn-primary',
+                        'fastcheckout-place-order-btn',
                         'fastcheckout-native-place-order-btn'
                     );
                     button.removeAttribute('disabled');
@@ -2479,10 +2494,32 @@ define([
                     return found;
                 }
 
+                function setPlaceOrderSsrVisible(visible) {
+                    getPlaceOrderSsrButtons().forEach(function (btn) {
+                        if (!btn) {
+                            return;
+                        }
+                        if (visible) {
+                            btn.classList.remove('hidden', 'fastcheckout-ssr-place-order-hidden');
+                            // Desktop SSR only (summary.phtml uses hidden md:flex).
+                            btn.classList.add('md:flex');
+                            btn.removeAttribute('aria-hidden');
+                            btn.removeAttribute('tabindex');
+                            btn.style.removeProperty('display');
+                        } else {
+                            // Beat shared geometry CSS (display:flex !important) + Tailwind md:flex.
+                            btn.classList.add('hidden', 'fastcheckout-ssr-place-order-hidden');
+                            btn.classList.remove('md:flex', 'flex');
+                            btn.setAttribute('aria-hidden', 'true');
+                            btn.setAttribute('tabindex', '-1');
+                            btn.style.setProperty('display', 'none', 'important');
+                        }
+                    });
+                }
+
                 function mountNativePlaceOrderToolbar() {
                     var host = getPlaceOrderHost(),
                         toolbar = findActivePlaceOrderToolbar(),
-                        ssrButtons = getPlaceOrderSsrButtons(),
                         buttons;
 
                     if (!host) {
@@ -2505,10 +2542,7 @@ define([
 
                     if (!toolbar) {
                         host.classList.add('hidden');
-                        ssrButtons.forEach(function (btn) {
-                            btn.classList.remove('hidden');
-                            btn.classList.add('md:flex');
-                        });
+                        setPlaceOrderSsrVisible(true);
                         return false;
                     }
 
@@ -2517,14 +2551,14 @@ define([
                     }
 
                     host.classList.remove('hidden');
+                    // Host uses "hidden md:block" in markup — ensure it is shown on desktop.
+                    host.classList.remove('hidden');
+                    host.style.removeProperty('display');
                     buttons = getNativeCheckoutActionButtons(toolbar);
                     buttons.forEach(wireNativePlaceOrderButton);
 
-                    // Magento toolbar is live — hide FC SSR fallback on desktop.
-                    ssrButtons.forEach(function (btn) {
-                        btn.classList.add('hidden');
-                        btn.classList.remove('md:flex');
-                    });
+                    // Magento toolbar is live — hide FC SSR fallback completely (one Place Order).
+                    setPlaceOrderSsrVisible(false);
 
                     toolbar.classList.remove('fastcheckout-actions-toolbar-hidden');
                     toolbar.classList.add('fastcheckout-place-order-toolbar');
