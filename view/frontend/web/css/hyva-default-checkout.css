@@ -660,10 +660,10 @@
 #fastcheckout-checkout .payment-method-billing-address .billing-address-form,
 #fastcheckout-checkout .checkout-billing-address .billing-address-form {
     margin: 0;
-    padding: 1rem;
-    border: 1px solid var(--color-slate-200, #e5e7eb);
-    border-radius: var(--radius-lg, 0.5rem);
-    background: #fff;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
 }
 
 #fastcheckout-checkout .payment-method-billing-address .billing-address-form + .actions-toolbar,
@@ -1435,6 +1435,22 @@
     color: inherit;
     font: inherit;
     line-height: inherit;
+}
+
+/* Spinner inside Magento-hosted place-order (injected by wireNativePlaceOrderButton). */
+#fastcheckout-checkout .fastcheckout-place-order-host .place-order-spinner,
+#fastcheckout-checkout .fastcheckout-place-order-btn .place-order-spinner {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    line-height: 0;
+}
+
+#fastcheckout-checkout .fastcheckout-place-order-host .place-order-spinner:not(.hidden),
+#fastcheckout-checkout .fastcheckout-place-order-btn .place-order-spinner:not(.hidden),
+body.checkout-submitting #fastcheckout-checkout .place-order-spinner {
+    display: inline-flex !important;
 }
 
 /* Order comment (Magento-style field) */

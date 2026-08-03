@@ -78,7 +78,8 @@ foreach ($clientMessagePhrases as $phrase) {
             '.fastcheckout-native-place-order-btn, ' +
             '[data-fastcheckout-place-order-host] .action.primary.checkout'
         ).forEach(function (btn) {
-            var label = btn.querySelector('[data-fastcheckout-place-order-label], span');
+            // Prefer explicit label only (not the spinner <span>).
+            var label = btn.querySelector('[data-fastcheckout-place-order-label]');
 
             if (isProcessing) {
                 var buttonStyle = window.getComputedStyle(btn);
@@ -102,15 +103,10 @@ foreach ($clientMessagePhrases as $phrase) {
             btn.classList.toggle('pointer-events-none', btn.disabled);
             btn.setAttribute('aria-disabled', btn.disabled ? 'true' : 'false');
 
-            if (label && label.hasAttribute && label.hasAttribute('data-fastcheckout-ready-text')) {
+            if (label && label.hasAttribute('data-fastcheckout-ready-text')) {
                 label.textContent = isProcessing
-                    ? label.getAttribute('data-fastcheckout-processing-text')
-                    : label.getAttribute('data-fastcheckout-ready-text');
-            } else if (label && isProcessing) {
-                // Magento place-order span: keep label, rely on aria-busy / opacity.
-                btn.classList.add('opacity-90');
-            } else if (label) {
-                btn.classList.remove('opacity-90');
+                    ? (label.getAttribute('data-fastcheckout-processing-text') || label.textContent)
+                    : (label.getAttribute('data-fastcheckout-ready-text') || label.textContent);
             }
         });
     }

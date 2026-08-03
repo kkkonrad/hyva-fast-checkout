@@ -2305,6 +2305,95 @@ define([
                  * Click still goes through Magento KO placeOrder after FC prep
                  * (form submit → placeOrderViaKo → renderer.placeOrder).
                  */
+                /**
+                 * Magento stock place-order is usually <button><span>Label</span></button>.
+                 * FC setProcessing() expects spinner + labelled span (like SSR/mobile).
+                 */
+                function ensurePlaceOrderProcessingUi(button) {
+                    var readyText = $t('Place Order'),
+                        processingText = $t('Please wait...'),
+                        existingLabel,
+                        label,
+                        spinner,
+                        ssrLabel,
+                        span,
+                        readyAttr,
+                        processAttr;
+
+                    if (!button || !button.appendChild) {
+                        return;
+                    }
+
+                    // Prefer copy of already-translated SSR labels when present.
+                    ssrLabel = document.querySelector(
+                        '[data-fastcheckout-place-order-ssr] [data-fastcheckout-place-order-label], ' +
+                        '[data-fastcheckout-place-order-mobile] [data-fastcheckout-place-order-label]'
+                    );
+                    if (ssrLabel) {
+                        readyAttr = ssrLabel.getAttribute('data-fastcheckout-ready-text');
+                        processAttr = ssrLabel.getAttribute('data-fastcheckout-processing-text');
+                        if (readyAttr) {
+                            readyText = readyAttr;
+                        }
+                        if (processAttr) {
+                            processingText = processAttr;
+                        }
+                    }
+
+                    if (!button.querySelector('[data-fastcheckout-place-order-spinner]')) {
+                        spinner = document.createElement('span');
+                        spinner.className = 'place-order-spinner hidden';
+                        spinner.setAttribute('data-fastcheckout-place-order-spinner', '');
+                        spinner.setAttribute('aria-hidden', 'true');
+                        spinner.innerHTML =
+                            '<svg class="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" aria-hidden="true">' +
+                            '<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>' +
+                            '<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>' +
+                            '</svg>';
+                        button.insertBefore(spinner, button.firstChild);
+                    }
+
+                    existingLabel = button.querySelector('[data-fastcheckout-place-order-label]');
+                    if (existingLabel) {
+                        if (!existingLabel.getAttribute('data-fastcheckout-ready-text')) {
+                            existingLabel.setAttribute(
+                                'data-fastcheckout-ready-text',
+                                (existingLabel.textContent || readyText).trim() || readyText
+                            );
+                        }
+                        if (!existingLabel.getAttribute('data-fastcheckout-processing-text')) {
+                            existingLabel.setAttribute(
+                                'data-fastcheckout-processing-text',
+                                processingText
+                            );
+                        }
+                        return;
+                    }
+
+                    // Promote Magento's first text span, or create one.
+                    span = button.querySelector('span:not([data-fastcheckout-place-order-spinner])');
+                    if (span) {
+                        label = span;
+                    } else {
+                        label = document.createElement('span');
+                        label.textContent = (button.textContent || readyText).trim() || readyText;
+                        // Clear loose text nodes so only label + spinner remain.
+                        Array.prototype.slice.call(button.childNodes).forEach(function (node) {
+                            if (node.nodeType === 3 && String(node.textContent || '').trim()) {
+                                button.removeChild(node);
+                            }
+                        });
+                        button.appendChild(label);
+                    }
+
+                    label.setAttribute('data-fastcheckout-place-order-label', '');
+                    label.setAttribute(
+                        'data-fastcheckout-ready-text',
+                        (label.textContent || readyText).trim() || readyText
+                    );
+                    label.setAttribute('data-fastcheckout-processing-text', processingText);
+                }
+
                 function wireNativePlaceOrderButton(button) {
                     if (!button || button.getAttribute('data-fastcheckout-place-order-wired') === '1') {
                         return;
@@ -2322,6 +2411,7 @@ define([
                     button.removeAttribute('disabled');
                     button.removeAttribute('aria-hidden');
                     button.removeAttribute('tabindex');
+                    ensurePlaceOrderProcessingUi(button);
 
                     // Capture phase: FC prep (shipping/billing) then Magento workflow.
                     button.addEventListener('click', function (event) {
