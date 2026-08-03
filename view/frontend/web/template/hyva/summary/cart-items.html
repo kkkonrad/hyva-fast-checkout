@@ -1,7 +1,8 @@
 <!--
 /**
  * Fastcheckout cart items list — matches previous SSR summary product rows.
- * Badge in the card header already shows qty; skip Magento "Items in Cart" title.
+ * No Magento "Items in Cart" title (card heading + badge already cover that).
+ * Product block is ordered before totals via summary children sortOrder in JS.
  */
 -->
 <div class="block items-in-cart fastcheckout-summary-items"

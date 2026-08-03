@@ -974,6 +974,27 @@ define([
                     // uiLayout accepts template on the node and/or under config.
                     summaryConfig.template = 'Kkkonrad_Fastcheckout/hyva/summary';
 
+                    // Magento stock layout lists totals before cart_items. Fastcheckout
+                    // wants products directly under the card "Order Summary" heading,
+                    // then totals — change KO child sortOrder (DOM order), not CSS flex.
+                    (function orderSummaryChildrenProductsFirst(children) {
+                        if (!children || typeof children !== 'object') {
+                            return;
+                        }
+                        if (children.itemsBefore) {
+                            children.itemsBefore.sortOrder = 10;
+                        }
+                        if (children.cart_items) {
+                            children.cart_items.sortOrder = 20;
+                        }
+                        if (children.itemsAfter) {
+                            children.itemsAfter.sortOrder = 30;
+                        }
+                        if (children.totals) {
+                            children.totals.sortOrder = 40;
+                        }
+                    })(summaryConfig.children);
+
                     app({
                         components: {
                             'checkout.sidebar.summary': summaryConfig

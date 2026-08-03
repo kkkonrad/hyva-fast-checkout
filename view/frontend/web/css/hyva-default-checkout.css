@@ -806,12 +806,16 @@
 }
 
 /*
- * Keep Magento template / layout order (no flex order hacks):
- * totals → itemsBefore (e.g. PayU) → cart_items → itemsAfter (e.g. Przelewy24).
+ * Summary child DOM order (via sortOrder in startNativeSummaryComponents):
+ * itemsBefore → cart_items → itemsAfter → totals
+ * (products under "Order Summary" heading; no CSS flex order).
  */
 
-#fastcheckout-checkout .fastcheckout-native-summary .opc-block-summary,
-#fastcheckout-checkout .fastcheckout-native-summary .title,
+/*
+ * DOM order is set via summary children sortOrder (products before totals) —
+ * not CSS flex order. Hide leftover Magento titles; card H2 is the only heading.
+ */
+#fastcheckout-checkout .fastcheckout-native-summary .opc-block-summary > .title,
 #fastcheckout-checkout .fastcheckout-native-summary .block.items-in-cart > .title {
     display: none !important;
 }
@@ -834,6 +838,23 @@
     border: 0;
     background: transparent;
     box-shadow: none;
+}
+
+/*
+ * Summary itemsAfter instalment banner (e.g. P24 simulator link):
+ * bare <a href="#"> with a single <img>, no module id/class in the selector.
+ */
+#fastcheckout-checkout .fastcheckout-native-summary > a[href='#']:not([class]):has(> img:only-child) {
+    display: block;
+    width: 100%;
+    margin: 0 0 1rem;
+    box-sizing: border-box;
+}
+
+#fastcheckout-checkout .fastcheckout-native-summary > a[href='#']:not([class]):has(> img:only-child) > img {
+    display: block;
+    max-width: 100%;
+    height: auto;
 }
 
 #fastcheckout-checkout .fastcheckout-native-summary .minicart-items-wrapper {
