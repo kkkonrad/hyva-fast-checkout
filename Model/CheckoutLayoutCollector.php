@@ -6,6 +6,7 @@ namespace Kkkonrad\Fastcheckout\Model;
 use Magento\Framework\App\Cache\Type\Config as ConfigCacheType;
 use Magento\Framework\App\Cache\Type\Layout as LayoutCacheType;
 use Magento\Framework\App\CacheInterface;
+use Magento\Framework\App\ObjectManager;
 use Magento\Framework\Component\ComponentRegistrar;
 use Magento\Framework\Component\ComponentRegistrarInterface;
 use Magento\Framework\Module\ModuleListInterface;
@@ -27,19 +28,62 @@ use SimpleXMLElement;
 class CheckoutLayoutCollector
 {
     private const CACHE_PREFIX = 'fastcheckout_raw_layout_';
-    private const CACHE_VERSION = 'v2-magento-merge';
+    /** Bump when collection logic changes so stale empty caches are not reused. */
+    private const CACHE_VERSION = 'v4-prefer-module-files';
+
+    private ?LayoutFactory $layoutFactory;
+    private ?ModuleListInterface $moduleList;
+    private ?ComponentRegistrarInterface $componentRegistrar;
+    private ?SerializerInterface $serializer;
+    private ?CacheInterface $cache;
+    private ?StoreManagerInterface $storeManager;
+    private ?DesignInterface $design;
+    private ?LoggerInterface $logger;
+    private ?string $localeCode;
 
     public function __construct(
-        private readonly ?LayoutFactory $layoutFactory = null,
-        private readonly ?ModuleListInterface $moduleList = null,
-        private readonly ?ComponentRegistrarInterface $componentRegistrar = null,
-        private readonly ?SerializerInterface $serializer = null,
-        private readonly ?CacheInterface $cache = null,
-        private readonly ?StoreManagerInterface $storeManager = null,
-        private readonly ?DesignInterface $design = null,
-        private readonly ?LoggerInterface $logger = null,
-        private readonly ?string $localeCode = null
+        ?LayoutFactory $layoutFactory = null,
+        ?ModuleListInterface $moduleList = null,
+        ?ComponentRegistrarInterface $componentRegistrar = null,
+        ?SerializerInterface $serializer = null,
+        ?CacheInterface $cache = null,
+        ?StoreManagerInterface $storeManager = null,
+        ?DesignInterface $design = null,
+        ?LoggerInterface $logger = null,
+        ?string $localeCode = null
     ) {
+        // Magento often skips injecting parameters that have `= null` defaults.
+        // Resolve critical services so web + CLI always scan module layout XML.
+        $this->layoutFactory = $layoutFactory;
+        $this->moduleList = $moduleList;
+        $this->componentRegistrar = $componentRegistrar;
+        $this->serializer = $serializer;
+        $this->cache = $cache;
+        $this->storeManager = $storeManager;
+        $this->design = $design;
+        $this->logger = $logger;
+        $this->localeCode = $localeCode;
+
+        if (
+            $this->moduleList === null
+            || $this->componentRegistrar === null
+            || $this->layoutFactory === null
+        ) {
+            try {
+                $om = ObjectManager::getInstance();
+                $this->layoutFactory = $this->layoutFactory ?? $om->get(LayoutFactory::class);
+                $this->moduleList = $this->moduleList ?? $om->get(ModuleListInterface::class);
+                $this->componentRegistrar = $this->componentRegistrar
+                    ?? $om->get(ComponentRegistrarInterface::class);
+                $this->serializer = $this->serializer ?? $om->get(SerializerInterface::class);
+                $this->cache = $this->cache ?? $om->get(CacheInterface::class);
+                $this->storeManager = $this->storeManager ?? $om->get(StoreManagerInterface::class);
+                $this->design = $this->design ?? $om->get(DesignInterface::class);
+                $this->logger = $this->logger ?? $om->get(LoggerInterface::class);
+            } catch (\Throwable $exception) {
+                // Unit tests may construct without a Magento ObjectManager.
+            }
+        }
     }
 
     /**
@@ -60,9 +104,13 @@ class CheckoutLayoutCollector
                 $cached = is_string($cached) && $cached !== ''
                     ? $this->serializer->unserialize($cached)
                     : null;
+                // Never reuse an empty jsLayout cache (Hyvä theme removes checkout.root,
+                // which previously cached an empty magento-layout forever).
                 if (
                     is_array($cached) &&
                     is_array($cached['jsLayout'] ?? null) &&
+                    $cached['jsLayout'] !== [] &&
+                    $this->jsLayoutHasShippingFieldset($cached['jsLayout']) &&
                     is_array($cached['assets'] ?? null)
                 ) {
                     $cached['source'] = (string)($cached['source'] ?? 'cache');
@@ -73,18 +121,41 @@ class CheckoutLayoutCollector
             }
         }
 
-        $result = $this->collectViaMagentoLayout();
-        if (($result['jsLayout'] ?? []) === [] && ($result['assets']['css'] ?? []) === [] &&
-            ($result['assets']['scripts'] ?? []) === []
-        ) {
-            $result = $this->collectViaModuleFiles();
+        // Prefer filesystem module merge: under Hyvä, theme checkout_index_index
+        // replaces Magento checkout.root with a "No Checkout module" notice, so a
+        // full LayoutFactory merge yields empty jsLayout. Module XML still has the
+        // real OPC tree (same as Luma Magento_Checkout).
+        $moduleResult = $this->collectViaModuleFiles();
+        $magentoResult = $this->collectViaMagentoLayout();
+
+        if ($this->jsLayoutHasShippingFieldset($moduleResult['jsLayout'] ?? [])) {
+            $result = $moduleResult;
+            $result['assets'] = $this->mergeAssets(
+                $moduleResult['assets'] ?? ['css' => [], 'scripts' => []],
+                $magentoResult['assets'] ?? ['css' => [], 'scripts' => []]
+            );
+            $result['source'] = 'module-files';
+        } elseif ($this->jsLayoutHasShippingFieldset($magentoResult['jsLayout'] ?? [])) {
+            $result = $magentoResult;
+        } elseif (($moduleResult['jsLayout'] ?? []) !== []) {
+            $result = $moduleResult;
+        } elseif (($magentoResult['jsLayout'] ?? []) !== []) {
+            $result = $magentoResult;
+        } else {
+            $result = $empty;
         }
 
         if ($result === []) {
             $result = $empty;
         }
 
-        if ($this->cache !== null && $this->serializer !== null && $cacheId !== '') {
+        if (
+            $this->cache !== null &&
+            $this->serializer !== null &&
+            $cacheId !== '' &&
+            ($result['jsLayout'] ?? []) !== [] &&
+            $this->jsLayoutHasShippingFieldset($result['jsLayout'])
+        ) {
             try {
                 $this->cache->save(
                     $this->serializer->serialize($result),
@@ -97,6 +168,36 @@ class CheckoutLayoutCollector
         }
 
         return $result;
+    }
+
+    /**
+     * @param array $jsLayout
+     */
+    private function jsLayoutHasShippingFieldset(array $jsLayout): bool
+    {
+        $fieldset = $jsLayout['components']['checkout']['children']['steps']['children']
+            ['shipping-step']['children']['shippingAddress']['children']
+            ['shipping-address-fieldset']['children'] ?? null;
+
+        return is_array($fieldset) && $fieldset !== [];
+    }
+
+    /**
+     * @param array{css?: array, scripts?: array} $left
+     * @param array{css?: array, scripts?: array} $right
+     * @return array{css: array, scripts: array}
+     */
+    private function mergeAssets(array $left, array $right): array
+    {
+        $css = array_values(array_unique(
+            array_merge($left['css'] ?? [], $right['css'] ?? []),
+            SORT_REGULAR
+        ));
+        $scripts = array_values(array_unique(
+            array_merge($left['scripts'] ?? [], $right['scripts'] ?? [])
+        ));
+
+        return ['css' => $css, 'scripts' => $scripts];
     }
 
     /**

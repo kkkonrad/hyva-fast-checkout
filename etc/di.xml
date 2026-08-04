@@ -13,6 +13,20 @@
             <argument name="attributes" xsi:type="array"/>
         </arguments>
     </type>
+
+    <!-- Global DI: CheckoutLayoutCollector must resolve outside frontend-only config. -->
+    <type name="Kkkonrad\Fastcheckout\Model\CheckoutLayoutCollector">
+        <arguments>
+            <argument name="layoutFactory" xsi:type="object">Magento\Framework\View\LayoutFactory</argument>
+            <argument name="moduleList" xsi:type="object">Magento\Framework\Module\ModuleListInterface</argument>
+            <argument name="componentRegistrar" xsi:type="object">Magento\Framework\Component\ComponentRegistrarInterface</argument>
+            <argument name="serializer" xsi:type="object">Magento\Framework\Serialize\SerializerInterface</argument>
+            <argument name="cache" xsi:type="object">Magento\Framework\App\CacheInterface</argument>
+            <argument name="storeManager" xsi:type="object">Magento\Store\Model\StoreManagerInterface</argument>
+            <argument name="design" xsi:type="object">Magento\Framework\View\DesignInterface</argument>
+            <argument name="logger" xsi:type="object">Psr\Log\LoggerInterface</argument>
+        </arguments>
+    </type>
     <type name="Magento\Quote\Api\CartRepositoryInterface">
         <plugin name="fastcheckout_preserve_shipping_extension_attributes"
                 type="Kkkonrad\Fastcheckout\Plugin\Quote\PreserveShippingExtensionAttributes"/>

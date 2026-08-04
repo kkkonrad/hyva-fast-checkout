@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Kkkonrad\Fastcheckout\Plugin\Quote;
 
 use Magento\Framework\Api\ExtensionAttribute\Config as ExtensionAttributeConfig;
+use Magento\Framework\App\ObjectManager;
 use Magento\Quote\Api\CartRepositoryInterface;
 use Magento\Quote\Api\Data\AddressInterface;
 use Magento\Quote\Api\Data\CartExtensionFactory;
@@ -38,11 +39,27 @@ class PreserveShippingExtensionAttributes
      * @param ExtensionAttributeConfig|null $extensionAttributeConfig
      * @param array<string, array> $attributes Optional override map (tests / emergency)
      */
+    private CartExtensionFactory $cartExtensionFactory;
+    private ?ExtensionAttributeConfig $extensionAttributeConfig;
+    private array $attributes;
+
     public function __construct(
-        private readonly CartExtensionFactory $cartExtensionFactory,
-        private readonly ?ExtensionAttributeConfig $extensionAttributeConfig = null,
-        private readonly array $attributes = []
+        CartExtensionFactory $cartExtensionFactory,
+        ?ExtensionAttributeConfig $extensionAttributeConfig = null,
+        array $attributes = []
     ) {
+        $this->cartExtensionFactory = $cartExtensionFactory;
+        $this->extensionAttributeConfig = $extensionAttributeConfig;
+        $this->attributes = $attributes;
+        // Nullable DI params are often not injected — resolve Config when missing.
+        if ($this->extensionAttributeConfig === null) {
+            try {
+                $this->extensionAttributeConfig = ObjectManager::getInstance()
+                    ->get(ExtensionAttributeConfig::class);
+            } catch (\Throwable $exception) {
+                // Unit tests without OM keep null and use $attributes only.
+            }
+        }
     }
 
     /**
