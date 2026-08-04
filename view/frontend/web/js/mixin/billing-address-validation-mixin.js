@@ -91,6 +91,81 @@ define([
         );
     }
 
+    /**
+     * Form-provider shape (firstname/street.0/…) has usable content.
+     *
+     * @param {Object|null} formData
+     * @returns {Boolean}
+     */
+    function hasBillingFormContent(formData) {
+        var street,
+            street0;
+
+        if (!formData || typeof formData !== 'object') {
+            return false;
+        }
+
+        street = formData.street;
+        if (Array.isArray(street)) {
+            street0 = street[0];
+        } else if (street && typeof street === 'object') {
+            street0 = street[0] != null ? street[0] : street['0'];
+        }
+
+        return Boolean(
+            (street0 && String(street0).trim()) ||
+            (formData.firstname && String(formData.firstname).trim()) ||
+            (formData.lastname && String(formData.lastname).trim()) ||
+            (formData.city && String(formData.city).trim()) ||
+            (formData.postcode && String(formData.postcode).trim())
+        );
+    }
+
+    /**
+     * Normalize street to UI object {0,1} and stringify region/country ids.
+     *
+     * @param {Object|null} formData
+     * @returns {Object|null}
+     */
+    function normalizeBillingFormData(formData) {
+        var streetObject = {},
+            street,
+            normalized;
+
+        if (!formData || typeof formData !== 'object') {
+            return null;
+        }
+
+        normalized = $.extend(true, {}, formData);
+        street = normalized.street;
+
+        if (Array.isArray(street)) {
+            street.forEach(function (line, index) {
+                streetObject[index] = line == null ? '' : String(line);
+            });
+        } else if (street && typeof street === 'object') {
+            Object.keys(street).forEach(function (key) {
+                streetObject[key] = street[key] == null ? '' : String(street[key]);
+            });
+        }
+        if (typeof streetObject[0] === 'undefined' && typeof streetObject['0'] === 'undefined') {
+            streetObject[0] = '';
+        }
+        if (typeof streetObject[1] === 'undefined' && typeof streetObject['1'] === 'undefined') {
+            streetObject[1] = '';
+        }
+        normalized.street = streetObject;
+
+        if (normalized.region_id != null && normalized.region_id !== '') {
+            normalized.region_id = String(normalized.region_id);
+        }
+        if (normalized.country_id != null && normalized.country_id !== '') {
+            normalized.country_id = String(normalized.country_id);
+        }
+
+        return normalized;
+    }
+
     function isBillingFormElement(element) {
         return Boolean(
             element &&
@@ -409,6 +484,18 @@ define([
                     }
                     if (this.isAddressSameAsShipping) {
                         this.isAddressSameAsShipping(false);
+                    }
+                    // Prefill this method's form with the shared separate address
+                    // (another payment method may have been the one that saved it).
+                    if (typeof this._fastcheckoutGetCanonicalBillingFormData === 'function') {
+                        persistedBillingAddressData = this._fastcheckoutGetCanonicalBillingFormData() ||
+                            normalizeBillingFormData(persistedBillingAddressData);
+                        if (hasBillingFormContent(persistedBillingAddressData)) {
+                            this._fastcheckoutWriteFormDataToComponent(
+                                this,
+                                persistedBillingAddressData
+                            );
+                        }
                     }
                     billing = quote && typeof quote.billingAddress === 'function'
                         ? quote.billingAddress()
@@ -901,18 +988,278 @@ define([
                     checkoutData.setBillingAddressFromData(formData);
                 }
 
-                // Mirror into shared / other payment billing scopes (same provider).
-                ['billingAddress', 'billingAddressshared'].forEach(function (sharedScope) {
-                    if (sharedScope === scope) {
+                // Mirror into shared + every payment-method billing scope. Magento creates
+                // billingAddress{methodCode} per renderer; without this, street/city vanish
+                // when the shopper switches payment methods (each form has its own path).
+                (function mirrorBillingToPaymentScopes() {
+                    var scopes = {
+                            billingAddress: true,
+                            billingAddressshared: true
+                        },
+                        list = [];
+
+                    if (scope) {
+                        scopes[scope] = true;
+                    }
+
+                    try {
+                        Array.prototype.forEach.call(
+                            document.querySelectorAll('input[name="payment_method"]'),
+                            function (input) {
+                                var code = input && input.value ? String(input.value) : '';
+
+                                if (code) {
+                                    scopes['billingAddress' + code] = true;
+                                }
+                            }
+                        );
+                    } catch (domErr) {
+                        // ignore
+                    }
+
+                    Object.keys(scopes).forEach(function (sharedScope) {
+                        if (sharedScope === scope) {
+                            return;
+                        }
+                        list.push(sharedScope);
+                    });
+
+                    list.forEach(function (sharedScope) {
+                        var existing;
+
+                        try {
+                            existing = typeof source.get === 'function'
+                                ? source.get(sharedScope)
+                                : undefined;
+                            // Only write when the scope already exists (Magento registered it).
+                            if (existing === undefined) {
+                                return;
+                            }
+                            source.set(sharedScope, $.extend(true, {}, existing || {}, formData));
+                            Object.keys(formData.street).forEach(function (key) {
+                                source.set(sharedScope + '.street.' + key, formData.street[key]);
+                            });
+                        } catch (e) {
+                            // Scope may not exist yet for inactive payment methods.
+                        }
+                    });
+                })();
+            },
+
+            /**
+             * Canonical separate billing form data shared across payment methods.
+             * Prefer quote (after Update) → checkout-data → this method's provider scope.
+             *
+             * @returns {Object|null}
+             */
+            _fastcheckoutGetCanonicalBillingFormData: function () {
+                var billing,
+                    shipping,
+                    data = null,
+                    persisted;
+
+                billing = quote && typeof quote.billingAddress === 'function'
+                    ? quote.billingAddress()
+                    : null;
+                shipping = quote && typeof quote.shippingAddress === 'function'
+                    ? quote.shippingAddress()
+                    : null;
+
+                // After Update, quote holds the shared separate address.
+                if (
+                    hasAddressContent(billing) &&
+                    !this._fastcheckoutBillingMatchesShipping(billing, shipping) &&
+                    addressConverter &&
+                    typeof addressConverter.quoteAddressToFormAddressData === 'function'
+                ) {
+                    data = addressConverter.quoteAddressToFormAddressData(billing);
+                }
+
+                // Magento updateAddress also stores new-customer billing + form data.
+                persisted = getPersistedNewBillingAddressData();
+                if (!hasBillingFormContent(data) && hasBillingFormContent(persisted)) {
+                    data = persisted;
+                } else if (
+                    hasBillingFormContent(persisted) &&
+                    hasBillingFormContent(data)
+                ) {
+                    // Prefer the explicitly saved new-customer payload (latest Update).
+                    data = $.extend(true, {}, data, persisted);
+                }
+
+                if (
+                    !hasBillingFormContent(data) &&
+                    checkoutData &&
+                    typeof checkoutData.getBillingAddressFromData === 'function'
+                ) {
+                    persisted = checkoutData.getBillingAddressFromData();
+                    if (hasBillingFormContent(persisted)) {
+                        data = persisted;
+                    }
+                }
+
+                if (
+                    !hasBillingFormContent(data) &&
+                    this.source &&
+                    this.dataScopePrefix &&
+                    typeof this.source.get === 'function'
+                ) {
+                    data = this.source.get(this.dataScopePrefix);
+                }
+
+                return normalizeBillingFormData(data);
+            },
+
+            /**
+             * Write form data into one billing component's provider scope + KO fields.
+             *
+             * @param {Object} billingComponent
+             * @param {Object} formData
+             */
+            _fastcheckoutWriteFormDataToComponent: function (billingComponent, formData) {
+                var scope,
+                    source,
+                    current,
+                    lineKey,
+                    lineIndex,
+                    normalized = normalizeBillingFormData(formData);
+
+                if (!billingComponent || !normalized) {
+                    return;
+                }
+
+                scope = billingComponent.dataScopePrefix;
+                source = billingComponent.source;
+                if (!scope || !source || typeof source.set !== 'function') {
+                    return;
+                }
+
+                current = typeof source.get === 'function' ? (source.get(scope) || {}) : {};
+                source.set(scope, $.extend(true, {}, current, normalized));
+
+                Object.keys(normalized.street || {}).forEach(function (key) {
+                    source.set(scope + '.street.' + key, normalized.street[key]);
+                });
+
+                collectBillingFields(billingComponent).forEach(function (field) {
+                    var match,
+                        value,
+                        fieldName = field && field.name ? String(field.name) : '';
+
+                    if (!field || !fieldName || typeof field.value !== 'function') {
                         return;
                     }
+
+                    match = fieldName.match(/(?:^|\.)street\.(\d+)(?:\.|$)/);
+                    if (match) {
+                        lineIndex = match[1];
+                        value = normalized.street[lineIndex];
+                        if (typeof value === 'undefined') {
+                            value = normalized.street[String(lineIndex)];
+                        }
+                        if (typeof value !== 'undefined') {
+                            field.value(value == null ? '' : String(value));
+                        }
+                        return;
+                    }
+
+                    [
+                        'firstname', 'lastname', 'company', 'city', 'postcode',
+                        'telephone', 'country_id', 'region_id', 'region',
+                        'prefix', 'middlename', 'suffix', 'fax', 'vat_id'
+                    ].forEach(function (code) {
+                        var suffix = '.' + code,
+                            endsWithCode = fieldName.length >= suffix.length &&
+                                fieldName.indexOf(suffix) === fieldName.length - suffix.length;
+
+                        if (
+                            endsWithCode &&
+                            typeof normalized[code] !== 'undefined' &&
+                            normalized[code] !== null
+                        ) {
+                            field.value(normalized[code]);
+                        }
+                    });
+                });
+            },
+
+            /**
+             * Share one billing form payload across every payment method's
+             * billingAddress{code} scope so Edit on method B shows method A's Update.
+             *
+             * @param {Object} formData
+             */
+            _fastcheckoutPropagateBillingFormData: function (formData) {
+                var self = this,
+                    normalized = normalizeBillingFormData(formData),
+                    scopes = {
+                        billingAddress: true,
+                        billingAddressshared: true
+                    },
+                    source = this.source;
+
+                if (!normalized || !hasBillingFormContent(normalized)) {
+                    return;
+                }
+
+                if (checkoutData && typeof checkoutData.setBillingAddressFromData === 'function') {
+                    checkoutData.setBillingAddressFromData(normalized);
+                }
+                if (checkoutData && typeof checkoutData.setNewCustomerBillingAddress === 'function') {
+                    checkoutData.setNewCustomerBillingAddress(normalized);
+                }
+
+                forEachBillingValidationComponent(function (billingComponent) {
+                    if (
+                        billingComponent &&
+                        typeof billingComponent._fastcheckoutWriteFormDataToComponent === 'function'
+                    ) {
+                        billingComponent._fastcheckoutWriteFormDataToComponent(
+                            billingComponent,
+                            normalized
+                        );
+                    } else {
+                        self._fastcheckoutWriteFormDataToComponent(billingComponent, normalized);
+                    }
+                });
+
+                // Provider scopes for methods that exist in DOM but whose billing
+                // component is not registered yet.
+                try {
+                    Array.prototype.forEach.call(
+                        document.querySelectorAll('input[name="payment_method"]'),
+                        function (input) {
+                            var code = input && input.value ? String(input.value) : '';
+
+                            if (code) {
+                                scopes['billingAddress' + code] = true;
+                            }
+                        }
+                    );
+                } catch (domErr) {
+                    // ignore
+                }
+
+                if (!source || typeof source.set !== 'function') {
+                    return;
+                }
+
+                Object.keys(scopes).forEach(function (scopeName) {
+                    var existing;
+
                     try {
-                        source.set(sharedScope, $.extend(true, {}, formData));
-                        Object.keys(formData.street).forEach(function (key) {
-                            source.set(sharedScope + '.street.' + key, formData.street[key]);
+                        existing = typeof source.get === 'function'
+                            ? source.get(scopeName)
+                            : undefined;
+                        if (existing === undefined) {
+                            return;
+                        }
+                        source.set(scopeName, $.extend(true, {}, existing || {}, normalized));
+                        Object.keys(normalized.street || {}).forEach(function (key) {
+                            source.set(scopeName + '.street.' + key, normalized.street[key]);
                         });
                     } catch (e) {
-                        // Scope may not exist yet for inactive payment methods.
+                        // Scope may not exist for inactive methods.
                     }
                 });
             },
@@ -921,23 +1268,68 @@ define([
              * Explicit update is intentional validation.
              */
             updateAddress: function () {
+                var result,
+                    formData;
+
                 if (isFastcheckoutActive()) {
                     this._fastcheckoutAllowBillingValidation();
                     this._fastcheckoutNormalizeBillingStreetLines();
                     this._fastcheckoutGuardBillingFields();
                 }
 
-                return this._super();
+                result = this._super();
+
+                // After a successful Update, share the form across every payment method
+                // so switching methods + Edit does not open a reset/shipping form.
+                if (
+                    isFastcheckoutActive() &&
+                    this.source &&
+                    typeof this.source.get === 'function' &&
+                    this.source.get('params.invalid') !== true
+                ) {
+                    formData = this.dataScopePrefix
+                        ? this.source.get(this.dataScopePrefix)
+                        : null;
+                    if (hasBillingFormContent(formData)) {
+                        userChoseSeparateBilling = true;
+                        this._fastcheckoutPropagateBillingFormData(formData);
+                    }
+                }
+
+                return result;
             },
 
             /**
              * Opening the form for edit must not show stale/premature errors.
+             * Prefill from the shared canonical billing (other payment method's Update).
              */
             editAddress: function () {
-                var result = this._super();
+                var canonicalData = null,
+                    result;
+
+                if (isFastcheckoutActive()) {
+                    // Capture before Magento nulls quote.billingAddress().
+                    canonicalData = this._fastcheckoutGetCanonicalBillingFormData();
+                }
+
+                result = this._super();
 
                 if (isFastcheckoutActive()) {
                     this._fastcheckoutBeginBillingValidationSuppress();
+                    if (hasBillingFormContent(canonicalData)) {
+                        userChoseSeparateBilling = true;
+                        if (this.isAddressSameAsShipping) {
+                            this._fastcheckoutSyncingSameAsShipping = true;
+                            try {
+                                this.isAddressSameAsShipping(false);
+                            } finally {
+                                this._fastcheckoutSyncingSameAsShipping = false;
+                            }
+                        }
+                        this._fastcheckoutWriteFormDataToComponent(this, canonicalData);
+                        // Keep siblings in sync immediately (not only after next Update).
+                        this._fastcheckoutPropagateBillingFormData(canonicalData);
+                    }
                 }
 
                 return result;

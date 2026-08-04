@@ -2336,6 +2336,15 @@ define([
                     if (component && component.messageContainer) {
                         subscribePaymentMessageContainer(component.messageContainer);
                     }
+
+                    // PayU (and similar) Secure Forms: recover from dead iframe/SDK state
+                    // after reparent or soft-remove, and catch tokenize rejections.
+                    if (
+                        component &&
+                        typeof component.renderSecureForm === 'function'
+                    ) {
+                        wrapHostedTokenizeRecovery(component);
+                    }
                 }
 
                 function patchRenderers() {
@@ -3002,11 +3011,377 @@ define([
                         );
                 }
 
+                /**
+                 * Hosted-field containers for a payment renderer (PayU Secure Forms, etc.).
+                 *
+                 * @param {Object} component
+                 * @returns {String[]}
+                 */
+                function getSecureFormSelectors(component) {
+                    var options = component && component.secureFormOptions;
+
+                    if (!options || typeof options !== 'object') {
+                        return [];
+                    }
+
+                    return [
+                        options.elementFormNumber,
+                        options.elementFormDate,
+                        options.elementFormCvv
+                    ].filter(function (selector) {
+                        return typeof selector === 'string' && selector !== '';
+                    });
+                }
+
+                /**
+                 * @param {Object} component
+                 * @param {Element|null} [root]
+                 * @returns {Boolean}
+                 */
+                function componentSecureFormsMounted(component, root) {
+                    var selectors = getSecureFormSelectors(component),
+                        scope = root || document;
+
+                    if (!selectors.length) {
+                        return true;
+                    }
+
+                    return selectors.every(function (selector) {
+                        var field = null;
+
+                        try {
+                            field = scope.querySelector
+                                ? scope.querySelector(selector)
+                                : document.querySelector(selector);
+                        } catch (e) {
+                            field = document.querySelector(selector);
+                        }
+
+                        return !!field && (
+                            String(field.tagName).toLowerCase() === 'iframe' ||
+                            !!field.querySelector('iframe')
+                        );
+                    });
+                }
+
+                /**
+                 * PayU tokenize() has no .catch — rejections leave the loader running and
+                 * isPlaceOrderActionAllowed(false), so card validation appears dead.
+                 *
+                 * @param {Object} component
+                 */
+                function wrapHostedTokenizeRecovery(component) {
+                    var sdk,
+                        originalTokenize;
+
+                    if (!component) {
+                        return;
+                    }
+
+                    sdk = component.payuSDK;
+                    if (!sdk || typeof sdk.tokenize !== 'function') {
+                        return;
+                    }
+
+                    // Recreated PayU SDK instances need a fresh wrap.
+                    if (
+                        component._fastcheckoutTokenizeWrapped &&
+                        component._fastcheckoutTokenizeSdk === sdk
+                    ) {
+                        return;
+                    }
+
+                    originalTokenize = sdk.tokenize.bind(sdk);
+                    sdk.tokenize = function () {
+                        var promise = originalTokenize.apply(sdk, arguments);
+
+                        if (!promise || typeof promise.then !== 'function') {
+                            return promise;
+                        }
+
+                        return promise.then(
+                            function (result) {
+                                return result;
+                            },
+                            function (error) {
+                                recoverHostedPaymentAfterTokenizeError(component, error);
+                                return Promise.reject(error);
+                            }
+                        );
+                    };
+                    component._fastcheckoutTokenizeWrapped = true;
+                    component._fastcheckoutTokenizeSdk = sdk;
+                }
+
+                /**
+                 * Reset PayU UI after secure.forms.not.exists / network failure.
+                 *
+                 * @param {Object} component
+                 * @param {*} error
+                 */
+                function recoverHostedPaymentAfterTokenizeError(component, error) {
+                    var message = '',
+                        formsMissing = false;
+
+                    try {
+                        if (fullScreenLoader && typeof fullScreenLoader.stopLoader === 'function') {
+                            fullScreenLoader.stopLoader();
+                        }
+                    } catch (e) {
+                        // ignore
+                    }
+
+                    try {
+                        if (
+                            component &&
+                            typeof component.isPlaceOrderActionAllowed === 'function'
+                        ) {
+                            component.isPlaceOrderActionAllowed(true);
+                        }
+                    } catch (e2) {
+                        // ignore
+                    }
+
+                    if (error) {
+                        if (typeof error === 'string') {
+                            message = error;
+                        } else if (error.message) {
+                            message = String(error.message);
+                        } else {
+                            message = String(error);
+                        }
+                    }
+
+                    formsMissing = /secure\.forms\.not\.exists/i.test(message);
+
+                    if (formsMissing) {
+                        message = translateFastcheckoutMessage(
+                            'Card form is not ready. Please re-enter card details and try again.'
+                        );
+                        // Force a fresh Secure Form mount — reparent/soft-hide can kill iframes
+                        // while the PayU SDK still thinks forms exist (or loses them entirely).
+                        ensureHostedSecureFormsReady(component, { force: true });
+                    }
+
+                    if (
+                        component &&
+                        component.secureFormError &&
+                        typeof component.secureFormError === 'function' &&
+                        message
+                    ) {
+                        try {
+                            component.secureFormError(message);
+                        } catch (e3) {
+                            // ignore
+                        }
+                    }
+                }
+
+                /**
+                 * Re-mount hosted secure forms when DOM iframes are missing or after force.
+                 * Safe no-op for non-hosted methods.
+                 *
+                 * @param {Object} component
+                 * @param {Object} [options]
+                 * @param {Boolean} [options.force=false]
+                 * @returns {Boolean}
+                 */
+                function ensureHostedSecureFormsReady(component, options) {
+                    var opts = options || {},
+                        selectors,
+                        methodCode,
+                        root;
+
+                    if (!component || typeof component.renderSecureForm !== 'function') {
+                        return true;
+                    }
+
+                    if (typeof component.useNewCard === 'function') {
+                        try {
+                            if (!component.useNewCard()) {
+                                return true;
+                            }
+                        } catch (e) {
+                            // continue and try to mount
+                        }
+                    }
+
+                    methodCode = getRendererCode(component, '');
+                    root = methodCode
+                        ? document.querySelector(
+                            '[data-fastcheckout-payment-method-ko-target="' +
+                            String(methodCode).replace(/"/g, '') + '"]'
+                        )
+                        : null;
+
+                    if (!opts.force && componentSecureFormsMounted(component, root || document)) {
+                        // Still wrap tokenize so rejections recover the place-order gate.
+                        if (
+                            component.payuSDK &&
+                            component._fastcheckoutTokenizeSdk !== component.payuSDK
+                        ) {
+                            component._fastcheckoutTokenizeWrapped = false;
+                        }
+                        wrapHostedTokenizeRecovery(component);
+                        return true;
+                    }
+
+                    selectors = getSecureFormSelectors(component);
+                    selectors.forEach(function (selector) {
+                        var field = null;
+
+                        try {
+                            field = document.querySelector(selector);
+                        } catch (e) {
+                            field = null;
+                        }
+                        if (field) {
+                            while (field.firstChild) {
+                                field.removeChild(field.firstChild);
+                            }
+                        }
+                    });
+
+                    try {
+                        // Fresh SDK instance: dead registry after reparent/display:none.
+                        if (
+                            component.secureForm &&
+                            component.secureForm.posId &&
+                            typeof window.PayU === 'function'
+                        ) {
+                            component.payuSDK = window.PayU(component.secureForm.posId, true);
+                            component._fastcheckoutTokenizeWrapped = false;
+                        }
+
+                        if (!component.payuSDK) {
+                            return false;
+                        }
+
+                        wrapHostedTokenizeRecovery(component);
+                        component.renderSecureForm();
+                        return componentSecureFormsMounted(component, root || document);
+                    } catch (reinitErr) {
+                        if (window.console && typeof window.console.warn === 'function') {
+                            window.console.warn(
+                                'Kkkonrad Fastcheckout: secure form re-init failed.',
+                                reinitErr
+                            );
+                        }
+                        return false;
+                    }
+                }
+
+                /**
+                 * Seed billingAddress{method} from the shared separate billing payload.
+                 * Prefer getNewCustomerBillingAddress (after Update) over getBillingAddressFromData.
+                 * Always overwrite when a canonical separate address exists — shipping-prefilled
+                 * street on method B must not block the address saved on method A.
+                 *
+                 * @param {String} methodCode
+                 */
+                function seedBillingScopeForPaymentMethod(methodCode) {
+                    var code = methodCode ? String(methodCode) : '',
+                        scope,
+                        data = null,
+                        street,
+                        hasStreet,
+                        billingComponent;
+
+                    if (!code) {
+                        return;
+                    }
+
+                    // Prefer the billing component's shared helper when available.
+                    billingComponent = getActiveBillingAddressComponent
+                        ? getActiveBillingAddressComponent()
+                        : null;
+                    if (
+                        billingComponent &&
+                        typeof billingComponent._fastcheckoutGetCanonicalBillingFormData === 'function'
+                    ) {
+                        data = billingComponent._fastcheckoutGetCanonicalBillingFormData();
+                    }
+
+                    if ((!data || typeof data !== 'object') && checkoutData) {
+                        if (typeof checkoutData.getNewCustomerBillingAddress === 'function') {
+                            data = checkoutData.getNewCustomerBillingAddress();
+                        }
+                        if (
+                            (!data || typeof data !== 'object') &&
+                            typeof checkoutData.getBillingAddressFromData === 'function'
+                        ) {
+                            data = checkoutData.getBillingAddressFromData();
+                        }
+                    }
+
+                    if (!data || typeof data !== 'object') {
+                        return;
+                    }
+
+                    street = data.street;
+                    hasStreet = false;
+                    if (Array.isArray(street)) {
+                        hasStreet = !!(street[0] && String(street[0]).trim());
+                    } else if (street && typeof street === 'object') {
+                        hasStreet = !!(String(street[0] || street['0'] || '').trim());
+                    }
+                    if (!hasStreet && !(data.firstname || data.city)) {
+                        return;
+                    }
+
+                    // Prefer writing through the billing component so KO fields refresh.
+                    if (
+                        billingComponent &&
+                        typeof billingComponent._fastcheckoutPropagateBillingFormData === 'function'
+                    ) {
+                        billingComponent._fastcheckoutPropagateBillingFormData(data);
+                        return;
+                    }
+
+                    scope = 'billingAddress' + code;
+                    registry.async('checkoutProvider')(function (provider) {
+                        var current,
+                            streetObject = {},
+                            merged;
+
+                        if (!provider || typeof provider.get !== 'function' || typeof provider.set !== 'function') {
+                            return;
+                        }
+
+                        current = provider.get(scope);
+                        if (current === undefined) {
+                            return;
+                        }
+
+                        if (Array.isArray(street)) {
+                            street.forEach(function (line, index) {
+                                streetObject[index] = line == null ? '' : String(line);
+                            });
+                        } else if (street && typeof street === 'object') {
+                            Object.keys(street).forEach(function (key) {
+                                streetObject[key] = street[key] == null ? '' : String(street[key]);
+                            });
+                        }
+                        if (typeof streetObject[0] === 'undefined') {
+                            streetObject[0] = '';
+                        }
+                        if (typeof streetObject[1] === 'undefined') {
+                            streetObject[1] = '';
+                        }
+
+                        // Force merge of shared separate billing over shipping-prefilled scope.
+                        merged = $.extend(true, {}, current || {}, data, { street: streetObject });
+                        provider.set(scope, merged);
+                        Object.keys(streetObject).forEach(function (key) {
+                            provider.set(scope + '.street.' + key, streetObject[key]);
+                        });
+                    });
+                }
+
                 function isPaymentRendererReady(methodCode) {
                     var component = getRendererByMethod(methodCode),
                         target,
-                        options,
-                        selectors;
+                        options;
 
                     if (!component || !isPaymentPanelOpen(methodCode, methodCode)) {
                         return false;
@@ -3026,28 +3401,12 @@ define([
                         }
                     }
 
-                    selectors = [
-                        options.elementFormNumber,
-                        options.elementFormDate,
-                        options.elementFormCvv
-                    ].filter(function (selector) {
-                        return typeof selector === 'string' && selector !== '';
-                    });
-                    if (!selectors.length) {
-                        return true;
-                    }
-
                     target = document.querySelector(
-                        '[data-fastcheckout-payment-method-ko-target="' + methodCode + '"]'
+                        '[data-fastcheckout-payment-method-ko-target="' +
+                        String(methodCode || '').replace(/"/g, '') + '"]'
                     );
-                    return !!target && selectors.every(function (selector) {
-                        var field = target.querySelector(selector);
 
-                        return !!field && (
-                            String(field.tagName).toLowerCase() === 'iframe' ||
-                            !!field.querySelector('iframe')
-                        );
-                    });
+                    return componentSecureFormsMounted(component, target || document);
                 }
 
                 function activateDeferredPaymentChildren(methodCode) {
@@ -3078,9 +3437,29 @@ define([
                                 paymentHostBridge &&
                                 !paymentHostBridge.isPermanentlyMounted(existingInTarget)
                             ) {
-                                paymentHostBridge.adoptRendererOnce(existingInTarget, methodCode);
+                                result = paymentHostBridge.adoptRendererOnce(existingInTarget, methodCode);
+                                // Reparent after PayU afterRender kills iframes — remount Secure Forms.
+                                if (result && result.moved) {
+                                    window.setTimeout(function () {
+                                        ensureHostedSecureFormsReady(
+                                            getRendererByMethod(methodCode),
+                                            { force: true }
+                                        );
+                                    }, 0);
+                                }
                             }
                             annotateNativePaymentActions(existingInTarget);
+                        }
+                        // Soft-hide/shipping remap can leave iframes detached without a reparent.
+                        if (!isPaymentRendererReady(methodCode)) {
+                            window.setTimeout(function () {
+                                ensureHostedSecureFormsReady(
+                                    getRendererByMethod(methodCode),
+                                    { force: true }
+                                );
+                            }, 0);
+                        } else {
+                            wrapHostedTokenizeRecovery(getRendererByMethod(methodCode));
                         }
                         document.querySelectorAll('input[name="payment_method"]').forEach(function (input) {
                             if (
@@ -3124,6 +3503,20 @@ define([
 
                     if (!result.opened) {
                         return false;
+                    }
+
+                    // Host adopt moves the Magento .payment-method node. PayU mounts
+                    // Secure Form iframes via afterRender — moving after that leaves
+                    // tokenize() with secure.forms.not.exists. Remount when needed.
+                    if (result.moved || !isPaymentRendererReady(methodCode)) {
+                        window.setTimeout(function () {
+                            ensureHostedSecureFormsReady(
+                                getRendererByMethod(methodCode),
+                                { force: !!result.moved }
+                            );
+                        }, 0);
+                    } else {
+                        wrapHostedTokenizeRecovery(getRendererByMethod(methodCode));
                     }
 
                     holdPaymentPanel(methodCode);
@@ -3218,6 +3611,10 @@ define([
                         selectPaymentMethodAction(activeMethod);
                         persistPaymentMethodToCheckoutData(activeCode);
                     }
+
+                    // Each payment method has its own billingAddress{code} provider scope.
+                    // Seed from checkout-data so street/city do not blank when switching methods.
+                    seedBillingScopeForPaymentMethod(activeCode || methodCode);
 
                     if (!isPaymentSelectionStillWanted(methodCode, selectionGeneration)) {
                         return false;
@@ -5190,6 +5587,14 @@ define([
 	                        }
 
                             methodCode = selectedMethod || getSelectedMethodCode();
+                            if (!isPaymentRendererReady(methodCode)) {
+                                // One recovery attempt: shipping remap / host reparent often
+                                // leaves PayU Secure Forms without iframes in the DOM.
+                                ensureHostedSecureFormsReady(
+                                    getRendererByMethod(methodCode),
+                                    { force: true }
+                                );
+                            }
                             if (!isPaymentRendererReady(methodCode)) {
                                 rendererNotReadyError = new Error(translateFastcheckoutMessage(
                                     'The selected payment method is not ready. Please try again.'
