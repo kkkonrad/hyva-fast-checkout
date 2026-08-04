@@ -2,29 +2,20 @@
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
 
-    <!-- Generic shipping extension / locker attribute preservation (InPost default + extensible). -->
+    <!--
+      Auto-discover scalar Cart/Address extension_attributes from all installed modules.
+      No per-vendor attribute list: installing a shipping/payment module is enough
+      (same integration surface as Magento_Checkout).
+    -->
     <type name="Kkkonrad\Fastcheckout\Plugin\Quote\PreserveShippingExtensionAttributes">
         <arguments>
-            <argument name="attributes" xsi:type="array">
-                <item name="inpost_locker_id" xsi:type="array">
-                    <item name="column" xsi:type="string">inpost_locker_id</item>
-                    <item name="extension_getter" xsi:type="string">getInpostLockerId</item>
-                    <item name="extension_setter" xsi:type="string">setInpostLockerId</item>
-                    <item name="shipping_method_needles" xsi:type="array">
-                        <item name="inpostlocker" xsi:type="string">inpostlocker</item>
-                        <item name="inpost_and_locker" xsi:type="string">inpost&&locker</item>
-                    </item>
-                </item>
-            </argument>
+            <argument name="extensionAttributeConfig" xsi:type="object">Magento\Framework\Api\ExtensionAttribute\Config</argument>
+            <argument name="attributes" xsi:type="array"/>
         </arguments>
     </type>
     <type name="Magento\Quote\Api\CartRepositoryInterface">
         <plugin name="fastcheckout_preserve_shipping_extension_attributes"
                 type="Kkkonrad\Fastcheckout\Plugin\Quote\PreserveShippingExtensionAttributes"/>
-        <!-- BC alias name kept for clarity in plugin lists; same generic class can be used alone. -->
-        <plugin name="fastcheckout_preserve_inpost_locker"
-                type="Kkkonrad\Fastcheckout\Plugin\Quote\PreserveInpostLocker"
-                disabled="true"/>
     </type>
     <type name="Magento\Quote\Api\CartManagementInterface">
         <plugin name="fastcheckout_place_order_extras"

@@ -8,11 +8,8 @@ use Magento\Quote\Api\Data\CartExtensionFactory;
 use Magento\Quote\Api\Data\CartInterface;
 
 /**
- * Backward-compatible InPost entry point.
- *
- * Prefer {@see PreserveShippingExtensionAttributes} with DI attribute config.
- * This class remains for existing tests and any external references; it
- * delegates to the generic preserver with InPost defaults.
+ * @deprecated Use PreserveShippingExtensionAttributes (auto-discovery).
+ * Kept as a thin BC wrapper for unit tests / external references.
  */
 class PreserveInpostLocker
 {
@@ -20,17 +17,15 @@ class PreserveInpostLocker
 
     public function __construct(CartExtensionFactory $cartExtensionFactory)
     {
+        // Explicit InPost map only when ExtensionAttribute\Config is unavailable (unit tests).
         $this->preserver = new PreserveShippingExtensionAttributes(
             $cartExtensionFactory,
+            null,
             [
                 'inpost_locker_id' => [
                     'column' => 'inpost_locker_id',
                     'extension_getter' => 'getInpostLockerId',
                     'extension_setter' => 'setInpostLockerId',
-                    'shipping_method_needles' => [
-                        'inpostlocker',
-                        'inpost&&locker',
-                    ],
                 ],
             ]
         );

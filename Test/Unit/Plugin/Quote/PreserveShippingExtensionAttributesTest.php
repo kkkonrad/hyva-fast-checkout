@@ -4,9 +4,12 @@ declare(strict_types=1);
 namespace Kkkonrad\Fastcheckout\Test\Unit\Plugin\Quote;
 
 use Kkkonrad\Fastcheckout\Plugin\Quote\PreserveShippingExtensionAttributes;
+use Magento\Framework\Api\ExtensionAttribute\Config as ExtensionAttributeConfig;
 use Magento\Quote\Api\CartRepositoryInterface;
+use Magento\Quote\Api\Data\AddressInterface;
 use Magento\Quote\Api\Data\CartExtensionFactory;
 use Magento\Quote\Api\Data\CartExtensionInterface;
+use Magento\Quote\Api\Data\CartInterface;
 use Magento\Quote\Model\Quote;
 use Magento\Quote\Model\Quote\Address as QuoteAddress;
 use PHPUnit\Framework\TestCase;
@@ -18,7 +21,7 @@ class PreserveShippingExtensionAttributesTest extends TestCase
         PreserveShippingExtensionAttributes::resetLookupCache();
     }
 
-    public function testRestoresGenericParcelAttributeForMatchingShippingMethod(): void
+    public function testDiscoversCartExtensionAttributesWithoutDiWhitelist(): void
     {
         $extension = $this->getMockBuilder(CartExtensionInterface::class)
             ->addMethods(['setParcelPointId', 'getParcelPointId'])
@@ -39,17 +42,16 @@ class PreserveShippingExtensionAttributesTest extends TestCase
         $factory = $this->createMock(CartExtensionFactory::class);
         $factory->expects($this->once())->method('create')->willReturn($extension);
 
-        $plugin = new PreserveShippingExtensionAttributes($factory, [
-            'parcel_point_id' => [
-                'column' => 'parcel_point_id',
-                'extension_getter' => 'getParcelPointId',
-                'extension_setter' => 'setParcelPointId',
-                'shipping_method_needles' => ['dpd_pickup', 'parcel'],
+        $config = $this->createMock(ExtensionAttributeConfig::class);
+        $config->method('get')->willReturn([
+            CartInterface::class => [
+                'parcel_point_id' => ['type' => 'string'],
+                'shipping_assignments' => ['type' => 'Magento\Quote\Api\Data\ShippingAssignmentInterface[]'],
             ],
         ]);
 
-        $shippingAddress = $this->createMock(QuoteAddress::class);
-        $shippingAddress->method('getShippingMethod')->willReturn('dpd_pickup_standard');
+        // Empty DI attributes — pure discovery.
+        $plugin = new PreserveShippingExtensionAttributes($factory, $config, []);
 
         $select = $this->getMockBuilder(\stdClass::class)->addMethods(['from', 'where'])->getMock();
         $select->method('from')->willReturnSelf();
@@ -59,14 +61,23 @@ class PreserveShippingExtensionAttributesTest extends TestCase
             ->addMethods(['select', 'fetchOne', 'tableColumnExists'])
             ->getMock();
         $connection->method('select')->willReturn($select);
-        $connection->method('tableColumnExists')->willReturn(true);
-        $connection->method('fetchOne')->willReturn('POINT-42');
+        $connection->method('tableColumnExists')->willReturnCallback(
+            static function ($table, $column) {
+                return $column === 'parcel_point_id';
+            }
+        );
+        $connection->method('fetchOne')->willReturn('POINT-99');
 
         $resource = $this->getMockBuilder(\stdClass::class)
             ->addMethods(['getConnection', 'getTable'])
             ->getMock();
         $resource->method('getConnection')->willReturn($connection);
-        $resource->method('getTable')->willReturn('quote');
+        $resource->method('getTable')->willReturnCallback(static function ($name) {
+            return $name;
+        });
+
+        $shippingAddress = $this->createMock(QuoteAddress::class);
+        $shippingAddress->method('getId')->willReturn(0);
 
         $quote = $this->getMockBuilder(Quote::class)
             ->disableOriginalConstructor()
@@ -82,89 +93,97 @@ class PreserveShippingExtensionAttributesTest extends TestCase
             ])
             ->getMock();
         $quote->method('isVirtual')->willReturn(false);
-        $quote->method('getId')->willReturn(99);
+        $quote->method('getId')->willReturn(50);
         $quote->method('getExtensionAttributes')->willReturn(null);
-        $quote->method('getData')->with('parcel_point_id')->willReturn(null);
+        $quote->method('getData')->willReturn(null);
         $quote->method('getShippingAddress')->willReturn($shippingAddress);
         $quote->method('getResource')->willReturn($resource);
-        $quote->expects($this->once())->method('setData')->with('parcel_point_id', 'POINT-42');
+        $quote->expects($this->once())->method('setData')->with('parcel_point_id', 'POINT-99');
         $quote->expects($this->once())->method('setExtensionAttributes')->with($extension);
 
         $repository = $this->createMock(CartRepositoryInterface::class);
         $this->assertSame([$quote], $plugin->beforeSave($repository, $quote));
-        $this->assertSame('POINT-42', $stored);
+        $this->assertSame('POINT-99', $stored);
     }
 
-    public function testSkipsDbWhenShippingNeedlesDoNotMatch(): void
+    public function testSkipsComplexExtensionAttributes(): void
     {
         $factory = $this->createMock(CartExtensionFactory::class);
         $factory->expects($this->never())->method('create');
 
-        $plugin = new PreserveShippingExtensionAttributes($factory, [
-            'parcel_point_id' => [
-                'column' => 'parcel_point_id',
-                'shipping_method_needles' => ['dpd_pickup'],
+        $config = $this->createMock(ExtensionAttributeConfig::class);
+        $config->method('get')->willReturn([
+            CartInterface::class => [
+                'shipping_assignments' => [
+                    'type' => 'Magento\Quote\Api\Data\ShippingAssignmentInterface[]',
+                ],
             ],
         ]);
 
-        $shippingAddress = $this->createMock(QuoteAddress::class);
-        $shippingAddress->method('getShippingMethod')->willReturn('flatrate_flatrate');
+        $plugin = new PreserveShippingExtensionAttributes($factory, $config, []);
 
-        $quote = $this->getMockBuilder(Quote::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods([
-                'isVirtual',
-                'getId',
-                'getExtensionAttributes',
-                'getData',
-                'getResource',
-                'getShippingAddress',
-            ])
-            ->getMock();
+        $quote = $this->createMock(Quote::class);
         $quote->method('isVirtual')->willReturn(false);
-        $quote->method('getId')->willReturn(5);
+        $quote->method('getId')->willReturn(1);
+        $quote->method('getShippingAddress')->willReturn(null);
         $quote->method('getExtensionAttributes')->willReturn(null);
-        $quote->method('getData')->willReturn(null);
-        $quote->method('getShippingAddress')->willReturn($shippingAddress);
         $quote->expects($this->never())->method('getResource');
 
         $repository = $this->createMock(CartRepositoryInterface::class);
         $this->assertSame([$quote], $plugin->beforeSave($repository, $quote));
     }
 
-    public function testCompoundNeedleRequiresBothParts(): void
+    public function testRestoresShippingAddressExtensionAttribute(): void
     {
         $factory = $this->createMock(CartExtensionFactory::class);
-        $factory->expects($this->never())->method('create');
 
-        $plugin = new PreserveShippingExtensionAttributes($factory, [
-            'inpost_locker_id' => [
-                'column' => 'inpost_locker_id',
-                'shipping_method_needles' => ['inpost&&locker'],
+        $config = $this->createMock(ExtensionAttributeConfig::class);
+        $config->method('get')->willReturn([
+            CartInterface::class => [],
+            AddressInterface::class => [
+                'pickup_location_code' => ['type' => 'string'],
             ],
         ]);
 
-        $shippingAddress = $this->createMock(QuoteAddress::class);
-        // Has inpost but not locker — must not hit DB.
-        $shippingAddress->method('getShippingMethod')->willReturn('inpost_courier');
+        $plugin = new PreserveShippingExtensionAttributes($factory, $config, []);
+
+        $select = $this->getMockBuilder(\stdClass::class)->addMethods(['from', 'where'])->getMock();
+        $select->method('from')->willReturnSelf();
+        $select->method('where')->willReturnSelf();
+
+        $connection = $this->getMockBuilder(\stdClass::class)
+            ->addMethods(['select', 'fetchOne', 'tableColumnExists'])
+            ->getMock();
+        $connection->method('select')->willReturn($select);
+        $connection->method('tableColumnExists')->willReturn(true);
+        $connection->method('fetchOne')->willReturn('STORE001');
+
+        $resource = $this->getMockBuilder(\stdClass::class)
+            ->addMethods(['getConnection', 'getTable'])
+            ->getMock();
+        $resource->method('getConnection')->willReturn($connection);
+        $resource->method('getTable')->willReturnCallback(static function ($name) {
+            return $name;
+        });
+
+        $shippingAddress = $this->getMockBuilder(QuoteAddress::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['getId', 'getExtensionAttributes', 'getData', 'setData'])
+            ->getMock();
+        $shippingAddress->method('getId')->willReturn(77);
+        $shippingAddress->method('getExtensionAttributes')->willReturn(null);
+        $shippingAddress->method('getData')->willReturn(null);
+        $shippingAddress->expects($this->once())->method('setData')->with('pickup_location_code', 'STORE001');
 
         $quote = $this->getMockBuilder(Quote::class)
             ->disableOriginalConstructor()
-            ->onlyMethods([
-                'isVirtual',
-                'getId',
-                'getExtensionAttributes',
-                'getData',
-                'getResource',
-                'getShippingAddress',
-            ])
+            ->onlyMethods(['isVirtual', 'getId', 'getShippingAddress', 'getResource', 'getExtensionAttributes'])
             ->getMock();
         $quote->method('isVirtual')->willReturn(false);
-        $quote->method('getId')->willReturn(6);
+        $quote->method('getId')->willReturn(10);
         $quote->method('getExtensionAttributes')->willReturn(null);
-        $quote->method('getData')->willReturn(null);
         $quote->method('getShippingAddress')->willReturn($shippingAddress);
-        $quote->expects($this->never())->method('getResource');
+        $quote->method('getResource')->willReturn($resource);
 
         $repository = $this->createMock(CartRepositoryInterface::class);
         $this->assertSame([$quote], $plugin->beforeSave($repository, $quote));

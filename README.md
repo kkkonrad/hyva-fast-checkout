@@ -134,3 +134,17 @@ php bin/magento cache:flush
 
 This is required when `pub/static/frontend/*/Kkkonrad_Fastcheckout` already exists
 (even in developer mode).
+
+## Third-party shipping / payment modules
+
+Fastcheckout is designed as a host for Magento's native Knockout checkout APIs.
+Installing a standard shipping or payment module should **not** require patches
+or DI entries inside Kkkonrad_Fastcheckout:
+
+- Payment renderers and shipping UI components are loaded from the merged
+  Magento `checkout_index_index` jsLayout (all active modules + theme).
+- Scalar `extension_attributes` declared on `CartInterface` /
+  `AddressInterface` are auto-discovered and re-hydrated on quote save when the
+  matching DB column exists (parcel lockers, store pickup codes, etc.).
+- Optional UI hooks (e.g. InPost RequireJS widget) load only when that module
+  registers its AMD path; missing modules fail silently.
