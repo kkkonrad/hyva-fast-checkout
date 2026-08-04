@@ -1,0 +1,41 @@
+<?php
+/**
+ * Fastcheckout wrapper for Magento guest registration on the success page.
+ *
+ * @var \Magento\Checkout\Block\Registration $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+?>
+<div id="registration"
+     class="fastcheckout-success-registration w-full text-center"
+     data-bind="scope: 'registration'">
+    <!-- ko template: getTemplate() --><!-- /ko -->
+    <script type="text/x-magento-init">
+        {
+            "#registration": {
+                "Magento_Ui/js/core/app": {
+                    "components": {
+                        "registration": {
+                            "component": "Magento_Checkout/js/view/registration",
+                            "config": {
+                                "template": "Kkkonrad_Fastcheckout/success/registration",
+                                "registrationUrl": "<?= $escaper->escapeJs($escaper->escapeUrl($block->getCreateAccountUrl())) ?>",
+                                "email": "<?= $escaper->escapeJs($block->getEmailAddress()) ?>"
+                            },
+                            "children": {
+                                "errors": {
+                                    "component": "Magento_Ui/js/view/messages",
+                                    "sortOrder": 0,
+                                    "displayArea": "messages",
+                                    "config": {
+                                        "autoHideTimeOut": -1
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</div>

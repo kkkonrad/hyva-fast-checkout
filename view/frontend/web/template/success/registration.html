@@ -1,0 +1,23 @@
+<!--
+/**
+ * Fastcheckout guest registration prompt on order success.
+ * Replaces Magento_Checkout/registration with Hyvä-friendly markup.
+ */
+-->
+<!-- ko foreach: getRegion('messages') -->
+    <!-- ko template: getTemplate() --><!-- /ko -->
+<!-- /ko -->
+<div class="fastcheckout-success-registration-inner w-full flex flex-col items-center gap-3 text-center">
+    <!-- ko if: isFormVisible -->
+    <p class="m-0 max-w-sm text-sm leading-relaxed text-gray-600"
+       data-bind="i18n: 'You can track your order status by creating an account.'"></p>
+    <p class="m-0 text-sm text-gray-700">
+        <span data-bind="i18n: 'Email Address'"></span>:
+        <span class="font-medium text-gray-900" data-bind="text: getEmailAddress()"></span>
+    </p>
+    <a class="btn btn-primary w-full no-underline"
+       data-bind="attr: { href: getUrl() }">
+        <span data-bind="i18n: 'Create an Account'"></span>
+    </a>
+    <!-- /ko -->
+</div>

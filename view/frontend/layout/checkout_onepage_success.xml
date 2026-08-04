@@ -1,11 +1,19 @@
 <?xml version="1.0"?>
+<!--
+/**
+ * Success-page FC registration styling on the standard Magento handle so CSS and
+ * the registration child always apply (plugin addHandle can be late for head).
+ * Module layout is only merged when Kkkonrad_Fastcheckout is enabled.
+ */
+-->
 <page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
     <head>
         <css src="Kkkonrad_Fastcheckout::css/hyva-success.css"/>
     </head>
     <body>
-        <referenceBlock name="checkout.tpay.order_status" remove="true"/>
+        <referenceBlock name="checkout.registration"
+                        template="Kkkonrad_Fastcheckout::success/registration.phtml"/>
         <move element="checkout.registration"
               destination="checkout.success"
               as="registration"/>

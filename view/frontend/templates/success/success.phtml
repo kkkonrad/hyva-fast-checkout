@@ -3,7 +3,7 @@
  * @var $block \Kkkonrad\Fastcheckout\Block\Onepage\Success
  */
 ?>
-<div class="max-w-md mx-auto my-12 p-8 bg-white border border-gray-200 shadow-md rounded-lg text-center space-y-6">
+<div class="fastcheckout-success-card max-w-md mx-auto my-12 p-8 bg-white border border-gray-200 shadow-md rounded-lg text-center space-y-6">
     <!-- Success Green Checkmark SVG -->
     <div class="mx-auto w-20 h-20 bg-green-50 text-green-500 rounded-full flex items-center justify-center animate-bounce">
         <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -36,8 +36,18 @@
         </p>
     </div>
 
-    <?= /* @noEscape -- standard Magento registration block validates whether it may be displayed. */
-    $block->getChildHtml('registration') ?>
+    <?php
+    /**
+     * Guest “create account to track order” prompt (Magento_Checkout::registration).
+     * Styled via hyva-success.css — Magento KO markup has no theme classes.
+     */
+    $registrationHtml = $block->getChildHtml('registration');
+    if (trim((string)$registrationHtml) !== ''):
+    ?>
+    <div class="fastcheckout-success-registration w-full text-center space-y-3 pt-1">
+        <?= /* @noEscape -- standard Magento registration block. */ $registrationHtml ?>
+    </div>
+    <?php endif; ?>
 
     <!-- Print Receipt -->
     <?php if ($block->getCanViewOrder() && $block->getCanPrintOrder()): ?>

@@ -1,0 +1,102 @@
+/**
+ * Fastcheckout success page — guest account registration prompt.
+ * Works with Magento stock KO template and our success/registration template.
+ */
+
+/* When registration sits inside the success card (moved as child) */
+.fastcheckout-success-card .fastcheckout-success-registration,
+.fastcheckout-success-registration {
+    display: block;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    text-align: center;
+}
+
+#registration.fastcheckout-success-registration,
+.fastcheckout-success-card #registration {
+    display: block;
+    width: 100%;
+    margin: 0 auto;
+    padding: 0;
+    text-align: center;
+}
+
+/* Magento stock template starts with a bare <br /> */
+#registration.fastcheckout-success-registration > br,
+.fastcheckout-success-card #registration > br {
+    display: none !important;
+}
+
+.fastcheckout-success-registration-inner,
+#registration.fastcheckout-success-registration > div,
+.fastcheckout-success-card #registration > div {
+    display: flex !important;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    width: 100%;
+    margin: 0 auto;
+    text-align: center;
+}
+
+.fastcheckout-success-registration-inner p,
+#registration.fastcheckout-success-registration p,
+.fastcheckout-success-card #registration p {
+    margin: 0 auto !important;
+    max-width: 22rem;
+    text-align: center !important;
+    font-size: 0.875rem !important;
+    line-height: 1.5 !important;
+    color: #6b7280 !important; /* gray-500 */
+}
+
+.fastcheckout-success-registration-inner p + p,
+#registration.fastcheckout-success-registration p + p,
+.fastcheckout-success-card #registration p + p {
+    color: #374151 !important; /* gray-700 */
+}
+
+/* CTA — Magento .action.primary or Hyvä .btn */
+.fastcheckout-success-registration-inner a.action,
+.fastcheckout-success-registration-inner a.btn,
+#registration.fastcheckout-success-registration a.action,
+#registration.fastcheckout-success-registration a.btn,
+.fastcheckout-success-card #registration a.action,
+.fastcheckout-success-card #registration a.btn {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 100% !important;
+    max-width: 100%;
+    margin: 0.25rem auto 0 !important;
+    padding: 0.75rem 1rem !important;
+    box-sizing: border-box;
+    border: 0 !important;
+    border-radius: var(--radius-lg, 0.5rem) !important;
+    background-color: var(--color-primary, #2563eb) !important;
+    color: var(--color-on-primary, #fff) !important;
+    font-size: 1rem !important;
+    font-weight: 500 !important;
+    line-height: 1.5 !important;
+    text-align: center !important;
+    text-decoration: none !important;
+    cursor: pointer;
+    float: none !important;
+}
+
+.fastcheckout-success-registration-inner a.action:hover,
+.fastcheckout-success-registration-inner a.btn:hover,
+#registration.fastcheckout-success-registration a.action:hover,
+.fastcheckout-success-card #registration a.action:hover {
+    background-color: var(--color-primary-lighter, var(--color-primary, #3b82f6)) !important;
+    color: var(--color-on-primary, #fff) !important;
+}
+
+.fastcheckout-success-registration-inner a span,
+#registration.fastcheckout-success-registration a span,
+.fastcheckout-success-card #registration a span {
+    color: inherit !important;
+    font: inherit !important;
+}
