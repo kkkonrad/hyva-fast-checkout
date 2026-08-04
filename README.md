@@ -42,14 +42,64 @@ Moduł nie wymaga Magewire i nie utrzymuje dodatkowego stanu procesu zamówienia
 
 ## Instalacja
 
-Instalacja za pomocą Composera:
+Pakiet **nie jest dostępny na Packagist**. Instalacja odbywa się przez Composer
+bezpośrednio z GitHuba (repozytorium VCS).
+
+### Composer + GitHub
+
+W katalogu głównym Magento dodaj repozytorium i wymagaj pakietu:
 
 ```bash
-composer require kkkonrad/fastcheckout
+composer config repositories.kkkonrad-fastcheckout vcs https://github.com/kkkonrad/hyva-fast-checkout.git
+composer require kkkonrad/fastcheckout:dev-master
+```
+
+Albo ręcznie w `composer.json` projektu:
+
+```json
+{
+  "repositories": [
+    {
+      "type": "vcs",
+      "url": "https://github.com/kkkonrad/hyva-fast-checkout.git"
+    }
+  ],
+  "require": {
+    "kkkonrad/fastcheckout": "dev-master"
+  }
+}
+```
+
+Następnie:
+
+```bash
+composer update kkkonrad/fastcheckout
 php bin/magento module:enable Kkkonrad_Fastcheckout
 php bin/magento setup:upgrade
 php bin/magento cache:clean
 ```
+
+**Uwagi:**
+
+- dla prywatnego repozytorium użyj SSH (`git@github.com:kkkonrad/hyva-fast-checkout.git`)
+  albo tokenu GitHub w HTTPS i uprawnień Composer do `github.com`;
+- zamiast `dev-master` można wskazać gałąź (`dev-nazwa-galezi`) lub tag
+  (`"kkkonrad/fastcheckout": "7.0.0"`), jeśli jest opublikowany w repozytorium;
+- przy instalacji z gałęzi Composer często prosi o `minimum-stability: dev`
+  oraz `prefer-stable: true` w `composer.json` projektu.
+
+### Instalacja ręczna (app/code)
+
+Alternatywnie sklonuj moduł do `app/code`:
+
+```bash
+git clone https://github.com/kkkonrad/hyva-fast-checkout.git app/code/Kkkonrad/Fastcheckout
+php bin/magento module:enable Kkkonrad_Fastcheckout
+php bin/magento setup:upgrade
+php bin/magento cache:clean
+```
+
+### Środowisko produkcyjne
 
 W środowisku produkcyjnym należy dodatkowo skompilować DI i wdrożyć pliki
 statyczne:
