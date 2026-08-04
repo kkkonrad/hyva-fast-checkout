@@ -18,10 +18,19 @@ Moduł nie wymaga Magewire i nie utrzymuje dodatkowego stanu procesu zamówienia
   natywną walidacją;
 - natywny bootstrap RequireJS Magento i warstwa zgodności rendererów płatności
   Knockout;
+- stabilne hosty KO dla metod płatności (jednorazowy adopt, soft-remove zamiast
+  niszczenia rendererów przy zmianie dostawy / odświeżeniu `method-list`);
+- współdzielony adres rozliczeniowy między metodami płatności (Update / Edytuj
+  na jednej metodzie zachowuje dane na pozostałych);
+- odzyskiwanie hostowanych pól karty (Secure Forms i podobne) po reparent /
+  soft-hide, bez per-vendor DI;
 - mapowanie metod płatności do metod dostawy;
+- podsumowanie zamówienia oparte o natywne totals Magento (w tym Tax), ze
+  skróconym komunikatem gdy dostawa nie jest jeszcze wybrana;
 - zachowanie adresu gościa po odświeżeniu strony;
 - obsługa komentarzy do zamówienia i zapisu do newslettera;
-- zachowanie atrybutu rozszerzającego automatu paczkowego InPost;
+- automatyczne zachowanie skalarnych `extension_attributes` koszyka i adresu
+  (np. paczkomat) oraz opcjonalne widgety UI ładowane tylko gdy moduł jest obecny;
 - opcjonalne przypisanie zamówienia gościa do istniejącego klienta o tym samym
   adresie e-mail.
 
@@ -72,20 +81,53 @@ dostępna jako alias zapewniający zgodność wsteczną.
 
 - `Block/Hyva/Checkout.php` jednokrotnie scala standardowy `jsLayout` i przekazuje
   go natywnym procesorom checkoutu Magento.
+- `Model/CheckoutLayoutCollector.php` zbiera OPC `jsLayout` z plików layout
+  aktywnych modułów (preferowane na Hyvä, gdzie motyw usuwa `checkout.root`)
+  oraz z merge motywu; pusty wynik nie jest cache’owany.
 - `view/frontend/web/js/requirejs-base.js` ustawia ścieżkę zasobów przed natywnym
   bootstrapem RequireJS, również przy włączonej minifikacji i łączeniu JavaScript.
 - Magento ładuje własną konfigurację RequireJS; szablon
   `view/frontend/templates/hyva/knockout/checkout-bridge.phtml` uruchamia wyłącznie
   most Knockout.
 - `view/frontend/web/js/hyva/checkout-bridge.js` montuje komponenty procesu
-  zamówienia Magento.
+  zamówienia Magento (adres, metody, summary, place order).
+- `payment-host-bridge.js` + `payment-list.js` — stabilne sloty per metoda oraz
+  soft-remove (ukrycie bez `dispose` rendererów z hostowanymi polami karty).
+- `billing-address-validation-mixin.js` — wspólny adres rozliczeniowy między
+  rendererami (`billingAddress{methodCode}`) przy Update / Edytuj / zmianie metody.
 - Obiekty Magento `quote`, `checkout-data` oraz operacje REST zarządzają adresami,
   metodami i podsumowaniem.
-- Niewielkie mixiny RequireJS zapewniają trwałość danych i zgodność z zewnętrznymi
-  modułami płatności.
+- Mixiny RequireJS (nie `map` override’y całych modułów) zapewniają trwałość
+  danych i zgodność ze standardowymi bramkami / przewoźnikami.
+- `Plugin/Quote/PreserveShippingExtensionAttributes.php` odkrywa skalarne
+  atrybuty rozszerzające Cart/Address i zachowuje je przy zapisie (zamiast
+  hardcodu pod jednego vendor’a).
 
 Moduł nie zawiera komponentu Magewire, mechanizmu modyfikowania DOM przez Livewire
 ani orkiestratora stanu opartego na Alpine.
+
+## Zgodność z modułami zewnętrznymi (shipping / payment)
+
+Fastcheckout działa jak host natywnego checkoutu Magento Knockout + REST.
+**Instalacja standardowego modułu dostawy lub płatności nie powinna wymagać
+patchy ani wpisów DI w Kkkonrad_Fastcheckout.**
+
+- Renderery płatności i komponenty UI dostawy pochodzą ze scalonego
+  `jsLayout` handle `checkout_index_index` (wszystkie aktywne moduły + motyw).
+- Lista dostępnych metod płatności jest synchronizowana z Magento
+  `method-list` (REST); soft-remove chroni bramki z Secure Forms / hosted fields
+  przed zniszczeniem przy chwilowym zniknięciu metody (zmiana dostawy, free
+  shipping, odświeżenie totals).
+- Skalarne `extension_attributes` na `CartInterface` / `AddressInterface` są
+  auto-odkrywane i ponownie ustawiane przy zapisie quote, gdy istnieje
+  odpowiadająca kolumna w bazie (paczkomaty, store pickup itd.).
+- Opcjonalne widgety UI (np. InPost) ładują się tylko gdy dany moduł zarejestruje
+  ścieżkę AMD; brak modułu kończy się cicho.
+- Hostowane pola karty (m.in. PayU Secure Forms) są remountowane po reparent
+  hosta / soft-hide, a reject tokenizacji nie zostawia zablokowanego place order.
+
+Nie dodawaj per-vendor DI „pod Fastcheckout” w projekcie sklepu, jeśli standardowy
+checkout Magento Luma/Hyvä i tak ładuje ten sam renderer.
 
 ## Testy
 
@@ -122,29 +164,17 @@ FC_PAYU_E2E=1 FC_PAYU_BASE_URL=https://m10625.app-on-demand.net/ \
     npx playwright test PayuCompatibility.spec.js
 ```
 
-## Frontend static refresh (developer / on-demand hosts)
+## Odświeżanie plików statycznych (developer / hosty on-demand)
 
-After changing files under `view/frontend/web`, refresh published Magento static
-copies so the storefront does not keep serving stale `pub/static` JS:
+Po zmianach w `view/frontend/web` odśwież opublikowane kopie Magento w
+`pub/static`, żeby storefront nie serwował starego JS/CSS:
 
 ```bash
 app/code/Kkkonrad/Fastcheckout/bin/sync-frontend-static.sh
 php bin/magento cache:flush
 ```
 
-This is required when `pub/static/frontend/*/Kkkonrad_Fastcheckout` already exists
-(even in developer mode).
-
-## Third-party shipping / payment modules
-
-Fastcheckout is designed as a host for Magento's native Knockout checkout APIs.
-Installing a standard shipping or payment module should **not** require patches
-or DI entries inside Kkkonrad_Fastcheckout:
-
-- Payment renderers and shipping UI components are loaded from the merged
-  Magento `checkout_index_index` jsLayout (all active modules + theme).
-- Scalar `extension_attributes` declared on `CartInterface` /
-  `AddressInterface` are auto-discovered and re-hydrated on quote save when the
-  matching DB column exists (parcel lockers, store pickup codes, etc.).
-- Optional UI hooks (e.g. InPost RequireJS widget) load only when that module
-  registers its AMD path; missing modules fail silently.
+Skrypt jest wymagany, gdy katalogi
+`pub/static/frontend/*/Kkkonrad_Fastcheckout` już istnieją (również w trybie
+developer). `requirejs-config.js` leży poza `web/` — po jego zmianie skopiuj go
+do drzew static albo przeładuj stronę tak, by Magento przebudował merge RequireJS.
