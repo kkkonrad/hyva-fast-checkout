@@ -1076,6 +1076,32 @@
     font-weight: 600;
     color: #111827;
     white-space: nowrap;
+    min-width: 0;
+}
+
+/*
+ * Magento puts notCalculatedMessage in shipping amount when no method is selected.
+ * Stock blank theme: .not-calculated { white-space: normal; font-style: italic }.
+ * Without this override, td.amount nowrap + flex row overflows ("rozjechany").
+ */
+#fastcheckout-checkout .fastcheckout-native-summary .table-totals tr:has(.not-calculated) {
+    align-items: flex-start;
+}
+
+#fastcheckout-checkout .fastcheckout-native-summary .table-totals tr:has(.not-calculated) td.amount {
+    white-space: normal;
+    flex: 1 1 auto;
+    max-width: 70%;
+}
+
+#fastcheckout-checkout .fastcheckout-native-summary .table-totals .not-calculated {
+    display: block;
+    white-space: normal;
+    font-style: italic;
+    font-weight: 400;
+    font-size: 0.75rem;
+    line-height: 1.25rem;
+    color: #6b7280;
 }
 
 #fastcheckout-checkout .fastcheckout-native-summary .table-totals tr.grand.totals th.mark,

@@ -97,6 +97,10 @@ var config = {
             'Magento_Checkout/js/view/summary/abstract-total': {
                 'Kkkonrad_Fastcheckout/js/mixin/summary-total-mixin': true
             },
+            // Short not-calculated shipping amount in narrow FC summary (Tax extends this).
+            'Magento_Checkout/js/view/summary/shipping': {
+                'Kkkonrad_Fastcheckout/js/mixin/summary-shipping-mixin': true
+            },
             'Magento_Checkout/js/view/summary/cart-items': {
                 'Kkkonrad_Fastcheckout/js/mixin/summary-cart-items-mixin': true
             },
@@ -106,6 +110,7 @@ var config = {
             'Magento_Checkout/js/view/summary/item/details/thumbnail': {
                 'Kkkonrad_Fastcheckout/js/mixin/summary-item-thumbnail-mixin': true
             },
+
             'Magento_SalesRule/js/view/payment/discount': {
                 'Kkkonrad_Fastcheckout/js/mixin/payment-discount-mixin': true
             }
