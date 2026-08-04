@@ -121,3 +121,16 @@ Test PayU Cards uruchamia się osobno na sklepie integracyjnym:
 FC_PAYU_E2E=1 FC_PAYU_BASE_URL=https://m10625.app-on-demand.net/ \
     npx playwright test PayuCompatibility.spec.js
 ```
+
+## Frontend static refresh (developer / on-demand hosts)
+
+After changing files under `view/frontend/web`, refresh published Magento static
+copies so the storefront does not keep serving stale `pub/static` JS:
+
+```bash
+app/code/Kkkonrad/Fastcheckout/bin/sync-frontend-static.sh
+php bin/magento cache:flush
+```
+
+This is required when `pub/static/frontend/*/Kkkonrad_Fastcheckout` already exists
+(even in developer mode).

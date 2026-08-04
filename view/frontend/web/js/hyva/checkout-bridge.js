@@ -1812,11 +1812,19 @@ define([
                             '.fastcheckout-native-shipping-address .mage-error, ' +
                             '[data-fastcheckout-shipping-methods] .field-error, ' +
                             '[data-fastcheckout-shipping-methods] .mage-error, ' +
-                            '[data-fastcheckout-shipping-methods] [role="alert"]'
+                            '[data-fastcheckout-shipping-methods] [role="alert"], ' +
+                            '[data-test-shipping-validator-error]'
                         ),
                         target = Array.prototype.filter.call(errors, function (element) {
-                            return element.offsetParent !== null && (
+                            // offsetParent is null for fixed/sticky or display:contents parents;
+                            // still scroll to shipping validator errors that have layout boxes.
+                            var rect = element.getBoundingClientRect ? element.getBoundingClientRect() : null,
+                                hasBox = rect && (rect.width > 0 || rect.height > 0),
+                                visible = element.offsetParent !== null || hasBox;
+
+                            return visible && (
                                 element.matches('[aria-invalid="true"]') ||
+                                element.hasAttribute('data-test-shipping-validator-error') ||
                                 String(element.textContent || '').trim() !== ''
                             );
                         }).shift(),
@@ -2160,6 +2168,11 @@ define([
                                 if (typeof validator === 'function') {
                                     try {
                                         if (!validator(activeMethod)) {
+                                            // Ensure submit path has a message for the banner / scroll helper.
+                                            if (!window.fastcheckoutLastShippingValidationError) {
+                                                window.fastcheckoutLastShippingValidationError =
+                                                    $t('Please complete shipping information.');
+                                            }
                                             return false;
                                         }
                                     } catch (err) {

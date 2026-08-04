@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Kkkonrad\Fastcheckout\Test\Unit\Plugin\Quote;
 
 use Kkkonrad\Fastcheckout\Plugin\Quote\PreserveInpostLocker;
+use Kkkonrad\Fastcheckout\Plugin\Quote\PreserveShippingExtensionAttributes;
 use Magento\Quote\Api\CartRepositoryInterface;
 use Magento\Quote\Api\Data\CartExtensionFactory;
 use Magento\Quote\Api\Data\CartExtensionInterface;
@@ -16,11 +17,7 @@ class PreserveInpostLockerTest extends TestCase
 {
     protected function setUp(): void
     {
-        // Reset per-request lookup cache between tests (static property).
-        $reflection = new \ReflectionClass(PreserveInpostLocker::class);
-        $property = $reflection->getProperty('lockerLookupCache');
-        $property->setAccessible(true);
-        $property->setValue(null, []);
+        PreserveShippingExtensionAttributes::resetLookupCache();
     }
 
     public function testSkipsVirtualQuotes(): void
@@ -117,9 +114,10 @@ class PreserveInpostLockerTest extends TestCase
         $select->method('where')->willReturnSelf();
 
         $connection = $this->getMockBuilder(\stdClass::class)
-            ->addMethods(['select', 'fetchOne'])
+            ->addMethods(['select', 'fetchOne', 'tableColumnExists'])
             ->getMock();
         $connection->method('select')->willReturn($select);
+        $connection->method('tableColumnExists')->willReturn(true);
         $connection->expects($this->once())->method('fetchOne')->willReturn('WAW02B');
 
         $resource = $this->getMockBuilder(\stdClass::class)
@@ -176,9 +174,10 @@ class PreserveInpostLockerTest extends TestCase
         $select->method('where')->willReturnSelf();
 
         $connection = $this->getMockBuilder(\stdClass::class)
-            ->addMethods(['select', 'fetchOne'])
+            ->addMethods(['select', 'fetchOne', 'tableColumnExists'])
             ->getMock();
         $connection->method('select')->willReturn($select);
+        $connection->method('tableColumnExists')->willReturn(true);
         $connection->expects($this->once())->method('fetchOne')->willReturn('GDN03C');
 
         $resource = $this->getMockBuilder(\stdClass::class)

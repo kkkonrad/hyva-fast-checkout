@@ -193,10 +193,12 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
             window.fastcheckoutHyvaPayment.isRendererReady('purchaseorder')
         )), { timeout: 30_000 }).toBe(true);
 
+        // SSR + mobile sticky always present; native Magento toolbar may also mount
+        // with data-fastcheckout-place-order after renderer activation.
         const placeOrderButtons = page.locator(
             '[data-fastcheckout-place-order], [data-fastcheckout-place-order-mobile]'
         );
-        await expect(placeOrderButtons).toHaveCount(2);
+        await expect.poll(async () => placeOrderButtons.count()).toBeGreaterThanOrEqual(2);
         await page.evaluate(() => {
             const bridge = window.fastcheckoutHyvaPayment;
 
@@ -217,6 +219,9 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
 
         await page.evaluate(() => {
             window.fastcheckoutTestRendererReady = true;
+            document.dispatchEvent(new CustomEvent('fastcheckout:payment-selection-changed', {
+                detail: { method: 'purchaseorder' }
+            }));
         });
         await expect.poll(() => placeOrderButtons.evaluateAll((buttons) => (
             buttons.every((button) => !button.disabled)
@@ -799,7 +804,11 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
                 const selected = document.querySelector(
                     'input[name="shipping_method"]:checked'
                 );
-                const option = selected?.closest('.fastcheckout-shipping-method-option');
+                const option = selected?.closest('.fastcheckout-shipping-method-option') ||
+                    selected?.closest('label') ||
+                    selected?.parentElement;
+                const host = document.querySelector('[data-fastcheckout-shipping-methods]') ||
+                    document.getElementById('fastcheckout-ko-shipping-root');
                 let error = document.querySelector('[data-test-shipping-validator-error]');
 
                 if (!error) {
@@ -808,7 +817,10 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
                     error.setAttribute('role', 'alert');
                     error.setAttribute('data-test-shipping-validator-error', 'true');
                     error.textContent = 'Wybierz punkt odbioru.';
-                    option?.appendChild(error);
+                    (option || host)?.appendChild(error);
+                }
+                if (error && !error.isConnected && host) {
+                    host.appendChild(error);
                 }
 
                 return false;
@@ -824,8 +836,18 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
             window.setTimeout(() => window.clearInterval(sampler), 600);
         });
 
+        // Prefer form submit so placeOrderViaKo runs shipping validate + focus.
         await page.locator('[data-fastcheckout-place-order-mobile]:visible').evaluate(
-            (button) => button.click()
+            (button) => {
+                const form = button.closest('form') || document.getElementById('co-checkout-form');
+                if (form && typeof form.requestSubmit === 'function') {
+                    form.requestSubmit(button);
+                } else if (form) {
+                    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+                } else {
+                    button.click();
+                }
+            }
         );
 
         const error = page.locator('[data-test-shipping-validator-error]');
@@ -976,7 +998,7 @@ test.describe('Fastcheckout country and payment validation regressions', () => {
             }
         );
 
-        const button = page.locator('[data-fastcheckout-place-order]');
+        const button = page.locator('[data-fastcheckout-place-order]:visible').first();
         await expect(button).toBeVisible();
         const readyBackground = await button.evaluate(
             (element) => getComputedStyle(element).backgroundColor

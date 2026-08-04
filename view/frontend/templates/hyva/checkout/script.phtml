@@ -275,6 +275,10 @@ foreach ($clientMessagePhrases as $phrase) {
             ));
         }
 
+        // Show primary loader immediately after validation so place-order UX
+        // (and e2e) do not depend solely on place-order-mixin event timing.
+        setProcessing(true);
+
         return Promise.resolve(paymentBridge.placeOrder(null, selectedMethod))
             .then(function (result) {
                 // A successful order starts Magento's redirect flow. Keep the

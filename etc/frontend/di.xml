@@ -5,8 +5,9 @@
     <type name="Magento\Checkout\Model\CompositeConfigProvider">
         <arguments>
             <argument name="configProviders" xsi:type="array">
+                <!-- sortOrder keeps peer providers' merge order stable (late FC settings). -->
                 <item name="fastcheckout_extended_checkout_config"
-                      xsi:type="object">Kkkonrad\Fastcheckout\Model\ExtendedCheckoutConfigProvider</item>
+                      xsi:type="object" sortOrder="1000">Kkkonrad\Fastcheckout\Model\ExtendedCheckoutConfigProvider</item>
             </argument>
         </arguments>
     </type>
