@@ -1,18 +1,90 @@
 /**
- * Fastcheckout success page — guest account registration prompt.
- * Works with Magento stock KO template and our success/registration template.
+ * Fastcheckout success page — centered card copy + guest registration CTA.
  */
 
-/* When registration sits inside the success card (moved as child) */
-.fastcheckout-success-card .fastcheckout-success-registration,
-.fastcheckout-success-registration {
-    display: block;
-    width: 100%;
-    margin: 0;
+/* --- Card shell --- */
+.fastcheckout-success-card {
+    text-align: center;
+}
+
+/* Title under the checkmark — explicit margins (page CSS may zero out h1). */
+.fastcheckout-success-card .fastcheckout-success-title,
+.fastcheckout-success-card h1 {
+    margin: 0 0 0.75rem !important;
     padding: 0;
     text-align: center;
 }
 
+.fastcheckout-success-card,
+.fastcheckout-success-card * {
+    box-sizing: border-box;
+}
+
+/* --- Shared body copy (order message, additional info, registration) --- */
+.fastcheckout-success-card .fastcheckout-success-copy,
+.fastcheckout-success-card .fastcheckout-success-additional,
+.fastcheckout-success-card .fastcheckout-success-registration,
+.fastcheckout-success-card .fastcheckout-success-print {
+    width: 100%;
+    text-align: center;
+}
+
+.fastcheckout-success-card .fastcheckout-success-text,
+.fastcheckout-success-card .fastcheckout-success-additional,
+.fastcheckout-success-card .fastcheckout-success-additional p,
+.fastcheckout-success-card .fastcheckout-success-additional li,
+.fastcheckout-success-card .fastcheckout-success-additional div,
+.fastcheckout-success-card .fastcheckout-success-registration p,
+.fastcheckout-success-card #registration p {
+    margin-left: auto !important;
+    margin-right: auto !important;
+    max-width: 22rem;
+    text-align: center !important;
+    font-size: 0.875rem !important;
+    line-height: 1.5 !important;
+    color: #6b7280 !important; /* gray-500 */
+}
+
+.fastcheckout-success-card .fastcheckout-success-additional p + p,
+.fastcheckout-success-card .fastcheckout-success-registration p + p,
+.fastcheckout-success-card #registration p + p {
+    color: #374151 !important; /* gray-700 — secondary line e.g. email */
+}
+
+.fastcheckout-success-card .fastcheckout-success-text a,
+.fastcheckout-success-card .fastcheckout-success-additional a:not(.btn):not(.action) {
+    color: var(--color-primary, #2563eb);
+    font-weight: 600;
+    text-decoration: underline;
+}
+
+.fastcheckout-success-card .fastcheckout-success-text a:hover,
+.fastcheckout-success-card .fastcheckout-success-additional a:not(.btn):not(.action):hover {
+    text-decoration: underline;
+}
+
+/* Magento page title above content (Hyvä) — soften / center if still shown */
+body.checkout-onepage-success .page-title-wrapper,
+body.checkout-onepage-success .page-title,
+body.checkout-onepage-success h1.page-title {
+    text-align: center !important;
+}
+
+body.checkout-onepage-success .page-title-wrapper .page-title span,
+body.checkout-onepage-success h1.page-title span {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #111827;
+}
+
+/* Hide empty Magento print button slot next to title when FC card has its own print */
+body.checkout-onepage-success .page-title-wrapper .order-print {
+    display: none;
+}
+
+/* --- Registration (#registration) --- */
+.fastcheckout-success-card .fastcheckout-success-registration,
+.fastcheckout-success-registration,
 #registration.fastcheckout-success-registration,
 .fastcheckout-success-card #registration {
     display: block;
@@ -22,7 +94,6 @@
     text-align: center;
 }
 
-/* Magento stock template starts with a bare <br /> */
 #registration.fastcheckout-success-registration > br,
 .fastcheckout-success-card #registration > br {
     display: none !important;
@@ -41,24 +112,7 @@
     text-align: center;
 }
 
-.fastcheckout-success-registration-inner p,
-#registration.fastcheckout-success-registration p,
-.fastcheckout-success-card #registration p {
-    margin: 0 auto !important;
-    max-width: 22rem;
-    text-align: center !important;
-    font-size: 0.875rem !important;
-    line-height: 1.5 !important;
-    color: #6b7280 !important; /* gray-500 */
-}
-
-.fastcheckout-success-registration-inner p + p,
-#registration.fastcheckout-success-registration p + p,
-.fastcheckout-success-card #registration p + p {
-    color: #374151 !important; /* gray-700 */
-}
-
-/* CTA — Magento .action.primary or Hyvä .btn */
+/* CTA buttons inside registration */
 .fastcheckout-success-registration-inner a.action,
 .fastcheckout-success-registration-inner a.btn,
 #registration.fastcheckout-success-registration a.action,
@@ -99,4 +153,14 @@
 .fastcheckout-success-card #registration a span {
     color: inherit !important;
     font: inherit !important;
+}
+
+/* Actions row */
+.fastcheckout-success-card .fastcheckout-success-actions {
+    width: 100%;
+}
+
+.fastcheckout-success-card .fastcheckout-success-actions .btn {
+    width: 100%;
+    justify-content: center;
 }

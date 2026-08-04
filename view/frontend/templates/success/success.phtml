@@ -1,80 +1,97 @@
 <?php
 /**
+ * Fastcheckout order success card.
+ *
  * @var $block \Kkkonrad\Fastcheckout\Block\Onepage\Success
+ * @var \Magento\Framework\Escaper $escaper
  */
+$escaper = $escaper ?? $block;
 ?>
 <div class="fastcheckout-success-card max-w-md mx-auto my-12 p-8 bg-white border border-gray-200 shadow-md rounded-lg text-center space-y-6">
     <!-- Success Green Checkmark SVG -->
-    <div class="mx-auto w-20 h-20 bg-green-50 text-green-500 rounded-full flex items-center justify-center animate-bounce">
-        <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <div class="mx-auto w-20 h-20 bg-green-50 text-green-500 rounded-full flex items-center justify-center">
+        <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path>
         </svg>
     </div>
 
-    <!-- Title and Info -->
-    <div class="space-y-3">
-        <h1 class="text-3xl font-extrabold text-gray-900 tracking-tight"><?= $block->escapeHtml(__('Thank You!')) ?></h1>
-        <p class="text-sm text-gray-500 leading-relaxed">
-            <?php if ($block->getOrderId()): ?>
+    <!-- Title and order info -->
+    <div class="fastcheckout-success-copy space-y-3 w-full flex flex-col items-center">
+        <h1 class="fastcheckout-success-title text-3xl font-extrabold text-gray-900 tracking-tight">
+            <?= $escaper->escapeHtml(__('Thank You!')) ?>
+        </h1>
+
+        <?php if ($block->getOrderId()): ?>
+            <p class="fastcheckout-success-text m-0 max-w-sm text-sm leading-relaxed text-gray-600">
                 <?php if ($block->getCanViewOrder()): ?>
-                    <?= /* @noEscape -- link URL and label are escaped below. */ sprintf(
-                        __('Your order %s has been placed. You will receive an email with more details of your purchase.'),
+                    <?= /* @noEscape */ sprintf(
+                        $escaper->escapeHtml(
+                            __('Your order %s has been placed. You will receive an email with more details of your purchase.')
+                        ),
                         sprintf(
-                            '<a class="font-semibold text-blue-600 hover:text-blue-700 underline" href="%s">#%s</a>',
-                            $block->escapeUrl($block->getViewOrderUrl()),
-                            $block->escapeHtml($block->getOrderId())
+                            '<a class="font-semibold text-primary hover:underline" href="%s">#%s</a>',
+                            $escaper->escapeUrl($block->getViewOrderUrl()),
+                            $escaper->escapeHtml($block->getOrderId())
                         )
                     ) ?>
                 <?php else: ?>
-                    <?= /* @noEscape -- order identifier is escaped below. */ sprintf(
-                        __('Your order %s has been placed. You will receive an email with more details of your purchase.'),
-                        '<span class="font-semibold text-gray-800">#' . $block->escapeHtml($block->getOrderId()) . '</span>'
+                    <?= /* @noEscape */ sprintf(
+                        $escaper->escapeHtml(
+                            __('Your order %s has been placed. You will receive an email with more details of your purchase.')
+                        ),
+                        '<span class="font-semibold text-gray-800">#' . $escaper->escapeHtml($block->getOrderId()) . '</span>'
                     ) ?>
                 <?php endif; ?>
-            <?php endif; ?>
-            <?= /* @noEscape -- HTML is provided by Magento success-page blocks. */ $block->getAdditionalInfoHtml() ?>
-        </p>
+            </p>
+        <?php endif; ?>
+
+        <?php
+        $additionalInfo = trim((string)$block->getAdditionalInfoHtml());
+        if ($additionalInfo !== ''):
+        ?>
+            <div class="fastcheckout-success-additional w-full max-w-sm text-sm leading-relaxed text-gray-600 space-y-2">
+                <?= /* @noEscape -- Magento / payment modules inject trusted markup. */ $additionalInfo ?>
+            </div>
+        <?php endif; ?>
     </div>
 
     <?php
     /**
-     * Guest “create account to track order” prompt (Magento_Checkout::registration).
-     * Styled via hyva-success.css — Magento KO markup has no theme classes.
+     * Guest “create account to track order” (Magento registration block).
      */
     $registrationHtml = $block->getChildHtml('registration');
     if (trim((string)$registrationHtml) !== ''):
     ?>
-    <div class="fastcheckout-success-registration w-full text-center space-y-3 pt-1">
-        <?= /* @noEscape -- standard Magento registration block. */ $registrationHtml ?>
+    <div class="fastcheckout-success-registration w-full text-center space-y-3 pt-1 border-t border-gray-100">
+        <?= /* @noEscape */ $registrationHtml ?>
     </div>
     <?php endif; ?>
 
-    <!-- Print Receipt -->
     <?php if ($block->getCanViewOrder() && $block->getCanPrintOrder()): ?>
-        <div class="text-sm">
-            <a href="<?= $block->escapeUrl($block->getPrintUrl()) ?>"
+        <div class="fastcheckout-success-print text-sm">
+            <a href="<?= $escaper->escapeUrl($block->getPrintUrl()) ?>"
                target="_blank"
-               class="inline-flex items-center gap-1.5 font-medium text-blue-600 hover:text-blue-700 transition-colors">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+               rel="noopener"
+               class="inline-flex items-center justify-center gap-1.5 font-medium text-primary hover:underline">
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
                 </svg>
-                <?= $block->escapeHtml(__('Print receipt')) ?>
+                <?= $escaper->escapeHtml(__('Print receipt')) ?>
             </a>
         </div>
     <?php endif; ?>
 
-    <!-- Actions -->
-    <div class="pt-2 flex flex-col gap-3">
-        <a href="<?= $block->escapeUrl($block->getUrl()) ?>"
+    <div class="fastcheckout-success-actions pt-2 flex flex-col gap-3 w-full">
+        <a href="<?= $escaper->escapeUrl($block->getUrl()) ?>"
            class="btn btn-primary w-full"
-           title="<?= $block->escapeHtmlAttr(__('Continue Shopping')) ?>">
-            <?= $block->escapeHtml(__('Continue Shopping')) ?>
+           title="<?= $escaper->escapeHtmlAttr(__('Continue Shopping')) ?>">
+            <?= $escaper->escapeHtml(__('Continue Shopping')) ?>
         </a>
         <?php if ($block->isCustomerLoggedIn()): ?>
-            <a href="<?= $block->escapeUrl($block->getCustomerAccountUrl()) ?>"
+            <a href="<?= $escaper->escapeUrl($block->getCustomerAccountUrl()) ?>"
                class="btn btn-secondary w-full"
-               title="<?= $block->escapeHtmlAttr(__('My Account')) ?>">
-                <?= $block->escapeHtml(__('My Account')) ?>
+               title="<?= $escaper->escapeHtmlAttr(__('My Account')) ?>">
+                <?= $escaper->escapeHtml(__('My Account')) ?>
             </a>
         <?php endif; ?>
     </div>

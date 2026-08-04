@@ -12,6 +12,7 @@
         <css src="Kkkonrad_Fastcheckout::css/hyva-success.css"/>
     </head>
     <body>
+        <!-- Hyvä still prints Magento page title; keep it soft / centered via CSS. -->
         <referenceBlock name="checkout.registration"
                         template="Kkkonrad_Fastcheckout::success/registration.phtml"/>
         <move element="checkout.registration"
