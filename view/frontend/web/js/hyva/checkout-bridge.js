@@ -2,6 +2,7 @@ define([
     'jquery',
     'Kkkonrad_Fastcheckout/js/hyva/region-country-guard',
     'Kkkonrad_Fastcheckout/js/hyva/renderer-manager',
+    'Kkkonrad_Fastcheckout/js/hyva/payment-host-bridge',
     'Kkkonrad_Fastcheckout/js/hyva/checkout-provider-bridge',
     'Kkkonrad_Fastcheckout/js/hyva/address-attributes-bridge',
     'Kkkonrad_Fastcheckout/js/hyva/form-data-collector',
@@ -26,6 +27,7 @@ define([
     $,
     regionCountryGuard,
     createRendererManager,
+    createPaymentHostBridge,
     createCheckoutProviderBridge,
     createAddressAttributesBridge,
     formDataCollector,
@@ -69,7 +71,8 @@ define([
         window.fastcheckoutKoPaymentBridgeInitCount = (window.fastcheckoutKoPaymentBridgeInitCount || 0) + 1;
         
         var scope = config.scope || 'fastcheckoutHyvaPaymentRenderers',
-            rendererManager = createRendererManager(config);
+            rendererManager = createRendererManager(config),
+            paymentHostBridge = null;
 
         window.checkoutConfig = config.checkoutConfig || {};
 
@@ -533,6 +536,9 @@ define([
                     scope: scope
                 });
                 var paymentDomBridge = createPaymentDomBridge({
+                    compareMethodCodes: paymentMethodCodesEqual
+                });
+                paymentHostBridge = createPaymentHostBridge({
                     compareMethodCodes: paymentMethodCodesEqual
                 });
                 var checkoutStateBridge = createCheckoutStateBridge({
@@ -2490,7 +2496,17 @@ define([
                 }
 
                 function wireNativePlaceOrderButton(button) {
-                    if (!button || button.getAttribute('data-fastcheckout-place-order-wired') === '1') {
+                    if (!button) {
+                        return;
+                    }
+
+                    // Idempotent public selector: always keep data-fastcheckout-place-order
+                    // on the live control so e2e / form scripts can find a visible CTA.
+                    if (!button.hasAttribute('data-fastcheckout-place-order')) {
+                        button.setAttribute('data-fastcheckout-place-order', '');
+                    }
+
+                    if (button.getAttribute('data-fastcheckout-place-order-wired') === '1') {
                         return;
                     }
 
@@ -2713,6 +2729,47 @@ define([
                     });
                 }
 
+                /**
+                 * After mounting a Magento toolbar, at least one control with
+                 * [data-fastcheckout-place-order] must remain effectively visible.
+                 * If not (host still hidden / wire failed), restore SSR fallback.
+                 */
+                function ensureVisiblePlaceOrderControl() {
+                    var hasVisible = false;
+
+                    document.querySelectorAll('[data-fastcheckout-place-order]').forEach(function (el) {
+                        var style,
+                            rect;
+
+                        if (!el || el.getAttribute('aria-hidden') === 'true') {
+                            return;
+                        }
+                        style = window.getComputedStyle(el);
+                        if (style.display === 'none' || style.visibility === 'hidden') {
+                            return;
+                        }
+                        rect = el.getBoundingClientRect();
+                        if (rect.width > 0 && rect.height > 0) {
+                            hasVisible = true;
+                        }
+                    });
+
+                    if (!hasVisible) {
+                        // CSS :has(.actions-toolbar) forces SSR visibility:hidden while a
+                        // toolbar sits in the host — clear non-working host content first.
+                        Array.prototype.slice.call(
+                            document.querySelectorAll(
+                                '[data-fastcheckout-place-order-host] .actions-toolbar'
+                            )
+                        ).forEach(function (hosted) {
+                            if (hosted.parentNode) {
+                                hosted.parentNode.removeChild(hosted);
+                            }
+                        });
+                        setPlaceOrderSsrVisible(true);
+                    }
+                }
+
                 function mountNativePlaceOrderToolbar() {
                     var host = getPlaceOrderHost(),
                         toolbar = findActivePlaceOrderToolbar(),
@@ -2768,6 +2825,11 @@ define([
                     } catch (eAllow) {
                         // non-fatal
                     }
+
+                    // If the hosted native control is not effectively visible (viewport /
+                    // CSS race), bring SSR back so [data-fastcheckout-place-order]:visible
+                    // always has a target.
+                    window.setTimeout(ensureVisiblePlaceOrderControl, 0);
 
                     return true;
                 }
@@ -2986,14 +3048,11 @@ define([
 
                 function updateActiveRendererClass(methodCode, activeCode) {
                     var root = document.getElementById('fastcheckout-ko-payment-root'),
-                        activeElement = null,
-                        movedToTarget = false,
-                        opened = false,
                         target = methodCode
                             ? document.querySelector('[data-fastcheckout-payment-method-ko-target="' + methodCode + '"]')
                             : null,
                         existingInTarget,
-                        allRenderers;
+                        result;
 
                     // Already open for this method — skip hide/show cycle, but always
                     // keep the radio checked (shipping remap can open content while
@@ -3001,6 +3060,13 @@ define([
                     if (isPaymentPanelOpen(methodCode, activeCode)) {
                         existingInTarget = target ? target.querySelector('.payment-method') : null;
                         if (existingInTarget) {
+                            // One-time adopt if still loose under payment root; never reparent mounted.
+                            if (
+                                paymentHostBridge &&
+                                !paymentHostBridge.isPermanentlyMounted(existingInTarget)
+                            ) {
+                                paymentHostBridge.adoptRendererOnce(existingInTarget, methodCode);
+                            }
                             annotateNativePaymentActions(existingInTarget);
                         }
                         document.querySelectorAll('input[name="payment_method"]').forEach(function (input) {
@@ -3023,65 +3089,35 @@ define([
                         return false;
                     }
 
-                    allRenderers = document.querySelectorAll('.payment-method');
-                    allRenderers.forEach(function (element) {
-                        if (!activeElement && elementMatchesMethod(element, methodCode, activeCode)) {
-                            activeElement = element;
+                    // Stable host activation: at most one adopt into the permanent
+                    // method slot; subsequent A→B→A switches are visibility only.
+                    result = paymentHostBridge.activateMethodInHost(methodCode, {
+                        activeCode: activeCode,
+                        hasVisibleContent: hasVisibleContent,
+                        annotate: annotateNativePaymentActions,
+                        onRadios: function (code, alt) {
+                            document.querySelectorAll('input[name="payment_method"]').forEach(function (input) {
+                                if (
+                                    paymentMethodCodesEqual(input.value, code) ||
+                                    paymentMethodCodesEqual(input.value, alt)
+                                ) {
+                                    if (!input.disabled) {
+                                        input.checked = true;
+                                    }
+                                }
+                            });
                         }
                     });
 
-                    // Critical: do not hide the previous panel until the next one is ready.
-                    // Hiding first caused open → empty → open flicker when the renderer was still booting.
-                    if (!activeElement || !hasVisibleContent(activeElement)) {
+                    if (!result.opened) {
                         return false;
                     }
 
-                    activeElement.classList.add('_active');
-                    activeElement.setAttribute('data-fastcheckout-active', 'true');
-                    annotateNativePaymentActions(activeElement);
-
-                    // Keep the matching payment radio checked whenever we open/activate a panel.
-                    document.querySelectorAll('input[name="payment_method"]').forEach(function (input) {
-                        if (
-                            paymentMethodCodesEqual(input.value, methodCode) ||
-                            paymentMethodCodesEqual(input.value, activeCode)
-                        ) {
-                            if (!input.disabled) {
-                                input.checked = true;
-                            }
-                        }
-                    });
-
-                    if (target) {
-                        if (activeElement.parentNode !== target) {
-                            target.appendChild(activeElement);
-                        }
-
-                        // Show the destination first, then hide every other panel.
-                        target.classList.remove('hidden');
-                        target.style.display = 'block';
-                        movedToTarget = true;
-                        opened = true;
-                        holdPaymentPanel(methodCode);
-                    } else {
-                        opened = true;
-                        holdPaymentPanel(methodCode);
-                    }
-
+                    holdPaymentPanel(methodCode);
                     hidePaymentPlaceholders(methodCode);
+                    activateDeferredPaymentChildren(methodCode);
 
-                    allRenderers.forEach(function (element) {
-                        if (!elementMatchesMethod(element, methodCode, activeCode)) {
-                            element.classList.remove('_active');
-                            element.removeAttribute('data-fastcheckout-active');
-                        }
-                    });
-
-                    if (opened || movedToTarget) {
-                        activateDeferredPaymentChildren(methodCode);
-                    }
-
-                    return opened || movedToTarget;
+                    return true;
                 }
 
                 function isPaymentSelectionStillWanted(methodCode, generation) {

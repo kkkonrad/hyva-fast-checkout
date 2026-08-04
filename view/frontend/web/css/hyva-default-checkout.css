@@ -1390,15 +1390,14 @@
 }
 
 /*
- * When Magento toolbar is mounted, SSR fallback must stay fully hidden.
- * Shared geometry above uses display:flex !important, which beats Tailwind .hidden.
+ * When Magento toolbar is mounted, JS sets .fastcheckout-ssr-place-order-hidden on the
+ * SSR fallback (setPlaceOrderSsrVisible). Do not use :has(.actions-toolbar) here — that
+ * permanently hid SSR even when the hosted native control was not actually visible,
+ * leaving zero [data-fastcheckout-place-order]:visible targets.
  */
 #fastcheckout-checkout [data-fastcheckout-place-order-ssr].hidden,
 #fastcheckout-checkout [data-fastcheckout-place-order-ssr].fastcheckout-ssr-place-order-hidden,
-#fastcheckout-checkout .fastcheckout-place-order-btn.fastcheckout-ssr-place-order-hidden,
-/* CSS sibling fallback: host already has the Magento toolbar */
-#fastcheckout-checkout .fastcheckout-place-order-host:has(.actions-toolbar) ~ [data-fastcheckout-place-order-ssr],
-#fastcheckout-checkout .fastcheckout-place-order-host:has(.action.primary.checkout) ~ [data-fastcheckout-place-order-ssr] {
+#fastcheckout-checkout .fastcheckout-place-order-btn.fastcheckout-ssr-place-order-hidden {
     display: none !important;
     visibility: hidden !important;
     pointer-events: none !important;

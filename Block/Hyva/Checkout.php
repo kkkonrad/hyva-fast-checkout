@@ -9,9 +9,6 @@ use Magento\Catalog\Helper\Product\Configuration as ProductConfiguration;
 use Magento\Checkout\Block\Onepage;
 use Magento\Checkout\Model\CompositeConfigProvider;
 use Magento\Checkout\Model\Session as CheckoutSession;
-use Magento\Framework\App\Cache\Type\Config as ConfigCacheType;
-use Magento\Framework\App\Cache\Type\Layout as LayoutCacheType;
-use Magento\Framework\Component\ComponentRegistrar;
 use Magento\Framework\Component\ComponentRegistrarInterface;
 use Magento\Framework\Serialize\SerializerInterface;
 use Magento\Framework\Locale\ResolverInterface;
@@ -26,6 +23,7 @@ use Magento\Quote\Api\PaymentMethodManagementInterface;
 use Magento\Payment\Helper\Data as PaymentHelper;
 use Magento\Payment\Model\MethodInterface;
 use Kkkonrad\Fastcheckout\Helper\Data as Helper;
+use Kkkonrad\Fastcheckout\Model\CheckoutLayoutCollector;
 use Magento\Tax\Helper\Data as TaxHelper;
 
 
@@ -125,6 +123,9 @@ class Checkout extends Template
     /** @var array|null */
     private $shippingMethodsCache;
 
+    /** @var CheckoutLayoutCollector|null */
+    private $layoutCollector;
+
     /**
      * @param Context $context
      * @param CheckoutSession $checkoutSession
@@ -155,7 +156,8 @@ class Checkout extends Template
         ?PaymentMethodManagementInterface $paymentMethodManagement = null,
         ?PaymentHelper $paymentHelper = null,
         ?SerializerInterface $serializer = null,
-        ?BlockFactory $blockFactory = null
+        ?BlockFactory $blockFactory = null,
+        ?CheckoutLayoutCollector $layoutCollector = null
     ) {
         $this->checkoutSession = $checkoutSession;
         $this->pricingHelper = $pricingHelper;
@@ -172,6 +174,7 @@ class Checkout extends Template
         $this->paymentHelper = $paymentHelper;
         $this->serializer = $serializer;
         $this->blockFactory = $blockFactory;
+        $this->layoutCollector = $layoutCollector;
 
         parent::__construct($context, $data);
     }
@@ -1021,8 +1024,12 @@ class Checkout extends Template
     }
 
     /**
-     * Read every active module's checkout layout once. Only the static XML merge
-     * is cached; Magento's processors remain request/quote aware.
+     * Collect native checkout jsLayout + head assets.
+     *
+     * Primary: Magento layout merge for handle checkout_index_index (modules + theme).
+     * Fallback: module/theme filesystem XML scan (unit tests and merge failures).
+     *
+     * LayoutProcessors still run in getProcessedCheckoutLayout() via Onepage.
      */
     private function getRawCheckoutLayoutData(): array
     {
@@ -1030,132 +1037,47 @@ class Checkout extends Template
             return $this->rawCheckoutLayoutData;
         }
 
+        $collector = $this->getLayoutCollector();
+        $collected = $collector->collect();
         $this->rawCheckoutLayoutData = [
-            'jsLayout' => [],
-            'assets' => ['css' => [], 'scripts' => []]
+            'jsLayout' => is_array($collected['jsLayout'] ?? null) ? $collected['jsLayout'] : [],
+            'assets' => is_array($collected['assets'] ?? null)
+                ? $collected['assets']
+                : ['css' => [], 'scripts' => []],
+            'source' => (string)($collected['source'] ?? 'unknown')
         ];
-        if ($this->moduleList === null || $this->componentRegistrar === null) {
-            return $this->rawCheckoutLayoutData;
-        }
-
-        if ($this->serializer !== null) {
-            try {
-                $cached = $this->_cache->load($this->getRawCheckoutLayoutCacheId());
-                $cached = is_string($cached) && $cached !== ''
-                    ? $this->serializer->unserialize($cached)
-                    : null;
-                if (
-                    is_array($cached) &&
-                    is_array($cached['jsLayout'] ?? null) &&
-                    is_array($cached['assets'] ?? null)
-                ) {
-                    $this->rawCheckoutLayoutData = $cached;
-                    return $this->rawCheckoutLayoutData;
-                }
-            } catch (\Throwable $exception) {
-                // A cache miss or stale entry only requires rebuilding the static merge.
-            }
-        }
-
-        foreach ($this->moduleList->getNames() as $moduleName) {
-            $modulePath = $this->componentRegistrar->getPath(ComponentRegistrar::MODULE, $moduleName);
-            $layoutFile = $modulePath
-                ? $modulePath . '/view/frontend/layout/checkout_index_index.xml'
-                : '';
-            if (!is_file($layoutFile)) {
-                continue;
-            }
-
-            $dom = new \DOMDocument();
-            $previous = libxml_use_internal_errors(true);
-            try {
-                if (!$dom->load($layoutFile)) {
-                    continue;
-                }
-
-                $xpath = new \DOMXPath($dom);
-                $arguments = $xpath->query(
-                    '//*[(local-name()="block" or local-name()="referenceBlock") and @name="checkout.root"]' .
-                    '/*[local-name()="arguments"]/*[local-name()="argument" and @name="jsLayout"]'
-                );
-                foreach ($arguments as $argument) {
-                    $layout = $this->parseJsLayoutItem($argument);
-                    if (is_array($layout)) {
-                        $this->rawCheckoutLayoutData['jsLayout'] = $this->mergeJsLayoutArrays(
-                            $this->rawCheckoutLayoutData['jsLayout'],
-                            $layout
-                        );
-                    }
-                }
-
-                if ($moduleName === 'Kkkonrad_Fastcheckout') {
-                    continue;
-                }
-                foreach ($xpath->query('//*[local-name()="head"]/*[local-name()="css"]') as $node) {
-                    $src = $node->getAttribute('src');
-                    if ($src !== '') {
-                        $this->rawCheckoutLayoutData['assets']['css'][] = [
-                            'src' => $src,
-                            'src_type' => $node->getAttribute('src_type') ?: null
-                        ];
-                    }
-                }
-                foreach ($xpath->query('//*[local-name()="head"]/*[local-name()="script"]') as $node) {
-                    $src = $node->getAttribute('src');
-                    if ($src !== '') {
-                        $this->rawCheckoutLayoutData['assets']['scripts'][] = $src;
-                    }
-                }
-            } catch (\Throwable $exception) {
-                // A malformed optional module layout must not break checkout.
-            } finally {
-                libxml_clear_errors();
-                libxml_use_internal_errors($previous);
-            }
-        }
-
-        $this->rawCheckoutLayoutData['assets']['css'] = array_values(array_unique(
-            $this->rawCheckoutLayoutData['assets']['css'],
-            SORT_REGULAR
-        ));
-        $this->rawCheckoutLayoutData['assets']['scripts'] = array_values(array_unique(
-            $this->rawCheckoutLayoutData['assets']['scripts']
-        ));
-
-        if ($this->serializer !== null) {
-            try {
-                $this->_cache->save(
-                    $this->serializer->serialize($this->rawCheckoutLayoutData),
-                    $this->getRawCheckoutLayoutCacheId(),
-                    [ConfigCacheType::CACHE_TAG, LayoutCacheType::CACHE_TAG]
-                );
-            } catch (\Throwable $exception) {
-                // Caching is optional.
-            }
-        }
 
         return $this->rawCheckoutLayoutData;
     }
 
-    private function getRawCheckoutLayoutCacheId(): string
+    /**
+     * Which collector path produced the raw layout (for diagnostics / tests).
+     */
+    public function getCheckoutLayoutSource(): string
     {
-        $storeId = '';
-        $themeId = '';
-        try {
-            $storeId = (string)$this->_storeManager->getStore()->getId();
-            $theme = $this->_design->getDesignTheme();
-            $themeId = $theme ? (string)($theme->getId() ?: $theme->getCode()) : '';
-        } catch (\Throwable $exception) {
-            // Unit tests and early bootstrap can run without a resolved store/theme.
+        return (string)($this->getRawCheckoutLayoutData()['source'] ?? '');
+    }
+
+    private function getLayoutCollector(): CheckoutLayoutCollector
+    {
+        if ($this->layoutCollector !== null) {
+            return $this->layoutCollector;
         }
 
-        return 'fastcheckout_raw_layout_' . sha1(implode('|', [
-            'v1',
-            $storeId,
-            $themeId,
-            $this->getLocaleCode(),
-            implode(',', $this->moduleList !== null ? $this->moduleList->getNames() : [])
-        ]));
+        // Lazy fallback for unit tests / partial DI that still pass moduleList.
+        $this->layoutCollector = new CheckoutLayoutCollector(
+            null,
+            $this->moduleList,
+            $this->componentRegistrar,
+            $this->serializer,
+            $this->_cache,
+            $this->_storeManager,
+            $this->_design,
+            $this->_logger,
+            $this->getLocaleCode()
+        );
+
+        return $this->layoutCollector;
     }
 
     private function getProcessedCheckoutLayout(): array
@@ -1282,74 +1204,6 @@ class Checkout extends Template
         }
 
         return $node;
-    }
-
-    /**
-     * @param \DOMElement $node
-     * @return array|bool|float|int|string|null
-     */
-    private function parseJsLayoutItem(\DOMElement $node)
-    {
-        $type = $node->getAttribute('xsi:type');
-        if (!$type && $node->hasAttributeNS('http://www.w3.org/2001/XMLSchema-instance', 'type')) {
-            $type = $node->getAttributeNS('http://www.w3.org/2001/XMLSchema-instance', 'type');
-        }
-
-        if ($type === 'array') {
-            $result = [];
-            foreach ($node->childNodes as $child) {
-                if (!$child instanceof \DOMElement || $child->localName !== 'item') {
-                    continue;
-                }
-
-                $name = $child->getAttribute('name');
-                if ($name === '') {
-                    continue;
-                }
-
-                $result[$name] = $this->mergeJsLayoutArrays(
-                    $result[$name] ?? [],
-                    $this->parseJsLayoutItem($child)
-                );
-            }
-
-            return $result;
-        }
-
-        $value = trim($node->textContent);
-        if ($type === 'boolean') {
-            return $value === 'true' || $value === '1';
-        }
-        if ($type === 'number') {
-            return strpos($value, '.') === false ? (int)$value : (float)$value;
-        }
-        if ($value === '') {
-            return null;
-        }
-
-        return $node->getAttribute('translate') === 'true' ? (string)__($value) : $value;
-    }
-
-    /**
-     * @param mixed $left
-     * @param mixed $right
-     * @return mixed
-     */
-    private function mergeJsLayoutArrays($left, $right)
-    {
-        if (!is_array($left) || !is_array($right)) {
-            return $right;
-        }
-
-        foreach ($right as $key => $value) {
-            if (array_key_exists($key, $left)) {
-                $left[$key] = $this->mergeJsLayoutArrays($left[$key], $value);
-            } else {
-                $left[$key] = $value;
-            }
-        }
-
-        return $left;
     }
 
     /**
