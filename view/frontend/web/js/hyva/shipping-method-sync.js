@@ -867,6 +867,7 @@ define([
             getShippingLockGeneration: getShippingLockGeneration,
             installQuoteGuard: installQuoteGuard,
             applyPaymentRemapForShipping: applyPaymentRemapForShipping,
+            getAllowedPaymentCodes: getAllowedPaymentCodes,
             pushNativeShippingSelection: pushNativeShippingSelection
         };
     };

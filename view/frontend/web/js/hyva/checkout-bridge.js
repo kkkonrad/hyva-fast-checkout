@@ -552,7 +552,10 @@ define([
                         hidePaymentPlaceholders: hidePaymentPlaceholders,
                         syncKoPaymentRenderers: syncKoPaymentRenderers,
                         setQuotePaymentMethodFromBridge: setQuotePaymentMethodFromBridge,
-                        persistEmailToCheckoutData: persistEmailToCheckoutData
+                        persistEmailToCheckoutData: persistEmailToCheckoutData,
+                        // Magento method-list → SSR radios (never DOM → method-list).
+                        syncDomPaymentMethodsFromService: syncDomPaymentMethodsFromService,
+                        getAllowedPaymentCodes: getAllowedPaymentCodesForState
                     }
                 });
                 var shippingAttributesSync = createShippingAttributesSync({
@@ -647,6 +650,77 @@ define([
 
                 function getCheckedDomPaymentMethod() {
                     return paymentDomBridge.getCheckedMethod();
+                }
+
+                /**
+                 * Magento method-list is the source of truth. Create any missing
+                 * Fastcheckout radio rows, then re-apply shipping→payment mapping
+                 * visibility (mapping only toggles allowed flags on DOM).
+                 *
+                 * @param {Array} methods
+                 */
+                function syncDomPaymentMethodsFromService(methods) {
+                    var created = 0,
+                        shippingCode = '';
+
+                    if (paymentDomBridge && typeof paymentDomBridge.syncFromService === 'function') {
+                        created = paymentDomBridge.syncFromService(methods) || 0;
+                    }
+
+                    try {
+                        if (
+                            quote &&
+                            typeof quote.shippingMethod === 'function' &&
+                            quote.shippingMethod()
+                        ) {
+                            shippingCode = getShippingMethodCode(quote.shippingMethod());
+                        }
+                    } catch (eShip) {
+                        shippingCode = '';
+                    }
+
+                    if (
+                        window.fastcheckoutHyvaShipping &&
+                        typeof window.fastcheckoutHyvaShipping.applyPaymentRemapForShipping === 'function'
+                    ) {
+                        window.fastcheckoutHyvaShipping.applyPaymentRemapForShipping(
+                            shippingCode,
+                            { deferPaymentActivation: true }
+                        );
+                    } else if (typeof applyPaymentOptionVisibility === 'function') {
+                        applyPaymentOptionVisibility();
+                    }
+
+                    if (created > 0 && typeof applyPaymentOptionVisibility === 'function') {
+                        applyPaymentOptionVisibility();
+                    }
+
+                    return created;
+                }
+
+                /**
+                 * Allowed payment codes from FC mapping (empty array = no mapping
+                 * filter active, or mapping hides everything until shipping pick).
+                 *
+                 * @returns {string[]|null} null when mapping is not configured
+                 */
+                function getAllowedPaymentCodesForState() {
+                    var mapping = window.checkoutConfig &&
+                        window.checkoutConfig.fastcheckoutSettings &&
+                        window.checkoutConfig.fastcheckoutSettings.shippingPaymentMapping;
+
+                    if (!Array.isArray(mapping) || !mapping.length) {
+                        return null;
+                    }
+
+                    if (
+                        window.fastcheckoutHyvaShipping &&
+                        typeof window.fastcheckoutHyvaShipping.getAllowedPaymentCodes === 'function'
+                    ) {
+                        return window.fastcheckoutHyvaShipping.getAllowedPaymentCodes();
+                    }
+
+                    return [];
                 }
 
                 // After a successful panel open, briefly refuse blank hide-all calls.
@@ -797,6 +871,17 @@ define([
 
                 function syncPaymentMethods() {
                     return checkoutStateBridge.syncPaymentMethods();
+                }
+
+                function onPaymentMethodsUpdated() {
+                    if (
+                        checkoutStateBridge &&
+                        typeof checkoutStateBridge.onPaymentMethodsUpdated === 'function'
+                    ) {
+                        return checkoutStateBridge.onPaymentMethodsUpdated();
+                    }
+
+                    return syncPaymentMethods();
                 }
 
                 syncPaymentMethods();
@@ -1781,13 +1866,23 @@ define([
                     syncShippingMethod: syncSelectedShippingMethodToKnockout,
                     persistShippingMethod: persistShippingMethod,
                     persistShippingMethodNow: persistShippingMethodNow,
-                    applyPaymentRemapForShipping: function (methodCode) {
+                    applyPaymentRemapForShipping: function (methodCode, options) {
                         if (
                             shippingMethodSync &&
                             typeof shippingMethodSync.applyPaymentRemapForShipping === 'function'
                         ) {
-                            return shippingMethodSync.applyPaymentRemapForShipping(methodCode);
+                            return shippingMethodSync.applyPaymentRemapForShipping(methodCode, options);
                         }
+                    },
+                    getAllowedPaymentCodes: function () {
+                        if (
+                            shippingMethodSync &&
+                            typeof shippingMethodSync.getAllowedPaymentCodes === 'function'
+                        ) {
+                            return shippingMethodSync.getAllowedPaymentCodes();
+                        }
+
+                        return [];
                     },
                     rememberUserShippingSelection: rememberUserShippingSelection,
                     getShippingMethodCode: getShippingMethodCode,
@@ -5405,9 +5500,21 @@ define([
                     return hasAvailable;
                 }
 
-                // Expose for shipping→payment remap after method pick.
+                // Expose for shipping→payment remap after method pick + REST updates.
                 window.fastcheckoutHyvaPayment = window.fastcheckoutHyvaPayment || {};
                 window.fastcheckoutHyvaPayment.applyPaymentOptionVisibility = applyPaymentOptionVisibility;
+                window.fastcheckoutHyvaPayment.onPaymentMethodsUpdated = onPaymentMethodsUpdated;
+                window.fastcheckoutHyvaPayment.syncPaymentMethods = syncPaymentMethods;
+                window.fastcheckoutHyvaPayment.getCanonicalPaymentMethods = function () {
+                    if (
+                        checkoutStateBridge &&
+                        typeof checkoutStateBridge.getCanonicalPaymentMethods === 'function'
+                    ) {
+                        return checkoutStateBridge.getCanonicalPaymentMethods();
+                    }
+
+                    return [];
+                };
 
                 /**
                  * Magento payment modules register renderers by side-effect when their
