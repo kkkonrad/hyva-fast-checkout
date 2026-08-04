@@ -26,9 +26,7 @@ var config = {
             'Magento_Checkout/js/action/select-payment-method': {
                 'Kkkonrad_Fastcheckout/js/mixin/select-payment-method-mixin': true
             },
-            'Magento_Checkout/js/action/set-shipping-information': {
-                'Kkkonrad_Fastcheckout/js/mixin/set-shipping-information-mixin': true
-            },
+            // set-shipping-information pure passthrough removed (point 2 cleanup).
             'Magento_Checkout/js/model/shipping-rate-processor/new-address': {
                 'Kkkonrad_Fastcheckout/js/mixin/shipping-rate-processor-new-address-mixin': true
             },
@@ -50,9 +48,7 @@ var config = {
             'Magento_Checkout/js/action/redirect-on-success': {
                 'Kkkonrad_Fastcheckout/js/mixin/redirect-on-success-mixin': true
             },
-            'Magento_Checkout/js/action/set-payment-information': {
-                'Kkkonrad_Fastcheckout/js/mixin/set-payment-information-mixin': true
-            },
+            // set-payment-information pure passthrough removed; extended mixin keeps coalescing.
             'Magento_Checkout/js/action/set-payment-information-extended': {
                 'Kkkonrad_Fastcheckout/js/mixin/set-payment-information-extended-mixin': true
             },
@@ -101,6 +97,10 @@ var config = {
             'Magento_Checkout/js/view/summary/abstract-total': {
                 'Kkkonrad_Fastcheckout/js/mixin/summary-total-mixin': true
             },
+            // Short not-calculated shipping amount in narrow FC summary (Tax extends this).
+            'Magento_Checkout/js/view/summary/shipping': {
+                'Kkkonrad_Fastcheckout/js/mixin/summary-shipping-mixin': true
+            },
             'Magento_Checkout/js/view/summary/cart-items': {
                 'Kkkonrad_Fastcheckout/js/mixin/summary-cart-items-mixin': true
             },
@@ -110,6 +110,7 @@ var config = {
             'Magento_Checkout/js/view/summary/item/details/thumbnail': {
                 'Kkkonrad_Fastcheckout/js/mixin/summary-item-thumbnail-mixin': true
             },
+
             'Magento_SalesRule/js/view/payment/discount': {
                 'Kkkonrad_Fastcheckout/js/mixin/payment-discount-mixin': true
             }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Kkkonrad\Fastcheckout\Test\Unit\Plugin\Quote;
 
 use Kkkonrad\Fastcheckout\Plugin\Quote\PreserveInpostLocker;
+use Kkkonrad\Fastcheckout\Plugin\Quote\PreserveShippingExtensionAttributes;
 use Magento\Quote\Api\CartRepositoryInterface;
 use Magento\Quote\Api\Data\CartExtensionFactory;
 use Magento\Quote\Api\Data\CartExtensionInterface;
@@ -16,11 +17,7 @@ class PreserveInpostLockerTest extends TestCase
 {
     protected function setUp(): void
     {
-        // Reset per-request lookup cache between tests (static property).
-        $reflection = new \ReflectionClass(PreserveInpostLocker::class);
-        $property = $reflection->getProperty('lockerLookupCache');
-        $property->setAccessible(true);
-        $property->setValue(null, []);
+        PreserveShippingExtensionAttributes::resetLookupCache();
     }
 
     public function testSkipsVirtualQuotes(): void
@@ -43,6 +40,9 @@ class PreserveInpostLockerTest extends TestCase
         $factory->expects($this->never())->method('create');
         $plugin = new PreserveInpostLocker($factory);
 
+        $shippingAddress = $this->createMock(QuoteAddress::class);
+        $shippingAddress->method('getId')->willReturn(0);
+
         $quote = $this->getMockBuilder(Quote::class)
             ->disableOriginalConstructor()
             ->onlyMethods(['isVirtual', 'getId', 'getExtensionAttributes', 'getData', 'getResource', 'getShippingAddress'])
@@ -51,21 +51,38 @@ class PreserveInpostLockerTest extends TestCase
         $quote->method('getId')->willReturn(10);
         $quote->method('getExtensionAttributes')->willReturn(null);
         $quote->method('getData')->with('inpost_locker_id')->willReturn('KRA01A');
+        $quote->method('getShippingAddress')->willReturn($shippingAddress);
         $quote->expects($this->never())->method('getResource');
-        $quote->expects($this->never())->method('getShippingAddress');
 
         $repository = $this->createMock(CartRepositoryInterface::class);
         $this->assertSame([$quote], $plugin->beforeSave($repository, $quote));
     }
 
-    public function testSkipsDbWhenShippingIsNotInpost(): void
+    public function testSkipsDbWhenColumnMissingOnQuoteTable(): void
     {
         $factory = $this->createMock(CartExtensionFactory::class);
         $factory->expects($this->never())->method('create');
         $plugin = new PreserveInpostLocker($factory);
 
+        $select = $this->getMockBuilder(\stdClass::class)->addMethods(['from', 'where'])->getMock();
+        $select->method('from')->willReturnSelf();
+        $select->method('where')->willReturnSelf();
+
+        $connection = $this->getMockBuilder(\stdClass::class)
+            ->addMethods(['select', 'fetchOne', 'tableColumnExists'])
+            ->getMock();
+        $connection->method('select')->willReturn($select);
+        $connection->method('tableColumnExists')->willReturn(false);
+        $connection->expects($this->never())->method('fetchOne');
+
+        $resource = $this->getMockBuilder(\stdClass::class)
+            ->addMethods(['getConnection', 'getTable'])
+            ->getMock();
+        $resource->method('getConnection')->willReturn($connection);
+        $resource->method('getTable')->willReturn('quote');
+
         $shippingAddress = $this->createMock(QuoteAddress::class);
-        $shippingAddress->method('getShippingMethod')->willReturn('flatrate_flatrate');
+        $shippingAddress->method('getId')->willReturn(0);
 
         $quote = $this->getMockBuilder(Quote::class)
             ->disableOriginalConstructor()
@@ -83,7 +100,7 @@ class PreserveInpostLockerTest extends TestCase
         $quote->method('getExtensionAttributes')->willReturn(null);
         $quote->method('getData')->with('inpost_locker_id')->willReturn(null);
         $quote->method('getShippingAddress')->willReturn($shippingAddress);
-        $quote->expects($this->never())->method('getResource');
+        $quote->method('getResource')->willReturn($resource);
 
         $repository = $this->createMock(CartRepositoryInterface::class);
         $this->assertSame([$quote], $plugin->beforeSave($repository, $quote));
@@ -108,7 +125,7 @@ class PreserveInpostLockerTest extends TestCase
         $plugin = new PreserveInpostLocker($factory);
 
         $shippingAddress = $this->createMock(QuoteAddress::class);
-        $shippingAddress->method('getShippingMethod')->willReturn('inpostlocker_standard');
+        $shippingAddress->method('getId')->willReturn(0);
 
         $select = $this->getMockBuilder(\stdClass::class)
             ->addMethods(['from', 'where'])
@@ -117,16 +134,17 @@ class PreserveInpostLockerTest extends TestCase
         $select->method('where')->willReturnSelf();
 
         $connection = $this->getMockBuilder(\stdClass::class)
-            ->addMethods(['select', 'fetchOne'])
+            ->addMethods(['select', 'fetchOne', 'tableColumnExists'])
             ->getMock();
         $connection->method('select')->willReturn($select);
+        $connection->method('tableColumnExists')->willReturn(true);
         $connection->expects($this->once())->method('fetchOne')->willReturn('WAW02B');
 
         $resource = $this->getMockBuilder(\stdClass::class)
             ->addMethods(['getConnection', 'getTable'])
             ->getMock();
         $resource->method('getConnection')->willReturn($connection);
-        $resource->method('getTable')->with('quote')->willReturn('quote');
+        $resource->method('getTable')->willReturn('quote');
 
         $quote = $this->getMockBuilder(Quote::class)
             ->disableOriginalConstructor()
@@ -167,7 +185,7 @@ class PreserveInpostLockerTest extends TestCase
         $plugin = new PreserveInpostLocker($factory);
 
         $shippingAddress = $this->createMock(QuoteAddress::class);
-        $shippingAddress->method('getShippingMethod')->willReturn('inpost_locker_standard');
+        $shippingAddress->method('getId')->willReturn(0);
 
         $select = $this->getMockBuilder(\stdClass::class)
             ->addMethods(['from', 'where'])
@@ -176,9 +194,10 @@ class PreserveInpostLockerTest extends TestCase
         $select->method('where')->willReturnSelf();
 
         $connection = $this->getMockBuilder(\stdClass::class)
-            ->addMethods(['select', 'fetchOne'])
+            ->addMethods(['select', 'fetchOne', 'tableColumnExists'])
             ->getMock();
         $connection->method('select')->willReturn($select);
+        $connection->method('tableColumnExists')->willReturn(true);
         $connection->expects($this->once())->method('fetchOne')->willReturn('GDN03C');
 
         $resource = $this->getMockBuilder(\stdClass::class)

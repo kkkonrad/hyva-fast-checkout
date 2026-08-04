@@ -78,6 +78,7 @@ class NativePipelineOwnershipTest extends TestCase
         $this->assertStringContainsString("'checkout.sidebar.summary'", $bridge);
         $this->assertStringContainsString('Kkkonrad_Fastcheckout/hyva/summary', $bridge);
         $this->assertStringContainsString('summary-total-mixin', $require);
+        $this->assertStringContainsString('summary-shipping-mixin', $require);
         $this->assertStringContainsString('summary-cart-items-mixin', $require);
         $this->assertStringContainsString('summary-item-details-mixin', $require);
         $this->assertStringContainsString('summary-item-thumbnail-mixin', $require);
@@ -108,6 +109,9 @@ class NativePipelineOwnershipTest extends TestCase
         );
         $this->assertFileExists(
             $this->moduleRoot() . '/view/frontend/web/js/mixin/summary-total-mixin.js'
+        );
+        $this->assertFileExists(
+            $this->moduleRoot() . '/view/frontend/web/js/mixin/summary-shipping-mixin.js'
         );
 
         // RequireJS baseUrl must resolve Magento_Tax/template/... (not /_view/ or missing /).

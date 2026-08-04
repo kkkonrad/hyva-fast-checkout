@@ -1076,6 +1076,32 @@
     font-weight: 600;
     color: #111827;
     white-space: nowrap;
+    min-width: 0;
+}
+
+/*
+ * Magento puts notCalculatedMessage in shipping amount when no method is selected.
+ * Stock blank theme: .not-calculated { white-space: normal; font-style: italic }.
+ * Without this override, td.amount nowrap + flex row overflows ("rozjechany").
+ */
+#fastcheckout-checkout .fastcheckout-native-summary .table-totals tr:has(.not-calculated) {
+    align-items: flex-start;
+}
+
+#fastcheckout-checkout .fastcheckout-native-summary .table-totals tr:has(.not-calculated) td.amount {
+    white-space: normal;
+    flex: 1 1 auto;
+    max-width: 70%;
+}
+
+#fastcheckout-checkout .fastcheckout-native-summary .table-totals .not-calculated {
+    display: block;
+    white-space: normal;
+    font-style: italic;
+    font-weight: 400;
+    font-size: 0.75rem;
+    line-height: 1.25rem;
+    color: #6b7280;
 }
 
 #fastcheckout-checkout .fastcheckout-native-summary .table-totals tr.grand.totals th.mark,
@@ -1390,15 +1416,14 @@
 }
 
 /*
- * When Magento toolbar is mounted, SSR fallback must stay fully hidden.
- * Shared geometry above uses display:flex !important, which beats Tailwind .hidden.
+ * When Magento toolbar is mounted, JS sets .fastcheckout-ssr-place-order-hidden on the
+ * SSR fallback (setPlaceOrderSsrVisible). Do not use :has(.actions-toolbar) here — that
+ * permanently hid SSR even when the hosted native control was not actually visible,
+ * leaving zero [data-fastcheckout-place-order]:visible targets.
  */
 #fastcheckout-checkout [data-fastcheckout-place-order-ssr].hidden,
 #fastcheckout-checkout [data-fastcheckout-place-order-ssr].fastcheckout-ssr-place-order-hidden,
-#fastcheckout-checkout .fastcheckout-place-order-btn.fastcheckout-ssr-place-order-hidden,
-/* CSS sibling fallback: host already has the Magento toolbar */
-#fastcheckout-checkout .fastcheckout-place-order-host:has(.actions-toolbar) ~ [data-fastcheckout-place-order-ssr],
-#fastcheckout-checkout .fastcheckout-place-order-host:has(.action.primary.checkout) ~ [data-fastcheckout-place-order-ssr] {
+#fastcheckout-checkout .fastcheckout-place-order-btn.fastcheckout-ssr-place-order-hidden {
     display: none !important;
     visibility: hidden !important;
     pointer-events: none !important;

@@ -121,3 +121,30 @@ Test PayU Cards uruchamia się osobno na sklepie integracyjnym:
 FC_PAYU_E2E=1 FC_PAYU_BASE_URL=https://m10625.app-on-demand.net/ \
     npx playwright test PayuCompatibility.spec.js
 ```
+
+## Frontend static refresh (developer / on-demand hosts)
+
+After changing files under `view/frontend/web`, refresh published Magento static
+copies so the storefront does not keep serving stale `pub/static` JS:
+
+```bash
+app/code/Kkkonrad/Fastcheckout/bin/sync-frontend-static.sh
+php bin/magento cache:flush
+```
+
+This is required when `pub/static/frontend/*/Kkkonrad_Fastcheckout` already exists
+(even in developer mode).
+
+## Third-party shipping / payment modules
+
+Fastcheckout is designed as a host for Magento's native Knockout checkout APIs.
+Installing a standard shipping or payment module should **not** require patches
+or DI entries inside Kkkonrad_Fastcheckout:
+
+- Payment renderers and shipping UI components are loaded from the merged
+  Magento `checkout_index_index` jsLayout (all active modules + theme).
+- Scalar `extension_attributes` declared on `CartInterface` /
+  `AddressInterface` are auto-discovered and re-hydrated on quote save when the
+  matching DB column exists (parcel lockers, store pickup codes, etc.).
+- Optional UI hooks (e.g. InPost RequireJS widget) load only when that module
+  registers its AMD path; missing modules fail silently.

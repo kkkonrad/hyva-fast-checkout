@@ -1,4 +1,15 @@
 <?xml version="1.0"?>
+<!--
+/**
+ * Fastcheckout page layout.
+ *
+ * PR #4: do NOT live-update the Magento OPC handle on this page — on Hyvä
+ * without hyva-checkout that handle injects the "No Checkout module installed"
+ * notice and Luma OPC chrome. Third-party jsLayout + head assets are merged in
+ * PHP via CheckoutLayoutCollector (full Magento layout resolution for the OPC
+ * handle in an isolated layout build) and rendered by the KO bridge templates.
+ */
+-->
 <page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       layout="1column"
       xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
@@ -17,6 +28,8 @@
         <referenceBlock name="messages" remove="true"/>
         <referenceBlock name="script-alpine-js" remove="true"/>
         <referenceBlock name="require-alpine-v3" remove="true"/>
+        <!-- Defensive: if any theme still pulls OPC root onto this route, drop it. -->
+        <referenceBlock name="checkout.root" remove="true"/>
         <referenceContainer name="after.body.start">
             <block class="Magento\RequireJs\Block\Html\Head\Config"
                    name="kkkonrad.fastcheckout.requirejs.config"/>
