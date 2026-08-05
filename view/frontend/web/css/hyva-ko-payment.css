@@ -40,14 +40,6 @@
     color: #1f2937;
 }
 
-.fastcheckout-ko-payment-root .payment-method-content {
-    display: none;
-}
-
-.fastcheckout-ko-payment-root .payment-method._active .payment-method-content {
-    display: flex;
-}
-
 .fastcheckout-ko-payment-root .payment-group > .step-title,
 .fastcheckout-native-place-order-hidden,
 .fastcheckout-actions-toolbar-hidden {
@@ -76,6 +68,10 @@
     gap: 0;
 }
 
+#fastcheckout-checkout .payment-method:not(._active) > :not(.payment-method-title) {
+    display: none !important;
+}
+
 .fastcheckout-ko-payment-root .payment-method-content > .payment-method-billing-address,
 .fastcheckout-payment-method-ko-container .payment-method-content > .payment-method-billing-address,
 #fastcheckout-checkout .payment-method-content > .payment-method-billing-address {
@@ -96,10 +92,8 @@
     order: 60;
 }
 
-.fastcheckout-ko-payment-root .payment-method-content > .actions-toolbar,
-.fastcheckout-payment-method-ko-container .payment-method-content > .actions-toolbar,
-#fastcheckout-checkout .payment-method-content > .actions-toolbar {
-    order: 70;
+#fastcheckout-checkout .payment-method .actions-toolbar {
+    display: none !important;
 }
 
 @media (min-width: 1024px) {
@@ -113,11 +107,6 @@
 .fastcheckout-payment-method-ko-container img {
     max-width: 100%;
     height: auto;
-}
-
-.fastcheckout-ko-payment-root .field,
-.fastcheckout-payment-method-ko-container .field {
-    margin-bottom: 1.75rem;
 }
 
 .fastcheckout-ko-payment-root input[type='text'],

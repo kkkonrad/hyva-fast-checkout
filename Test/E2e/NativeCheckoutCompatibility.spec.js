@@ -88,13 +88,6 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         await expect(nativeSummary.locator('.product-item')).toBeVisible({timeout: 45_000});
         await expect(nativeSummary.locator('.table-totals tr.grand.totals')).toBeVisible();
         await expect(page.locator('[data-fastcheckout-summary-ssr]')).toBeHidden();
-        const initialSameAsShipping = page.locator(
-            '#billing-address-same-as-shipping-shared'
-        );
-        await expect(initialSameAsShipping).toBeChecked({timeout: 45_000});
-        await expect(page.locator(
-            '.fastcheckout-payment-after-methods [data-form="billing-new-address"]'
-        )).toBeHidden();
         expect(await page.evaluate(() => {
             const quote = window.require('Magento_Checkout/js/model/quote');
             const billing = quote.billingAddress();
@@ -238,6 +231,47 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             '#checkout-payment-method-load .payment-method'
         ).count(), {timeout: 45_000}).toBeGreaterThan(0);
 
+        const paymentPresentation = await page.evaluate(() => {
+            const methods = Array.from(document.querySelectorAll(
+                    '.fastcheckout-ko-payment-root .payment-method'
+                )),
+                inactive = methods.filter((method) => !method.classList.contains('_active')),
+                sample = inactive[0] || methods[0],
+                sampleWasActive = sample && sample.classList.contains('_active'),
+                toolbars = Array.from(document.querySelectorAll(
+                    '.fastcheckout-ko-payment-root .payment-method .actions-toolbar'
+                )),
+                fields = Array.from(document.querySelectorAll(
+                    '.fastcheckout-ko-payment-root .field'
+                ));
+
+            if (sampleWasActive) {
+                sample.classList.remove('_active');
+            }
+            const inactiveOnlyTitles = Boolean(sample) &&
+                Array.from(sample.children).filter((child) => (
+                    getComputedStyle(child).display !== 'none'
+                )).every((child) => child.classList.contains('payment-method-title'));
+            if (sampleWasActive) {
+                sample.classList.add('_active');
+            }
+
+            return {
+                inactiveOnlyTitles,
+                toolbarCount: toolbars.length,
+                toolbarsHidden: toolbars.every((toolbar) => (
+                    getComputedStyle(toolbar).display === 'none'
+                )),
+                noLegacyFieldMargin: fields.every((field) => (
+                    getComputedStyle(field).marginBottom !== '28px'
+                ))
+            };
+        });
+        expect(paymentPresentation.toolbarCount).toBeGreaterThan(0);
+        expect(paymentPresentation.inactiveOnlyTitles).toBe(true);
+        expect(paymentPresentation.toolbarsHidden).toBe(true);
+        expect(paymentPresentation.noLegacyFieldMargin).toBe(true);
+
         const rendererState = await page.evaluate(() => new Promise((resolve, reject) => {
             window.require([
                 'Magento_Checkout/js/model/payment/renderer-list',
@@ -271,7 +305,7 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         await expect(sameAsShipping).toBeChecked();
         await sameAsShipping.uncheck({force: true});
         const billingAddress = page.locator(
-            '.fastcheckout-payment-after-methods > .checkout-billing-address'
+            '.payment-method._active .checkout-billing-address'
         );
         const billingFieldset = billingAddress.locator('[data-form="billing-new-address"]');
         await expect(billingFieldset).toBeVisible();

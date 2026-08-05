@@ -292,11 +292,7 @@ define([
         initialized = true;
 
         app(jsLayout);
-        registry.async(
-            'checkout.steps.billing-step.payment.afterMethods.billing-address-form'
-        )(function () {
-            checkoutDataResolver.resolveBillingAddress();
-        });
+        checkoutDataResolver.resolveBillingAddress();
         bindPlaceOrderProxies();
         saveShippingWhenMethodChanges();
 
