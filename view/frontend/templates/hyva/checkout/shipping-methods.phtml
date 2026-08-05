@@ -9,29 +9,6 @@
 // Collect rates with Magento default destination when quote has no country yet.
 $shippingMethods = $block->getShippingMethods();
 $selectedShipping = $block->getSelectedShippingMethodCode();
-$shippingAddress = $block->getQuote() ? $block->getQuote()->getShippingAddress() : null;
-
-$jsRates = [];
-foreach ($shippingMethods as $carrierCode => $rates) {
-    foreach ($rates as $rate) {
-        $priceExcl = $block->getShippingRateAmountExclTax($rate);
-        $priceIncl = $block->getShippingRateAmountInclTax($rate);
-        // Magento estimate payload uses amount ≈ primary/base; KO list reads
-        // price_excl_tax / price_incl_tax when Magento tax display is set.
-        $jsRates[] = [
-            'carrier_code' => (string)$rate->getCarrier(),
-            'method_code' => (string)$rate->getMethod(),
-            'carrier_title' => (string)$rate->getCarrierTitle(),
-            'method_title' => (string)$rate->getMethodTitle(),
-            'amount' => $priceExcl,
-            'base_amount' => $priceExcl,
-            'price_excl_tax' => $priceExcl,
-            'price_incl_tax' => $priceIncl,
-            'available' => !$rate->getErrorMessage(),
-            'error_message' => (string)$rate->getErrorMessage(),
-        ];
-    }
-}
 ?>
 <!-- Container 2: Shipping Method -->
 <div class="fc-container-2 space-y-6 min-w-0 w-full" data-fastcheckout-shipping-methods>
@@ -121,18 +98,3 @@ foreach ($shippingMethods as $carrierCode => $rates) {
         </div>
     </div>
 </div>
-<script>
-    window.fastcheckoutInitialShippingRates = <?= /* @noEscape */ $block->serializeForScript($jsRates) ?>;
-    window.fastcheckoutInitialShippingMethod = <?= /* @noEscape */ $block->serializeForScript($selectedShipping) ?>;
-    window.fastcheckoutDefaultDestination = {
-        countryId: <?= /* @noEscape */ $block->serializeForScript(
-            $shippingAddress && $shippingAddress->getCountryId()
-                ? (string)$shippingAddress->getCountryId()
-                : $block->getDefaultDestinationCountryId()
-        ) ?>,
-        postcode: <?= /* @noEscape */ $block->serializeForScript($shippingAddress ? (string)$shippingAddress->getPostcode() : '') ?>,
-        regionId: <?= /* @noEscape */ $block->serializeForScript($shippingAddress ? (string)$shippingAddress->getRegionId() : '') ?>,
-        city: <?= /* @noEscape */ $block->serializeForScript($shippingAddress ? (string)$shippingAddress->getCity() : '') ?>
-    };
-</script>
-<?php $hyvaCsp->registerInlineScript() ?>

@@ -1,9 +1,9 @@
 # Kkkonrad Fastcheckout
 
 Fastcheckout to moduł procesu zamówienia Magento 2 przeznaczony dla motywów Hyvä.
-Renderuje standardowe komponenty Knockout Magento odpowiedzialne za adresy i
-płatności wewnątrz układu Hyvä. Natywny koszyk Magento oraz operacje REST pozostają
-jedynym źródłem danych.
+Uruchamia standardowy checkout Knockout Magento przez oficjalny mechanizm Hyvä
+Theme Fallback i nakłada własną warstwę wizualną. Natywny koszyk Magento oraz
+operacje REST pozostają jedynym źródłem danych.
 
 Moduł nie wymaga Magewire i nie utrzymuje dodatkowego stanu procesu zamówienia.
 
@@ -16,21 +16,12 @@ Moduł nie wymaga Magewire i nie utrzymuje dodatkowego stanu procesu zamówienia
 - responsywny układ procesu zamówienia zgodny z Hyvä;
 - standardowe formularze adresu wysyłki i adresu rozliczeniowego Magento wraz z
   natywną walidacją;
-- natywny bootstrap RequireJS Magento i warstwa zgodności rendererów płatności
-  Knockout;
-- stabilne hosty KO dla metod płatności (jednorazowy adopt, soft-remove zamiast
-  niszczenia rendererów przy zmianie dostawy / odświeżeniu `method-list`);
-- współdzielony adres rozliczeniowy między metodami płatności (Update / Edytuj
-  na jednej metodzie zachowuje dane na pozostałych);
-- odzyskiwanie hostowanych pól karty (Secure Forms i podobne) po reparent /
-  soft-hide, bez per-vendor DI;
+- natywny bootstrap RequireJS i dokładnie jeden, pełny `Magento_Ui/js/core/app`;
+- niezmienione ścieżki komponentów `checkout.*` i `checkoutProvider`, dzięki czemu
+  renderery płatności oraz dodatki dostawy działają tak samo jak w core;
 - mapowanie metod płatności do metod dostawy;
-- podsumowanie zamówienia oparte o natywne totals Magento (w tym Tax), ze
-  skróconym komunikatem gdy dostawa nie jest jeszcze wybrana;
-- zachowanie adresu gościa po odświeżeniu strony;
+- natywne podsumowanie i totals Magento, w tym Tax;
 - obsługa komentarzy do zamówienia i zapisu do newslettera;
-- automatyczne zachowanie skalarnych `extension_attributes` koszyka i adresu
-  (np. paczkomat) oraz opcjonalne widgety UI ładowane tylko gdy moduł jest obecny;
 - opcjonalne przypisanie zamówienia gościa do istniejącego klienta o tym samym
   adresie e-mail.
 
@@ -38,7 +29,8 @@ Moduł nie wymaga Magewire i nie utrzymuje dodatkowego stanu procesu zamówienia
 
 - Magento 2.4 (`magento/framework` 103.x);
 - PHP 8.1–8.4;
-- Hyvä Theme Module 1.4 lub nowszy.
+- Hyvä Theme Module 1.4 lub nowszy;
+- Hyvä Theme Fallback 1.x (instalowany jako zależność Composer modułu).
 
 ## Instalacja
 
@@ -109,8 +101,8 @@ php bin/magento setup:di:compile
 php bin/magento setup:static-content:deploy -f pl_PL en_US
 ```
 
-Moduł rejestruje swoje szablony w konfiguracji Tailwind Hyvä. Po instalacji lub
-zmianie szablonów procesu zamówienia należy ponownie zbudować CSS aktywnego motywu.
+Style checkoutu są dostarczane jako zwykły zasób CSS modułu; nie wymagają
+przebudowy konfiguracji Tailwind aktywnego motywu.
 
 ## Konfiguracja
 
@@ -123,35 +115,29 @@ newslettera, opcjonalnie przypisywać zamówienia gości oraz definiować mapowa
 metod płatności do metod dostawy.
 
 Proces zamówienia jest dostępny pod standardową ścieżką `/checkout/`. Gdy moduł oraz
-zgodny motyw Hyvä są aktywne, Fastcheckout zastępuje zawartość tej strony bez
-dodatkowego przekierowania. Dotychczasowa ścieżka `/fast-checkout/` pozostaje
-dostępna jako alias zapewniający zgodność wsteczną.
+zgodny motyw Hyvä są aktywne, Fastcheckout dodaje własny handle prezentacyjny do
+layoutu natywnego kontrolera Magento. Dotychczasowa ścieżka `/fast-checkout/`
+pozostaje dostępna ze względów zgodności wstecznej.
 
 ## Architektura
 
-- `Block/Hyva/Checkout.php` jednokrotnie scala standardowy `jsLayout` i przekazuje
-  go natywnym procesorom checkoutu Magento.
-- `Model/CheckoutLayoutCollector.php` zbiera OPC `jsLayout` z plików layout
-  aktywnych modułów (preferowane na Hyvä, gdzie motyw usuwa `checkout.root`)
-  oraz z merge motywu; pusty wynik nie jest cache’owany.
-- `view/frontend/web/js/requirejs-base.js` ustawia ścieżkę zasobów przed natywnym
-  bootstrapem RequireJS, również przy włączonej minifikacji i łączeniu JavaScript.
-- Magento ładuje własną konfigurację RequireJS; szablon
-  `view/frontend/templates/hyva/knockout/checkout-bridge.phtml` uruchamia wyłącznie
-  most Knockout.
-- `view/frontend/web/js/hyva/checkout-bridge.js` montuje komponenty procesu
-  zamówienia Magento (adres, metody, summary, place order).
-- `payment-host-bridge.js` + `payment-list.js` — stabilne sloty per metoda oraz
-  soft-remove (ukrycie bez `dispose` rendererów z hostowanymi polami karty).
-- `billing-address-validation-mixin.js` — wspólny adres rozliczeniowy między
-  rendererami (`billingAddress{methodCode}`) przy Update / Edytuj / zmianie metody.
-- Obiekty Magento `quote`, `checkout-data` oraz operacje REST zarządzają adresami,
-  metodami i podsumowaniem.
-- Mixiny RequireJS (nie `map` override’y całych modułów) zapewniają trwałość
-  danych i zgodność ze standardowymi bramkami / przewoźnikami.
-- `Plugin/Quote/PreserveShippingExtensionAttributes.php` odkrywa skalarne
-  atrybuty rozszerzające Cart/Address i zachowuje je przy zapisie (zamiast
-  hardcodu pod jednego vendor’a).
+- Kontroler `/checkout/` pozostaje `Magento\Checkout\Controller\Index\Index`.
+  Standardowy event `layout_load_before` dodaje handle `fastcheckout_index_index`
+  przed scaleniem layoutu; moduł nie pluginuje ani nie omija kontrolera checkoutu.
+- Fastcheckout buduje izolowany layout motywu fallback dla handle
+  `checkout_index_index`, dzięki czemu wszystkie layout processory i wpisy
+  `jsLayout` z modułów zewnętrznych trafiają do oryginalnego `checkout.root`.
+  Izolowany layout nie ładuje globalnego handle `default`, więc nie regeneruje
+  assetów RequireJS aktywnego motywu podczas renderowania strony.
+- Pełny, scalony `jsLayout` jest uruchamiany dokładnie raz przez
+  `Magento_Ui/js/core/app`; Fastcheckout zmienia wyłącznie trzy ścieżki szablonów
+  odpowiedzialne za dotychczasowy wygląd.
+- Magento zachowuje własne komponenty `shipping`, `payment`, `payments-list`,
+  `renderer-list`, `shipping-service`, `checkout-data` i `quote` bez forków.
+- Fastcheckout zachowuje natywne regiony płatności i używa tylko trzech małych
+  mixinów: extras place-order, mapowanie dostawa→płatność i widoczność natywnego
+  formularza rabatowego. Własne pole komentarza oraz newsletter pozostają w
+  istniejącym panelu podsumowania, więc nie zmieniają układu checkoutu.
 
 Moduł nie zawiera komponentu Magewire, mechanizmu modyfikowania DOM przez Livewire
 ani orkiestratora stanu opartego na Alpine.
@@ -162,22 +148,21 @@ Fastcheckout działa jak host natywnego checkoutu Magento Knockout + REST.
 **Instalacja standardowego modułu dostawy lub płatności nie powinna wymagać
 patchy ani wpisów DI w Kkkonrad_Fastcheckout.**
 
-- Renderery płatności i komponenty UI dostawy pochodzą ze scalonego
-  `jsLayout` handle `checkout_index_index` (wszystkie aktywne moduły + motyw).
-- Lista dostępnych metod płatności jest synchronizowana z Magento
-  `method-list` (REST); soft-remove chroni bramki z Secure Forms / hosted fields
-  przed zniszczeniem przy chwilowym zniknięciu metody (zmiana dostawy, free
-  shipping, odświeżenie totals).
-- Skalarne `extension_attributes` na `CartInterface` / `AddressInterface` są
-  auto-odkrywane i ponownie ustawiane przy zapisie quote, gdy istnieje
-  odpowiadająca kolumna w bazie (paczkomaty, store pickup itd.).
-- Opcjonalne widgety UI (np. InPost) ładują się tylko gdy dany moduł zarejestruje
-  ścieżkę AMD; brak modułu kończy się cicho.
-- Hostowane pola karty (m.in. PayU Secure Forms) są remountowane po reparent
-  hosta / soft-hide, a reject tokenizacji nie zostawia zablokowanego place order.
+- Renderery płatności i komponenty UI dostawy pochodzą ze standardowego,
+  dynamicznie scalonego handle `checkout_index_index`.
+- `shippingAdditional`, `before-shipping-method-form`, `beforeMethods`,
+  `afterMethods`, `before-place-order`, `payments-list`, `renderer-list` i
+  `checkout.sidebar.shipping-information` pozostają w oryginalnych miejscach.
+- Fastcheckout nie zastępuje `window.checkoutConfig`, nie zapisuje własnego checkout
+  store i nie odtwarza `extension_attributes` z bazy. Natywny toolbar aktywnego
+  renderera jest zachowywany wraz z handlerami i umieszczany w istniejącym wizualnym
+  hoście przycisku zamówienia; sam renderer i jego pola pozostają własnością modułu.
+- Mixiny nie są rejestrowane na akcjach wyboru adresu/metody, transporcie REST,
+  rate processorach ani `customer-data`, więc łańcuchy innych vendorów pozostają
+  nienaruszone.
 
 Nie dodawaj per-vendor DI „pod Fastcheckout” w projekcie sklepu, jeśli standardowy
-checkout Magento Luma/Hyvä i tak ładuje ten sam renderer.
+checkout Magento w motywie fallback już ładuje ten sam renderer.
 
 ## Testy
 
@@ -202,16 +187,14 @@ npm ci
 npx playwright test
 ```
 
-Testy składające rzeczywiste zamówienia są domyślnie pomijane. Można je
-uruchomić świadomie przez `FC_PLACE_REAL_ORDER=1`. Test ciepłego startu formularza
-adresu wymaga gotowości w ciągu 1000 ms od `DOMContentLoaded`; dla innego
-środowiska limit można ustawić przez `FC_ADDRESS_READY_BUDGET_MS`.
-
-Test PayU Cards uruchamia się osobno na sklepie integracyjnym:
+Testy E2E domyślnie nie składają zamówień. Sprawdzają natywny bootstrap,
+kanoniczne wpisy `uiRegistry`, regiony rozszerzeń i pełny łańcuch walidatorów.
+Jawny test końcowego zamówienia Purchase Order na izolowanym sklepie testowym
+uruchom przez:
 
 ```bash
-FC_PAYU_E2E=1 FC_PAYU_BASE_URL=https://m10625.app-on-demand.net/ \
-    npx playwright test PayuCompatibility.spec.js
+FC_ALLOW_PLACE_ORDER=1 npx playwright test \
+    -g 'validates shipping and Purchase Order, optionally placing an order'
 ```
 
 ## Odświeżanie plików statycznych (developer / hosty on-demand)
