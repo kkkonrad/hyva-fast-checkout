@@ -1,80 +1,85 @@
 <div class="grid gap-3 relative">
     <!-- ko if: isLoading -->
-    <!-- pointer-events-none: the veil covers the whole list, so without it a click on a
-         rate during an in-flight estimate hit the overlay instead of the radio and the
-         trusted-click handler never ran. -->
-    <div class="absolute inset-0 bg-white/70 backdrop-blur-[1px] z-20 rounded items-center justify-center transition-all duration-200 pointer-events-none">
-        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center">
-            <svg class="animate-spin h-8 w-8 text-primary" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    <div class="absolute inset-0 bg-white/70 backdrop-blur-[1px] z-20 rounded pointer-events-none"
+         role="status"
+         aria-live="polite">
+        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+            <svg class="animate-spin h-8 w-8 text-primary"
+                 fill="none"
+                 viewBox="0 0 24 24"
+                 aria-hidden="true">
+                <circle class="opacity-25" cx="12" cy="12" r="10"
+                        stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
         </div>
     </div>
     <!-- /ko -->
-    <!-- ko foreach: getRegion('before-shipping-method-form') -->
-        <!-- ko template: getTemplate() --><!-- /ko -->
-    <!-- /ko -->
 
-    <!-- List-level validation (e.g. no shipping method selected) -->
-    <!-- ko if: hasGeneralError -->
-        <div class="rounded-lg border border-red-200 bg-red-50 px-3 py-2"
-             role="alert"
-             data-fastcheckout-shipping-method-error="1">
-            <span class="field-error shipping-field-error text-sm text-red-600 font-medium block"
-                  data-bind="text: errorValidationMessage"></span>
-        </div>
+    <each args="getRegion('before-shipping-method-form')" render=""></each>
+
+    <!-- ko if: errorValidationMessage().length -->
+    <div class="rounded-lg border border-red-200 bg-red-50 px-3 py-2"
+         role="alert"
+         data-fastcheckout-shipping-method-error="1">
+        <span class="field-error shipping-field-error text-sm text-red-600 font-medium block"
+              data-bind="text: errorValidationMessage"></span>
+    </div>
     <!-- /ko -->
 
     <!-- ko foreach: { data: rates(), as: 'method' } -->
-        <!-- selectionRevision forces border/css recompute when user lock changes -->
-        <div class="fastcheckout-shipping-method-option rounded p-4 transition-all duration-200 cursor-pointer"
-             data-bind="css: $parent.getMethodCss(method), attr: { 'data-shipping-selected': $parent.methodMatchesCode(method, $parent.getPreferredSelectedCode()) ? '1' : '0' }">
-            <label class="flex items-center justify-between cursor-pointer mb-0 w-full">
-                <div class="flex items-center min-w-0">
-                    <input type="radio"
-                           class="form-radio mr-4 shrink-0"
-                           name="shipping_method"
-                           required
-                           data-bind="checked: $parent.selectedMethodCode, value: method.carrier_code + '_' + method.method_code" />
-                    <div class="min-w-0 pl-4">
-                        <span class="block text-sm font-semibold text-gray-900 leading-tight"
-                              data-bind="text: method.method_title">
-                        </span>
-                        <span class="block text-xs text-gray-500 mt-1"
-                              data-bind="text: method.carrier_title, attr: { id: 'label_carrier_' + method.method_code + '_' + method.carrier_code }">
-                        </span>
-                    </div>
-                </div>
-                <div class="text-sm font-bold text-gray-900 shrink-0 pl-3 text-right">
-                    <span data-bind="text: $parent.formatShippingPrice(method)"></span>
-                    <!-- ko if: $parent.showShippingPriceExclSecondary(method) -->
-                    <span class="block text-xs font-normal text-gray-500 mt-0.5"
-                          data-bind="attr: {'data-label': $t('Excl. Tax')}">
-                        <span data-bind="i18n: 'Excl. Tax'"></span>:
-                        <span data-bind="text: $parent.formatShippingPriceExclSecondary(method)"></span>
-                    </span>
-                    <!-- /ko -->
-                </div>
-            </label>
-            <!-- InPost widget container placeholder -->
-            <div data-bind="attr: { id: 'label_method_' + method.method_code + '_' + method.carrier_code }"></div>
-
-            <!-- ko if: $parent.hasError(method) -->
-            <span class="field-error shipping-field-error mt-2 text-xs text-red-600 block font-medium"
-                  data-bind="text: $parent.errorValidationMessage"></span>
-            <!-- /ko -->
-        </div>
+    <div class="fastcheckout-shipping-method-option rounded p-4 transition-all duration-200 cursor-pointer border-2"
+         data-bind="
+             click: $parent.selectShippingMethod,
+             css: {
+                 'border-primary bg-container': $parent.isSelected() === method.carrier_code + '_' + method.method_code,
+                 'border-gray-200 hover:border-gray-300 hover:bg-gray-50/50':
+                     $parent.isSelected() !== method.carrier_code + '_' + method.method_code
+             }
+         ">
+        <label class="flex items-center justify-between cursor-pointer mb-0 w-full">
+            <span class="flex items-center min-w-0">
+                <input type="radio"
+                       class="form-radio mr-4 shrink-0"
+                       name="shipping_method"
+                       required
+                       data-bind="
+                           checked: $parent.isSelected,
+                           value: method.carrier_code + '_' + method.method_code,
+                           attr: {
+                               'aria-labelledby':
+                                   'label_method_' + method.method_code + '_' + method.carrier_code + ' ' +
+                                   'label_carrier_' + method.method_code + '_' + method.carrier_code
+                           }
+                       "/>
+                <span class="min-w-0 pl-4">
+                    <span class="block text-sm font-semibold text-gray-900 leading-tight"
+                          data-bind="
+                              text: method.method_title,
+                              attr: {id: 'label_method_' + method.method_code + '_' + method.carrier_code}
+                          "></span>
+                    <span class="block text-xs text-gray-500 mt-1"
+                          data-bind="
+                              text: method.carrier_title,
+                              attr: {id: 'label_carrier_' + method.method_code + '_' + method.carrier_code}
+                          "></span>
+                </span>
+            </span>
+            <span class="text-sm font-bold text-gray-900 shrink-0 pl-3 text-right">
+                <each args="$parent.getRegion('price')" render=""></each>
+            </span>
+        </label>
+        <div data-bind="attr: {id: 'label_method_' + method.method_code + '_' + method.carrier_code + '_additional'}"></div>
+    </div>
     <!-- /ko -->
 
     <!-- ko ifnot: rates().length -->
-        <p class="text-sm text-gray-500" data-bind="i18n: 'Please enter your shipping address details to estimate shipping rates.'">
-        </p>
+    <p class="text-sm text-gray-500"
+       data-bind="i18n: 'Please enter your shipping address details to estimate shipping rates.'"></p>
     <!-- /ko -->
 
     <div id="onepage-checkout-shipping-method-additional-load">
-        <!-- ko foreach: getRegion('shippingAdditional') -->
-            <!-- ko template: getTemplate() --><!-- /ko -->
-        <!-- /ko -->
+        <each args="getRegion('shippingAdditional')" render=""></each>
     </div>
 </div>

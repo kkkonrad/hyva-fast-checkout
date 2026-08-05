@@ -1058,6 +1058,56 @@ class Checkout extends Template
         return (string)($this->getRawCheckoutLayoutData()['source'] ?? '');
     }
 
+    /**
+     * Complete, processed Magento checkout tree. Only template names and visual
+     * sort order are changed; component names, children and display areas stay intact.
+     */
+    public function getCheckoutJsLayout(): array
+    {
+        $layout = $this->getProcessedCheckoutLayout();
+        if (!isset($layout['components']['checkout']['children']) ||
+            !is_array($layout['components']['checkout']['children'])) {
+            return $layout;
+        }
+
+        $checkout = &$layout['components']['checkout']['children'];
+        $shipping = &$checkout['steps']['children']['shipping-step']['children']['shippingAddress'];
+
+        if (is_array($shipping)) {
+            $shipping['config'] = is_array($shipping['config'] ?? null) ? $shipping['config'] : [];
+            $shipping['config']['template'] = 'Kkkonrad_Fastcheckout/hyva/shipping-address';
+            $shipping['template'] = 'Kkkonrad_Fastcheckout/hyva/shipping-address';
+            $shipping['config']['popUpForm']['options']['appendTo'] =
+                '#fastcheckout-checkout .fastcheckout-native-shipping-address';
+        }
+
+        $summary = &$checkout['sidebar']['children']['summary'];
+        if (is_array($summary)) {
+            $summary['config'] = is_array($summary['config'] ?? null) ? $summary['config'] : [];
+            $summary['config']['template'] = 'Kkkonrad_Fastcheckout/hyva/summary';
+            $summary['template'] = 'Kkkonrad_Fastcheckout/hyva/summary';
+            if (isset($summary['children']['cart_items'])) {
+                $summary['children']['cart_items']['sortOrder'] = 10;
+            }
+            if (isset($summary['children']['itemsAfter'])) {
+                $summary['children']['itemsAfter']['sortOrder'] = 20;
+            }
+            if (isset($summary['children']['totals'])) {
+                $summary['children']['totals']['sortOrder'] = 30;
+            }
+        }
+
+        $discount = &$checkout['steps']['children']['billing-step']['children']['payment']
+            ['children']['afterMethods']['children']['discount'];
+        if (is_array($discount)) {
+            $discount['config'] = is_array($discount['config'] ?? null) ? $discount['config'] : [];
+            $discount['config']['template'] = 'Kkkonrad_Fastcheckout/hyva/payment/discount';
+            $discount['template'] = 'Kkkonrad_Fastcheckout/hyva/payment/discount';
+        }
+
+        return $layout;
+    }
+
     private function getLayoutCollector(): CheckoutLayoutCollector
     {
         if ($this->layoutCollector !== null) {
@@ -1102,9 +1152,7 @@ class Checkout extends Template
             }
         }
 
-        // One normalization pass over the final tree. Normalizing the raw layout first
-        // only to overwrite it with the processed one walked the whole tree twice.
-        $this->processedCheckoutLayout = $this->normalizeStandardStreetLineDefaults($layout);
+        $this->processedCheckoutLayout = $layout;
 
         return $this->processedCheckoutLayout;
     }
@@ -1123,87 +1171,6 @@ class Checkout extends Template
         }
 
         return $nodes;
-    }
-
-    /**
-     * Normalize Magento multiline street UI config for shipping and billing.
-     *
-     * - UI form elements start with `undefined` when checkoutProvider has no
-     *   persisted address. Magento's max_text_length validator treats that as an
-     *   error; an empty string is the normal form value.
-     * - AttributeMerger copies attribute validation (e.g. min_text_length) onto
-     *   every street line. Only line 0 is required; optional lines must not
-     *   carry required-entry and must accept empty values.
-     *
-     * @param array $node
-     * @return array
-     */
-    private function normalizeStandardStreetLineDefaults(array $node)
-    {
-        $dataScope = isset($node['dataScope']) ? (string)$node['dataScope'] : '';
-        if (
-            substr($dataScope, -7) === '.street' &&
-            isset($node['children']) &&
-            is_array($node['children'])
-        ) {
-            $ordinal = 0;
-            foreach ($node['children'] as $key => $child) {
-                if (!is_array($child)) {
-                    continue;
-                }
-
-                if (!array_key_exists('value', $child) && !array_key_exists('default', $child)) {
-                    $child['default'] = '';
-                }
-
-                $lineIndex = $ordinal;
-                if (isset($child['dataScope']) && is_numeric($child['dataScope'])) {
-                    $lineIndex = (int)$child['dataScope'];
-                } elseif (is_numeric($key)) {
-                    $lineIndex = (int)$key;
-                }
-
-                // Only the first street line is required.
-                // Always materialize empty defaults for every line — Magento's
-                // max_text_length rule treats `undefined` as invalid and shows
-                // "Please enter less or equal than 255 symbols" on empty optional lines.
-                $child['default'] = array_key_exists('default', $child) ? $child['default'] : '';
-                if ($child['default'] === null) {
-                    $child['default'] = '';
-                }
-                if (!array_key_exists('value', $child)) {
-                    $child['value'] = '';
-                } elseif ($child['value'] === null) {
-                    $child['value'] = '';
-                }
-
-                if ($lineIndex > 0) {
-                    if (!isset($child['validation']) || !is_array($child['validation'])) {
-                        $child['validation'] = [];
-                    }
-                    unset($child['validation']['required-entry']);
-                    if (array_key_exists('min_text_length', $child['validation'])) {
-                        $child['validation']['min_text_length'] = 0;
-                    }
-                    // max_text_length is fine for non-empty values; empty is handled via value "".
-                    $child['required'] = false;
-                    $child['additionalClasses'] = isset($child['additionalClasses'])
-                        ? $child['additionalClasses']
-                        : 'additional';
-                }
-
-                $node['children'][$key] = $child;
-                $ordinal++;
-            }
-        }
-
-        foreach ($node as $key => $value) {
-            if (is_array($value)) {
-                $node[$key] = $this->normalizeStandardStreetLineDefaults($value);
-            }
-        }
-
-        return $node;
     }
 
     /**

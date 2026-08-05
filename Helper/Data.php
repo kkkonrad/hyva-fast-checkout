@@ -280,11 +280,6 @@ class Data extends AbstractHelper
             return $this->canUseHyvaNativeCheckoutCache = false;
         }
 
-        // Hyvä CSP is required for the Fastcheckout shell.
-        if (!class_exists(\Hyva\Theme\ViewModel\HyvaCsp::class)) {
-            return $this->canUseHyvaNativeCheckoutCache = false;
-        }
-
         $theme = null;
         try {
             $theme = $this->design ? $this->design->getDesignTheme() : null;
