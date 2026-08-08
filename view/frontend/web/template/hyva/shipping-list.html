@@ -49,7 +49,7 @@
                            value: method.carrier_code + '_' + method.method_code,
                            attr: {
                                'aria-labelledby':
-                                   'label_method_' + method.method_code + '_' + method.carrier_code + ' ' +
+                                   'label_method_title_' + method.method_code + '_' + method.carrier_code + ' ' +
                                    'label_carrier_' + method.method_code + '_' + method.carrier_code
                            }
                        "/>
@@ -57,7 +57,7 @@
                     <span class="block text-sm font-semibold text-gray-900 leading-tight"
                           data-bind="
                               text: method.method_title,
-                              attr: {id: 'label_method_' + method.method_code + '_' + method.carrier_code}
+                              attr: {id: 'label_method_title_' + method.method_code + '_' + method.carrier_code}
                           "></span>
                     <span class="block text-xs text-gray-500 mt-1"
                           data-bind="
@@ -70,6 +70,7 @@
                 <each args="$parent.getRegion('price')" render=""></each>
             </span>
         </label>
+        <div data-bind="attr: {id: 'label_method_' + method.method_code + '_' + method.carrier_code}"></div>
         <div data-bind="attr: {id: 'label_method_' + method.method_code + '_' + method.carrier_code + '_additional'}"></div>
     </div>
     <!-- /ko -->

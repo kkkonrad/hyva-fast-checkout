@@ -35,7 +35,8 @@ async function openCheckoutWithProduct(page) {
     await expect(page.locator('body')).toHaveClass(/fastcheckout-checkout-page/, {
         timeout: 30_000
     });
-    await expect(page.locator('#fastcheckout-checkout')).toBeVisible({timeout: 45_000});
+    await expect(page.locator('#checkout > #fastcheckout-checkout'))
+        .toBeVisible({timeout: 45_000});
     await page.waitForFunction(() => (
         typeof window.require === 'function' &&
         window.require.defined &&
@@ -158,6 +159,9 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
 
         const initialProxy = page.locator('[data-fastcheckout-place-order-ssr]');
         await expect(initialProxy).toBeEnabled();
+        await expect(initialProxy).toHaveAttribute(
+            'data-fastcheckout-native-target-ready', /[01]/
+        );
         await initialProxy.click({force: true});
         await expect(shippingRoot.locator('input[name="firstname"]'))
             .toHaveAttribute('aria-invalid', 'true');
@@ -212,6 +216,15 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             '[value="tablerate_bestway"]'
         );
         await expect(selected).toHaveCount(1);
+        await expect(page.locator(
+            '#checkout div#label_method_bestway_tablerate:empty'
+        )).toHaveCount(1);
+        await expect(page.locator(
+            '#checkout #label_method_title_bestway_tablerate'
+        )).toHaveCount(1);
+        await expect(page.locator(
+            '#checkout #label_method_bestway_tablerate_additional'
+        )).toHaveCount(1);
         const shippingResponse = page.waitForResponse((response) => (
             response.request().method() === 'POST' &&
             response.url().includes('/shipping-information')
