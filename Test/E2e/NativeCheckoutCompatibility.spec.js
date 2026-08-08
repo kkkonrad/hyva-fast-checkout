@@ -489,6 +489,8 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         expect(paymentRequests).toBe(0);
         await purchaseOrderNumber.fill('FC-E2E-' + Date.now());
         await purchaseOrderNumber.blur();
+        await purchaseOrderNumber.evaluate((input) => window.jQuery(input).valid());
+        await expect.poll(() => visibleErrorText(purchaseOrderNumber)).toEqual([]);
 
         await page.evaluate(() => new Promise((resolve, reject) => {
             window.require([
@@ -505,7 +507,43 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
                 resolve();
             }, reject);
         }));
+        await page.evaluate(() => {
+            const scrollIntoView = Element.prototype.scrollIntoView;
+
+            window.fastcheckoutE2eScrollTargets = [];
+            window.fastcheckoutE2eRestoreScrollIntoView = () => {
+                Element.prototype.scrollIntoView = scrollIntoView;
+            };
+            Element.prototype.scrollIntoView = function (options) {
+                window.fastcheckoutE2eScrollTargets.push({
+                    paymentError: this.dataset.fastcheckoutE2ePaymentError === '1',
+                    behavior: options && options.behavior
+                });
+
+                return scrollIntoView.call(this, options);
+            };
+            window.setTimeout(() => {
+                const error = document.createElement('p');
+
+                error.className = 'msg msg__error';
+                error.dataset.fastcheckoutE2ePaymentError = '1';
+                error.textContent = 'Payment validation error';
+                document.querySelector('.payment-method._active .payment-method-content')
+                    .appendChild(error);
+            }, 250);
+        });
         await clickProxy();
+        const paymentError = page.locator('[data-fastcheckout-e2e-payment-error]');
+        await expect(paymentError).toBeVisible();
+        await expect.poll(() => page.evaluate(() => (
+            window.fastcheckoutE2eScrollTargets.some((target) => (
+                target.paymentError && target.behavior === 'smooth'
+            ))
+        ))).toBe(true);
+        await paymentError.evaluate((error) => {
+            error.remove();
+            window.fastcheckoutE2eRestoreScrollIntoView();
+        });
         await expect.poll(() => page.evaluate(() => (
             window.fastcheckoutE2eValidationCalls
         ))).toBe(1);
