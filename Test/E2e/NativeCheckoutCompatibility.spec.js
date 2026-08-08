@@ -42,6 +42,25 @@ async function openCheckoutWithProduct(page) {
         window.require.defined &&
         window.require.defined('uiRegistry')
     ), null, {timeout: 45_000});
+
+    const scripts = await page.locator('script[src]').evaluateAll((nodes) => (
+        nodes.map((node) => node.src)
+    ));
+    const scriptIndex = (part) => scripts.findIndex((src) => src.includes(part));
+    const baseIndex = scriptIndex('Kkkonrad_Fastcheckout/js/requirejs-base.js');
+    const requireIndex = scriptIndex('/requirejs/require.js');
+    const mixinsIndex = scriptIndex('/mage/requirejs/mixins.js');
+    const configIndex = scriptIndex('/requirejs-config.js');
+    const inPostIndex = scriptIndex('Smartmage_Inpost/js/inpost-event.js');
+
+    expect(baseIndex).toBeGreaterThanOrEqual(0);
+    expect(baseIndex).toBeLessThan(requireIndex);
+    expect(requireIndex).toBeLessThan(mixinsIndex);
+    expect(requireIndex).toBeLessThan(configIndex);
+    if (inPostIndex >= 0) {
+        expect(mixinsIndex).toBeLessThan(inPostIndex);
+        expect(configIndex).toBeLessThan(inPostIndex);
+    }
 }
 
 test.describe('Fastcheckout native Magento compatibility host', () => {

@@ -4,6 +4,7 @@ define([
     'Magento_Ui/js/core/app',
     'Magento_Checkout/js/model/quote',
     'Magento_Checkout/js/model/checkout-data-resolver',
+    'Magento_Customer/js/customer-data',
     'Magento_Checkout/js/model/totals',
     'Magento_Checkout/js/action/set-shipping-information',
     'Magento_Catalog/js/price-utils',
@@ -15,6 +16,7 @@ define([
     app,
     quote,
     checkoutDataResolver,
+    customerData,
     totals,
     setShippingInformation,
     priceUtils,
@@ -292,29 +294,31 @@ define([
         initialized = true;
 
         app(jsLayout);
-        checkoutDataResolver.resolveBillingAddress();
-        bindPlaceOrderProxies();
-        saveShippingWhenMethodChanges();
+        customerData.getInitCustomerData().done(function () {
+            checkoutDataResolver.resolveBillingAddress();
+            bindPlaceOrderProxies();
+            saveShippingWhenMethodChanges();
 
-        quote.paymentMethod.subscribe(function () {
-            setClientOrderError('');
-            window.setTimeout(wirePlaceOrderButtons, 0);
-        });
-        if (totals.totals && typeof totals.totals.subscribe === 'function') {
-            totals.totals.subscribe(updateMobileTotal);
-        }
-
-        if (root && window.MutationObserver) {
-            observer = new MutationObserver(function () {
-                window.setTimeout(revealNativeContent, 0);
+            quote.paymentMethod.subscribe(function () {
+                setClientOrderError('');
+                window.setTimeout(wirePlaceOrderButtons, 0);
             });
-            observer.observe(root, {childList: true, subtree: true});
-        }
+            if (totals.totals && typeof totals.totals.subscribe === 'function') {
+                totals.totals.subscribe(updateMobileTotal);
+            }
 
-        window.setTimeout(function () {
-            revealNativeContent();
-            updateMobileTotal();
-            window.dispatchEvent(new CustomEvent('fastcheckout:ready'));
-        }, 0);
+            if (root && window.MutationObserver) {
+                observer = new MutationObserver(function () {
+                    window.setTimeout(revealNativeContent, 0);
+                });
+                observer.observe(root, {childList: true, subtree: true});
+            }
+
+            window.setTimeout(function () {
+                revealNativeContent();
+                updateMobileTotal();
+                window.dispatchEvent(new CustomEvent('fastcheckout:ready'));
+            }, 0);
+        });
     };
 });

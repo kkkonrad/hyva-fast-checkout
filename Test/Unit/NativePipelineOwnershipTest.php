@@ -85,6 +85,14 @@ class NativePipelineOwnershipTest extends TestCase
             "'Magento_Checkout/js/action/set-shipping-information'",
             $bootstrap
         );
+        $this->assertStringContainsString(
+            "'Magento_Customer/js/customer-data'",
+            $bootstrap
+        );
+        $this->assertStringContainsString(
+            'customerData.getInitCustomerData().done(',
+            $bootstrap
+        );
     }
 
     public function testDiDoesNotReplaceOrGloballyPatchCheckoutServices(): void
