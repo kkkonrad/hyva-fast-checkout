@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Refresh published Magento static copies of Kkkonrad_Fastcheckout frontend assets.
-# Prevents the storefront from serving stale pub/static JS after module web/ changes
-# (the failure mode that hid data-fastcheckout-place-order on the native toolbar).
+# Prevents the storefront from serving stale pub/static assets after module web/ changes.
 #
 # Usage (from Magento root or module root):
 #   app/code/Kkkonrad/Fastcheckout/bin/sync-frontend-static.sh
@@ -35,14 +34,13 @@ if [[ -z "${MAGENTO_ROOT}" || ! -d "${MAGENTO_ROOT}/pub/static/frontend" ]]; the
   exit 1
 fi
 
-MARKER="data-fastcheckout-place-order"
 SYNCED=0
 while IFS= read -r -d '' dest; do
   mkdir -p "${dest}/js" "${dest}/css" "${dest}/template" 2>/dev/null || true
   if command -v rsync >/dev/null 2>&1; then
-    rsync -a "${WEB_SRC}/js/" "${dest}/js/"
-    [[ -d "${WEB_SRC}/css" ]] && rsync -a "${WEB_SRC}/css/" "${dest}/css/" || true
-    [[ -d "${WEB_SRC}/template" ]] && rsync -a "${WEB_SRC}/template/" "${dest}/template/" || true
+    rsync -a --delete "${WEB_SRC}/js/" "${dest}/js/"
+    [[ -d "${WEB_SRC}/css" ]] && rsync -a --delete "${WEB_SRC}/css/" "${dest}/css/" || true
+    [[ -d "${WEB_SRC}/template" ]] && rsync -a --delete "${WEB_SRC}/template/" "${dest}/template/" || true
   else
     cp -a "${WEB_SRC}/js/." "${dest}/js/"
     [[ -d "${WEB_SRC}/css" ]] && cp -a "${WEB_SRC}/css/." "${dest}/css/" || true
@@ -58,15 +56,7 @@ if [[ "${SYNCED}" -eq 0 ]]; then
   exit 0
 fi
 
-# Marker parity check (checkout-bridge must expose place-order public selector).
-BRIDGE_SRC="${WEB_SRC}/js/hyva/checkout-bridge.js"
-if [[ -f "${BRIDGE_SRC}" ]] && grep -q "${MARKER}" "${BRIDGE_SRC}"; then
-  while IFS= read -r -d '' published; do
-    if ! grep -q "${MARKER}" "${published}"; then
-      echo "ERROR: published file missing marker ${MARKER}: ${published}" >&2
-      exit 1
-    fi
-  done < <(find "${MAGENTO_ROOT}/pub/static/frontend" -path '*/Kkkonrad_Fastcheckout/js/hyva/checkout-bridge.js' -print0 2>/dev/null)
-fi
+# Magento uses this value verbatim in asset URLs; intentionally omit a newline.
+printf '%s' "$(date +%s)" > "${MAGENTO_ROOT}/pub/static/deployed_version.txt"
 
 echo "OK: synced ${SYNCED} Kkkonrad_Fastcheckout static tree(s)."

@@ -1,26 +1,18 @@
 <?xml version="1.0"?>
-<!--
-/**
- * Fastcheckout page layout.
- *
- * PR #4: do NOT live-update the Magento OPC handle on this page — on Hyvä
- * without hyva-checkout that handle injects the "No Checkout module installed"
- * notice and Luma OPC chrome. Third-party jsLayout + head assets are merged in
- * PHP via CheckoutLayoutCollector (full Magento layout resolution for the OPC
- * handle in an isolated layout build) and rendered by the KO bridge templates.
- */
--->
 <page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       layout="1column"
       xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
+    <!-- Preserve third-party checkout head assets and auxiliary blocks. The
+         canonical jsLayout itself is built in an isolated fallback-theme layout. -->
+    <update handle="checkout_index_index"/>
     <head>
-        <script src="Kkkonrad_Fastcheckout::js/requirejs-base.js"/>
-        <script src="requirejs/require.js"/>
         <css src="Kkkonrad_Fastcheckout::css/hyva-ko-payment.css"/>
         <css src="Kkkonrad_Fastcheckout::css/hyva-default-checkout.css"/>
     </head>
     <body>
+        <attribute name="class" value="fastcheckout-checkout-page"/>
         <referenceBlock name="page.main.title" remove="true"/>
+        <referenceBlock name="fallback.module.missing" remove="true"/>
         <referenceBlock name="header-content"
                         template="Kkkonrad_Fastcheckout::hyva/header-logo.phtml"/>
         <referenceBlock name="footer-content"
@@ -28,11 +20,36 @@
         <referenceBlock name="messages" remove="true"/>
         <referenceBlock name="script-alpine-js" remove="true"/>
         <referenceBlock name="require-alpine-v3" remove="true"/>
-        <!-- Defensive: if any theme still pulls OPC root onto this route, drop it. -->
+        <!-- The native tree is initialized once inside the existing Fastcheckout shell. -->
         <referenceBlock name="checkout.root" remove="true"/>
         <referenceContainer name="after.body.start">
             <block class="Magento\RequireJs\Block\Html\Head\Config"
                    name="kkkonrad.fastcheckout.requirejs.config"/>
+            <!-- Hyva replaces Magento_Customer/default.xml and intentionally omits
+                 these KO initializers. Native checkout-data requires them. -->
+            <block class="Magento\Customer\Block\SectionConfig"
+                   name="customer.section.config"
+                   template="Magento_Customer::js/section-config.phtml">
+                <arguments>
+                    <argument name="sectionNamesProvider"
+                              xsi:type="object">Magento\Customer\Block\SectionNamesProvider</argument>
+                </arguments>
+            </block>
+            <block class="Magento\Customer\Block\CustomerData"
+                   name="customer.customer.data"
+                   template="Magento_Customer::js/customer-data.phtml">
+                <arguments>
+                    <argument name="auth"
+                              xsi:type="object">Magento\Customer\ViewModel\Customer\Auth</argument>
+                    <argument name="json_serializer"
+                              xsi:type="object">Magento\Customer\ViewModel\Customer\JsonSerializer</argument>
+                    <argument name="cookie_settings"
+                              xsi:type="object">Magento\Customer\ViewModel\CookieSettings</argument>
+                </arguments>
+            </block>
+            <block class="Magento\Customer\Block\CustomerScopeData"
+                   name="customer.data.invalidation.rules"
+                   template="Magento_Customer::js/customer-data/invalidation-rules.phtml"/>
         </referenceContainer>
         <referenceContainer name="content">
             <block class="Kkkonrad\Fastcheckout\Block\Hyva\Checkout"

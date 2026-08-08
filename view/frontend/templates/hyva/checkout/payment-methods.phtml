@@ -1,113 +1,50 @@
 <?php
 /**
- * Payment methods container — Tailwind cards; KO owns renderers.
+ * Native Magento payment regions in the Fastcheckout payment section.
  *
- * @var \Kkkonrad\Fastcheckout\Block\Hyva\Checkout $block
  * @var \Magento\Framework\Escaper $escaper
- * @var array $paymentMethods
- * @var array $allowedPaymentMethodCodes
  */
-$paymentMethodAvailability = [];
-$hasAvailablePaymentMethods = false;
-$normalizedPaymentMethods = [];
-$shippingPaymentMapping = $checkoutConfig['fastcheckoutSettings']['shippingPaymentMapping'] ?? [];
-$shippingAddress = $block->getQuote()->getShippingAddress();
-$isWaitingForShippingMethod = !empty($shippingPaymentMapping)
-    && (!$shippingAddress || (string)$shippingAddress->getShippingMethod() === '');
-$emptyPaymentMethodsMessage = $isWaitingForShippingMethod
-    ? __('To see available payment methods, select a shipping method.')
-    : __('No payment methods available.');
-
-foreach ($paymentMethods as $paymentMethod) {
-    $paymentMethodCode = is_array($paymentMethod)
-        ? (string)($paymentMethod['code'] ?? $paymentMethod['method'] ?? '')
-        : (string)$paymentMethod->getCode();
-    if ($paymentMethodCode === '') {
-        continue;
-    }
-    $paymentMethodTitle = is_array($paymentMethod)
-        ? (string)($paymentMethod['title'] ?? $paymentMethodCode)
-        : (string)$paymentMethod->getTitle();
-    $isAvailable = $block->isPaymentMethodAvailable($paymentMethodCode, $allowedPaymentMethodCodes);
-    $paymentMethodAvailability[$paymentMethodCode] = $isAvailable;
-    $hasAvailablePaymentMethods = $hasAvailablePaymentMethods || $isAvailable;
-    $normalizedPaymentMethods[] = [
-        'code' => $paymentMethodCode,
-        'title' => $paymentMethodTitle,
-    ];
-}
 ?>
-<!-- Container 3: Payment Method -->
 <div class="fc-container-3 space-y-6 min-w-0 w-full">
-<div class="card relative" data-fastcheckout-payment-methods-card>
-    <div class="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
-        <h2 class="text-xl font-semibold text-gray-900">
-            <?= $escaper->escapeHtml(__('Payment Method')) ?>
-        </h2>
-    </div>
-
-    <div class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 mb-4 hidden"
-         data-fastcheckout-payment-selection-error
-         role="alert">
-        <span class="field-error text-sm text-red-600 font-medium block"></span>
-    </div>
-
-    <p class="text-sm text-gray-500<?= $hasAvailablePaymentMethods ? ' hidden' : '' ?>"
-       role="status"
-       data-fastcheckout-no-payment-methods
-       data-fastcheckout-no-payment-methods-message="<?= $escaper->escapeHtmlAttr(__('No payment methods available.')) ?>"
-       data-fastcheckout-select-shipping-message="<?= $escaper->escapeHtmlAttr(__('To see available payment methods, select a shipping method.')) ?>"
-        <?= $hasAvailablePaymentMethods ? 'style="display: none;" aria-hidden="true"' : '' ?>>
-        <?= $escaper->escapeHtml($emptyPaymentMethodsMessage) ?>
-    </p>
-
-    <?php if (!empty($normalizedPaymentMethods)): ?>
-        <div class="grid gap-3 relative min-h-[50px]<?= $hasAvailablePaymentMethods ? '' : ' hidden' ?>"
-             data-fastcheckout-payment-methods-grid>
-            <div data-fastcheckout-payment-loading
-                 class="absolute inset-0 bg-white/80 backdrop-blur-[1px] z-20 rounded items-center justify-center transition-all duration-200 hidden"
-                 role="status"
-                 aria-live="polite"
-                 aria-hidden="true">
-                <svg class="animate-spin h-8 w-8 text-primary" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <span class="sr-only"><?= $escaper->escapeHtml(__('Please wait...')) ?></span>
-            </div>
-            <?php foreach ($normalizedPaymentMethods as $method): ?>
-                <?php
-                $methodCode = $method['code'];
-                $isPaymentMethodAllowed = $paymentMethodAvailability[(string)$methodCode] ?? false;
-                $isSelectedPayment = $isPaymentMethodAllowed && $block->isPaymentMethodSelected((string)$methodCode);
-                ?>
-                <div class="border rounded transition-all duration-200 border-gray-200 hover:border-gray-300"
-                     data-fastcheckout-payment-option="<?= $escaper->escapeHtmlAttr($methodCode) ?>"
-                     data-fastcheckout-payment-allowed="<?= $isPaymentMethodAllowed ? '1' : '0' ?>"
-                     <?= $isPaymentMethodAllowed ? '' : 'style="display:none;" aria-hidden="true"' ?>>
-                    <label class="flex items-center gap-3 p-3 cursor-pointer hover:bg-gray-50/50 mb-0">
-                        <input type="radio"
-                               class="form-radio"
-                               name="payment_method"
-                               value="<?= $escaper->escapeHtmlAttr($methodCode) ?>"
-                               data-fastcheckout-payment-option-input="<?= $escaper->escapeHtmlAttr($methodCode) ?>"
-                               <?= $isSelectedPayment ? 'checked' : '' ?>
-                                <?= $isPaymentMethodAllowed ? '' : 'disabled' ?>
-                               required/>
-                        <span class="font-medium text-sm text-gray-800"><?= $escaper->escapeHtml($method['title']) ?></span>
-                    </label>
-
-                    <div class="fastcheckout-payment-method-ko-container border-t border-gray-100 hidden"
-                         style="display: none;"
-                         data-fastcheckout-payment-method-ko-target="<?= $escaper->escapeHtmlAttr($methodCode) ?>"></div>
-                </div>
-            <?php endforeach; ?>
+    <div class="card relative" data-fastcheckout-payment-methods-card>
+        <div class="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
+            <h2 class="text-xl font-semibold text-gray-900">
+                <?= $escaper->escapeHtml(__('Payment Method')) ?>
+            </h2>
         </div>
-    <?php endif; ?>
 
-    <div class="fastcheckout-shared-billing-address payment-method-billing-address hidden mt-4 pt-4 border-t border-gray-200"
-         style="display: none;"
-         data-fastcheckout-shared-billing-target
-         aria-hidden="true"></div>
-</div>
+        <div class="fastcheckout-ko-payment-root"
+             data-bind="scope: 'checkout.steps.billing-step.payment'">
+            <!-- ko if: quoteIsVirtual -->
+                <!-- ko foreach: getRegion('customer-email') -->
+                    <!-- ko template: getTemplate() --><!-- /ko -->
+                <!-- /ko -->
+            <!-- /ko -->
+            <form id="co-payment-form" class="form payments" novalidate="novalidate">
+                <input data-bind="attr: {value: getFormKey()}" type="hidden" name="form_key"/>
+                <!-- ko foreach: getRegion('place-order-captcha') -->
+                    <!-- ko template: getTemplate() --><!-- /ko -->
+                <!-- /ko -->
+                <!-- ko foreach: getRegion('beforeMethods') -->
+                    <!-- ko template: getTemplate() --><!-- /ko -->
+                <!-- /ko -->
+                <div id="checkout-payment-method-load"
+                     class="opc-payment"
+                     data-bind="visible: isPaymentMethodsAvailable">
+                    <!-- ko foreach: getRegion('payment-methods-list') -->
+                        <!-- ko template: getTemplate() --><!-- /ko -->
+                    <!-- /ko -->
+                </div>
+                <p class="no-quotes-block text-sm text-gray-500"
+                   data-bind="visible: isPaymentMethodsAvailable() === false,
+                              i18n: 'No Payment method available.'"></p>
+            </form>
+        </div>
+    </div>
+    <div class="fastcheckout-payment-after-methods space-y-6"
+         data-bind="scope: 'checkout.steps.billing-step.payment'">
+        <!-- ko foreach: getRegion('afterMethods') -->
+            <!-- ko template: getTemplate() --><!-- /ko -->
+        <!-- /ko -->
+    </div>
 </div>

@@ -1,93 +1,65 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Kkkonrad\Fastcheckout\Test\Unit\Layout;
 
 use PHPUnit\Framework\TestCase;
 
-/**
- * PR #4: Fastcheckout hosts KO bridge; OPC jsLayout/assets come from
- * CheckoutLayoutCollector (isolated Magento merge of checkout_index_index),
- * not a live <update handle> that would pull Hyvä "no checkout" chrome.
- */
 class FastcheckoutHandleTest extends TestCase
 {
-    public function testFastcheckoutLayoutHostsKoBridgeWithoutLiveOpcUpdateHandle(): void
+    private function moduleRoot(): string
     {
-        $path = dirname(__DIR__, 3) . '/view/frontend/layout/fastcheckout_index_index.xml';
-        $this->assertFileExists($path);
-
-        $xml = file_get_contents($path);
-        $this->assertNotFalse($xml);
-
-        // Must NOT pull Hyvä OPC empty-state / Luma chrome onto the FC route.
-        $this->assertDoesNotMatchRegularExpression(
-            '/^\s*<update\s+handle="checkout_index_index"\s*\/>/m',
-            $xml,
-            'Live update of checkout_index_index breaks Hyvä + Fastcheckout shell'
-        );
-        $this->assertStringContainsString(
-            'kkkonrad.fastcheckout.hyva.checkout',
-            $xml
-        );
-        $this->assertStringContainsString(
-            'kkkonrad.fastcheckout.hyva.checkout.ko_checkout_bridge',
-            $xml
-        );
-        $this->assertStringContainsString(
-            'Kkkonrad_Fastcheckout::hyva/knockout/checkout-renderers.phtml',
-            $xml
-        );
-        $this->assertStringContainsString(
-            'Kkkonrad_Fastcheckout::js/requirejs-base.js',
-            $xml
-        );
-        $this->assertStringContainsString(
-            'name="checkout.root" remove="true"',
-            $xml,
-            'Defensive remove of checkout.root if a theme injects it'
-        );
+        return dirname(__DIR__, 3);
     }
 
-    public function testCollectorIsTheOpcMergePath(): void
+    public function testHandleKeepsTheExistingHyvaPresentationAndLoadsCheckoutExtensions(): void
     {
-        $collector = dirname(__DIR__, 3) . '/Model/CheckoutLayoutCollector.php';
-        $this->assertFileExists($collector);
-        $src = file_get_contents($collector);
-        $this->assertStringContainsString('collectViaMagentoLayout', $src);
-        $this->assertStringContainsString('checkout_index_index', $src);
-        $this->assertStringContainsString('checkout.root', $src);
+        $source = (string)file_get_contents(
+            $this->moduleRoot() . '/view/frontend/layout/fastcheckout_index_index.xml'
+        );
+        $checkout = (string)file_get_contents(
+            $this->moduleRoot() . '/view/frontend/layout/checkout_index_index.xml'
+        );
+
+        $this->assertStringContainsString('<update handle="checkout_index_index"/>', $source);
+        $this->assertStringContainsString('Kkkonrad_Fastcheckout::js/requirejs-base.js', $checkout);
+        $this->assertStringContainsString('requirejs/require.js', $checkout);
+        $this->assertStringContainsString('hyva-default-checkout.css', $source);
+        $this->assertStringContainsString('Kkkonrad_Fastcheckout::hyva/checkout.phtml', $source);
+        $this->assertStringContainsString('fastcheckout-checkout-page', $source);
+        $this->assertStringContainsString('name="fallback.module.missing" remove="true"', $source);
+        $this->assertStringContainsString('name="checkout.root" remove="true"', $source);
+        $this->assertStringNotContainsString('fastcheckout_native_checkout', $source);
     }
 
-    public function testCheckoutBridgeStillUsesPaymentHostBridgeWithoutLateAppendChildInActivatePath(): void
+    public function testVisualShellUsesCanonicalCheckoutScopesAndRegions(): void
     {
-        $bridge = dirname(__DIR__, 3) . '/view/frontend/web/js/hyva/checkout-bridge.js';
-        $host = dirname(__DIR__, 3) . '/view/frontend/web/js/hyva/payment-host-bridge.js';
-        $this->assertFileExists($bridge);
-        $this->assertFileExists($host);
-
-        $bridgeSrc = file_get_contents($bridge);
-        $hostSrc = file_get_contents($host);
-
-        $this->assertStringContainsString('payment-host-bridge', $bridgeSrc);
-        $this->assertStringContainsString('activateMethodInHost', $bridgeSrc);
-        $this->assertStringContainsString('adoptRendererOnce', $hostSrc);
-        $this->assertStringContainsString('data-fastcheckout-host-mounted', $hostSrc);
-
-        if (preg_match(
-            '/function updateActiveRendererClass\([\s\S]*?\n                function /',
-            $bridgeSrc,
-            $m
-        )) {
-            $body = $m[0];
-            $this->assertStringNotContainsString(
-                'target.appendChild(activeElement)',
-                $body,
-                'updateActiveRendererClass must not late-appendChild payment renderers'
-            );
-            $this->assertStringContainsString('activateMethodInHost', $body);
-        } else {
-            $this->fail('Could not locate updateActiveRendererClass in checkout-bridge.js');
+        $templates = '';
+        foreach ([
+            '/view/frontend/templates/hyva/checkout/shipping-address.phtml',
+            '/view/frontend/templates/hyva/checkout/shipping-methods.phtml',
+            '/view/frontend/templates/hyva/checkout/payment-methods.phtml',
+            '/view/frontend/templates/hyva/checkout/summary.phtml',
+            '/view/frontend/web/template/hyva/shipping-list.html',
+        ] as $file) {
+            $templates .= (string)file_get_contents($this->moduleRoot() . $file);
         }
+
+        foreach ([
+            'checkout.steps.shipping-step.shippingAddress',
+            'checkout.steps.billing-step.payment',
+            'checkout.sidebar.summary',
+            "getRegion('shippingAdditional')",
+            "getRegion('before-shipping-method-form')",
+            "getRegion('beforeMethods')",
+            "getRegion('afterMethods')",
+            "getRegion('payment-methods-list')",
+        ] as $extensionPoint) {
+            $this->assertStringContainsString($extensionPoint, $templates);
+        }
+
+        $this->assertStringNotContainsString('data-fastcheckout-payment-option=', $templates);
+        $this->assertStringNotContainsString('fastcheckoutHyvaPaymentRenderers', $templates);
     }
 }

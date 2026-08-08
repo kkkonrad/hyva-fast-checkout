@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:noNamespaceSchemaLocation="urn:magento:framework:Event/etc/events.xsd">
-    <event name="hyva_config_generate_before">
-        <observer name="Kkkonrad_Fastcheckout_Hyva_Config_Generate_Before"
-                  instance="Kkkonrad\Fastcheckout\Observer\HyvaConfigGenerateBefore"/>
+    <event name="layout_load_before">
+        <observer name="fastcheckout_add_checkout_layout_handle"
+                  instance="Kkkonrad\Fastcheckout\Observer\AddCheckoutLayoutHandle"/>
     </event>
 </config>

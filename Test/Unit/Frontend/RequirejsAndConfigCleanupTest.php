@@ -1,54 +1,50 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Kkkonrad\Fastcheckout\Test\Unit\Frontend;
 
 use PHPUnit\Framework\TestCase;
 
-/**
- * Point 2: passthrough mixins removed; ConfigProvider sortOrder present.
- */
 class RequirejsAndConfigCleanupTest extends TestCase
 {
-    public function testRequirejsConfigDoesNotRegisterPurePassthroughMixins(): void
+    private function moduleRoot(): string
     {
-        $path = dirname(__DIR__, 3) . '/view/frontend/requirejs-config.js';
-        $this->assertFileExists($path);
-        $src = file_get_contents($path);
-
-        $this->assertStringNotContainsString(
-            'set-shipping-information-mixin',
-            $src,
-            'Pure passthrough set-shipping-information mixin must be unregistered'
-        );
-        $this->assertStringNotContainsString(
-            "'Kkkonrad_Fastcheckout/js/mixin/set-payment-information-mixin'",
-            $src,
-            'Pure passthrough set-payment-information mixin must be unregistered'
-        );
-        // Still register mixins that do real work.
-        $this->assertStringContainsString('get-payment-information-mixin', $src);
-        $this->assertStringContainsString('place-order-mixin', $src);
-        $this->assertStringContainsString('shipping-view-mixin', $src);
+        return dirname(__DIR__, 3);
     }
 
-    public function testConfigProviderHasExplicitSortOrder(): void
+    public function testRequirejsUsesNoCoreMapOverrideAndOnlyDelegatingMixins(): void
     {
-        $path = dirname(__DIR__, 3) . '/etc/frontend/di.xml';
-        $xml = file_get_contents($path);
-        $this->assertStringContainsString('fastcheckout_extended_checkout_config', $xml);
+        $source = (string)file_get_contents($this->moduleRoot() . '/view/frontend/requirejs-config.js');
+
+        $this->assertStringNotContainsString('map:', $source);
+        $this->assertStringContainsString("'Magento_Checkout/js/action/place-order'", $source);
+        $this->assertStringContainsString("'Magento_Checkout/js/model/payment-service'", $source);
+        $this->assertStringContainsString("'Magento_Checkout/js/view/summary/abstract-total'", $source);
+        $this->assertStringContainsString("'Magento_Checkout/js/view/summary/cart-items'", $source);
+        $this->assertStringContainsString("'Magento_SalesRule/js/view/payment/discount'", $source);
+        $this->assertSame(5, substr_count($source, ': true'));
+
+        foreach ([
+            'Magento_Checkout/js/checkout-data',
+            'Magento_Customer/js/customer-data',
+            'Magento_Checkout/js/action/select-shipping-method',
+            'Magento_Checkout/js/action/select-payment-method',
+            'Magento_Checkout/js/model/shipping-service',
+            'Magento_Checkout/js/model/shipping-rate-service',
+            'mage/storage',
+        ] as $forbiddenTarget) {
+            $this->assertStringNotContainsString($forbiddenTarget, $source);
+        }
+    }
+
+    public function testConfigProviderKeepsAnExplicitUniqueSortOrder(): void
+    {
+        $source = (string)file_get_contents($this->moduleRoot() . '/etc/frontend/di.xml');
+
         $this->assertMatchesRegularExpression(
             '/fastcheckout_extended_checkout_config[^>]*sortOrder="1000"/',
-            $xml
+            $source
         );
-    }
-
-    public function testInPostUiHookIsOptionalInShippingViewMixin(): void
-    {
-        $path = dirname(__DIR__, 3) . '/view/frontend/web/js/mixin/shipping-view-mixin.js';
-        $src = file_get_contents($path);
-        $this->assertStringContainsString('isInPostModuleAvailable', $src);
-        $this->assertStringContainsString('inPostPaczkomaty', $src);
-        $this->assertStringContainsString('// Module path exists but failed to load — fail silently.', $src);
     }
 }

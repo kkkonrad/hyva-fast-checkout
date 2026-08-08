@@ -3,50 +3,18 @@
  * Order summary, coupon and place-order controls.
  *
  * Coupon uses Magento_SalesRule payment/discount (native KO).
- * Comment uses a Magento-UI-style KO field (core OPC has no storefront comment).
+ * Core OPC has no storefront order-comment field, so the existing FC textarea
+ * is appended to payment data by the place-order mixin.
  *
  * @var \Kkkonrad\Fastcheckout\Block\Hyva\Checkout $block
  * @var \Magento\Framework\Escaper $escaper
  * @var array $items
  */
-$couponCode = $block->getCouponCode();
-$showDiscount = $block->isShowDiscount();
 $showComment = $block->isShowComment();
 $showSubscribe = $block->isShowSubscribe();
 ?>
 <!-- Container 4: Order Summary, Coupon & Place Order -->
 <div class="fc-container-4 space-y-6 min-w-0 w-full">
-    <?php if ($showDiscount): ?>
-    <div class="card relative" data-fastcheckout-coupon-card>
-        <div id="fastcheckout-ko-discount-root"
-             class="fastcheckout-ko-discount-root hidden"
-             data-bind="scope: 'checkout.steps.billing-step.payment.afterMethods.discount'"
-             data-fastcheckout-native-discount>
-            <!-- ko template: getTemplate() --><!-- /ko -->
-        </div>
-
-        <div data-fastcheckout-discount-ssr>
-            <h2 class="text-xl font-semibold text-gray-900 border-b border-gray-200 pb-4 mb-4">
-                <?= $escaper->escapeHtml(__('Apply Discount Code')) ?>
-            </h2>
-            <div class="flex flex-col sm:flex-row gap-2">
-                <input class="form-input w-full sm:flex-1"
-                       type="text"
-                       id="fastcheckout-coupon-code"
-                       value="<?= $escaper->escapeHtmlAttr($couponCode) ?>"
-                       placeholder="<?= $escaper->escapeHtmlAttr(__('Enter discount code')) ?>"
-                       disabled
-                       aria-disabled="true"/>
-                <div class="flex gap-2 w-full sm:w-auto">
-                    <button class="btn btn-primary flex-1 sm:flex-initial" type="button" disabled>
-                        <?= $escaper->escapeHtml(__('Apply')) ?>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-    <?php endif; ?>
-
     <div class="card sticky top-6 space-y-6" data-fastcheckout-totals-card>
         <div class="relative space-y-6">
             <div class="flex items-center justify-between border-b border-gray-200 pb-3 mb-4">
@@ -62,7 +30,7 @@ $showSubscribe = $block->isShowSubscribe();
             <?php
             /**
              * Native Magento KO summary (cart items + totals, Magento_Tax templates).
-             * Mounted by checkout-bridge startNativeSummaryComponents().
+             * Mounted by checkout-renderers.js.
              * SSR below is progressive enhancement until KO binds.
              */
             ?>
@@ -124,19 +92,11 @@ $showSubscribe = $block->isShowSubscribe();
 
             <?php if ($showComment): ?>
                 <div class="border-t border-gray-200 pt-4">
-                    <div id="fastcheckout-ko-comment-root"
-                         class="fastcheckout-ko-comment-root hidden"
-                         data-bind="scope: 'fastcheckout.order-comment'"
-                         data-fastcheckout-native-comment
-                         data-label="<?= $escaper->escapeHtmlAttr(__('Order Comment')) ?>"
-                         data-placeholder="<?= $escaper->escapeHtmlAttr(__('Optional comment for this order')) ?>">
-                        <!-- ko template: getTemplate() --><!-- /ko -->
-                    </div>
-                    <div data-fastcheckout-comment-ssr>
-                        <label class="block text-sm font-medium text-gray-700 mb-1" for="fastcheckout-comment-ssr">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1" for="fastcheckout-comment">
                             <?= $escaper->escapeHtml(__('Order Comment')) ?>
                         </label>
-                        <textarea id="fastcheckout-comment-ssr"
+                        <textarea id="fastcheckout-comment"
                                   name="fastcheckout_comment"
                                   data-fastcheckout-comment
                                   class="form-input w-full"
@@ -147,7 +107,7 @@ $showSubscribe = $block->isShowSubscribe();
             <?php endif; ?>
 
             <?php if ($showSubscribe): ?>
-                <div class="border-t border-gray-200 pt-4">
+                <div class="border-t border-gray-200 pt-4" data-fastcheckout-newsletter>
                     <label class="flex items-center gap-2 text-sm text-gray-700 mb-0 cursor-pointer">
                         <input type="checkbox"
                                id="fastcheckout-subscribe"
@@ -161,11 +121,14 @@ $showSubscribe = $block->isShowSubscribe();
                 </div>
             <?php endif; ?>
 
+            <div class="fastcheckout-agreements-host fastcheckout-ko-payment-root payment-method _active border-t border-gray-200 pt-4"
+                 data-fastcheckout-agreements-host></div>
+
             <?php
             /**
-             * Magento payment renderer place-order toolbar is relocated here
-             * (checkout-bridge mountNativePlaceOrderToolbar). Styling matches FC primary.
-             * SSR fallback submit button until the active method toolbar is mounted.
+             * The visible FC button delegates to the active renderer's native
+             * place-order button. The native button stays in its original DOM so
+             * payment-specific and additional validators keep their context.
              */
             ?>
             <div class="pt-2 fastcheckout-place-order-section">
@@ -173,9 +136,9 @@ $showSubscribe = $block->isShowSubscribe();
                      class="fastcheckout-place-order-host hidden md:block"
                      data-fastcheckout-place-order-host>
                 </div>
-                <?php /* SSR fallback only — hidden completely once Magento toolbar mounts (see checkout-bridge setPlaceOrderSsrVisible). Avoid bare "flex" so Tailwind hidden can apply before JS runs. */ ?>
+                <?php /* Always available; the native checkout validators run on click. */ ?>
                 <button class="btn btn-primary w-full items-center justify-center gap-2 hidden md:flex fastcheckout-place-order-btn"
-                        type="submit"
+                        type="button"
                         data-fastcheckout-place-order
                         data-fastcheckout-place-order-ssr>
                     <span class="place-order-spinner hidden" data-fastcheckout-place-order-spinner aria-hidden="true">

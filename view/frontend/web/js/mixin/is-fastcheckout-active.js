@@ -2,6 +2,9 @@ define(function () {
     'use strict';
 
     return function () {
-        return !!document.getElementById('fastcheckout-checkout');
+        return !!(
+            document.body &&
+            document.body.classList.contains('fastcheckout-checkout-page')
+        );
     };
 });

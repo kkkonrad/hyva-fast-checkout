@@ -15,9 +15,8 @@ $hyvaCsp = $block->getHyvaCsp();
 
 $items = $block->getVisibleItems();
 $checkoutConfig = $block->getCheckoutConfig();
-$paymentMethods = $block->getAvailablePaymentMethods();
-$allowedPaymentMethodCodes = $block->getAllowedPaymentMethodCodes();
 ?>
+<div id="checkout">
 <section class="space-y-8 max-w-7xl mx-auto px-0 py-4 pb-24 md:p-6 md:pb-6 overflow-x-hidden" id="fastcheckout-checkout">
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-gray-200 pb-6 px-4 md:px-0">
         <div>
@@ -38,6 +37,9 @@ $allowedPaymentMethodCodes = $block->getAllowedPaymentMethodCodes();
             <?= $escaper->escapeHtml(__('Edit Cart')) ?>
         </a>
     </div>
+    <div data-bind="scope: 'checkout.errors'" aria-live="polite">
+        <!-- ko template: getTemplate() --><!-- /ko -->
+    </div>
 
     <?php if (!$items): ?>
         <div class="card text-center py-16">
@@ -53,10 +55,7 @@ $allowedPaymentMethodCodes = $block->getAllowedPaymentMethodCodes();
             </a>
         </div>
     <?php else: ?>
-    <form id="co-checkout-form"
-          novalidate
-          class="contents"
-          data-fastcheckout-native-form="1">
+    <div id="co-checkout-form" class="contents" data-fastcheckout-native-form="1">
 
         <div class="fc-grid grid gap-6 grid-cols-1 items-start w-full">
             <div class="fc-left-wrapper flex flex-col gap-6">
@@ -92,7 +91,7 @@ $allowedPaymentMethodCodes = $block->getAllowedPaymentMethodCodes();
                 </div>
             </div>
             <button class="btn btn-primary w-full flex items-center justify-center gap-2 transition-all duration-200 fastcheckout-place-order-btn"
-                    type="submit"
+                    type="button"
                     data-fastcheckout-place-order
                     data-fastcheckout-place-order-mobile>
                 <span class="place-order-spinner hidden" data-fastcheckout-place-order-spinner aria-hidden="true">
@@ -111,9 +110,7 @@ $allowedPaymentMethodCodes = $block->getAllowedPaymentMethodCodes();
                data-fastcheckout-client-order-error
                role="alert"></p>
         </div>
-    </form>
+    </div>
     <?php endif; ?>
-
-    <?php // phpcs:ignore Magento2.Security.IncludeFile.FoundIncludeFile -- trusted module template. ?>
-    <?php include $block->getTemplateFile('Kkkonrad_Fastcheckout::hyva/checkout/script.phtml'); ?>
 </section>
+</div>

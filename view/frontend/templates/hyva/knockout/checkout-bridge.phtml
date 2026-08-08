@@ -1,284 +1,35 @@
 <?php
 /**
- * Knockout checkout bridge island for the Hyvä checkout.
+ * Native Magento checkout bootstrap for the existing Fastcheckout presentation.
  *
- * @var \Kkkonrad\Fastcheckout\Block\Hyva\Checkout $block
- * @var \Magento\Framework\Escaper $escaper
- * @var \Hyva\Theme\ViewModel\HyvaCsp $hyvaCsp
+ * @var KkkonradFastcheckoutBlockHyvaCheckout $block
+ * @var MagentoFrameworkEscaper $escaper
  */
-
 $hyvaCsp = $block->getHyvaCsp();
 $checkoutConfig = $block->getCheckoutConfig();
-$paymentMethods = $block->getData('payment_methods');
-if (!is_array($paymentMethods) || $paymentMethods === []) {
-    $paymentMethods = $checkoutConfig['paymentMethods'] ?? [];
-}
-$rendererComponents = $block->getPaymentRendererComponents();
-$rendererComponentMap = $block->getPaymentRendererComponentMap();
-$shippingRatesValidationComponents = $block->getShippingRatesValidationComponents();
-$paymentValidationComponents = $block->getPaymentValidationComponents();
-$paymentListChildren = $block->getPaymentListChildren();
-$paymentRegionChildren = $block->getPaymentRegionChildren();
-$shippingListChildren = $block->getShippingListChildren();
-$shippingAddressChildren = $block->getShippingAddressChildren();
-$shippingAddress = $block->getShippingAddressComponentConfig();
-$checkoutProvider = $block->getCheckoutProviderConfig();
-$checkoutStepChildren = $block->getCheckoutStepChildren();
-$checkoutSidebarSummary = $block->getCheckoutSidebarSummary();
-$paymentDiscount = $block->getPaymentDiscountComponent();
-$layoutScripts = $block->getCheckoutLayoutScripts();
+$jsLayout = $block->getCheckoutJsLayout();
 
-if (
-    empty($rendererComponents) &&
-    empty($rendererComponentMap) &&
-    empty($shippingRatesValidationComponents) &&
-    empty($paymentValidationComponents) &&
-    empty($paymentListChildren) &&
-    empty($paymentRegionChildren) &&
-    empty($shippingListChildren) &&
-    empty($shippingAddressChildren) &&
-    empty($checkoutStepChildren) &&
-    empty($checkoutSidebarSummary) &&
-    empty($paymentDiscount) &&
-    empty($layoutScripts['modules']) &&
-    empty($layoutScripts['external'])
-) {
+if ($jsLayout === []) {
     return;
 }
-
-$mageInitConfig = [
-    'paymentMethods' => $paymentMethods,
-    'rendererComponents' => $rendererComponents,
-    'rendererComponentMap' => $rendererComponentMap,
-    'shippingRatesValidationComponents' => $shippingRatesValidationComponents,
-    'paymentValidationComponents' => $paymentValidationComponents,
-    'paymentListChildren' => $paymentListChildren,
-    'paymentRegionChildren' => $paymentRegionChildren,
-    'shippingListChildren' => $shippingListChildren,
-    'shippingAddressChildren' => $shippingAddressChildren,
-    'shippingAddress' => $shippingAddress,
-    'checkoutProvider' => $checkoutProvider,
-    'checkoutStepChildren' => $checkoutStepChildren,
-    'checkoutSidebarSummary' => $checkoutSidebarSummary,
-    'paymentDiscount' => $paymentDiscount,
-    'layoutScripts' => $layoutScripts['modules'] ?? [],
-    'layoutExternalScripts' => $layoutScripts['external'] ?? [],
-    'scope' => 'fastcheckoutHyvaPaymentRenderers'
-];
 ?>
-<?php
-$layoutAssets = $block->getCheckoutLayoutAssets();
-foreach ($layoutAssets['css'] as $cssAsset) {
-    $url = ($cssAsset['src_type'] === 'url') ? $cssAsset['src'] : $block->getViewFileUrl($cssAsset['src']);
-    echo '<link rel="stylesheet" type="text/css" href="' . $escaper->escapeUrl($url) . '" />';
-}
-?>
-
-<div id="fastcheckout-ko-payment-root"
-     class="fastcheckout-ko-payment-root mt-4"
-     style="display: none !important;"
-     data-bind="scope: 'fastcheckoutHyvaPaymentRenderers'">
-    <!-- ko foreach: getRegion('place-order-captcha') -->
-        <!-- ko template: getTemplate() --><!-- /ko -->
-    <!-- /ko -->
-    <!-- ko foreach: getRegion('beforeMethods') -->
-        <!-- ko template: getTemplate() --><!-- /ko -->
-    <!-- /ko -->
-    <!-- ko foreach: getRegion('payment-methods-list') -->
-        <!-- ko template: getTemplate() --><!-- /ko -->
-    <!-- /ko -->
-    <div data-fastcheckout-ko-after-methods-region>
-        <!-- ko foreach: getRegion('afterMethods') -->
-            <!-- ko template: getTemplate() --><!-- /ko -->
-        <!-- /ko -->
-    </div>
-</div>
-
 <script>
 (function () {
-    // Safely define checkoutConfig and payment config inline before RequireJS is loaded/executed
-    // We use a getter/setter to prevent subsequent scripts (e.g. from PayPal_Braintree) from overwriting it completely and removing key structures
-    var serverConfig = <?= /* @noEscape */ $block->serializeForScript($checkoutConfig) ?>;
-    var existingConfig = window.checkoutConfig && typeof window.checkoutConfig === 'object'
-        ? window.checkoutConfig
-        : {};
-    // Hyva or a payment module may define an empty checkoutConfig first. Keep
-    // those additions, but always start with Magento's complete server config.
-    var actualConfig = Object.assign({}, serverConfig, existingConfig);
-    if (!actualConfig.totalsData || typeof actualConfig.totalsData !== 'object') {
-        actualConfig.totalsData = {
-            items: actualConfig.quoteItemData || [],
-            total_segments: [],
-            subtotal: 0,
-            subtotal_with_discount: 0,
-            grand_total: 0
-        };
-    }
-    if (!Array.isArray(actualConfig.totalsData.items)) {
-        actualConfig.totalsData.items = actualConfig.quoteItemData || [];
-    }
-    
-    // Defined by Kkkonrad_Fastcheckout::js/requirejs-base.js, which the layout loads
-    // ahead of this block. Missing only if that asset failed, and then the raw config
-    // is still usable.
-    var initPaymentProxy = function (paymentObj) {
-        return typeof window.fastcheckoutInitPaymentProxy === 'function'
-            ? window.fastcheckoutInitPaymentProxy(paymentObj, actualConfig.paymentMethods)
-            : (paymentObj || {});
-    };
+    'use strict';
 
-    Object.defineProperty(window, 'checkoutConfig', {
-        get: function() {
-            return actualConfig;
-        },
-        set: function(newConfig) {
-            if (newConfig && typeof newConfig === 'object') {
-                actualConfig = Object.assign(actualConfig, newConfig);
-            } else {
-                actualConfig = newConfig;
-            }
-            if (actualConfig && typeof actualConfig === 'object') {
-                actualConfig.payment = initPaymentProxy(actualConfig.payment);
-            }
-        },
-        configurable: true,
-        enumerable: true
-    });
-    window.checkoutConfig = actualConfig;
-    window.isCustomerLoggedIn = actualConfig.isCustomerLoggedIn;
-    window.customerData = actualConfig.customerData || {};
-
-    var config = <?= /* @noEscape */ $block->serializeForScript($mageInitConfig) ?>;
-    // Keep a single serialized checkoutConfig in the HTML. The bridge receives
-    // the same object by reference instead of embedding the large payload twice.
-    config.checkoutConfig = window.checkoutConfig;
-    // Prefer the same static base detection as requirejs-base.js (theme/locale from a
-    // published CSS link). getViewFileUrl('/') can omit the trailing slash or resolve
-    // to frontend/_view/... which breaks text! template loads (Magento_Tax summary).
-    var staticBaseUrlFallback = '<?= $escaper->escapeJs($block->getViewFileUrl('/')) ?>';
-    var started = false;
-
-    /**
-     * RequireJS baseUrl must end with "/" and point at frontend/<Vendor>/<theme>/<locale>/.
-     *
-     * @returns {String}
-     */
-    function resolveStaticBaseUrl() {
-        var asset = document.querySelector('link[href*="/frontend/"], script[src*="/frontend/"]');
-        var href = asset && (asset.href || asset.src) || '';
-        var match = href.match(/^(.*\/frontend\/[^/]+\/[^/]+\/[^/]+\/)/);
-        var existing;
-        var base;
-
-        if (match) {
-            return match[1];
-        }
-
-        try {
-            existing = window.require && window.require.s &&
-                window.require.s.contexts._ &&
-                window.require.s.contexts._.config &&
-                window.require.s.contexts._.config.baseUrl;
-        } catch (e) {
-            existing = '';
-        }
-
-        if (existing && /\/frontend\/[^/]+\/[^/]+\/[^/]+\/?$/.test(existing) && existing.indexOf('/_view/') === -1) {
-            return existing.replace(/\/?$/, '/');
-        }
-
-        base = String(staticBaseUrlFallback || '').replace(/\/?$/, '/');
-        if (base.indexOf('/_view/') !== -1) {
-            // Last resort: leave whatever requirejs-base already set (if any).
-            return existing ? String(existing).replace(/\/?$/, '/') : base;
-        }
-
-        return base;
-    }
-
-    // Magento stock sets LOCALE via LocaleFormatter::getLocaleJs() (BCP 47: pl-PL).
-    // Underscore form (pl_PL) breaks Number#toLocaleString / priceUtils.formatPriceLocale
-    // and cascades into Magento_Tax summary template render failures.
-    window.LOCALE = window.LOCALE || '<?= $escaper->escapeJs(str_replace('_', '-', $block->getLocaleCode())) ?>';
+    window.checkoutConfig = <?= /* @noEscape */ $block->serializeForScript($checkoutConfig) ?>;
+    window.isCustomerLoggedIn = Boolean(window.checkoutConfig.isCustomerLoggedIn);
+    window.customerData = window.checkoutConfig.customerData || {};
+    window.LOCALE = window.LOCALE ||
+        '<?= $escaper->escapeJs(str_replace('_', '-', $block->getLocaleCode())) ?>';
     window.BASE_URL = window.BASE_URL || '<?= $escaper->escapeJs($block->getBaseUrl()) ?>';
 
-    function initFullCheckoutBridge() {
-        if (
-            window.fastcheckoutKoCheckoutRenderersStarted ||
-            window.fastcheckoutKoCheckoutBridgeStarted ||
-            typeof window.require !== 'function'
-        ) {
-            return;
+    require(
+        ['Kkkonrad_Fastcheckout/js/hyva/checkout-renderers'],
+        function (initializeCheckout) {
+            initializeCheckout(<?= /* @noEscape */ $block->serializeForScript($jsLayout) ?>);
         }
-
-        window.fastcheckoutKoCheckoutRenderersStarted = true;
-        window.fastcheckoutKoCheckoutBridgeStarted = true;
-        window.fastcheckoutKoPaymentRenderersStarted = true;
-
-        window.require(['Kkkonrad_Fastcheckout/js/hyva/checkout-renderers'], function (init) {
-            init(config);
-        });
-    }
-
-    function initCheckoutBridge() {
-        if (
-            started ||
-            window.fastcheckoutShippingBootstrapRequested ||
-            typeof window.require !== 'function'
-        ) {
-            return;
-        }
-
-        started = true;
-        window.fastcheckoutShippingBootstrapRequested = true;
-        window.require.config({
-            baseUrl: resolveStaticBaseUrl()
-        });
-
-        window.require(
-            ['Kkkonrad_Fastcheckout/js/hyva/shipping-address-bootstrap'],
-            function (initShippingAddress) {
-                var fallbackTimer,
-                    fullBridgeQueued = false;
-
-                function startFullBridge() {
-                    if (fullBridgeQueued) {
-                        return;
-                    }
-                    fullBridgeQueued = true;
-                    // A separate task lets the browser paint the shipping form before
-                    // the full payment/module graph starts downloading.
-                    window.setTimeout(function () {
-                        initFullCheckoutBridge();
-                        if (fallbackTimer) {
-                            window.clearTimeout(fallbackTimer);
-                        }
-                    }, 0);
-                }
-
-                window.addEventListener(
-                    'fastcheckout:address-fields-ready',
-                    startFullBridge,
-                    { once: true }
-                );
-                initShippingAddress(config);
-
-                if (window.fastcheckoutAddressFieldsReady) {
-                    startFullBridge();
-                    return;
-                }
-                // Preserve checkout functionality if a third-party field component
-                // prevents the readiness event. The normal path starts much earlier.
-                fallbackTimer = window.setTimeout(startFullBridge, 10000);
-            }
-        );
-    }
-
-    if (typeof window.require === 'function') {
-        initCheckoutBridge();
-    } else if (window.console && typeof window.console.warn === 'function') {
-        window.console.warn('Kkkonrad Fastcheckout: RequireJS is unavailable.');
-    }
+    );
 })();
 </script>
 <?php $hyvaCsp->registerInlineScript() ?>
