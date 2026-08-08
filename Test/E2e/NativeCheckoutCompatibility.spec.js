@@ -244,6 +244,20 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             '#checkout-payment-method-load .payment-method'
         ).count(), {timeout: 45_000}).toBeGreaterThan(0);
 
+        const paymentMethods = page.locator(
+            '#checkout-payment-method-load .payment-method'
+        );
+        if (await paymentMethods.count() === 1) {
+            const radio = paymentMethods.locator('input[name="payment[method]"]:checked');
+
+            await expect(radio).toBeHidden();
+            expect(await paymentMethods.locator('.payment-method-title').evaluate((title) => {
+                const indicator = getComputedStyle(title, '::before');
+
+                return indicator.content !== 'none' && parseFloat(indicator.width) > 0;
+            })).toBe(true);
+        }
+
         const paymentPresentation = await page.evaluate(() => {
             const methods = Array.from(document.querySelectorAll(
                     '.fastcheckout-ko-payment-root .payment-method'

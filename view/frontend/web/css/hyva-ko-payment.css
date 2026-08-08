@@ -31,6 +31,18 @@
     cursor: pointer;
 }
 
+.fastcheckout-ko-payment-root .payment-method-title:has(
+    input[name='payment[method]']:checked[style*='display: none']
+)::before {
+    content: '';
+    width: 1.125rem;
+    height: 1.125rem;
+    flex: 0 0 1.125rem;
+    border-radius: 50%;
+    background: radial-gradient(circle, #fff 0 18%, transparent 20%),
+        var(--form-active-color, var(--color-primary));
+}
+
 .fastcheckout-ko-payment-root .payment-method-title label {
     flex: 1 1 auto;
     margin: 0;
