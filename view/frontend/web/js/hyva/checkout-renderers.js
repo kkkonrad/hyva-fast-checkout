@@ -231,6 +231,24 @@ define([
         return false;
     }
 
+    function scrollToFirstVisibleError() {
+        var errors = document.querySelectorAll(
+                '#fastcheckout-checkout [data-fastcheckout-shipping-method-error], ' +
+                '#fastcheckout-checkout .field-error, ' +
+                '#fastcheckout-checkout .mage-error:not(input):not(select):not(textarea), ' +
+                '#fastcheckout-checkout [aria-invalid="true"], ' +
+                '#fastcheckout-checkout [role="alert"]'
+            ),
+            error = Array.prototype.find.call(errors, function (element) {
+                return element.getClientRects().length &&
+                    window.getComputedStyle(element).visibility !== 'hidden';
+            });
+
+        if (error) {
+            error.scrollIntoView({behavior: 'smooth', block: 'center'});
+        }
+    }
+
     function validateAndPlaceOrder(shipping) {
         var source = shipping.source,
             email = $('form[data-role=email-with-possible-login] input[name=username]'),
@@ -262,6 +280,7 @@ define([
             shipping.focusInvalid();
         }
         if (!addressValid || !emailValid || !shippingValid || !paymentValid) {
+            window.setTimeout(scrollToFirstVisibleError, 0);
             return;
         }
         if (!validateBillingAddress()) {

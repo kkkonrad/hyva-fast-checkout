@@ -253,6 +253,15 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             await expect.poll(() => page.locator(
                 '#checkout-payment-method-load .payment-method'
             ).count(), {timeout: 45_000}).toBeGreaterThan(0);
+            const placeOrder = page.locator('[data-fastcheckout-place-order-ssr]');
+            await placeOrder.click({force: true});
+            const inPostError = page.locator('[data-fastcheckout-shipping-method-error]');
+            await expect(inPostError).toBeVisible();
+            await expect.poll(() => inPostError.evaluate((error) => {
+                const box = error.getBoundingClientRect();
+
+                return box.top >= 0 && box.bottom <= window.innerHeight;
+            })).toBe(true);
             const selectPoint = page.locator(
                 '[data-inpost-wrapper] [data-inpost-select-point]'
             ).first();
