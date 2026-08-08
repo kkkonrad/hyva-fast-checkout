@@ -270,10 +270,7 @@ define([
                 }
 
                 shippingSaveTimer = window.setTimeout(function () {
-                    if (!shipping.validateShippingInformation()) {
-                        return;
-                    }
-
+                    // Carrier-specific fields are validated by the place-order flow.
                     quote.billingAddress(null);
                     checkoutDataResolver.resolveBillingAddress();
                     shippingSavePending = true;

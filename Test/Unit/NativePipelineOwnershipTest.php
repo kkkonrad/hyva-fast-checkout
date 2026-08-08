@@ -93,6 +93,7 @@ class NativePipelineOwnershipTest extends TestCase
             'customerData.getInitCustomerData().done(',
             $bootstrap
         );
+        $this->assertSame(1, substr_count($bootstrap, 'shipping.validateShippingInformation()'));
     }
 
     public function testDiDoesNotReplaceOrGloballyPatchCheckoutServices(): void

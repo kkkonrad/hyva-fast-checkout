@@ -236,10 +236,23 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         await expect.poll(() => rates.count(), {timeout: 45_000}).toBeGreaterThan(0);
 
         if (hasInPost) {
-            await expect.poll(() => page.locator(
+            const inPostRate = page.locator(
                 '#fastcheckout-ko-shipping-root ' +
                 'input[name="shipping_method"][value*="inpostlocker"]'
-            ).count()).toBeGreaterThan(0);
+            ).first();
+
+            await expect(inPostRate).toBeVisible();
+            const inPostShippingResponse = page.waitForResponse((response) => (
+                response.request().method() === 'POST' &&
+                response.url().includes('/shipping-information')
+            ), {timeout: 45_000});
+            await inPostRate.click({force: true});
+            expect((await inPostShippingResponse).ok()).toBe(true);
+            await expect(page.locator('[data-fastcheckout-shipping-method-error]'))
+                .toBeHidden();
+            await expect.poll(() => page.locator(
+                '#checkout-payment-method-load .payment-method'
+            ).count(), {timeout: 45_000}).toBeGreaterThan(0);
             const selectPoint = page.locator(
                 '[data-inpost-wrapper] [data-inpost-select-point]'
             ).first();
