@@ -298,6 +298,16 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         await expect.poll(() => page.locator(
             '#checkout-payment-method-load .payment-method'
         ).count(), {timeout: 45_000}).toBeGreaterThan(0);
+        expect(await page.locator('.fastcheckout-payment-after-methods').evaluate((region) => (
+            !region.closest('[data-fastcheckout-payment-methods-card]') &&
+            region.previousElementSibling?.matches('[data-fastcheckout-payment-methods-card]')
+        ))).toBe(true);
+        const agreementsHost = page.locator('[data-fastcheckout-agreements-host]');
+        await expect(agreementsHost.locator('.checkout-agreements-block')).toHaveCount(1);
+        expect(await agreementsHost.evaluate((host) => (
+            host.matches('.payment-method._active') &&
+            host.previousElementSibling?.matches('[data-fastcheckout-newsletter]')
+        ))).toBe(true);
 
         const paymentMethods = page.locator(
             '#checkout-payment-method-load .payment-method'

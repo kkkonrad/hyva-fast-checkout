@@ -107,7 +107,7 @@ $showSubscribe = $block->isShowSubscribe();
             <?php endif; ?>
 
             <?php if ($showSubscribe): ?>
-                <div class="border-t border-gray-200 pt-4">
+                <div class="border-t border-gray-200 pt-4" data-fastcheckout-newsletter>
                     <label class="flex items-center gap-2 text-sm text-gray-700 mb-0 cursor-pointer">
                         <input type="checkbox"
                                id="fastcheckout-subscribe"
@@ -120,6 +120,9 @@ $showSubscribe = $block->isShowSubscribe();
                     </label>
                 </div>
             <?php endif; ?>
+
+            <div class="fastcheckout-agreements-host fastcheckout-ko-payment-root payment-method _active border-t border-gray-200 pt-4"
+                 data-fastcheckout-agreements-host></div>
 
             <?php
             /**

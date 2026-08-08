@@ -104,6 +104,38 @@ define([
         });
     }
 
+    function wireAgreements() {
+        var host = document.querySelector('[data-fastcheckout-agreements-host]'),
+            activeCode = activePaymentCode(),
+            activeMethod,
+            agreements;
+
+        if (!host) {
+            return;
+        }
+
+        document.querySelectorAll('.fastcheckout-ko-payment-root .payment-method').forEach(
+            function (method) {
+                if (!activeMethod && paymentCode(method) === activeCode) {
+                    activeMethod = method;
+                }
+            }
+        );
+        agreements = activeMethod && (
+            activeMethod.fastcheckoutAgreements ||
+            activeMethod.querySelector('.checkout-agreements-block')
+        );
+
+        if (activeMethod && agreements) {
+            activeMethod.fastcheckoutAgreements = agreements;
+        }
+        if (agreements && host.firstElementChild !== agreements) {
+            host.replaceChildren(agreements);
+        } else if (!agreements && host.firstElementChild) {
+            host.replaceChildren();
+        }
+    }
+
     function revealNativeContent() {
         var loader = document.querySelector('[data-fastcheckout-startup-loader]'),
             summaryRoot = document.getElementById('fastcheckout-ko-summary-root'),
@@ -127,6 +159,7 @@ define([
         }
 
         wirePlaceOrderButtons();
+        wireAgreements();
     }
 
     function updateMobileTotal() {
@@ -298,7 +331,10 @@ define([
 
             quote.paymentMethod.subscribe(function () {
                 setClientOrderError('');
-                window.setTimeout(wirePlaceOrderButtons, 0);
+                window.setTimeout(function () {
+                    wirePlaceOrderButtons();
+                    wireAgreements();
+                }, 0);
             });
             if (totals.totals && typeof totals.totals.subscribe === 'function') {
                 totals.totals.subscribe(updateMobileTotal);

@@ -1,6 +1,6 @@
 <?php
 /**
- * Native Magento payment regions inside the unchanged Fastcheckout card.
+ * Native Magento payment regions in the Fastcheckout payment section.
  *
  * @var \Magento\Framework\Escaper $escaper
  */
@@ -40,11 +40,11 @@
                               i18n: 'No Payment method available.'"></p>
             </form>
         </div>
-        <div class="fastcheckout-payment-after-methods space-y-6 mt-4 pt-4 border-t border-gray-200"
-             data-bind="scope: 'checkout.steps.billing-step.payment'">
-            <!-- ko foreach: getRegion('afterMethods') -->
-                <!-- ko template: getTemplate() --><!-- /ko -->
-            <!-- /ko -->
-        </div>
+    </div>
+    <div class="fastcheckout-payment-after-methods space-y-6"
+         data-bind="scope: 'checkout.steps.billing-step.payment'">
+        <!-- ko foreach: getRegion('afterMethods') -->
+            <!-- ko template: getTemplate() --><!-- /ko -->
+        <!-- /ko -->
     </div>
 </div>
