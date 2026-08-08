@@ -18,17 +18,13 @@ class FastcheckoutHandleTest extends TestCase
         $source = (string)file_get_contents(
             $this->moduleRoot() . '/view/frontend/layout/fastcheckout_index_index.xml'
         );
-        $requireJs = (string)file_get_contents(
-            $this->moduleRoot() . '/view/frontend/layout/fastcheckout_requirejs.xml'
+        $checkout = (string)file_get_contents(
+            $this->moduleRoot() . '/view/frontend/layout/checkout_index_index.xml'
         );
 
-        $this->assertMatchesRegularExpression(
-            '/<update handle="fastcheckout_requirejs"\/>\s*' .
-            '<update handle="checkout_index_index"\/>/',
-            $source
-        );
-        $this->assertStringContainsString('Kkkonrad_Fastcheckout::js/requirejs-base.js', $requireJs);
-        $this->assertStringContainsString('requirejs/require.js', $requireJs);
+        $this->assertStringContainsString('<update handle="checkout_index_index"/>', $source);
+        $this->assertStringContainsString('Kkkonrad_Fastcheckout::js/requirejs-base.js', $checkout);
+        $this->assertStringContainsString('requirejs/require.js', $checkout);
         $this->assertStringContainsString('hyva-default-checkout.css', $source);
         $this->assertStringContainsString('Kkkonrad_Fastcheckout::hyva/checkout.phtml', $source);
         $this->assertStringContainsString('fastcheckout-checkout-page', $source);

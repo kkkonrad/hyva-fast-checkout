@@ -4,7 +4,6 @@
       xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
     <!-- Preserve third-party checkout head assets and auxiliary blocks. The
          canonical jsLayout itself is built in an isolated fallback-theme layout. -->
-    <update handle="fastcheckout_requirejs"/>
     <update handle="checkout_index_index"/>
     <head>
         <css src="Kkkonrad_Fastcheckout::css/hyva-ko-payment.css"/>

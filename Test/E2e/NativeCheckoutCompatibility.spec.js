@@ -15,6 +15,9 @@ async function dismissConsent(page) {
 }
 
 async function openCheckoutWithProduct(page) {
+    const pageErrors = [];
+
+    page.on('pageerror', (error) => pageErrors.push(error.message));
     await page.goto(new URL(PRODUCT, BASE).href, {
         waitUntil: 'domcontentloaded',
         timeout: 60_000
@@ -61,6 +64,8 @@ async function openCheckoutWithProduct(page) {
         expect(mixinsIndex).toBeLessThan(inPostIndex);
         expect(configIndex).toBeLessThan(inPostIndex);
     }
+
+    return {hasInPost: inPostIndex >= 0, pageErrors};
 }
 
 test.describe('Fastcheckout native Magento compatibility host', () => {
@@ -165,7 +170,7 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
 
     test('validates shipping and Purchase Order, optionally placing an order', async ({page}) => {
         test.setTimeout(180_000);
-        await openCheckoutWithProduct(page);
+        const {hasInPost, pageErrors} = await openCheckoutWithProduct(page);
         const shippingRoot = page.locator('.fastcheckout-native-shipping-address');
         await expect(shippingRoot.locator('input[name="firstname"]'))
             .toBeVisible({timeout: 45_000});
@@ -229,6 +234,24 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             '#fastcheckout-ko-shipping-root input[name="shipping_method"]'
         );
         await expect.poll(() => rates.count(), {timeout: 45_000}).toBeGreaterThan(0);
+
+        if (hasInPost) {
+            await expect.poll(() => page.locator(
+                '#fastcheckout-ko-shipping-root ' +
+                'input[name="shipping_method"][value*="inpostlocker"]'
+            ).count()).toBeGreaterThan(0);
+            const selectPoint = page.locator(
+                '[data-inpost-wrapper] [data-inpost-select-point]'
+            ).first();
+
+            await expect(selectPoint).toBeVisible({timeout: 25_000});
+            await selectPoint.evaluate((button) => button.click());
+            await expect(page.locator('[data-inpost-modal] inpost-geowidget')).toBeVisible();
+            await page.locator('[data-inpost-modal-btn-close]').evaluate((button) => (
+                button.click()
+            ));
+            await expect(page.locator('[data-inpost-modal]')).toHaveCount(0);
+        }
 
         const selected = page.locator(
             '#fastcheckout-ko-shipping-root input[name="shipping_method"]' +
@@ -456,6 +479,10 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         ))).toBe(1);
         await expect.poll(() => visibleErrorText(purchaseOrderNumber)).toEqual([]);
         expect(paymentRequests).toBe(0);
+        expect(pageErrors.filter((message) => (
+            message.includes('requirejs is not defined') ||
+            message.includes("Cannot read properties of undefined (reading 'set')")
+        ))).toEqual([]);
 
         if (process.env.FC_ALLOW_PLACE_ORDER !== '1') {
             return;
