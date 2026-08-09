@@ -386,6 +386,25 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             block.querySelector('[data-fastcheckout-newsletter]')
                 ?.nextElementSibling?.matches('[data-role="checkout-agreements"]')
         ))).toBe(true);
+        expect(await page.locator('[data-fastcheckout-place-order-ssr]').evaluate((button) => {
+            const paymentCard = button.closest('[data-fastcheckout-payment-methods-card]');
+            const agreementBlock = paymentCard && paymentCard.querySelector(
+                '.payment-method._active .checkout-agreements-block'
+            );
+
+            return {
+                inPaymentCard: Boolean(paymentCard),
+                inTotalsCard: Boolean(button.closest('[data-fastcheckout-totals-card]')),
+                afterAgreements: Boolean(agreementBlock && (
+                    agreementBlock.compareDocumentPosition(button) &
+                    Node.DOCUMENT_POSITION_FOLLOWING
+                ))
+            };
+        })).toEqual({
+            inPaymentCard: true,
+            inTotalsCard: false,
+            afterAgreements: true
+        });
         await expect(page.locator('[data-fastcheckout-agreements-host]')).toHaveCount(0);
 
         const shippingInformationRoot = page.locator(
@@ -494,7 +513,6 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             toolbar.appendChild(secondary);
         });
         await expect(page.locator('[data-fastcheckout-e2e-secondary-action]')).toBeVisible();
-        await expect(page.locator('#fastcheckout-place-order-host .actions-toolbar')).toHaveCount(0);
 
         const sameAsShipping = page.locator(
             'input[name="billing-address-same-as-shipping"]'
@@ -604,20 +622,6 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             }, reject);
         }));
         await page.evaluate(() => {
-            const scrollIntoView = Element.prototype.scrollIntoView;
-
-            window.fastcheckoutE2eScrollTargets = [];
-            window.fastcheckoutE2eRestoreScrollIntoView = () => {
-                Element.prototype.scrollIntoView = scrollIntoView;
-            };
-            Element.prototype.scrollIntoView = function (options) {
-                window.fastcheckoutE2eScrollTargets.push({
-                    paymentError: this.dataset.fastcheckoutE2ePaymentError === '1',
-                    behavior: options && options.behavior
-                });
-
-                return scrollIntoView.call(this, options);
-            };
             window.setTimeout(() => {
                 const error = document.createElement('p');
 
@@ -631,14 +635,13 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         await clickProxy();
         const paymentError = page.locator('[data-fastcheckout-e2e-payment-error]');
         await expect(paymentError).toBeVisible();
-        await expect.poll(() => page.evaluate(() => (
-            window.fastcheckoutE2eScrollTargets.some((target) => (
-                target.paymentError && target.behavior === 'smooth'
-            ))
-        ))).toBe(true);
+        await expect.poll(() => paymentError.evaluate((error) => {
+            const box = error.getBoundingClientRect();
+
+            return box.top >= 0 && box.bottom <= window.innerHeight;
+        })).toBe(true);
         await paymentError.evaluate((error) => {
             error.remove();
-            window.fastcheckoutE2eRestoreScrollIntoView();
         });
         await expect.poll(() => page.evaluate(() => (
             window.fastcheckoutE2eValidationCalls

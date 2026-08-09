@@ -123,6 +123,9 @@ class NativePipelineOwnershipTest extends TestCase
         $summary = (string)file_get_contents(
             $this->moduleRoot() . '/view/frontend/templates/hyva/checkout/summary.phtml'
         );
+        $payment = (string)file_get_contents(
+            $this->moduleRoot() . '/view/frontend/templates/hyva/checkout/payment-methods.phtml'
+        );
         $layout = (string)file_get_contents(
             $this->moduleRoot() . '/view/frontend/layout/checkout_index_index.xml'
         );
@@ -140,6 +143,8 @@ class NativePipelineOwnershipTest extends TestCase
         $this->assertStringContainsString("'newsletterLabel'", $configProvider);
         $this->assertStringContainsString("__('Sign Up for Our Newsletter')", $configProvider);
         $this->assertStringNotContainsString('data-fastcheckout-agreements-host', $summary);
+        $this->assertStringContainsString('data-fastcheckout-place-order-ssr', $payment);
+        $this->assertStringNotContainsString('data-fastcheckout-place-order-ssr', $summary);
     }
 
     public function testModuleHasNoHyvaCheckoutOrMagewireRequirement(): void

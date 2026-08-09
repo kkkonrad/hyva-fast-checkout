@@ -1392,11 +1392,8 @@
 }
 
 /*
- * Magento payment place-order toolbar hosted in the summary card.
- * Markup: .actions-toolbar > .primary > button.action.primary.checkout
- *
- * One fixed control size for SSR fallback AND Magento-hosted button so the
- * button does not jump taller→shorter when the native toolbar mounts.
+ * Fastcheckout place-order proxy following the native payment regions.
+ * Keep one control size for the desktop proxy and mobile sticky action.
  */
 #fastcheckout-checkout {
     --fc-place-order-height: 3rem; /* 48px */

@@ -1,8 +1,7 @@
 <?php
 /**
- * Order summary, coupon and place-order controls.
+ * Order summary and order-comment control.
  *
- * Coupon uses Magento_SalesRule payment/discount (native KO).
  * Core OPC has no storefront order-comment field, so the existing FC textarea
  * is appended to payment data by the place-order mixin.
  *
@@ -12,7 +11,7 @@
  */
 $showComment = $block->isShowComment();
 ?>
-<!-- Container 4: Order Summary, Coupon & Place Order -->
+<!-- Container 4: Order Summary -->
 <div class="fc-container-4 space-y-6 min-w-0 w-full">
     <div class="card sticky top-6 space-y-6" data-fastcheckout-totals-card>
         <div class="relative space-y-6">
@@ -113,39 +112,6 @@ $showComment = $block->isShowComment();
                 </div>
             <?php endif; ?>
 
-            <?php
-            /**
-             * The visible FC button delegates to the active renderer's native
-             * place-order button. The native button stays in its original DOM so
-             * payment-specific and additional validators keep their context.
-             */
-            ?>
-            <div class="pt-2 fastcheckout-place-order-section">
-                <div id="fastcheckout-place-order-host"
-                     class="fastcheckout-place-order-host hidden md:block"
-                     data-fastcheckout-place-order-host>
-                </div>
-                <?php /* Always available; the native checkout validators run on click. */ ?>
-                <button class="btn btn-primary w-full items-center justify-center gap-2 hidden md:flex fastcheckout-place-order-btn"
-                        type="button"
-                        data-fastcheckout-place-order
-                        data-fastcheckout-place-order-ssr>
-                    <span class="place-order-spinner hidden" data-fastcheckout-place-order-spinner aria-hidden="true">
-                        <svg class="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                    </span>
-                    <span data-fastcheckout-place-order-label
-                          data-fastcheckout-ready-text="<?= $escaper->escapeHtmlAttr(__('Place Order')) ?>"
-                          data-fastcheckout-processing-text="<?= $escaper->escapeHtmlAttr(__('Please wait...')) ?>">
-                        <?= $escaper->escapeHtml(__('Place Order')) ?>
-                    </span>
-                </button>
-                <p class="text-sm text-red-600 font-medium text-center mt-2 hidden"
-                   data-fastcheckout-client-order-error
-                   role="alert"></p>
-            </div>
         </div>
     </div>
 </div>
