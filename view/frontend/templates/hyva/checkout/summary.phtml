@@ -11,7 +11,6 @@
  * @var array $items
  */
 $showComment = $block->isShowComment();
-$showSubscribe = $block->isShowSubscribe();
 ?>
 <!-- Container 4: Order Summary, Coupon & Place Order -->
 <div class="fc-container-4 space-y-6 min-w-0 w-full">
@@ -90,6 +89,14 @@ $showSubscribe = $block->isShowSubscribe();
                 </div>
             </div>
 
+            <div id="fastcheckout-ko-shipping-information-root"
+                 data-bind="scope: 'checkout.sidebar'"
+                 data-fastcheckout-shipping-information>
+                <!-- ko foreach: getRegion('shipping-information') -->
+                    <!-- ko template: getTemplate() --><!-- /ko -->
+                <!-- /ko -->
+            </div>
+
             <?php if ($showComment): ?>
                 <div class="border-t border-gray-200 pt-4">
                     <div>
@@ -105,24 +112,6 @@ $showSubscribe = $block->isShowSubscribe();
                     </div>
                 </div>
             <?php endif; ?>
-
-            <?php if ($showSubscribe): ?>
-                <div class="border-t border-gray-200 pt-4" data-fastcheckout-newsletter>
-                    <label class="flex items-center gap-2 text-sm text-gray-700 mb-0 cursor-pointer">
-                        <input type="checkbox"
-                               id="fastcheckout-subscribe"
-                               name="fastcheckout_subscribe"
-                               data-fastcheckout-subscribe
-                               class="form-checkbox"
-                               value="1"
-                            <?= $block->getHelper()->isSubscribeByDefault() ? 'checked' : '' ?> />
-                        <span><?= $escaper->escapeHtml(__('Sign Up for Our Newsletter')) ?></span>
-                    </label>
-                </div>
-            <?php endif; ?>
-
-            <div class="fastcheckout-agreements-host fastcheckout-ko-payment-root payment-method _active border-t border-gray-200 pt-4"
-                 data-fastcheckout-agreements-host></div>
 
             <?php
             /**

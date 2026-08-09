@@ -28,9 +28,9 @@ define([
     var initialized = false,
         observer,
         paymentErrorObserver,
-        paymentErrorTimer,
         shippingSaveTimer,
-        shippingSavePending = false;
+        shippingSavePending = false,
+        shippingSaveQueued = false;
 
     function paymentCode(method) {
         var input = method.querySelector(
@@ -49,11 +49,25 @@ define([
     function placeOrderButton(method) {
         return method && method.querySelector(
             '.payment-method-content [data-role="review-save"], ' +
-            '.payment-method-content .action.checkout, ' +
-            '.payment-method-content > .actions-toolbar button, ' +
-            '.payment-method-content > .actions-toolbar input[type="submit"], ' +
-            '.payment-method-content > .actions-toolbar [role="button"]'
+            '.payment-method-content .action.checkout'
         );
+    }
+
+    function updatePlaceOrderToolbar(button) {
+        var toolbar = button.closest('.actions-toolbar'),
+            otherAction;
+
+        if (!toolbar) {
+            return;
+        }
+
+        otherAction = Array.prototype.some.call(toolbar.querySelectorAll(
+            'button, input[type="submit"], [role="button"], a.action'
+        ), function (action) {
+            return action !== button &&
+                !action.classList.contains('fastcheckout-native-place-order-btn');
+        });
+        toolbar.classList.toggle('fastcheckout-actions-toolbar-hidden', !otherAction);
     }
 
     function activePlaceOrderButton() {
@@ -88,6 +102,7 @@ define([
                 'fastcheckout-native-place-order-btn',
                 'fastcheckout-native-place-order-hidden'
             );
+            updatePlaceOrderToolbar(button);
         });
 
         activeButton = activePlaceOrderButton();
@@ -104,38 +119,6 @@ define([
         document.querySelectorAll('[data-fastcheckout-place-order-ssr]').forEach(function (button) {
             button.classList.toggle('fastcheckout-place-order-proxy-ready', Boolean(activeButton));
         });
-    }
-
-    function wireAgreements() {
-        var host = document.querySelector('[data-fastcheckout-agreements-host]'),
-            activeCode = activePaymentCode(),
-            activeMethod,
-            agreements;
-
-        if (!host) {
-            return;
-        }
-
-        document.querySelectorAll('.fastcheckout-ko-payment-root .payment-method').forEach(
-            function (method) {
-                if (!activeMethod && paymentCode(method) === activeCode) {
-                    activeMethod = method;
-                }
-            }
-        );
-        agreements = activeMethod && (
-            activeMethod.fastcheckoutAgreements ||
-            activeMethod.querySelector('.checkout-agreements-block')
-        );
-
-        if (activeMethod && agreements) {
-            activeMethod.fastcheckoutAgreements = agreements;
-        }
-        if (agreements && host.firstElementChild !== agreements) {
-            host.replaceChildren(agreements);
-        } else if (!agreements && host.firstElementChild) {
-            host.replaceChildren();
-        }
     }
 
     function revealNativeContent() {
@@ -161,7 +144,6 @@ define([
         }
 
         wirePlaceOrderButtons();
-        wireAgreements();
     }
 
     function updateMobileTotal() {
@@ -267,23 +249,25 @@ define([
             '.fastcheckout-ko-payment-root .payment-method._active'
         );
 
+        if (paymentErrorObserver) {
+            paymentErrorObserver.disconnect();
+            paymentErrorObserver = null;
+        }
         if (!payment || scrollToFirstVisibleError(payment) || !window.MutationObserver) {
             return;
         }
-        if (paymentErrorObserver) {
-            paymentErrorObserver.disconnect();
-        }
-        window.clearTimeout(paymentErrorTimer);
         paymentErrorObserver = new MutationObserver(function () {
             if (scrollToFirstVisibleError(payment)) {
                 paymentErrorObserver.disconnect();
-                window.clearTimeout(paymentErrorTimer);
+                paymentErrorObserver = null;
             }
         });
-        paymentErrorObserver.observe(payment, {childList: true, subtree: true});
-        paymentErrorTimer = window.setTimeout(function () {
-            paymentErrorObserver.disconnect();
-        }, 3000);
+        paymentErrorObserver.observe(payment, {
+            attributes: true,
+            characterData: true,
+            childList: true,
+            subtree: true
+        });
     }
 
     function validateAndPlaceOrder(shipping) {
@@ -351,21 +335,34 @@ define([
     }
 
     function saveShippingWhenMethodChanges() {
-        registry.async('checkout.steps.shipping-step.shippingAddress')(function (shipping) {
+        function saveLatestShippingInformation() {
+            if (shippingSavePending) {
+                return;
+            }
+
+            window.clearTimeout(shippingSaveTimer);
+            shippingSaveQueued = false;
+            shippingSavePending = true;
+            setShippingInformation().always(function () {
+                shippingSavePending = false;
+                if (shippingSaveQueued) {
+                    saveLatestShippingInformation();
+                }
+            });
+        }
+
+        registry.async('checkout.steps.shipping-step.shippingAddress')(function () {
             quote.shippingMethod.subscribe(function (method) {
                 window.clearTimeout(shippingSaveTimer);
-                if (!method || shippingSavePending) {
+                if (!method) {
+                    shippingSaveQueued = false;
                     return;
                 }
 
+                shippingSaveQueued = true;
                 shippingSaveTimer = window.setTimeout(function () {
                     // Carrier-specific fields are validated by the place-order flow.
-                    quote.billingAddress(null);
-                    checkoutDataResolver.resolveBillingAddress();
-                    shippingSavePending = true;
-                    setShippingInformation().always(function () {
-                        shippingSavePending = false;
-                    });
+                    saveLatestShippingInformation();
                 }, 50);
             });
         });
@@ -387,9 +384,12 @@ define([
 
             quote.paymentMethod.subscribe(function () {
                 setClientOrderError('');
+                if (paymentErrorObserver) {
+                    paymentErrorObserver.disconnect();
+                    paymentErrorObserver = null;
+                }
                 window.setTimeout(function () {
                     wirePlaceOrderButtons();
-                    wireAgreements();
                 }, 0);
             });
             if (totals.totals && typeof totals.totals.subscribe === 'function') {

@@ -136,8 +136,9 @@ pozostaje dostępna ze względów zgodności wstecznej.
   `renderer-list`, `shipping-service`, `checkout-data` i `quote` bez forków.
 - Fastcheckout zachowuje natywne regiony płatności i używa tylko trzech małych
   mixinów: extras place-order, mapowanie dostawa→płatność i widoczność natywnego
-  formularza rabatowego. Własne pole komentarza oraz newsletter pozostają w
-  istniejącym panelu podsumowania, więc nie zmieniają układu checkoutu.
+  formularza rabatowego. Pole komentarza pozostaje w panelu podsumowania, a własny
+  newsletter jest zwykłym dzieckiem regionu `before-place-order` z `sortOrder=90`.
+  Żaden cudzy komponent Knockout nie jest przenoszony ani klonowany.
 
 Moduł nie zawiera komponentu Magewire, mechanizmu modyfikowania DOM przez Livewire
 ani orkiestratora stanu opartego na Alpine.
@@ -151,12 +152,13 @@ patchy ani wpisów DI w Kkkonrad_Fastcheckout.**
 - Renderery płatności i komponenty UI dostawy pochodzą ze standardowego,
   dynamicznie scalonego handle `checkout_index_index`.
 - `shippingAdditional`, `before-shipping-method-form`, `beforeMethods`,
-  `afterMethods`, `before-place-order`, `payments-list`, `renderer-list` i
-  `checkout.sidebar.shipping-information` pozostają w oryginalnych miejscach.
+  `afterMethods`, `before-place-order`, `payments-list` i `renderer-list` pozostają
+  w oryginalnych miejscach. `checkout.sidebar.shipping-information` jest renderowany
+  przez kanoniczny region komponentu `checkout.sidebar`.
 - Fastcheckout nie zastępuje `window.checkoutConfig`, nie zapisuje własnego checkout
-  store i nie odtwarza `extension_attributes` z bazy. Natywny toolbar aktywnego
-  renderera jest zachowywany wraz z handlerami i umieszczany w istniejącym wizualnym
-  hoście przycisku zamówienia; sam renderer i jego pola pozostają własnością modułu.
+  store i nie odtwarza `extension_attributes` z bazy. Natywny przycisk zamówienia
+  pozostaje w rendererze wraz z handlerami i jest wywoływany przez widoczne proxy;
+  pozostałe akcje toolbara nie są ukrywane.
 - Mixiny nie są rejestrowane na akcjach wyboru adresu/metody, transporcie REST,
   rate processorach ani `customer-data`, więc łańcuchy innych vendorów pozostają
   nienaruszone.

@@ -47,7 +47,10 @@ test('adds checkout extras and invokes Magento place-order exactly once', () => 
             getElementById(id) {
                 return id === 'fastcheckout-comment'
                     ? {value: '  Leave at reception  '}
-                    : {checked: true};
+                    : null;
+            },
+            querySelector() {
+                return {checked: true};
             }
         },
         define(dependencies, factory) {

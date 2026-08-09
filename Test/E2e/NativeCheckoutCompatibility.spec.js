@@ -86,6 +86,7 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             'checkout.steps.shipping-step.shippingAddress',
             'checkout.steps.billing-step.payment',
             'checkout.steps.billing-step.payment.payments-list',
+            'checkout.sidebar',
             'checkout.sidebar.summary',
             'checkout.sidebar.shipping-information'
         ];
@@ -113,14 +114,6 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         await expect(nativeSummary.locator('.product-item')).toBeVisible({timeout: 45_000});
         await expect(nativeSummary.locator('.table-totals tr.grand.totals')).toBeVisible();
         await expect(page.locator('[data-fastcheckout-summary-ssr]')).toBeHidden();
-        expect(await page.evaluate(() => {
-            const quote = window.require('Magento_Checkout/js/model/quote');
-            const billing = quote.billingAddress();
-            const shipping = quote.shippingAddress();
-
-            return Boolean(billing && shipping &&
-                billing.getCacheKey() === shipping.getCacheKey());
-        })).toBe(true);
         const initialPlaceOrder = page.locator('[data-fastcheckout-place-order-ssr]');
         await expect(initialPlaceOrder).toBeVisible();
         await expect(initialPlaceOrder).toBeEnabled();
@@ -275,6 +268,38 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             await expect(page.locator('[data-inpost-modal]')).toHaveCount(0);
         }
 
+        const flatRate = page.locator(
+            '#fastcheckout-ko-shipping-root ' +
+            'input[name="shipping_method"][value="flatrate_flatrate"]'
+        );
+        if (await flatRate.count()) {
+            const flatRateResponse = page.waitForResponse((response) => (
+                response.request().method() === 'POST' &&
+                response.url().includes('/shipping-information')
+            ), {timeout: 45_000});
+            await flatRate.click({force: true});
+            expect((await flatRateResponse).ok()).toBe(true);
+
+            const payuCard = page.locator(
+                'input[name="payment[method]"][value="payu_gateway_card"]'
+            );
+            const payuCardActive = await page.evaluate(() => Boolean(
+                window.checkoutConfig.payment?.payuGatewayCard?.isActive
+            ));
+            if (payuCardActive) {
+                await expect(payuCard).toHaveCount(1, {timeout: 30_000});
+                await payuCard.evaluate((input) => input.click());
+                const activePayu = page.locator('.payu-payment-card._active');
+
+                await expect(activePayu).toHaveCount(1);
+                await expect(activePayu.locator('.payu-secure-form-iframe')).toHaveCount(3, {
+                    timeout: 30_000
+                });
+                await expect(activePayu.locator('[data-fastcheckout-newsletter]')).toBeVisible();
+                await expect(activePayu.locator('.action.checkout')).toBeHidden();
+            }
+        }
+
         const selected = page.locator(
             '#fastcheckout-ko-shipping-root input[name="shipping_method"]' +
             '[value="tablerate_bestway"]'
@@ -289,12 +314,48 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         await expect(page.locator(
             '#checkout #label_method_bestway_tablerate_additional'
         )).toHaveCount(1);
-        const shippingResponse = page.waitForResponse((response) => (
-            response.request().method() === 'POST' &&
-            response.url().includes('/shipping-information')
-        ), {timeout: 45_000});
-        await selected.click({force: true});
-        expect((await shippingResponse).ok()).toBe(true);
+        if (hasInPost && await flatRate.count()) {
+            let queuedShippingRequests = 0;
+            let queuedShippingResponses = 0;
+            const shippingRoute = async (route) => {
+                queuedShippingRequests += 1;
+                if (queuedShippingRequests === 1) {
+                    await new Promise((resolve) => setTimeout(resolve, 500));
+                }
+                await route.continue();
+            };
+            const countShippingResponse = (response) => {
+                if (response.request().method() === 'POST' &&
+                    response.url().includes('/shipping-information')) {
+                    queuedShippingResponses += 1;
+                }
+            };
+
+            await page.route('**/shipping-information*', shippingRoute);
+            page.on('response', countShippingResponse);
+            await page.locator(
+                '#fastcheckout-ko-shipping-root ' +
+                'input[name="shipping_method"][value*="inpostlocker"]'
+            ).first().click({force: true});
+            await expect.poll(() => queuedShippingRequests).toBe(1);
+            await selected.click({force: true});
+            await expect.poll(() => queuedShippingRequests, {timeout: 45_000}).toBe(2);
+            await expect.poll(() => queuedShippingResponses, {timeout: 45_000}).toBe(2);
+            page.off('response', countShippingResponse);
+            await page.unroute('**/shipping-information*', shippingRoute);
+            expect(await page.evaluate(() => {
+                const method = window.require('Magento_Checkout/js/model/quote').shippingMethod();
+
+                return method && method.carrier_code + '_' + method.method_code;
+            })).toBe('tablerate_bestway');
+        } else {
+            const shippingResponse = page.waitForResponse((response) => (
+                response.request().method() === 'POST' &&
+                response.url().includes('/shipping-information')
+            ), {timeout: 45_000});
+            await selected.click({force: true});
+            expect((await shippingResponse).ok()).toBe(true);
+        }
         await expect.poll(() => page.evaluate(() => {
             const quote = window.require('Magento_Checkout/js/model/quote');
             const billing = quote.billingAddress();
@@ -311,12 +372,32 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             !region.closest('[data-fastcheckout-payment-methods-card]') &&
             region.previousElementSibling?.matches('[data-fastcheckout-payment-methods-card]')
         ))).toBe(true);
-        const agreementsHost = page.locator('[data-fastcheckout-agreements-host]');
-        await expect(agreementsHost.locator('.checkout-agreements-block')).toHaveCount(1);
-        expect(await agreementsHost.evaluate((host) => (
-            host.matches('.payment-method._active') &&
-            host.previousElementSibling?.matches('[data-fastcheckout-newsletter]')
+        const activePayment = page.locator(
+            '.fastcheckout-ko-payment-root .payment-method._active'
+        );
+        await expect(activePayment).toHaveCount(1);
+        const agreements = activePayment.locator('.checkout-agreements-block');
+        await expect(agreements).toHaveCount(1);
+        await expect(activePayment.locator('[data-fastcheckout-newsletter]')).toContainText(
+            'Zapisz się do naszego newslettera'
+        );
+        await expect.poll(() => agreements.evaluate((block) => (
+            block.closest('.payment-method._active') !== null &&
+            block.querySelector('[data-fastcheckout-newsletter]')
+                ?.nextElementSibling?.matches('[data-role="checkout-agreements"]')
         ))).toBe(true);
+        await expect(page.locator('[data-fastcheckout-agreements-host]')).toHaveCount(0);
+
+        const shippingInformationRoot = page.locator(
+            '#fastcheckout-ko-shipping-information-root'
+        );
+        await expect(shippingInformationRoot).toHaveCount(1);
+        expect(await shippingInformationRoot.evaluate(() => {
+            const component = window.require('uiRegistry').get('checkout.sidebar');
+
+            return Boolean(component) &&
+                typeof component.getRegion('shipping-information') === 'function';
+        })).toBe(true);
 
         const paymentMethods = page.locator(
             '#checkout-payment-method-load .payment-method'
@@ -360,8 +441,10 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             return {
                 inactiveOnlyTitles,
                 toolbarCount: toolbars.length,
-                toolbarsHidden: toolbars.every((toolbar) => (
-                    getComputedStyle(toolbar).display === 'none'
+                nativeButtonsHidden: Array.from(document.querySelectorAll(
+                    '.fastcheckout-native-place-order-btn'
+                )).every((button) => (
+                    getComputedStyle(button).display === 'none'
                 )),
                 noLegacyFieldMargin: fields.every((field) => (
                     getComputedStyle(field).marginBottom !== '28px'
@@ -370,7 +453,7 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         });
         expect(paymentPresentation.toolbarCount).toBeGreaterThan(0);
         expect(paymentPresentation.inactiveOnlyTitles).toBe(true);
-        expect(paymentPresentation.toolbarsHidden).toBe(true);
+        expect(paymentPresentation.nativeButtonsHidden).toBe(true);
         expect(paymentPresentation.noLegacyFieldMargin).toBe(true);
 
         const rendererState = await page.evaluate(() => new Promise((resolve, reject) => {
@@ -398,6 +481,19 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             '.payment-method._active .payment-method-content .action.checkout'
         );
         await expect(nativeButton).toHaveCount(1);
+        await expect(nativeButton).toBeHidden();
+        const nativeToolbar = nativeButton.locator(
+            'xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " actions-toolbar ")][1]'
+        );
+        await nativeToolbar.evaluate((toolbar) => {
+            const secondary = document.createElement('button');
+
+            secondary.type = 'button';
+            secondary.dataset.fastcheckoutE2eSecondaryAction = '1';
+            secondary.textContent = 'Use new card';
+            toolbar.appendChild(secondary);
+        });
+        await expect(page.locator('[data-fastcheckout-e2e-secondary-action]')).toBeVisible();
         await expect(page.locator('#fastcheckout-place-order-host .actions-toolbar')).toHaveCount(0);
 
         const sameAsShipping = page.locator(

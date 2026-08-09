@@ -11,7 +11,10 @@ define([
     return function (placeOrderAction) {
         return wrapper.wrap(placeOrderAction, function (originalAction, paymentData, messageContainer) {
             var comment = document.getElementById('fastcheckout-comment'),
-                subscribe = document.getElementById('fastcheckout-subscribe'),
+                subscribe = document.querySelector(
+                    '.fastcheckout-ko-payment-root .payment-method._active ' +
+                    '[data-fastcheckout-subscribe]'
+                ),
                 additional,
                 shipping;
 

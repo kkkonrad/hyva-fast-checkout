@@ -104,8 +104,9 @@
     order: 60;
 }
 
-#fastcheckout-checkout .payment-method .actions-toolbar {
-    display: none !important;
+#fastcheckout-checkout .payment-method-content [data-fastcheckout-newsletter] {
+    order: 55;
+    margin-top: 1rem;
 }
 
 @media (min-width: 1024px) {
