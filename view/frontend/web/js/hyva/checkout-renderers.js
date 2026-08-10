@@ -651,7 +651,7 @@ define([
 
         shippingValid = shipping.validateShippingInformation();
         addressValid = source ? !source.get('params.invalid') : addressValid;
-        paymentValid = validatePaymentMethod();
+        paymentValid = !shippingValid || validatePaymentMethod();
 
         if (!emailValid) {
             email.trigger('focus');

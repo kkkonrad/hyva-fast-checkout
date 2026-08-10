@@ -186,8 +186,7 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         await expect(shippingRoot.locator('input[name="firstname"]'))
             .toHaveAttribute('aria-invalid', 'true');
         await expect(page.locator('[data-fastcheckout-shipping-method-error]')).toBeVisible();
-        await expect(page.locator('[data-fastcheckout-client-order-error]:visible'))
-            .toContainText('Brakuje metody płatności. Wybierz metodę płatności i spróbuj ponownie.');
+        await expect(page.locator('[data-fastcheckout-client-order-error]')).toBeHidden();
         expect(paymentRequests).toBe(0);
 
         await shippingRoot.locator('input[name="username"]').fill(
