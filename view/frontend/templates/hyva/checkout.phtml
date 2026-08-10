@@ -10,7 +10,6 @@ use Magento\Framework\Escaper;
 /** @var Checkout $block */
 /** @var Escaper $escaper */
 $items = $block->getVisibleItems();
-$checkoutConfig = $block->getCheckoutConfig();
 ?>
 <div id="checkout">
 <section class="space-y-8 max-w-7xl mx-auto px-0 py-4 pb-24 md:p-6 md:pb-6 overflow-x-hidden" id="fastcheckout-checkout">
@@ -21,11 +20,6 @@ $checkoutConfig = $block->getCheckoutConfig();
             </h1>
             <p class="mt-2 text-sm text-gray-500">
                 <?= $escaper->escapeHtml(__('Complete your purchase details below.')) ?>
-                <?php if (empty($checkoutConfig['isCustomerLoggedIn'])): ?>
-                    <span class="block mt-1">
-                        <?= $escaper->escapeHtml(__('You can create an account after checkout.')) ?>
-                    </span>
-                <?php endif; ?>
             </p>
         </div>
         <a class="btn btn-secondary w-full sm:w-auto text-center"
