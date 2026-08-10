@@ -83,7 +83,7 @@ php bin/magento cache:clean
 - dla prywatnego repozytorium użyj SSH (`git@github.com:kkkonrad/hyva-fast-checkout.git`)
   albo tokenu GitHub w HTTPS i uprawnień Composer do `github.com`;
 - zamiast `dev-master` można wskazać gałąź (`dev-nazwa-galezi`) lub tag
-  (`"kkkonrad/fastcheckout": "7.0.0"`), jeśli jest opublikowany w repozytorium;
+  (`"kkkonrad/fastcheckout": "8.0.0"`), jeśli jest opublikowany w repozytorium;
 - przy instalacji z gałęzi Composer często prosi o `minimum-stability: dev`
   oraz `prefer-stable: true` w `composer.json` projektu.
 

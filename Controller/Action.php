@@ -8,7 +8,6 @@ use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Framework\App\Action\Action as MagentoAction;
 use Magento\Customer\Model\Session as CustomerSession;
 use Magento\Framework\App\Action\Context;
-use Magento\Framework\Controller\Result\RawFactory;
 use Magento\Checkout\Model\Type\Onepage;
 use Kkkonrad\Fastcheckout\Helper\Data as Helper;
 use Magento\Checkout\Helper\Data as CheckoutHelper;
@@ -23,7 +22,6 @@ abstract class Action extends MagentoAction
     public $accountManagement;
     public $onepage;
     public $checkoutHelper;
-    public $resultRawFactory;
     public $checkoutSession;
     public $resultPageFactory;
     public $helper;
@@ -34,7 +32,6 @@ abstract class Action extends MagentoAction
         Onepage $onepage,
         CheckoutHelper $checkoutHelper,
         CustomerRepositoryInterface $customerRepository,
-        RawFactory $resultRawFactory,
         CheckoutSession $checkoutSession,
         PageFactory $resultPageFactory,
         Helper $helper,
@@ -47,7 +44,6 @@ abstract class Action extends MagentoAction
         $this->onepage = $onepage;
         $this->customerRepository = $customerRepository;
         $this->accountManagement = $accountManagement;
-        $this->resultRawFactory = $resultRawFactory;
         $this->checkoutHelper = $checkoutHelper;
         parent::__construct($context);
     }
@@ -55,29 +51,6 @@ abstract class Action extends MagentoAction
     public function getQuote()
     {
         return $this->onepage->getQuote();
-    }
-
-    public function isQuoteValid()
-    {
-        $quote = $this->getQuote();
-        if (!$quote->hasItems() || $quote->getHasError() || !$quote->validateMinimumAmount()) {
-            return false;
-        }
-
-        return true;
-    }
-
-    /**
-     * Check can page show for unregistered users
-     *
-     * @return boolean
-     */
-    public function canShowForUnregisteredUsers()
-    {
-        return $this->customerSession->isLoggedIn()
-            || $this->getRequest()->getActionName() == 'index'
-            || $this->checkoutHelper->isAllowedGuestCheckout($this->getQuote())
-            || !$this->checkoutHelper->isCustomerMustBeLogged();
     }
 
     /**

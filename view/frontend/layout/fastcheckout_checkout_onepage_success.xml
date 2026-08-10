@@ -1,13 +1,7 @@
 <?xml version="1.0"?>
 <page xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
       xsi:noNamespaceSchemaLocation="urn:magento:framework:View/Layout/etc/page_configuration.xsd">
-    <head>
-        <css src="Kkkonrad_Fastcheckout::css/hyva-success.css"/>
-    </head>
     <body>
         <referenceBlock name="checkout.tpay.order_status" remove="true"/>
-        <move element="checkout.registration"
-              destination="checkout.success"
-              as="registration"/>
     </body>
 </page>

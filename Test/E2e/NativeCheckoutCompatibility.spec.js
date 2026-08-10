@@ -628,9 +628,8 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             component.startsWith('PayPal_Braintree/')
         ))).toBe(true);
         expect(rendererState.methodCodes).toContain('purchaseorder');
-        await expect(page.locator(
-            '[data-fastcheckout-payment-option], [data-fastcheckout-payment-method-ko-target]'
-        )).toHaveCount(0);
+        await expect(page.locator('[data-fastcheckout-payment-method-ko-target]'))
+            .toHaveCount(0);
 
         const nativeButton = page.locator(
             '.payment-method._active .payment-method-content .action.checkout'

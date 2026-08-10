@@ -9,19 +9,14 @@ use Magento\Catalog\Helper\Product\Configuration as ProductConfiguration;
 use Magento\Checkout\Block\Onepage;
 use Magento\Checkout\Model\CompositeConfigProvider;
 use Magento\Checkout\Model\Session as CheckoutSession;
-use Magento\Framework\Component\ComponentRegistrarInterface;
 use Magento\Framework\Serialize\SerializerInterface;
 use Magento\Framework\Locale\ResolverInterface;
-use Magento\Framework\Module\ModuleListInterface;
 use Magento\Framework\Pricing\Helper\Data as PricingHelper;
 use Magento\Framework\View\Element\BlockFactory;
 use Magento\Framework\View\Element\Template;
 use Magento\Framework\View\Element\Template\Context;
 use Magento\Quote\Model\Quote;
 use Magento\Quote\Model\Quote\Item;
-use Magento\Quote\Api\PaymentMethodManagementInterface;
-use Magento\Payment\Helper\Data as PaymentHelper;
-use Magento\Payment\Model\MethodInterface;
 use Kkkonrad\Fastcheckout\Helper\Data as Helper;
 use Kkkonrad\Fastcheckout\Model\CheckoutLayoutCollector;
 use Magento\Tax\Helper\Data as TaxHelper;
@@ -59,24 +54,10 @@ class Checkout extends Template
      */
     private $quote;
 
-    /**
-     * @var CompositeConfigProvider|null
-     */
+    /** @var CompositeConfigProvider */
     private $configProvider;
 
-    /**
-     * @var ModuleListInterface|null
-     */
-    private $moduleList;
-
-    /**
-     * @var ComponentRegistrarInterface|null
-     */
-    private $componentRegistrar;
-
-    /**
-     * @var ResolverInterface|null
-     */
+    /** @var ResolverInterface */
     private $localeResolver;
 
     /**
@@ -96,34 +77,22 @@ class Checkout extends Template
      */
     private $helper;
 
-    /** @var TaxHelper|null */
+    /** @var TaxHelper */
     private $taxHelper;
 
-    /** @var SerializerInterface|null */
+    /** @var SerializerInterface */
     private $serializer;
 
-    /** @var BlockFactory|null */
+    /** @var BlockFactory */
     private $blockFactory;
-
-    /** @var array|null */
-    private $rawCheckoutLayoutData;
 
     /** @var array|null */
     private $processedCheckoutLayout;
 
-    /** @var PaymentMethodManagementInterface|null */
-    private $paymentMethodManagement;
-
-    /** @var PaymentHelper|null */
-    private $paymentHelper;
-
-    /** @var array|null */
-    private $paymentMethodsCache;
-
     /** @var array|null */
     private $shippingMethodsCache;
 
-    /** @var CheckoutLayoutCollector|null */
+    /** @var CheckoutLayoutCollector */
     private $layoutCollector;
 
     /**
@@ -133,10 +102,12 @@ class Checkout extends Template
      * @param ImageHelper $imageHelper
      * @param ProductConfiguration $productConfiguration
      * @param ViewModelRegistry $viewModelRegistry
-     * @param CompositeConfigProvider|null $configProvider
-     * @param ModuleListInterface|null $moduleList
-     * @param ComponentRegistrarInterface|null $componentRegistrar
-     * @param ResolverInterface|null $localeResolver
+     * @param CompositeConfigProvider $configProvider
+     * @param ResolverInterface $localeResolver
+     * @param TaxHelper $taxHelper
+     * @param SerializerInterface $serializer
+     * @param BlockFactory $blockFactory
+     * @param CheckoutLayoutCollector $layoutCollector
      * @param array $data
      */
     public function __construct(
@@ -147,17 +118,13 @@ class Checkout extends Template
         ProductConfiguration $productConfiguration,
         ViewModelRegistry $viewModelRegistry,
         Helper $helper,
-        ?CompositeConfigProvider $configProvider = null,
-        ?ModuleListInterface $moduleList = null,
-        ?ComponentRegistrarInterface $componentRegistrar = null,
-        ?ResolverInterface $localeResolver = null,
-        array $data = [],
-        ?TaxHelper $taxHelper = null,
-        ?PaymentMethodManagementInterface $paymentMethodManagement = null,
-        ?PaymentHelper $paymentHelper = null,
-        ?SerializerInterface $serializer = null,
-        ?BlockFactory $blockFactory = null,
-        ?CheckoutLayoutCollector $layoutCollector = null
+        CompositeConfigProvider $configProvider,
+        ResolverInterface $localeResolver,
+        TaxHelper $taxHelper,
+        SerializerInterface $serializer,
+        BlockFactory $blockFactory,
+        CheckoutLayoutCollector $layoutCollector,
+        array $data = []
     ) {
         $this->checkoutSession = $checkoutSession;
         $this->pricingHelper = $pricingHelper;
@@ -166,12 +133,8 @@ class Checkout extends Template
         $this->viewModelRegistry = $viewModelRegistry;
         $this->helper = $helper;
         $this->configProvider = $configProvider;
-        $this->moduleList = $moduleList;
-        $this->componentRegistrar = $componentRegistrar;
         $this->localeResolver = $localeResolver;
         $this->taxHelper = $taxHelper;
-        $this->paymentMethodManagement = $paymentMethodManagement;
-        $this->paymentHelper = $paymentHelper;
         $this->serializer = $serializer;
         $this->blockFactory = $blockFactory;
         $this->layoutCollector = $layoutCollector;
@@ -185,156 +148,6 @@ class Checkout extends Template
     public function isShowComment(): bool
     {
         return $this->helper->isShowComment();
-    }
-
-    /**
-     * @return bool
-     */
-    public function isShowDiscount(): bool
-    {
-        return $this->helper->isShowDiscount();
-    }
-
-    /**
-     * @return bool
-     */
-    public function isShowSubscribe(): bool
-    {
-        return $this->helper->isShowSubscribe();
-    }
-
-    /**
-     * Available payment methods for the current quote.
-     *
-     * @return array
-     */
-    public function getAvailablePaymentMethods(): array
-    {
-        if ($this->paymentMethodsCache !== null) {
-            return $this->paymentMethodsCache;
-        }
-
-        $this->paymentMethodsCache = [];
-        $quote = $this->getQuote();
-        if (!$quote || !$quote->getId()) {
-            return $this->paymentMethodsCache;
-        }
-
-        $configuredMethods = $this->getCheckoutConfig()['paymentMethods'] ?? null;
-        $configuredMethods = is_array($configuredMethods) ? $configuredMethods : null;
-
-        $paymentMethodManagement = $this->paymentMethodManagement
-            ?: $this->resolveObject(\Magento\Quote\Api\PaymentMethodManagementInterface::class);
-        $paymentHelper = $this->paymentHelper
-            ?: $this->resolveObject(\Magento\Payment\Helper\Data::class);
-
-        // Reuse CompositeConfigProvider results when checkout config was already
-        // resolved for the page. An empty configured list is meaningful here:
-        // it normally means no shipping method is selected yet, so go directly
-        // to the active-store fallback instead of repeating the quote API call.
-        if ($configuredMethods !== null) {
-            $this->paymentMethodsCache = array_values($configuredMethods);
-        } elseif ($paymentMethodManagement) {
-            try {
-                $methods = $paymentMethodManagement->getList($quote->getId());
-                $this->paymentMethodsCache = is_array($methods) ? array_values($methods) : [];
-            } catch (\Throwable $exception) {
-                $this->paymentMethodsCache = [];
-            }
-        }
-
-        // Fallback: active store payment methods so the DOM has option rows
-        //    before shipping is selected; JS remap shows the mapped ones after pick.
-        if ($this->paymentMethodsCache === [] && $paymentHelper) {
-            try {
-                $storeMethods = $paymentHelper->getStoreMethods(null, $quote);
-                if (is_array($storeMethods)) {
-                    $this->paymentMethodsCache = array_values(array_filter(
-                        $storeMethods,
-                        static function ($method) {
-                            return $method instanceof MethodInterface
-                                && (string)$method->getCode() !== '';
-                        }
-                    ));
-                }
-            } catch (\Throwable $exception) {
-                // keep empty
-            }
-        }
-
-        // Normalize to objects with getCode()/getTitle() for the template.
-        $this->paymentMethodsCache = array_map(function ($method) {
-            if ($method instanceof MethodInterface) {
-                return new class ($method) {
-                    private $method;
-                    public function __construct(MethodInterface $method)
-                    {
-                        $this->method = $method;
-                    }
-                    public function getCode(): string
-                    {
-                        return (string)$this->method->getCode();
-                    }
-                    public function getTitle(): string
-                    {
-                        return (string)$this->method->getTitle();
-                    }
-                };
-            }
-            return $method;
-        }, $this->paymentMethodsCache);
-
-        return $this->paymentMethodsCache;
-    }
-
-    /**
-     * Payment codes allowed for the currently selected shipping method (mapping).
-     *
-     * @return string[]
-     */
-    public function getAllowedPaymentMethodCodes(): array
-    {
-        $quote = $this->getQuote();
-        $shippingMethod = '';
-        if ($quote && $quote->getShippingAddress()) {
-            $shippingMethod = (string)$quote->getShippingAddress()->getShippingMethod();
-        }
-
-        if (!$this->helper->hasShippingPaymentMapping()) {
-            return [];
-        }
-
-        // No shipping picked yet → no mapped payments (JS shows "select shipping first").
-        if ($shippingMethod === '') {
-            return [];
-        }
-
-        return $this->helper->getMappedPaymentMethodsForShipping($shippingMethod);
-    }
-
-    public function isPaymentMethodAvailable(string $paymentMethodCode, ?array $allowedCodes = null): bool
-    {
-        if (!$this->helper->hasShippingPaymentMapping()) {
-            // No mapping configured → all payment methods allowed.
-            return true;
-        }
-
-        $allowedCodes = $allowedCodes !== null ? $allowedCodes : $this->getAllowedPaymentMethodCodes();
-        if (empty($allowedCodes)) {
-            // Mapping exists but no shipping selected (or no rules match) → hide until pick.
-            return false;
-        }
-
-        return $this->helper->isPaymentMethodCodeAllowedByRules($paymentMethodCode, $allowedCodes);
-    }
-
-    public function isPaymentMethodSelected(string $paymentMethodCode): bool
-    {
-        $quote = $this->getQuote();
-        $payment = $quote ? $quote->getPayment() : null;
-        $selected = $payment ? (string)$payment->getMethod() : '';
-
-        return $selected !== '' && $selected === $paymentMethodCode;
     }
 
     /**
@@ -496,17 +309,6 @@ class Checkout extends Template
         return (string)$quote->getShippingAddress()->getShippingMethod();
     }
 
-    public function getCouponCode(): string
-    {
-        $quote = $this->getQuote();
-        return $quote ? (string)$quote->getCouponCode() : '';
-    }
-
-    public function getHelper(): Helper
-    {
-        return $this->helper;
-    }
-
     /**
      * JSON for an inline <script> block.
      *
@@ -523,22 +325,6 @@ class Checkout extends Template
         $json = json_encode($data, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
 
         return $json === false ? 'null' : $json;
-    }
-
-    /**
-     * Resolve a dependency when compiled DI omitted an optional constructor arg.
-     *
-     * @template T
-     * @param class-string<T> $type
-     * @return T|null
-     */
-    private function resolveObject(string $type)
-    {
-        try {
-            return \Magento\Framework\App\ObjectManager::getInstance()->get($type);
-        } catch (\Throwable $exception) {
-            return null;
-        }
     }
 
     /**
@@ -577,7 +363,7 @@ class Checkout extends Template
             return self::$checkoutConfigCache[$cacheKey];
         }
 
-        if (!$quote || !$quote->getId() || !$quote->hasItems() || $this->configProvider === null) {
+        if (!$quote || !$quote->getId() || !$quote->hasItems()) {
             return self::$checkoutConfigCache[$cacheKey] = [];
         }
 
@@ -593,469 +379,7 @@ class Checkout extends Template
      */
     public function getLocaleCode()
     {
-        return $this->localeResolver ? (string)$this->localeResolver->getLocale() : 'en_US';
-    }
-
-    /**
-     * Return payment renderer registration components declared by active modules
-     * for the standard Magento checkout handle.
-     *
-     * @return string[]
-     */
-    public function getPaymentRendererComponents()
-    {
-        $components = [];
-        foreach ($this->getPaymentRendererChildren() as $code => $renderer) {
-            if (!is_array($renderer) || !$this->isPaymentRendererEnabled((string)$code, $renderer)) {
-                continue;
-            }
-
-            $component = $renderer['component'] ?? null;
-            if (is_string($component) && $component !== '') {
-                $components[] = $component;
-            }
-        }
-
-        return array_values(array_unique($components));
-    }
-
-    /**
-     * Return payment renderer components indexed by payment method code.
-     *
-     * @return array[]
-     */
-    public function getPaymentRendererComponentMap()
-    {
-        $map = [];
-        foreach ($this->getPaymentRendererChildren() as $code => $renderer) {
-            if (!is_array($renderer) || !$this->isPaymentRendererEnabled((string)$code, $renderer)) {
-                continue;
-            }
-
-            $component = $renderer['component'] ?? null;
-            if (!is_string($component) || $component === '' || $component === 'uiComponent') {
-                continue;
-            }
-
-            $map[$code . '::' . $component] = [
-                'method' => (string)$code,
-                'component' => $component
-            ];
-            foreach (array_keys(is_array($renderer['methods'] ?? null) ? $renderer['methods'] : []) as $method) {
-                if ($this->_scopeConfig->getValue('payment/' . $method . '/active') === '0') {
-                    continue;
-                }
-                $map[$method . '::' . $component] = [
-                    'method' => (string)$method,
-                    'component' => $component
-                ];
-            }
-        }
-
-        return array_values($map);
-    }
-
-    /**
-     * Return shipping rates validation components declared by active modules
-     * for the standard Magento checkout handle.
-     *
-     * @return string[]
-     */
-    public function getShippingRatesValidationComponents()
-    {
-        $children = $this->getCheckoutStepsChildren()['shipping-step']['children']['step-config']['children']
-            ['shipping-rates-validation']['children'] ?? [];
-
-        return $this->getChildComponents($children);
-    }
-
-    /**
-     * Return payment validator registration components declared by active modules
-     * for the standard Magento checkout handle.
-     *
-     * @return string[]
-     */
-    public function getPaymentValidationComponents()
-    {
-        $children = $this->getPaymentComponent()['children']['additional-payment-validators']['children'] ?? [];
-
-        return $this->getChildComponents($children, true);
-    }
-
-    /**
-     * Return child UI components declared under the standard Magento payment list.
-     *
-     * @return array
-     */
-    public function getPaymentListChildren()
-    {
-        $children = $this->getPaymentComponent()['children']['payments-list']['children'] ?? [];
-
-        return is_array($children) ? $children : [];
-    }
-
-    /**
-     * Return direct children declared under the standard Magento payment component
-     * for regions used outside the payment renderer list.
-     *
-     * Discount (coupon form) is extracted separately via getPaymentDiscountComponent()
-     * and mounted in the Fastcheckout summary column — strip it here so it is not
-     * left only in the hidden payment root.
-     *
-     * @return array
-     */
-    public function getPaymentRegionChildren()
-    {
-        $result = [];
-        $children = $this->getPaymentComponent()['children'] ?? [];
-        foreach (['place-order-captcha', 'beforeMethods', 'afterMethods'] as $name) {
-            if (isset($children[$name]) && is_array($children[$name])) {
-                $result[$name] = $children[$name];
-            }
-        }
-
-        if (
-            isset($result['afterMethods']['children']['discount']) &&
-            is_array($result['afterMethods']['children']['discount'])
-        ) {
-            // Deep-copy before mutating so the processed layout cache stays intact.
-            $result['afterMethods'] = $this->deepCopyArray($result['afterMethods']);
-            unset($result['afterMethods']['children']['discount']);
-        }
-
-        return $result;
-    }
-
-    /**
-     * Magento_SalesRule payment discount (coupon) component from native jsLayout.
-     * Mounted in the Fastcheckout summary column with FC styling.
-     *
-     * @return array
-     */
-    public function getPaymentDiscountComponent(): array
-    {
-        $discount = $this->getPaymentComponent()
-            ['children']['afterMethods']['children']['discount'] ?? [];
-
-        return is_array($discount) ? $discount : [];
-    }
-
-    /**
-     * @param array $value
-     * @return array
-     */
-    private function deepCopyArray(array $value): array
-    {
-        return json_decode(json_encode($value), true) ?: [];
-    }
-
-    /**
-     * Return child UI components used by the standard Magento shipping method view.
-     *
-     * @return array
-     */
-    public function getShippingListChildren()
-    {
-        $result = [];
-        $children = $this->getShippingAddressChildren();
-        foreach (['before-shipping-method-form', 'shippingAdditional'] as $name) {
-            if (isset($children[$name]) && is_array($children[$name])) {
-                $result[$name] = $children[$name];
-            }
-        }
-
-        return $result;
-    }
-
-    /**
-     * Return non-fieldset child UI components used by the standard Magento shipping address view.
-     *
-     * @return array
-     */
-    public function getShippingAddressChildren()
-    {
-        $children = $this->getShippingAddressComponent()['children'] ?? [];
-
-        return is_array($children) ? $this->normalizeShippingAddressChildren($children) : [];
-    }
-
-    /**
-     * Keep the customer-email region limited to the address form. Payment
-     * modules place express checkout groups in the same region on the native
-     * one-page checkout, but Fastcheckout renders payment methods separately.
-     * Also restore Magento's email template when a payment module replaces it.
-     *
-     * @param array $children
-     * @return array
-     */
-    private function normalizeShippingAddressChildren(array $children): array
-    {
-        foreach ($children as $name => $child) {
-            if (
-                $name !== 'customer-email' &&
-                is_array($child) &&
-                ($child['displayArea'] ?? null) === 'customer-email'
-            ) {
-                unset($children[$name]);
-            }
-        }
-
-        if (isset($children['customer-email']) && is_array($children['customer-email'])) {
-            $children['customer-email']['template'] = 'Magento_Checkout/form/element/email';
-        }
-
-        $fastlane = $this->getCheckoutConfig()['payment']['payment_services_paypal_fastlane'] ?? [];
-        if (empty($fastlane['isVisible'])) {
-            $children = $this->removeComponentsByPrefix(
-                $children,
-                'Magento_PaymentServicesPaypal/js/view/form/element/'
-            );
-        }
-
-        return $this->translateShippingAddressConfig($children);
-    }
-
-    /**
-     * Resolve address labels on the server as well as through Magento's KO
-     * translate binding. This avoids an English-label flash when the JS
-     * translation dictionary is still loading on the custom checkout route.
-     *
-     * @param array $config
-     * @return array
-     */
-    private function translateShippingAddressConfig(array $config): array
-    {
-        foreach ($config as $key => $value) {
-            if (is_array($value)) {
-                $config[$key] = $this->translateShippingAddressConfig($value);
-                continue;
-            }
-
-            if (
-                is_string($value) &&
-                in_array((string)$key, ['label', 'caption', 'notice', 'placeholder'], true)
-            ) {
-                $config[$key] = (string)__($value);
-            }
-        }
-
-        return $config;
-    }
-
-    /**
-     * Return the native Magento shipping component configuration with a
-     * Fastcheckout template that renders only address regions (not methods).
-     *
-     * @return array
-     */
-    public function getShippingAddressComponentConfig()
-    {
-        $component = $this->getShippingAddressComponent();
-
-        $component['component'] = $component['component'] ?? 'Magento_Checkout/js/view/shipping';
-        $component['provider'] = $component['provider'] ?? 'checkoutProvider';
-        $component['children'] = $this->getShippingAddressChildren();
-        $component['config'] = isset($component['config']) && is_array($component['config'])
-            ? $component['config']
-            : [];
-        // The provider and step-config are initialized in the same reduced app
-        // tree. Keeping the core async deps here can deadlock the parent while
-        // its children are already registered by the UI layout renderer.
-        unset($component['config']['deps']);
-        $component['config']['template'] = 'Kkkonrad_Fastcheckout/hyva/shipping-address';
-        $component['config']['popUpForm']['options']['appendTo'] =
-            '#fastcheckout-checkout .fastcheckout-native-shipping-address';
-        $component['config']['popUpForm']['options']['buttons']['save']['text'] =
-            (string) __('Deliver to this address');
-
-        return $component;
-    }
-
-    /**
-     * @return array
-     */
-    public function getCheckoutProviderConfig()
-    {
-        $provider = $this->getProcessedCheckoutLayout()['components']['checkoutProvider'] ?? [];
-
-        return is_array($provider) ? $provider : [];
-    }
-
-    /**
-     * Return additional direct children declared under the standard Magento checkout steps component.
-     *
-     * The shipping-step and billing-step are handled by dedicated Fastcheckout bridges because their
-     * core regions are mapped into the custom Hyvä/KO UI. Other step children, such as MSI
-     * Store Pickup, are kept as native KO components so their registry entries and side effects stay
-     * compatible with standard checkout modules.
-     *
-     * @return array
-     */
-    public function getCheckoutStepChildren()
-    {
-        $children = $this->getCheckoutStepsChildren();
-        unset($children['shipping-step'], $children['billing-step']);
-
-        return $children;
-    }
-
-    /**
-     * Native Magento checkout sidebar summary (cart items + totals) from processed
-     * jsLayout, including Magento_Tax component overrides. Used by Fastcheckout to
-     * mount stock KO summary instead of a PHP-only totals renderer.
-     *
-     * @return array
-     */
-    public function getCheckoutSidebarSummary(): array
-    {
-        $summary = $this->getProcessedCheckoutLayout()
-            ['components']['checkout']['children']['sidebar']['children']['summary'] ?? [];
-
-        return is_array($summary) ? $summary : [];
-    }
-
-    /**
-     * Return custom layout assets declared in the standard Magento checkout layout (checkout_index_index.xml)
-     * of active modules.
-     *
-     * @return array
-     */
-    public function getCheckoutLayoutAssets()
-    {
-        return $this->getRawCheckoutLayoutData()['assets'];
-    }
-
-    /**
-     * @return array
-     */
-    public function getCheckoutLayoutScripts()
-    {
-        $assets = $this->getCheckoutLayoutAssets();
-        $requireModules = [];
-        $externalScripts = [];
-
-        foreach ($assets['scripts'] as $scriptSrc) {
-            if (strpos($scriptSrc, 'http://') === 0 || strpos($scriptSrc, 'https://') === 0 || strpos($scriptSrc, '//') === 0) {
-                $externalScripts[] = $scriptSrc;
-            } else {
-                $clean = $scriptSrc;
-                if (substr($clean, -3) === '.js') {
-                    $clean = substr($clean, 0, -3);
-                }
-                $clean = str_replace('::', '/', $clean);
-                $requireModules[] = $clean;
-            }
-        }
-
-        return [
-            'modules' => $requireModules,
-            'external' => $externalScripts
-        ];
-    }
-
-    private function getCheckoutStepsChildren(): array
-    {
-        $children = $this->getProcessedCheckoutLayout()['components']['checkout']['children']['steps']['children']
-            ?? [];
-
-        return is_array($children) ? $children : [];
-    }
-
-    private function getShippingAddressComponent(): array
-    {
-        $component = $this->getCheckoutStepsChildren()['shipping-step']['children']['shippingAddress'] ?? [];
-
-        return is_array($component) ? $component : [];
-    }
-
-    private function getPaymentComponent(): array
-    {
-        $component = $this->getCheckoutStepsChildren()['billing-step']['children']['payment'] ?? [];
-
-        return is_array($component) ? $component : [];
-    }
-
-    private function getPaymentRendererChildren(): array
-    {
-        $children = $this->getPaymentComponent()['children']['renders']['children'] ?? [];
-
-        return is_array($children) ? $children : [];
-    }
-
-    private function isPaymentRendererEnabled(string $code, array $renderer): bool
-    {
-        if ($this->_scopeConfig->getValue('payment/' . $code . '/active') === '0') {
-            return false;
-        }
-
-        $methods = is_array($renderer['methods'] ?? null) ? $renderer['methods'] : [];
-        if ($methods === []) {
-            return true;
-        }
-
-        foreach (array_keys($methods) as $method) {
-            if ($this->_scopeConfig->getValue('payment/' . $method . '/active') !== '0') {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private function getChildComponents($children, bool $skipUiComponent = false): array
-    {
-        if (!is_array($children)) {
-            return [];
-        }
-
-        $components = [];
-        foreach ($children as $child) {
-            $component = is_array($child) ? ($child['component'] ?? null) : null;
-            if (
-                is_string($component) &&
-                $component !== '' &&
-                (!$skipUiComponent || $component !== 'uiComponent')
-            ) {
-                $components[] = $component;
-            }
-        }
-
-        return array_values(array_unique($components));
-    }
-
-    /**
-     * Collect native checkout jsLayout + head assets.
-     *
-     * Primary: Magento layout merge for handle checkout_index_index (modules + theme).
-     * Fallback: module/theme filesystem XML scan (unit tests and merge failures).
-     *
-     * LayoutProcessors still run in getProcessedCheckoutLayout() via Onepage.
-     */
-    private function getRawCheckoutLayoutData(): array
-    {
-        if ($this->rawCheckoutLayoutData !== null) {
-            return $this->rawCheckoutLayoutData;
-        }
-
-        $collector = $this->getLayoutCollector();
-        $collected = $collector->collect();
-        $this->rawCheckoutLayoutData = [
-            'jsLayout' => is_array($collected['jsLayout'] ?? null) ? $collected['jsLayout'] : [],
-            'assets' => is_array($collected['assets'] ?? null)
-                ? $collected['assets']
-                : ['css' => [], 'scripts' => []],
-            'source' => (string)($collected['source'] ?? 'unknown')
-        ];
-
-        return $this->rawCheckoutLayoutData;
-    }
-
-    /**
-     * Which collector path produced the raw layout (for diagnostics / tests).
-     */
-    public function getCheckoutLayoutSource(): string
-    {
-        return (string)($this->getRawCheckoutLayoutData()['source'] ?? '');
+        return (string)$this->localeResolver->getLocale();
     }
 
     /**
@@ -1108,37 +432,15 @@ class Checkout extends Template
         return $layout;
     }
 
-    private function getLayoutCollector(): CheckoutLayoutCollector
-    {
-        if ($this->layoutCollector !== null) {
-            return $this->layoutCollector;
-        }
-
-        // Lazy fallback for unit tests / partial DI that still pass moduleList.
-        $this->layoutCollector = new CheckoutLayoutCollector(
-            null,
-            $this->moduleList,
-            $this->componentRegistrar,
-            $this->serializer,
-            $this->_cache,
-            $this->_storeManager,
-            $this->_design,
-            $this->_logger,
-            $this->getLocaleCode()
-        );
-
-        return $this->layoutCollector;
-    }
-
     private function getProcessedCheckoutLayout(): array
     {
         if ($this->processedCheckoutLayout !== null) {
             return $this->processedCheckoutLayout;
         }
 
-        $layout = $this->getRawCheckoutLayoutData()['jsLayout'];
+        $layout = $this->layoutCollector->collect();
 
-        if ($layout !== [] && $this->blockFactory !== null && $this->serializer !== null) {
+        if ($layout !== []) {
             try {
                 $onepage = $this->blockFactory->createBlock(Onepage::class, ['data' => ['jsLayout' => $layout]]);
                 $processed = $this->serializer->unserialize($onepage->getJsLayout());
@@ -1155,22 +457,6 @@ class Checkout extends Template
         $this->processedCheckoutLayout = $layout;
 
         return $this->processedCheckoutLayout;
-    }
-
-    private function removeComponentsByPrefix(array $nodes, string $prefix): array
-    {
-        foreach ($nodes as $name => $node) {
-            if (!is_array($node)) {
-                continue;
-            }
-            if (strpos((string)($node['component'] ?? ''), $prefix) === 0) {
-                unset($nodes[$name]);
-                continue;
-            }
-            $nodes[$name] = $this->removeComponentsByPrefix($node, $prefix);
-        }
-
-        return $nodes;
     }
 
     /**
@@ -1566,16 +852,6 @@ class Checkout extends Template
     }
 
     /**
-     * Magento tax/cart/display/price = Excluding Tax
-     */
-    public function displayCartPriceExclTax(): bool
-    {
-        $helper = $this->getTaxHelper();
-
-        return $helper ? (bool)$helper->displayCartPriceExclTax() : true;
-    }
-
-    /**
      * Magento tax/cart/display/price = Including and Excluding Tax
      */
     public function displayCartBothPrices(): bool
@@ -1603,29 +879,6 @@ class Checkout extends Template
         $helper = $this->getTaxHelper();
 
         return $helper ? (bool)$helper->displayShippingBothPrices() : false;
-    }
-
-    /**
-     * @param Item $item
-     * @return float
-     */
-    public function getItemRowTotalExclTax(Item $item): float
-    {
-        return (float)($item->getRowTotal() ?? 0);
-    }
-
-    /**
-     * @param Item $item
-     * @return float
-     */
-    public function getItemRowTotalInclTax(Item $item): float
-    {
-        $incl = $item->getRowTotalInclTax();
-        if ($incl === null || $incl === '') {
-            return $this->getItemRowTotalExclTax($item);
-        }
-
-        return (float)$incl;
     }
 
     /**

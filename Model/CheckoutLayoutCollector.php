@@ -6,14 +6,9 @@ namespace Kkkonrad\Fastcheckout\Model;
 
 use Hyva\ThemeFallback\Model\ThemeSwitch;
 use Magento\Checkout\Block\Onepage;
-use Magento\Framework\Component\ComponentRegistrarInterface;
-use Magento\Framework\App\CacheInterface;
-use Magento\Framework\Module\ModuleListInterface;
-use Magento\Framework\Serialize\SerializerInterface;
 use Magento\Framework\View\DesignInterface;
 use Magento\Framework\View\LayoutFactory;
 use Magento\Framework\View\Page\Layout\ReaderFactory as PageLayoutReaderFactory;
-use Magento\Store\Model\StoreManagerInterface;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -21,28 +16,19 @@ use Psr\Log\LoggerInterface;
  */
 class CheckoutLayoutCollector
 {
-    private ?LayoutFactory $layoutFactory;
-    private ?DesignInterface $design;
-    private ?ThemeSwitch $themeSwitch;
-    private ?LoggerInterface $logger;
-    private ?PageLayoutReaderFactory $pageLayoutReaderFactory;
+    private LayoutFactory $layoutFactory;
+    private DesignInterface $design;
+    private LoggerInterface $logger;
+    private ThemeSwitch $themeSwitch;
+    private PageLayoutReaderFactory $pageLayoutReaderFactory;
     private ?array $collected = null;
 
-    /**
-     * Legacy optional arguments stay in place for constructor compatibility with 7.0.x.
-     */
     public function __construct(
-        ?LayoutFactory $layoutFactory = null,
-        ?ModuleListInterface $moduleList = null,
-        ?ComponentRegistrarInterface $componentRegistrar = null,
-        ?SerializerInterface $serializer = null,
-        ?CacheInterface $cache = null,
-        ?StoreManagerInterface $storeManager = null,
-        ?DesignInterface $design = null,
-        ?LoggerInterface $logger = null,
-        ?string $localeCode = null,
-        ?ThemeSwitch $themeSwitch = null,
-        ?PageLayoutReaderFactory $pageLayoutReaderFactory = null
+        LayoutFactory $layoutFactory,
+        DesignInterface $design,
+        LoggerInterface $logger,
+        ThemeSwitch $themeSwitch,
+        PageLayoutReaderFactory $pageLayoutReaderFactory
     ) {
         $this->layoutFactory = $layoutFactory;
         $this->design = $design;
@@ -52,7 +38,7 @@ class CheckoutLayoutCollector
     }
 
     /**
-     * @return array{jsLayout: array, assets: array{css: array, scripts: array}, source: string}
+     * @return array<string, mixed>
      */
     public function collect(): array
     {
@@ -60,16 +46,7 @@ class CheckoutLayoutCollector
             return $this->collected;
         }
 
-        $result = [
-            'jsLayout' => [],
-            'assets' => ['css' => [], 'scripts' => []],
-            'source' => 'magento-layout'
-        ];
-
-        if ($this->layoutFactory === null || $this->design === null || $this->themeSwitch === null ||
-            $this->pageLayoutReaderFactory === null) {
-            return $this->collected = $result;
-        }
+        $result = [];
 
         $originalTheme = $this->design->getDesignTheme();
 
@@ -93,15 +70,12 @@ class CheckoutLayoutCollector
             $checkoutRoot = $layout->getBlock('checkout.root');
             if ($checkoutRoot instanceof Onepage) {
                 $jsLayout = $checkoutRoot->getData('jsLayout');
-                $result['jsLayout'] = is_array($jsLayout) ? $jsLayout : [];
+                $result = is_array($jsLayout) ? $jsLayout : [];
             }
         } catch (\Throwable $exception) {
-            $result['source'] = 'magento-layout-failed';
-            if ($this->logger !== null) {
-                $this->logger->error('Fastcheckout could not build the native checkout layout.', [
-                    'exception' => $exception
-                ]);
-            }
+            $this->logger->error('Fastcheckout could not build the native checkout layout.', [
+                'exception' => $exception
+            ]);
         } finally {
             $this->design->setDesignTheme($originalTheme);
         }
