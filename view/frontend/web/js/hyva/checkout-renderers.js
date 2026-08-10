@@ -643,7 +643,9 @@ define([
             emailValid = true,
             addressValid = true,
             shippingValid,
-            paymentValid;
+            paymentValid,
+            scroller = document.scrollingElement || document.documentElement,
+            scrollTop = scroller.scrollTop;
 
         setClientOrderError('');
 
@@ -662,12 +664,8 @@ define([
         addressValid = source ? !source.get('params.invalid') : addressValid;
         paymentValid = !shippingValid || validatePaymentMethod();
 
-        if (!emailValid) {
-            email.trigger('focus');
-        } else if (!addressValid && typeof shipping.focusInvalid === 'function') {
-            shipping.focusInvalid();
-        }
         if (!addressValid || !emailValid || !shippingValid || !paymentValid) {
+            scroller.scrollTop = scrollTop;
             window.setTimeout(function () {
                 watchForValidationError(
                     addressValid && emailValid && !shippingValid

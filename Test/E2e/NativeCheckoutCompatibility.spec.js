@@ -781,7 +781,7 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
         };
 
-        const telephone = shippingRoot.locator('input[name="telephone"]');
+        const addressValidationField = shippingRoot.locator('input[name="firstname"]');
         const purchaseOrderNumber = page.locator('input[name="payment[po_number]"]');
         const visibleErrorText = (field) => field.evaluate((input) => {
             const wrapper = input.closest('.field') || input.parentElement;
@@ -799,13 +799,32 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         await purchaseOrderNumber.fill('FC-E2E-' + Date.now());
         await purchaseOrderNumber.blur();
 
-        await telephone.fill('');
+        await addressValidationField.fill('');
+        await proxy.evaluate((button) => button.scrollIntoView({block: 'center'}));
+        await page.waitForTimeout(50);
+        await page.evaluate(() => {
+            window.fastcheckoutE2eAddressScroll = [window.scrollY];
+            const sampler = window.setInterval(() => {
+                window.fastcheckoutE2eAddressScroll.push(window.scrollY);
+            }, 16);
+
+            window.setTimeout(() => {
+                window.clearInterval(sampler);
+                window.fastcheckoutE2eAddressScrollDone = true;
+            }, 650);
+        });
         await clickProxy();
-        await expect.poll(() => visibleErrorText(telephone)).not.toEqual([]);
+        await expect.poll(() => visibleErrorText(addressValidationField)).not.toEqual([]);
+        await expect.poll(() => page.evaluate(() => (
+            window.fastcheckoutE2eAddressScrollDone
+        ))).toBe(true);
+        expect(new Set((await page.evaluate(() => (
+            window.fastcheckoutE2eAddressScroll
+        ))).map(Math.round)).size).toBeGreaterThan(4);
         expect(paymentRequests).toBe(0);
-        await telephone.fill('500600700');
-        await telephone.blur();
-        await expect.poll(() => visibleErrorText(telephone)).toEqual([]);
+        await addressValidationField.fill('Jan');
+        await addressValidationField.blur();
+        await expect.poll(() => visibleErrorText(addressValidationField)).toEqual([]);
         await expect.poll(() => nativeButton.isEnabled()).toBe(true);
 
         await purchaseOrderNumber.fill('');
