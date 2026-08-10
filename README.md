@@ -127,7 +127,7 @@ Włącz je tylko wtedy, gdy sklep niezależnie potwierdza własność adresu e-m
 Proces zamówienia jest dostępny pod standardową ścieżką `/checkout/`. Gdy moduł oraz
 zgodny motyw Hyvä są aktywne, Fastcheckout dodaje własny handle prezentacyjny do
 layoutu natywnego kontrolera Magento. Dotychczasowa ścieżka `/fast-checkout/`
-pozostaje dostępna ze względów zgodności wstecznej.
+pozostaje dostępna jako redirect do `/checkout/` ze względów zgodności wstecznej.
 
 ## Walidacja i składanie zamówienia
 
@@ -162,6 +162,9 @@ Magento.
 - Fastcheckout buduje izolowany layout motywu fallback dla handle
   `checkout_index_index`, dzięki czemu wszystkie layout processory i wpisy
   `jsLayout` z modułów zewnętrznych trafiają do oryginalnego `checkout.root`.
+  Przetworzone drzewo jest pobierane przez `checkout.root::getJsLayout()` bez
+  tworzenia drugiego bloku `Onepage`; trzy zmiany prezentacyjne wykonuje końcowy
+  `LayoutProcessorInterface` Fastcheckout.
   Izolowany layout nie ładuje globalnego handle `default`, więc nie regeneruje
   assetów RequireJS aktywnego motywu podczas renderowania strony.
 - Pełny, scalony `jsLayout` jest uruchamiany dokładnie raz przez
@@ -179,6 +182,9 @@ Magento.
   mają w podsumowaniu zsynchronizowane proxy prezentacyjne; ich oryginalne kontrolki,
   nazwy pól, kontekst KO i walidatory pozostają w aktywnym rendererze płatności.
   Zawartość rendererów zewnętrznych nie jest przenoszona ani klonowana.
+- Strona sukcesu zachowuje core `Magento\Checkout\Block\Onepage\Success`, a
+  komentarz i newsletter są zapisywane przez
+  `OrderStatusHistoryRepositoryInterface` i `SubscriptionManagerInterface`.
 
 Moduł nie zawiera komponentu Magewire, mechanizmu modyfikowania DOM przez Livewire
 ani orkiestratora stanu opartego na Alpine.

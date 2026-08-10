@@ -6,13 +6,10 @@ use Hyva\Theme\Model\ViewModelRegistry;
 use Hyva\Theme\ViewModel\HyvaCsp;
 use Magento\Catalog\Helper\Image as ImageHelper;
 use Magento\Catalog\Helper\Product\Configuration as ProductConfiguration;
-use Magento\Checkout\Block\Onepage;
 use Magento\Checkout\Model\CompositeConfigProvider;
 use Magento\Checkout\Model\Session as CheckoutSession;
-use Magento\Framework\Serialize\SerializerInterface;
 use Magento\Framework\Locale\ResolverInterface;
 use Magento\Framework\Pricing\Helper\Data as PricingHelper;
-use Magento\Framework\View\Element\BlockFactory;
 use Magento\Framework\View\Element\Template;
 use Magento\Framework\View\Element\Template\Context;
 use Magento\Quote\Model\Quote;
@@ -80,15 +77,6 @@ class Checkout extends Template
     /** @var TaxHelper */
     private $taxHelper;
 
-    /** @var SerializerInterface */
-    private $serializer;
-
-    /** @var BlockFactory */
-    private $blockFactory;
-
-    /** @var array|null */
-    private $processedCheckoutLayout;
-
     /** @var array|null */
     private $shippingMethodsCache;
 
@@ -105,8 +93,6 @@ class Checkout extends Template
      * @param CompositeConfigProvider $configProvider
      * @param ResolverInterface $localeResolver
      * @param TaxHelper $taxHelper
-     * @param SerializerInterface $serializer
-     * @param BlockFactory $blockFactory
      * @param CheckoutLayoutCollector $layoutCollector
      * @param array $data
      */
@@ -121,8 +107,6 @@ class Checkout extends Template
         CompositeConfigProvider $configProvider,
         ResolverInterface $localeResolver,
         TaxHelper $taxHelper,
-        SerializerInterface $serializer,
-        BlockFactory $blockFactory,
         CheckoutLayoutCollector $layoutCollector,
         array $data = []
     ) {
@@ -135,8 +119,6 @@ class Checkout extends Template
         $this->configProvider = $configProvider;
         $this->localeResolver = $localeResolver;
         $this->taxHelper = $taxHelper;
-        $this->serializer = $serializer;
-        $this->blockFactory = $blockFactory;
         $this->layoutCollector = $layoutCollector;
 
         parent::__construct($context, $data);
@@ -383,80 +365,11 @@ class Checkout extends Template
     }
 
     /**
-     * Complete, processed Magento checkout tree. Only template names and visual
-     * sort order are changed; component names, children and display areas stay intact.
+     * Complete Magento checkout tree processed on the native checkout.root block.
      */
     public function getCheckoutJsLayout(): array
     {
-        $layout = $this->getProcessedCheckoutLayout();
-        if (!isset($layout['components']['checkout']['children']) ||
-            !is_array($layout['components']['checkout']['children'])) {
-            return $layout;
-        }
-
-        $checkout = &$layout['components']['checkout']['children'];
-        $shipping = &$checkout['steps']['children']['shipping-step']['children']['shippingAddress'];
-
-        if (is_array($shipping)) {
-            $shipping['config'] = is_array($shipping['config'] ?? null) ? $shipping['config'] : [];
-            $shipping['config']['template'] = 'Kkkonrad_Fastcheckout/hyva/shipping-address';
-            $shipping['template'] = 'Kkkonrad_Fastcheckout/hyva/shipping-address';
-            $shipping['config']['popUpForm']['options']['appendTo'] =
-                '#fastcheckout-checkout .fastcheckout-native-shipping-address';
-        }
-
-        $summary = &$checkout['sidebar']['children']['summary'];
-        if (is_array($summary)) {
-            $summary['config'] = is_array($summary['config'] ?? null) ? $summary['config'] : [];
-            $summary['config']['template'] = 'Kkkonrad_Fastcheckout/hyva/summary';
-            $summary['template'] = 'Kkkonrad_Fastcheckout/hyva/summary';
-            if (isset($summary['children']['cart_items'])) {
-                $summary['children']['cart_items']['sortOrder'] = 10;
-            }
-            if (isset($summary['children']['itemsAfter'])) {
-                $summary['children']['itemsAfter']['sortOrder'] = 20;
-            }
-            if (isset($summary['children']['totals'])) {
-                $summary['children']['totals']['sortOrder'] = 30;
-            }
-        }
-
-        $discount = &$checkout['steps']['children']['billing-step']['children']['payment']
-            ['children']['afterMethods']['children']['discount'];
-        if (is_array($discount)) {
-            $discount['config'] = is_array($discount['config'] ?? null) ? $discount['config'] : [];
-            $discount['config']['template'] = 'Kkkonrad_Fastcheckout/hyva/payment/discount';
-            $discount['template'] = 'Kkkonrad_Fastcheckout/hyva/payment/discount';
-        }
-
-        return $layout;
-    }
-
-    private function getProcessedCheckoutLayout(): array
-    {
-        if ($this->processedCheckoutLayout !== null) {
-            return $this->processedCheckoutLayout;
-        }
-
-        $layout = $this->layoutCollector->collect();
-
-        if ($layout !== []) {
-            try {
-                $onepage = $this->blockFactory->createBlock(Onepage::class, ['data' => ['jsLayout' => $layout]]);
-                $processed = $this->serializer->unserialize($onepage->getJsLayout());
-                if (is_array($processed)) {
-                    $layout = $processed;
-                }
-            } catch (\Throwable $exception) {
-                $this->_logger->warning('Fastcheckout could not process the native checkout jsLayout.', [
-                    'exception' => $exception
-                ]);
-            }
-        }
-
-        $this->processedCheckoutLayout = $layout;
-
-        return $this->processedCheckoutLayout;
+        return $this->layoutCollector->collect();
     }
 
     /**

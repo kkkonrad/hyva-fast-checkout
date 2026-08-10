@@ -2,10 +2,11 @@
 /**
  * Fastcheckout order success card.
  *
- * @var $block \Kkkonrad\Fastcheckout\Block\Onepage\Success
+ * @var $block \Magento\Checkout\Block\Onepage\Success
  * @var \Magento\Framework\Escaper $escaper
  */
 $escaper = $escaper ?? $block;
+$customerAuth = $block->getData('customer_auth');
 ?>
 <div class="fastcheckout-success-card max-w-md mx-auto my-12 p-8 bg-white border border-gray-200 shadow-md rounded-lg text-center space-y-6">
     <!-- Success Green Checkmark SVG -->
@@ -87,8 +88,8 @@ $escaper = $escaper ?? $block;
            title="<?= $escaper->escapeHtmlAttr(__('Continue Shopping')) ?>">
             <?= $escaper->escapeHtml(__('Continue Shopping')) ?>
         </a>
-        <?php if ($block->isCustomerLoggedIn()): ?>
-            <a href="<?= $escaper->escapeUrl($block->getCustomerAccountUrl()) ?>"
+        <?php if ($customerAuth && $customerAuth->isLoggedIn()): ?>
+            <a href="<?= $escaper->escapeUrl($block->getUrl('customer/account')) ?>"
                class="btn btn-secondary w-full"
                title="<?= $escaper->escapeHtmlAttr(__('My Account')) ?>">
                 <?= $escaper->escapeHtml(__('My Account')) ?>

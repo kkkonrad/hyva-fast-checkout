@@ -48,8 +48,6 @@ class SuccessTest extends TestCase
         $this->request->expects($this->never())->method('getParam');
 
         $page = $this->createMock(Page::class);
-        $page->expects($this->never())->method('addHandle');
-
         $this->assertSame($page, $this->plugin()->aroundExecute(
             $this->controller(),
             static function () use ($page) {
@@ -90,10 +88,6 @@ class SuccessTest extends TestCase
         $this->checkoutSession->expects($this->never())->method('setErrorMessage');
 
         $page = $this->createMock(Page::class);
-        $page->expects($this->once())
-            ->method('addHandle')
-            ->with('fastcheckout_checkout_onepage_success');
-
         $this->assertSame($page, $this->plugin()->aroundExecute(
             $this->controller(),
             static function () use ($page) {
@@ -102,22 +96,18 @@ class SuccessTest extends TestCase
         ));
     }
 
-    public function testEnabledModuleAppliesItsOwnLayoutHandle(): void
+    public function testEnabledModuleKeepsTheNativeSuccessResult(): void
     {
         $this->helper->method('isEnable')->willReturn(true);
         $this->request->method('getParam')->with('error')->willReturn(null);
 
         $page = $this->createMock(Page::class);
-        $page->expects($this->once())
-            ->method('addHandle')
-            ->with('fastcheckout_checkout_onepage_success');
-
-        $this->plugin()->aroundExecute(
+        $this->assertSame($page, $this->plugin()->aroundExecute(
             $this->controller(),
             static function () use ($page) {
                 return $page;
             }
-        );
+        ));
     }
 
     private function plugin(): Success

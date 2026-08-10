@@ -9,16 +9,9 @@ use Magento\Checkout\Controller\Onepage\Success as SuccessController;
 use Magento\Framework\App\RequestInterface;
 use Magento\Framework\Controller\Result\RedirectFactory;
 use Magento\Checkout\Model\Session as CheckoutSession;
-use Magento\Framework\View\Result\Page;
 
 class Success
 {
-    /**
-     * Fastcheckout success-page overrides live in a custom handle, not in
-     * checkout_onepage_success, so a disabled module leaves the native page intact.
-     */
-    private const LAYOUT_HANDLE = 'fastcheckout_checkout_onepage_success';
-
     /**
      * @var RequestInterface
      */
@@ -58,8 +51,8 @@ class Success
     }
 
     /**
-     * Redirect to failure page when a gateway returned an error code, and apply the
-     * Fastcheckout success layout handle.
+     * Redirect to failure when a gateway returned an error code; otherwise keep
+     * Magento's native success result.
      *
      * @param SuccessController $subject
      * @param callable $proceed
@@ -84,11 +77,6 @@ class Success
             return $redirect->setPath('checkout/onepage/failure');
         }
 
-        $result = $proceed();
-        if ($result instanceof Page) {
-            $result->addHandle(self::LAYOUT_HANDLE);
-        }
-
-        return $result;
+        return $proceed();
     }
 }
