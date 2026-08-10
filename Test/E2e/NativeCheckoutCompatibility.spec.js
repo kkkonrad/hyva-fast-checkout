@@ -295,7 +295,11 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
                 await expect(activePayu.locator('.payu-secure-form-iframe')).toHaveCount(3, {
                     timeout: 30_000
                 });
-                await expect(activePayu.locator('[data-fastcheckout-newsletter]')).toBeVisible();
+                await expect(activePayu.locator('[data-fastcheckout-newsletter]')).toHaveCount(1);
+                await expect(page.locator(
+                    '[data-fastcheckout-agreements-summary-host] ' +
+                    '[data-fastcheckout-newsletter-proxy]'
+                )).toBeVisible();
                 await expect(activePayu.locator('.action.checkout')).toBeHidden();
             }
         }
@@ -376,34 +380,119 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             '.fastcheckout-ko-payment-root .payment-method._active'
         );
         await expect(activePayment).toHaveCount(1);
-        const agreements = activePayment.locator('.checkout-agreements-block');
-        await expect(agreements).toHaveCount(1);
+        const nativeAgreements = activePayment.locator('.checkout-agreements-block');
+        await expect(nativeAgreements).toHaveCount(1);
         await expect(activePayment.locator('[data-fastcheckout-newsletter]')).toContainText(
             'Zapisz się do naszego newslettera'
         );
-        await expect.poll(() => agreements.evaluate((block) => (
+        await expect.poll(() => nativeAgreements.evaluate((block) => (
             block.closest('.payment-method._active') !== null &&
             block.querySelector('[data-fastcheckout-newsletter]')
                 ?.nextElementSibling?.matches('[data-role="checkout-agreements"]')
         ))).toBe(true);
+        const agreementsPortal = page.locator(
+            '[data-fastcheckout-agreements-summary-host]'
+        );
+        await expect(agreementsPortal).toBeVisible();
+        await expect(agreementsPortal.locator(
+            '[data-fastcheckout-newsletter-proxy]'
+        )).toContainText('Zapisz się do naszego newslettera');
+        expect(await nativeAgreements.locator(
+            '[data-fastcheckout-newsletter], [data-role="checkout-agreements"]'
+        ).evaluateAll((parts) => parts.every((part) => (
+            part.classList.contains('fastcheckout-agreements-native-source')
+        )))).toBe(true);
+
+        const nativeAgreementInputs = nativeAgreements.locator(
+            'input[type="checkbox"][name^="agreement["]'
+            ),
+            proxyAgreementInputs = agreementsPortal.locator(
+                '.checkout-agreement input[type="checkbox"]'
+            );
+        await expect(proxyAgreementInputs).toHaveCount(await nativeAgreementInputs.count());
+        if (await proxyAgreementInputs.count()) {
+            for (let index = 0; index < await proxyAgreementInputs.count(); index += 1) {
+                const nativeAgreement = nativeAgreementInputs.nth(index),
+                    proxyAgreement = proxyAgreementInputs.nth(index);
+
+                await expect(proxyAgreement).toBeVisible();
+                await expect(proxyAgreement).not.toHaveAttribute('name', /.+/);
+                await expect(proxyAgreement).not.toHaveAttribute('data-bind', /.+/);
+                await expect(nativeAgreement).toHaveAttribute('name', /^agreement\[/);
+                if (await proxyAgreement.getAttribute(
+                    'data-fastcheckout-automatic-agreement'
+                )) {
+                    await expect(proxyAgreement).toBeDisabled();
+                    await expect(proxyAgreement).toBeChecked();
+                    await expect(nativeAgreement).toBeChecked();
+                } else {
+                    await expect(proxyAgreement).toBeEnabled();
+                    await proxyAgreement.check();
+                    await expect(proxyAgreement).toBeChecked();
+                    await expect(nativeAgreement).toBeChecked();
+                }
+            }
+
+            await dismissConsent(page);
+            const agreementAction = agreementsPortal.locator('button.action-show').first();
+            await agreementAction.evaluate((button) => {
+                button.scrollIntoView({block: 'center'});
+            });
+            await page.waitForTimeout(50);
+            const agreementActionBox = await agreementAction.boundingBox();
+
+            expect(agreementActionBox).not.toBeNull();
+            expect(agreementActionBox.y).toBeGreaterThanOrEqual(0);
+            expect(agreementActionBox.y + agreementActionBox.height)
+                .toBeLessThanOrEqual(page.viewportSize().height);
+            await page.mouse.click(
+                agreementActionBox.x + agreementActionBox.width / 2,
+                agreementActionBox.y + agreementActionBox.height / 2
+            );
+            const shownAgreementModal = page.locator('.agreements-modal._show').last();
+            await expect(shownAgreementModal).toBeVisible();
+            await expect(page.locator('.agreements-modal._show')).toHaveCount(1);
+            const closeAgreementModal = shownAgreementModal.locator(
+                '[data-role="closeBtn"], .action-close'
+            ).first();
+            await expect(closeAgreementModal).toHaveCount(1);
+            expect(await closeAgreementModal.evaluate((button) => (
+                getComputedStyle(button, '::before').content
+            ))).not.toBe('none');
+            await closeAgreementModal.evaluate((button) => button.click());
+            await expect(page.locator('.agreements-modal:visible')).toHaveCount(0);
+            await expect(page.locator('.modals-overlay')).toHaveCount(0);
+            await expect(page.locator('body')).not.toHaveClass(/_has-modal/);
+        }
         expect(await page.locator('[data-fastcheckout-place-order-ssr]').evaluate((button) => {
             const paymentCard = button.closest('[data-fastcheckout-payment-methods-card]');
-            const agreementBlock = paymentCard && paymentCard.querySelector(
-                '.payment-method._active .checkout-agreements-block'
-            );
+            const agreementBlock = document.querySelector(
+                    '.payment-method._active .checkout-agreements-block'
+                ),
+                agreementHost = document.querySelector(
+                    '[data-fastcheckout-agreements-summary-host]'
+                ),
+                comment = document.querySelector('[data-fastcheckout-order-comment]');
 
             return {
                 inPaymentCard: Boolean(paymentCard),
                 inTotalsCard: Boolean(button.closest('[data-fastcheckout-totals-card]')),
-                afterAgreements: Boolean(agreementBlock && (
-                    agreementBlock.compareDocumentPosition(button) &
+                nativeOwnedByPayment: Boolean(agreementBlock),
+                agreementsBeforeComment: Boolean(agreementHost && (!comment || (
+                    agreementHost.compareDocumentPosition(comment) &
+                    Node.DOCUMENT_POSITION_FOLLOWING
+                ))),
+                agreementsBeforeButton: Boolean(agreementHost && (
+                    agreementHost.compareDocumentPosition(button) &
                     Node.DOCUMENT_POSITION_FOLLOWING
                 ))
             };
         })).toEqual({
-            inPaymentCard: true,
-            inTotalsCard: false,
-            afterAgreements: true
+            inPaymentCard: false,
+            inTotalsCard: true,
+            nativeOwnedByPayment: true,
+            agreementsBeforeComment: true,
+            agreementsBeforeButton: true
         });
         await expect(page.locator('[data-fastcheckout-agreements-host]')).toHaveCount(0);
 
@@ -518,12 +607,48 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             'input[name="billing-address-same-as-shipping"]'
         );
         await expect(sameAsShipping).toBeChecked();
-        await sameAsShipping.uncheck({force: true});
-        const billingAddress = page.locator(
-            '.payment-method._active .checkout-billing-address'
-        );
-        const billingFieldset = billingAddress.locator('[data-form="billing-new-address"]');
+        await page.evaluate(() => {
+            const quote = window.require('Magento_Checkout/js/model/quote'),
+                marker = document.createElement('i');
+
+            quote.billingAddress(null);
+            document.getElementById('fastcheckout-checkout').appendChild(marker);
+            marker.remove();
+        });
+        await expect(sameAsShipping).toBeChecked();
+        await expect.poll(() => page.evaluate(() => {
+            const quote = window.require('Magento_Checkout/js/model/quote'),
+                billing = quote.billingAddress(),
+                shipping = quote.shippingAddress();
+
+            return Boolean(billing && shipping &&
+                billing.getCacheKey() === shipping.getCacheKey());
+        })).toBe(true);
+        await sameAsShipping.evaluate((input) => input.click());
+        await expect(sameAsShipping).not.toBeChecked();
+        const billingFieldset = page.locator(
+            '.payment-method._active .checkout-billing-address ' +
+            '[data-form="billing-new-address"]:visible, ' +
+            '.fastcheckout-payment-after-methods .checkout-billing-address ' +
+            '[data-form="billing-new-address"]:visible'
+        ).first();
         await expect(billingFieldset).toBeVisible();
+        expect(await billingFieldset.evaluate((fieldset) => {
+            const billing = fieldset.closest('.checkout-billing-address'),
+                card = document.querySelector('.fc-container-1 > .card');
+
+            if (billing.closest('.payment-method')) {
+                return true;
+            }
+
+            const billingStyle = getComputedStyle(billing),
+                cardStyle = getComputedStyle(card);
+
+            return [
+                'backgroundColor', 'borderTopColor', 'borderTopWidth',
+                'borderRadius', 'paddingTop', 'paddingRight'
+            ].every((property) => billingStyle[property] === cardStyle[property]);
+        })).toBe(true);
         const billingLayout = await billingFieldset.evaluate((fieldset) => {
             const box = fieldset.getBoundingClientRect();
             const style = getComputedStyle(fieldset);
@@ -534,8 +659,9 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
 
             return {
                 display: style.display,
-                insidePaymentCard: Boolean(fieldset.closest(
-                    '[data-fastcheckout-payment-methods-card]'
+                insidePaymentHost: Boolean(fieldset.closest(
+                    '[data-fastcheckout-payment-methods-card], ' +
+                    '.fastcheckout-payment-after-methods'
                 )),
                 noHorizontalOverflow: fieldset.scrollWidth <= Math.ceil(box.width),
                 firstRowHasTwoFields: Boolean(firstName && lastName &&
@@ -547,18 +673,20 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         });
         expect(billingLayout).toEqual({
             display: 'grid',
-            insidePaymentCard: true,
+            insidePaymentHost: true,
             noHorizontalOverflow: true,
             firstRowHasTwoFields: true,
             inputWidth: expect.any(Number)
         });
         expect(billingLayout.inputWidth).toBeGreaterThan(150);
-        await sameAsShipping.check({force: true});
+        await sameAsShipping.evaluate((input) => input.click());
+        await expect(sameAsShipping).toBeChecked();
 
         const proxy = page.locator('[data-fastcheckout-place-order-ssr]');
         await expect(proxy).toBeVisible();
         await expect(proxy).toBeEnabled();
         const clickProxy = async () => {
+            await dismissConsent(page);
             await proxy.evaluate((button) => {
                 button.scrollIntoView({block: 'center'});
             });
@@ -566,6 +694,19 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             const box = await proxy.boundingBox();
 
             expect(box).not.toBeNull();
+            expect(await page.evaluate(({x, y}) => {
+                const button = document.querySelector(
+                        '[data-fastcheckout-place-order-ssr]'
+                    ),
+                    target = document.elementFromPoint(x, y);
+
+                return Boolean(button && target && (
+                    target === button || button.contains(target)
+                ));
+            }, {
+                x: box.x + box.width / 2,
+                y: box.y + box.height / 2
+            })).toBe(true);
             await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
         };
 
@@ -654,6 +795,32 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         ))).toEqual([]);
 
         if (process.env.FC_ALLOW_PLACE_ORDER !== '1') {
+            await page.reload({waitUntil: 'domcontentloaded'});
+            await expect(page.locator('#checkout > #fastcheckout-checkout'))
+                .toBeVisible({timeout: 45_000});
+            await expect.poll(() => page.evaluate(() => {
+                const quote = window.require('Magento_Checkout/js/model/quote'),
+                    input = Array.from(document.querySelectorAll(
+                        'input[name="billing-address-same-as-shipping"]'
+                    )).find((candidate) => candidate.getClientRects().length),
+                    component = input && window.require('ko').dataFor(
+                        input.closest('.checkout-billing-address')
+                    ),
+                    billing = quote.billingAddress(),
+                    shipping = quote.shippingAddress();
+
+                return {
+                    modelSame: Boolean(billing && shipping &&
+                        billing.getCacheKey() === shipping.getCacheKey()),
+                    componentSame: Boolean(component &&
+                        component.isAddressSameAsShipping()),
+                    checked: Boolean(input && input.checked)
+                };
+            }), {timeout: 10_000}).toEqual({
+                modelSame: true,
+                componentSame: true,
+                checked: true
+            });
             return;
         }
 

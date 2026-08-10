@@ -27,6 +27,7 @@
     display: flex;
     align-items: center;
     gap: 0.75rem;
+    margin: 0;
     padding: 0.75rem;
     cursor: pointer;
 }
@@ -63,6 +64,21 @@
     height: 1px !important;
     overflow: hidden !important;
     clip: rect(0, 0, 0, 0) !important;
+}
+
+/* Keep Magento's agreement inputs under the active payment method for its validators. */
+.fastcheckout-agreements-native-source {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    clip-path: inset(50%) !important;
+    white-space: nowrap !important;
+    pointer-events: none !important;
 }
 
 /*
@@ -182,6 +198,11 @@
 .fastcheckout-payment-method-ko-container .checkout-agreement.field input[type="checkbox"] {
     margin: 0 !important;
     flex-shrink: 0 !important;
+}
+
+.fastcheckout-ko-payment-root input[data-fastcheckout-automatic-agreement],
+.fastcheckout-payment-method-ko-container input[data-fastcheckout-automatic-agreement] {
+    opacity: 0.65;
 }
 
 .fastcheckout-ko-payment-root .checkout-agreement.field label,
@@ -764,7 +785,7 @@ body.fastcheckout-scroll-locked {
     visibility: hidden !important;
     opacity: 0 !important;
     z-index: 9999 !important;
-    transition: opacity 0.3s ease, visibility 0s 0.3s !important;
+    transition: opacity 0.3s ease !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
@@ -839,7 +860,8 @@ body.fastcheckout-scroll-locked {
     color: #374151 !important;
 }
 
-.new-shipping-address-modal .action-close {
+.new-shipping-address-modal .action-close,
+.agreements-modal .action-close {
     display: inline-flex !important;
     width: 2.25rem !important;
     height: 2.25rem !important;
@@ -848,11 +870,13 @@ body.fastcheckout-scroll-locked {
     border-radius: 9999px !important;
 }
 
-.new-shipping-address-modal .action-close:hover {
+.new-shipping-address-modal .action-close:hover,
+.agreements-modal .action-close:hover {
     background: #f3f4f6 !important;
 }
 
-.new-shipping-address-modal .action-close > span {
+.new-shipping-address-modal .action-close > span,
+.agreements-modal .action-close > span {
     position: absolute !important;
     width: 1px !important;
     height: 1px !important;
@@ -864,7 +888,8 @@ body.fastcheckout-scroll-locked {
     border: 0 !important;
 }
 
-.new-shipping-address-modal .action-close::before {
+.new-shipping-address-modal .action-close::before,
+.agreements-modal .action-close::before {
     content: '×';
     font-size: 1.75rem;
     font-weight: 300;

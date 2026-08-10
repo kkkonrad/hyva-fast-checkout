@@ -96,8 +96,13 @@ $showComment = $block->isShowComment();
                 <!-- /ko -->
             </div>
 
+            <?php /* Visual proxy; native KO agreements stay owned by the active payment method. */ ?>
+            <div class="fastcheckout-payment-method-ko-container"
+                 data-fastcheckout-agreements-summary-host
+                 hidden></div>
+
             <?php if ($showComment): ?>
-                <div class="border-t border-gray-200 pt-4">
+                <div class="border-t border-gray-200 pt-4" data-fastcheckout-order-comment>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1" for="fastcheckout-comment">
                             <?= $escaper->escapeHtml(__('Order Comment')) ?>
@@ -111,6 +116,29 @@ $showComment = $block->isShowComment();
                     </div>
                 </div>
             <?php endif; ?>
+
+            <?php /* The native payment renderer and its validators remain in place. */ ?>
+            <div class="pt-2 fastcheckout-place-order-section">
+                <button class="btn btn-primary w-full items-center justify-center gap-2 hidden md:flex fastcheckout-place-order-btn"
+                        type="button"
+                        data-fastcheckout-place-order
+                        data-fastcheckout-place-order-ssr>
+                    <span class="place-order-spinner hidden" data-fastcheckout-place-order-spinner aria-hidden="true">
+                        <svg class="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </span>
+                    <span data-fastcheckout-place-order-label
+                          data-fastcheckout-ready-text="<?= $escaper->escapeHtmlAttr(__('Place Order')) ?>"
+                          data-fastcheckout-processing-text="<?= $escaper->escapeHtmlAttr(__('Please wait...')) ?>">
+                        <?= $escaper->escapeHtml(__('Place Order')) ?>
+                    </span>
+                </button>
+                <p class="text-sm text-red-600 font-medium text-center mt-2 hidden"
+                   data-fastcheckout-client-order-error
+                   role="alert"></p>
+            </div>
 
         </div>
     </div>

@@ -99,6 +99,8 @@ class NativePipelineOwnershipTest extends TestCase
         $this->assertStringNotContainsString('quote.billingAddress(null)', $bootstrap);
         $this->assertStringContainsString('shippingSaveQueued', $bootstrap);
         $this->assertStringNotContainsString('paymentErrorTimer', $bootstrap);
+        $this->assertStringContainsString('sourcePart.cloneNode(true)', $bootstrap);
+        $this->assertStringNotContainsString('host.appendChild(source', $bootstrap);
     }
 
     public function testDiDoesNotReplaceOrGloballyPatchCheckoutServices(): void
@@ -143,8 +145,9 @@ class NativePipelineOwnershipTest extends TestCase
         $this->assertStringContainsString("'newsletterLabel'", $configProvider);
         $this->assertStringContainsString("__('Sign Up for Our Newsletter')", $configProvider);
         $this->assertStringNotContainsString('data-fastcheckout-agreements-host', $summary);
-        $this->assertStringContainsString('data-fastcheckout-place-order-ssr', $payment);
-        $this->assertStringNotContainsString('data-fastcheckout-place-order-ssr', $summary);
+        $this->assertStringContainsString('data-fastcheckout-agreements-summary-host', $summary);
+        $this->assertStringNotContainsString('data-fastcheckout-place-order-ssr', $payment);
+        $this->assertStringContainsString('data-fastcheckout-place-order-ssr', $summary);
     }
 
     public function testModuleHasNoHyvaCheckoutOrMagewireRequirement(): void

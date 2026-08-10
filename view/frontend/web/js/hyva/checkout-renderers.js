@@ -4,9 +4,11 @@ define([
     'Magento_Ui/js/core/app',
     'Magento_Checkout/js/model/quote',
     'Magento_Checkout/js/model/checkout-data-resolver',
+    'Magento_Checkout/js/checkout-data',
     'Magento_Customer/js/customer-data',
     'Magento_Checkout/js/model/totals',
     'Magento_Checkout/js/action/set-shipping-information',
+    'Magento_Checkout/js/action/select-billing-address',
     'Magento_Catalog/js/price-utils',
     'mage/translate',
     'uiRegistry'
@@ -16,9 +18,11 @@ define([
     app,
     quote,
     checkoutDataResolver,
+    checkoutData,
     customerData,
     totals,
     setShippingInformation,
+    selectBillingAddress,
     priceUtils,
     $t,
     registry
@@ -28,10 +32,14 @@ define([
     var initialized = false,
         observer,
         validationErrorObserver,
+        agreementsPortalObserver,
+        agreementsPortalSource,
+        agreementsPortalParts = [],
         scrollAnimationTimer,
         shippingSaveTimer,
         shippingSavePending = false,
-        shippingSaveQueued = false;
+        shippingSaveQueued = false,
+        billingAddressChoiceTouched = false;
 
     function paymentCode(method) {
         var input = method.querySelector(
@@ -122,11 +130,241 @@ define([
         });
     }
 
+    function agreementParts(source) {
+        return source ? Array.prototype.filter.call(source.children, function (child) {
+            return child.matches(
+                '[data-fastcheckout-newsletter], [data-role="checkout-agreements"]'
+            );
+        }) : [];
+    }
+
+    function restoreAgreementPart(part) {
+        part.classList.remove('fastcheckout-agreements-native-source');
+        part.removeAttribute('aria-hidden');
+        part.querySelectorAll('[data-fastcheckout-portal-tabindex]').forEach(function (control) {
+            var original = control.getAttribute('data-fastcheckout-portal-tabindex');
+
+            if (original === '') {
+                control.removeAttribute('tabindex');
+            } else {
+                control.setAttribute('tabindex', original);
+            }
+            control.removeAttribute('data-fastcheckout-portal-tabindex');
+        });
+    }
+
+    function restoreAgreementSource() {
+        if (agreementsPortalObserver) {
+            agreementsPortalObserver.disconnect();
+        }
+        agreementsPortalParts.forEach(restoreAgreementPart);
+        agreementsPortalSource = null;
+        agreementsPortalParts = [];
+    }
+
+    function proxyAgreementControl(source, proxy) {
+        var tag = proxy.tagName.toLowerCase(),
+            type = String(proxy.type || '').toLowerCase(),
+            originalTabindex = proxy.getAttribute('data-fastcheckout-portal-tabindex');
+
+        if (originalTabindex !== null) {
+            if (originalTabindex === '') {
+                proxy.removeAttribute('tabindex');
+            } else {
+                proxy.setAttribute('tabindex', originalTabindex);
+            }
+            proxy.removeAttribute('data-fastcheckout-portal-tabindex');
+        }
+
+        if (tag === 'input' || tag === 'select' || tag === 'textarea') {
+            if (type === 'checkbox' || type === 'radio') {
+                proxy.checked = source.checked;
+            } else {
+                proxy.value = source.value;
+            }
+            proxy.disabled = source.disabled;
+            proxy.removeAttribute('name');
+            proxy.removeAttribute('form');
+            proxy.removeAttribute('required');
+            proxy.removeAttribute('aria-required');
+            proxy.removeAttribute('data-validate');
+            proxy.classList.remove('required-entry');
+            ['input', 'change'].forEach(function (eventName) {
+                proxy.addEventListener(eventName, function () {
+                    if (type === 'checkbox' || type === 'radio') {
+                        source.checked = proxy.checked;
+                    } else {
+                        source.value = proxy.value;
+                    }
+                    source.dispatchEvent(new Event(eventName, {bubbles: true}));
+                    if (eventName === 'change' && source.checked &&
+                        String(source.name || '').indexOf('agreement[') === 0) {
+                        $(source).valid();
+                    }
+                });
+            });
+        } else if (tag === 'button' || tag === 'a') {
+            proxy.addEventListener('click', function (event) {
+                event.preventDefault();
+                source.click();
+            });
+        }
+    }
+
+    function agreementProxyPart(sourcePart, partIndex) {
+        var clone = sourcePart.cloneNode(true),
+            sourceControls,
+            cloneControls,
+            idMap = {};
+
+        clone.classList.remove('fastcheckout-agreements-native-source');
+        clone.removeAttribute('aria-hidden');
+        clone.querySelectorAll('#checkout-agreements-modal').forEach(function (modal) {
+            modal.remove();
+        });
+
+        sourceControls = Array.prototype.filter.call(sourcePart.querySelectorAll(
+            'input, select, textarea, button, a'
+        ), function (control) {
+            return !control.closest('#checkout-agreements-modal');
+        });
+        cloneControls = clone.querySelectorAll('input, select, textarea, button, a');
+        cloneControls.forEach(function (control, index) {
+            if (sourceControls[index]) {
+                proxyAgreementControl(sourceControls[index], control);
+            }
+        });
+
+        clone.querySelectorAll('[data-bind]').forEach(function (node) {
+            node.removeAttribute('data-bind');
+        });
+        clone.removeAttribute('data-bind');
+        clone.querySelectorAll('[data-fastcheckout-subscribe]').forEach(function (input) {
+            input.setAttribute('data-fastcheckout-subscribe-proxy', '1');
+            input.removeAttribute('data-fastcheckout-subscribe');
+        });
+        if (clone.hasAttribute('data-fastcheckout-newsletter')) {
+            clone.setAttribute('data-fastcheckout-newsletter-proxy', '1');
+            clone.removeAttribute('data-fastcheckout-newsletter');
+        }
+        if (clone.getAttribute('data-role') === 'checkout-agreements') {
+            clone.setAttribute('data-fastcheckout-agreements-proxy-region', '1');
+            clone.removeAttribute('data-role');
+        }
+
+        Array.prototype.forEach.call(clone.querySelectorAll('[id]'), function (node) {
+            var original = node.id;
+
+            node.id = 'fastcheckout-agreements-summary-' + partIndex + '-' + original;
+            idMap[original] = node.id;
+        });
+        clone.querySelectorAll('[for], [aria-describedby], [aria-labelledby], [aria-controls]')
+            .forEach(function (node) {
+                ['for', 'aria-describedby', 'aria-labelledby', 'aria-controls']
+                    .forEach(function (attribute) {
+                        var value = node.getAttribute(attribute);
+
+                        if (value) {
+                            node.setAttribute(attribute, value.split(/\s+/).map(function (id) {
+                                return idMap[id] || id;
+                            }).join(' '));
+                        }
+                    });
+            });
+
+        return clone;
+    }
+
+    function syncAgreementsPortal(force) {
+        var host = document.querySelector('[data-fastcheckout-agreements-summary-host]'),
+            sources = document.querySelectorAll(
+                '.fastcheckout-ko-payment-root .payment-method._active ' +
+                '.checkout-agreements-block'
+            ),
+            source = Array.prototype.find.call(sources, function (candidate) {
+                return agreementParts(candidate).length;
+            }),
+            parts = agreementParts(source),
+            proxy;
+
+        if (!host || !source || !parts.length) {
+            restoreAgreementSource();
+            if (host) {
+                host.textContent = '';
+                host.hidden = true;
+            }
+            return;
+        }
+        if (!force && source === agreementsPortalSource && !host.hidden) {
+            return;
+        }
+        if (source !== agreementsPortalSource) {
+            restoreAgreementSource();
+        } else if (agreementsPortalObserver) {
+            agreementsPortalObserver.disconnect();
+        }
+
+        proxy = document.createElement('div');
+        proxy.className = 'checkout-agreements-block';
+        proxy.setAttribute('data-fastcheckout-agreements-proxy', '1');
+        parts.forEach(function (part, index) {
+            proxy.appendChild(agreementProxyPart(part, index));
+        });
+        host.textContent = '';
+        host.appendChild(proxy);
+        host.hidden = false;
+
+        agreementsPortalParts.forEach(function (part) {
+            if (parts.indexOf(part) === -1) {
+                restoreAgreementPart(part);
+            }
+        });
+        parts.forEach(function (part) {
+            part.classList.add('fastcheckout-agreements-native-source');
+            part.setAttribute('aria-hidden', 'true');
+            part.querySelectorAll('input, select, textarea, button, a, [tabindex]')
+                .forEach(function (control) {
+                    if (!control.hasAttribute('data-fastcheckout-portal-tabindex')) {
+                        control.setAttribute(
+                            'data-fastcheckout-portal-tabindex',
+                            control.hasAttribute('tabindex') ? control.getAttribute('tabindex') : ''
+                        );
+                    }
+                    control.setAttribute('tabindex', '-1');
+                });
+        });
+        agreementsPortalSource = source;
+        agreementsPortalParts = parts;
+
+        if (window.MutationObserver) {
+            agreementsPortalObserver = agreementsPortalObserver || new MutationObserver(function () {
+                syncAgreementsPortal(true);
+            });
+            agreementsPortalObserver.observe(source, {
+                attributes: true,
+                attributeFilter: [
+                    'aria-invalid',
+                    'checked',
+                    'disabled',
+                    'data-fastcheckout-automatic-agreement'
+                ],
+                characterData: true,
+                childList: true,
+                subtree: true
+            });
+        }
+    }
+
     function revealNativeContent() {
         var loader = document.querySelector('[data-fastcheckout-startup-loader]'),
             summaryRoot = document.getElementById('fastcheckout-ko-summary-root'),
             summaryFallback = document.querySelector('[data-fastcheckout-summary-ssr]'),
-            nativeSummary = summaryRoot && summaryRoot.querySelector('.fastcheckout-native-summary');
+            nativeSummary = summaryRoot && summaryRoot.querySelector('.fastcheckout-native-summary'),
+            billingComponent = activeBillingAddressComponent(),
+            billingAddress = quote.billingAddress(),
+            shippingAddress = quote.shippingAddress(),
+            billingType = billingAddress && typeof billingAddress.getType === 'function' ?
+                billingAddress.getType() : '';
 
         if (loader && document.querySelector(
             '.fastcheckout-native-shipping-address input[name="firstname"]'
@@ -144,6 +382,24 @@ define([
             }
         }
 
+        if (!quote.isVirtual() && shippingAddress &&
+            (!billingAddress || billingAddress.getCacheKey() !== shippingAddress.getCacheKey()) &&
+            !billingAddressChoiceTouched &&
+            !checkoutData.getSelectedBillingAddress() &&
+            (!billingAddress || billingType === 'new-customer-address' ||
+                billingType === 'new-customer-billing-address')) {
+            selectBillingAddress(shippingAddress);
+            billingAddress = quote.billingAddress();
+        }
+
+        if (billingComponent && typeof billingComponent.isAddressSameAsShipping === 'function') {
+            billingComponent.isAddressSameAsShipping(Boolean(
+                !quote.isVirtual() && billingAddress && shippingAddress &&
+                billingAddress.getCacheKey() === shippingAddress.getCacheKey()
+            ));
+        }
+
+        syncAgreementsPortal(false);
         wirePlaceOrderButtons();
     }
 
@@ -174,13 +430,19 @@ define([
     }
 
     function validateBillingAddress() {
-        var component;
+        var component = activeBillingAddressComponent();
+
+        if (component && component.isAddressSameAsShipping &&
+            component.isAddressSameAsShipping() && quote.shippingAddress()) {
+            selectBillingAddress(quote.shippingAddress());
+
+            return true;
+        }
 
         if (quote.billingAddress()) {
             return true;
         }
 
-        component = activeBillingAddressComponent();
         if (!component) {
             return false;
         }
@@ -227,7 +489,8 @@ define([
             )),
             start = scroller.scrollTop,
             distance = target - start,
-            startedAt = Date.now();
+            startedAt = Date.now(),
+            lastApplied = start;
 
         if (scrollAnimationTimer) {
             window.clearInterval(scrollAnimationTimer);
@@ -242,8 +505,15 @@ define([
         scrollAnimationTimer = window.setInterval(function () {
             var progress;
 
+            if (Math.abs(scroller.scrollTop - lastApplied) > 2) {
+                window.clearInterval(scrollAnimationTimer);
+                scrollAnimationTimer = null;
+                return;
+            }
+
             progress = Math.min((Date.now() - startedAt) / 300, 1);
-            scroller.scrollTop = start + distance * (1 - Math.pow(1 - progress, 3));
+            lastApplied = start + distance * (1 - Math.pow(1 - progress, 3));
+            scroller.scrollTop = lastApplied;
 
             if (progress === 1) {
                 window.clearInterval(scrollAnimationTimer);
@@ -265,7 +535,8 @@ define([
                 '[role="alert"]'
             ),
             error = errors && Array.prototype.find.call(errors, function (element) {
-                return element.getClientRects().length &&
+                return !element.closest('.fastcheckout-agreements-native-source') &&
+                    element.getClientRects().length &&
                     window.getComputedStyle(element).visibility !== 'hidden';
             }),
             box,
@@ -283,16 +554,23 @@ define([
         return false;
     }
 
-    function watchForValidationError(scope) {
+    function watchForValidationError(scope, errorScopes) {
+        var scopes = errorScopes || [scope],
+            scrollToError = function () {
+                return scopes.some(function (errorScope) {
+                    return scrollToFirstVisibleError(errorScope);
+                });
+            };
+
         if (validationErrorObserver) {
             validationErrorObserver.disconnect();
             validationErrorObserver = null;
         }
-        if (!scope || scrollToFirstVisibleError(scope) || !window.MutationObserver) {
+        if (!scope || scrollToError() || !window.MutationObserver) {
             return;
         }
         validationErrorObserver = new MutationObserver(function () {
-            if (scrollToFirstVisibleError(scope)) {
+            if (scrollToError()) {
                 validationErrorObserver.disconnect();
                 validationErrorObserver = null;
             }
@@ -306,9 +584,12 @@ define([
     }
 
     function watchForPaymentError() {
-        watchForValidationError(document.querySelector(
-            '.fastcheckout-ko-payment-root .payment-method._active'
-        ));
+        var root = document.getElementById('fastcheckout-checkout');
+
+        watchForValidationError(root, [
+            document.querySelector('.fastcheckout-ko-payment-root .payment-method._active'),
+            document.querySelector('[data-fastcheckout-agreements-summary-host]')
+        ].filter(Boolean));
     }
 
     function validateAndPlaceOrder(shipping) {
@@ -390,6 +671,9 @@ define([
             window.clearTimeout(shippingSaveTimer);
             shippingSaveQueued = false;
             shippingSavePending = true;
+            if (quote.guestEmail) {
+                quote.shippingAddress().email = quote.guestEmail;
+            }
             setShippingInformation().always(function () {
                 shippingSavePending = false;
                 if (shippingSaveQueued) {
@@ -423,6 +707,16 @@ define([
         }
         initialized = true;
 
+        if (root) {
+            root.addEventListener('click', function (event) {
+                if (event.target.matches && event.target.matches(
+                    'input[name="billing-address-same-as-shipping"]'
+                )) {
+                    billingAddressChoiceTouched = true;
+                }
+            }, true);
+        }
+
         app(jsLayout);
         customerData.getInitCustomerData().done(function () {
             checkoutDataResolver.resolveBillingAddress();
@@ -436,7 +730,7 @@ define([
                     validationErrorObserver = null;
                 }
                 window.setTimeout(function () {
-                    wirePlaceOrderButtons();
+                    revealNativeContent();
                 }, 0);
             });
             if (totals.totals && typeof totals.totals.subscribe === 'function') {
