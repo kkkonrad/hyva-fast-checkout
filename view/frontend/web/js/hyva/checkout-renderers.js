@@ -39,7 +39,8 @@ define([
         shippingSaveTimer,
         shippingSavePending = false,
         shippingSaveQueued = false,
-        billingAddressChoiceTouched = false;
+        billingAddressChoiceTouched = false,
+        placeOrderProcessing = false;
 
     function paymentCode(method) {
         var input = method.querySelector(
@@ -119,15 +120,50 @@ define([
         document.querySelectorAll(
             '[data-fastcheckout-place-order-mobile], [data-fastcheckout-place-order-ssr]'
         ).forEach(function (button) {
-            button.disabled = Boolean(
+            button.disabled = placeOrderProcessing || Boolean(
                 activeButton && activeButton.disabled && quote.billingAddress()
             );
+            button.setAttribute('aria-disabled', button.disabled ? 'true' : 'false');
             button.dataset.fastcheckoutNativeTargetReady = activeButton ? '1' : '0';
         });
 
         document.querySelectorAll('[data-fastcheckout-place-order-ssr]').forEach(function (button) {
             button.classList.toggle('fastcheckout-place-order-proxy-ready', Boolean(activeButton));
         });
+    }
+
+    function setPlaceOrderProcessing(isProcessing) {
+        placeOrderProcessing = Boolean(isProcessing);
+        document.body.classList.toggle('checkout-submitting', placeOrderProcessing);
+        document.querySelectorAll(
+            '[data-fastcheckout-place-order-mobile], [data-fastcheckout-place-order-ssr]'
+        ).forEach(function (button) {
+            var spinner = button.querySelector('[data-fastcheckout-place-order-spinner]'),
+                label = button.querySelector('[data-fastcheckout-place-order-label]'),
+                textAttribute = placeOrderProcessing ?
+                    'data-fastcheckout-processing-text' : 'data-fastcheckout-ready-text';
+
+            button.disabled = placeOrderProcessing;
+            button.setAttribute('aria-disabled', placeOrderProcessing ? 'true' : 'false');
+            if (placeOrderProcessing) {
+                button.setAttribute('data-fastcheckout-processing', 'true');
+                button.setAttribute('aria-busy', 'true');
+            } else {
+                button.removeAttribute('data-fastcheckout-processing');
+                button.removeAttribute('aria-busy');
+            }
+            if (spinner) {
+                spinner.classList.toggle('hidden', !placeOrderProcessing);
+                spinner.setAttribute('aria-hidden', placeOrderProcessing ? 'false' : 'true');
+            }
+            if (label && label.getAttribute(textAttribute)) {
+                label.textContent = label.getAttribute(textAttribute);
+            }
+        });
+
+        if (!placeOrderProcessing) {
+            wirePlaceOrderButtons();
+        }
     }
 
     function agreementParts(source) {
@@ -647,10 +683,24 @@ define([
     }
 
     function bindPlaceOrderProxies() {
+        document.addEventListener('fastcheckout:order-submit-started', function () {
+            setPlaceOrderProcessing(true);
+        });
+        document.addEventListener('fastcheckout:order-submit-failed', function () {
+            setPlaceOrderProcessing(false);
+        });
+        window.addEventListener('pageshow', function (event) {
+            if (event.persisted) {
+                setPlaceOrderProcessing(false);
+            }
+        });
         document.querySelectorAll(
             '[data-fastcheckout-place-order-mobile], [data-fastcheckout-place-order-ssr]'
         ).forEach(function (proxy) {
             proxy.addEventListener('click', function () {
+                if (placeOrderProcessing) {
+                    return;
+                }
                 if (quote.isVirtual && quote.isVirtual()) {
                     validateVirtualAndPlaceOrder();
                     return;
@@ -709,10 +759,32 @@ define([
 
         if (root) {
             root.addEventListener('click', function (event) {
+                var method,
+                    radio;
+
                 if (event.target.matches && event.target.matches(
                     'input[name="billing-address-same-as-shipping"]'
                 )) {
                     billingAddressChoiceTouched = true;
+                }
+
+                if (!event.target.closest || event.target.closest(
+                    'a, button, input, label, select, textarea, [role="button"], ' +
+                    '[contenteditable="true"]'
+                )) {
+                    return;
+                }
+
+                method = event.target.closest('.payment-method:not(._active)');
+                if (!method || !method.closest('.fastcheckout-ko-payment-root')) {
+                    return;
+                }
+
+                radio = method.querySelector(
+                    'input[type="radio"][name="payment[method]"], input[type="radio"]'
+                );
+                if (radio && !radio.disabled) {
+                    radio.click();
                 }
             }, true);
         }

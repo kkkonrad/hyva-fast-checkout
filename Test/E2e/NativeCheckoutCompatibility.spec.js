@@ -158,6 +158,9 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         await page.setViewportSize({width: 390, height: 844});
         await expect(page.locator('[data-fastcheckout-place-order-mobile]')).toBeVisible();
         await expect(page.locator('[data-fastcheckout-place-order-mobile]')).toBeEnabled();
+        await expect(page.locator(
+            '[data-fastcheckout-mobile-sticky] [data-fastcheckout-client-order-error]'
+        )).toHaveCount(0);
         expect(assetFailures, assetFailures.join('\n')).toEqual([]);
     });
 
@@ -380,6 +383,28 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             '.fastcheckout-ko-payment-root .payment-method._active'
         );
         await expect(activePayment).toHaveCount(1);
+        const activePaymentCode = await activePayment.locator(
+                'input[name="payment[method]"]'
+            ).inputValue(),
+            closedPayment = page.locator(
+                '.fastcheckout-ko-payment-root .payment-method:not(._active)'
+            ).first();
+        if (await closedPayment.count()) {
+            const closedPaymentCode = await closedPayment.locator(
+                'input[name="payment[method]"]'
+            ).inputValue();
+
+            await closedPayment.evaluate((method) => method.click());
+            await expect.poll(() => page.evaluate(() => (
+                window.require('Magento_Checkout/js/model/quote').paymentMethod()?.method
+            ))).toBe(closedPaymentCode);
+            await page.locator(
+                `input[name="payment[method]"][value="${activePaymentCode}"]`
+            ).evaluate((input) => input.click());
+            await expect.poll(() => page.evaluate(() => (
+                window.require('Magento_Checkout/js/model/quote').paymentMethod()?.method
+            ))).toBe(activePaymentCode);
+        }
         const nativeAgreements = activePayment.locator('.checkout-agreements-block');
         await expect(nativeAgreements).toHaveCount(1);
         await expect(activePayment.locator('[data-fastcheckout-newsletter]')).toContainText(
@@ -685,6 +710,25 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         const proxy = page.locator('[data-fastcheckout-place-order-ssr]');
         await expect(proxy).toBeVisible();
         await expect(proxy).toBeEnabled();
+        const proxyLabel = proxy.locator('[data-fastcheckout-place-order-label]'),
+            readyText = await proxyLabel.getAttribute('data-fastcheckout-ready-text'),
+            processingText = await proxyLabel.getAttribute(
+                'data-fastcheckout-processing-text'
+            );
+        await page.evaluate(() => document.dispatchEvent(
+            new Event('fastcheckout:order-submit-started')
+        ));
+        await expect(proxy).toBeDisabled();
+        await expect(proxy).toHaveAttribute('aria-busy', 'true');
+        await expect(proxyLabel).toHaveText(processingText);
+        await expect(proxy.locator('[data-fastcheckout-place-order-spinner]')).toBeVisible();
+        await page.evaluate(() => document.dispatchEvent(
+            new Event('fastcheckout:order-submit-failed')
+        ));
+        await expect(proxy).toBeEnabled();
+        await expect(proxy).not.toHaveAttribute('aria-busy');
+        await expect(proxyLabel).toHaveText(readyText);
+        await expect(proxy.locator('[data-fastcheckout-place-order-spinner]')).toBeHidden();
         const clickProxy = async () => {
             await dismissConsent(page);
             await proxy.evaluate((button) => {

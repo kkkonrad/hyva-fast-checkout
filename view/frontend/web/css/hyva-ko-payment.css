@@ -15,6 +15,10 @@
     overflow: hidden;
 }
 
+.fastcheckout-ko-payment-root .payment-method:not(._active) {
+    cursor: pointer;
+}
+
 .fastcheckout-ko-payment-root .payment-method:has(
     input[name='payment[method]']:checked
 ) {

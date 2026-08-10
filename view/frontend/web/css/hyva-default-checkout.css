@@ -508,7 +508,7 @@
 #fastcheckout-checkout .fastcheckout-native-shipping-address .note {
     display: block;
     margin-top: 0.25rem;
-    color: var(--color-slate-500);
+    color: var(--color-slate-500, #64748b);
     font-size: var(--text-sm);
 }
 
