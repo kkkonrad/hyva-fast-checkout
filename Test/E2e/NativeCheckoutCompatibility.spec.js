@@ -170,10 +170,16 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         const shippingRoot = page.locator('.fastcheckout-native-shipping-address');
         await expect(shippingRoot.locator('input[name="firstname"]'))
             .toBeVisible({timeout: 45_000});
-        let paymentRequests = 0;
+        let paymentRequests = 0,
+            placeOrderRequests = null;
         page.on('request', (request) => {
             if (request.method() === 'POST' && request.url().includes('/payment-information')) {
                 paymentRequests += 1;
+            }
+            if (placeOrderRequests && request.method() === 'POST' &&
+                /\/(?:estimate-shipping-methods|shipping-information|payment-information)(?:\?|$)/
+                    .test(request.url())) {
+                placeOrderRequests.push(request.url());
             }
         });
 
@@ -628,9 +634,8 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             component.startsWith('PayPal_Braintree/')
         ))).toBe(true);
         expect(rendererState.methodCodes).toContain('purchaseorder');
-        await expect(page.locator(
-            '[data-fastcheckout-payment-option], [data-fastcheckout-payment-method-ko-target]'
-        )).toHaveCount(0);
+        await expect(page.locator('[data-fastcheckout-payment-method-ko-target]'))
+            .toHaveCount(0);
 
         const nativeButton = page.locator(
             '.payment-method._active .payment-method-content .action.checkout'
@@ -776,7 +781,7 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
         };
 
-        const telephone = shippingRoot.locator('input[name="telephone"]');
+        const addressValidationField = shippingRoot.locator('input[name="firstname"]');
         const purchaseOrderNumber = page.locator('input[name="payment[po_number]"]');
         const visibleErrorText = (field) => field.evaluate((input) => {
             const wrapper = input.closest('.field') || input.parentElement;
@@ -794,13 +799,32 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         await purchaseOrderNumber.fill('FC-E2E-' + Date.now());
         await purchaseOrderNumber.blur();
 
-        await telephone.fill('');
+        await addressValidationField.fill('');
+        await proxy.evaluate((button) => button.scrollIntoView({block: 'center'}));
+        await page.waitForTimeout(50);
+        await page.evaluate(() => {
+            window.fastcheckoutE2eAddressScroll = [window.scrollY];
+            const sampler = window.setInterval(() => {
+                window.fastcheckoutE2eAddressScroll.push(window.scrollY);
+            }, 16);
+
+            window.setTimeout(() => {
+                window.clearInterval(sampler);
+                window.fastcheckoutE2eAddressScrollDone = true;
+            }, 650);
+        });
         await clickProxy();
-        await expect.poll(() => visibleErrorText(telephone)).not.toEqual([]);
+        await expect.poll(() => visibleErrorText(addressValidationField)).not.toEqual([]);
+        await expect.poll(() => page.evaluate(() => (
+            window.fastcheckoutE2eAddressScrollDone
+        ))).toBe(true);
+        expect(new Set((await page.evaluate(() => (
+            window.fastcheckoutE2eAddressScroll
+        ))).map(Math.round)).size).toBeGreaterThan(4);
         expect(paymentRequests).toBe(0);
-        await telephone.fill('500600700');
-        await telephone.blur();
-        await expect.poll(() => visibleErrorText(telephone)).toEqual([]);
+        await addressValidationField.fill('Jan');
+        await addressValidationField.blur();
+        await expect.poll(() => visibleErrorText(addressValidationField)).toEqual([]);
         await expect.poll(() => nativeButton.isEnabled()).toBe(true);
 
         await purchaseOrderNumber.fill('');
@@ -828,18 +852,19 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
                 resolve();
             }, reject);
         }));
-        await page.evaluate(() => {
-            window.setTimeout(() => {
-                const error = document.createElement('p');
-
-                error.className = 'msg msg__error';
-                error.dataset.fastcheckoutE2ePaymentError = '1';
-                error.textContent = 'Payment validation error';
-                document.querySelector('.payment-method._active .payment-method-content')
-                    .appendChild(error);
-            }, 250);
-        });
         await clickProxy();
+        await expect.poll(() => page.evaluate(() => (
+            window.fastcheckoutE2eValidationCalls
+        ))).toBe(1);
+        await page.evaluate(() => {
+            const error = document.createElement('p');
+
+            error.className = 'msg msg__error';
+            error.dataset.fastcheckoutE2ePaymentError = '1';
+            error.textContent = 'Payment validation error';
+            document.querySelector('.payment-method._active .payment-method-content')
+                .appendChild(error);
+        });
         const paymentError = page.locator('[data-fastcheckout-e2e-payment-error]');
         await expect(paymentError).toBeVisible();
         await expect.poll(() => paymentError.evaluate((error) => {
@@ -850,9 +875,6 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         await paymentError.evaluate((error) => {
             error.remove();
         });
-        await expect.poll(() => page.evaluate(() => (
-            window.fastcheckoutE2eValidationCalls
-        ))).toBe(1);
         await expect.poll(() => visibleErrorText(purchaseOrderNumber)).toEqual([]);
         expect(paymentRequests).toBe(0);
         expect(pageErrors.filter((message) => (
@@ -896,14 +918,47 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
 
         await page.evaluate(() => {
             window.fastcheckoutE2eAllowOrder = true;
+            const staleError = document.createElement('p');
+
+            staleError.className = 'msg__error';
+            staleError.dataset.fastcheckoutE2eStaleError = '1';
+            staleError.textContent = 'Previous validation error';
+            document.querySelector('.payment-method._active .payment-method-content')
+                .prepend(staleError);
         });
+        await page.route('**/payment-information*', async (route) => {
+            await new Promise((resolve) => setTimeout(resolve, 600));
+            await route.continue();
+        });
+        const paymentRequestStarted = page.waitForRequest((request) => (
+            request.method() === 'POST' &&
+            request.url().includes('/payment-information')
+        ), {timeout: 60_000});
+        await proxy.evaluate((button) => button.scrollIntoView({block: 'center'}));
+        await page.waitForTimeout(50);
+        const scrollBeforeSubmit = await page.evaluate(() => window.scrollY);
         const placeOrderResponse = page.waitForResponse((response) => (
             response.request().method() === 'POST' &&
             response.url().includes('/payment-information')
         ), {timeout: 60_000});
+        placeOrderRequests = [];
         await clickProxy();
+        await paymentRequestStarted;
+        await page.waitForTimeout(350);
+        expect(Math.abs(
+            await page.evaluate(() => window.scrollY) - scrollBeforeSubmit
+        )).toBeLessThanOrEqual(2);
         const orderResponse = await placeOrderResponse;
         expect(orderResponse.ok()).toBe(true);
         await page.waitForURL(/checkout\/onepage\/success/, {timeout: 60_000});
+        expect(placeOrderRequests.filter((url) => (
+            url.includes('/estimate-shipping-methods')
+        ))).toHaveLength(0);
+        expect(placeOrderRequests.filter((url) => (
+            url.includes('/shipping-information')
+        ))).toHaveLength(1);
+        expect(placeOrderRequests.filter((url) => (
+            /\/payment-information(?:\?|$)/.test(url)
+        ))).toHaveLength(1);
     });
 });

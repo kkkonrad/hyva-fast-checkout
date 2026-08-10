@@ -66,13 +66,6 @@ class Json extends Value
             return $this->normalizeShippingPaymentMapping($decoded);
         }
 
-        if (
-            (string)$this->getPath() === ConfigPaths::XML_PATH_REQUIRED_PAYMENT_FIELDS
-            || (string)$this->getPath() === ConfigPaths::XML_PATH_REQUIRED_SHIPPING_FIELDS
-        ) {
-            return $this->normalizeRequiredMethodFields($decoded);
-        }
-
         return $decoded;
     }
 
@@ -89,14 +82,6 @@ class Json extends Value
             return;
         }
 
-        if ($path === ConfigPaths::XML_PATH_REQUIRED_PAYMENT_FIELDS) {
-            $this->validateRequiredPaymentFields($decoded);
-            return;
-        }
-
-        if ($path === ConfigPaths::XML_PATH_REQUIRED_SHIPPING_FIELDS) {
-            $this->validateRequiredShippingFields($decoded);
-        }
     }
 
     /**
@@ -136,33 +121,6 @@ class Json extends Value
 
     /**
      * @param mixed $decoded
-     * @return mixed
-     */
-    private function normalizeRequiredMethodFields($decoded)
-    {
-        if (!is_array($decoded)) {
-            return $decoded;
-        }
-
-        $mapping = [];
-        foreach ($decoded as $methodCode => $fieldPaths) {
-            if (!is_array($fieldPaths)) {
-                $mapping[$methodCode] = $fieldPaths;
-                continue;
-            }
-
-            $paths = [];
-            foreach ($fieldPaths as $fieldPath) {
-                $paths[] = trim((string)$fieldPath);
-            }
-            $mapping[trim((string)$methodCode)] = $paths;
-        }
-
-        return $mapping;
-    }
-
-    /**
-     * @param mixed $decoded
      * @throws LocalizedException
      */
     private function validateShippingPaymentMapping($decoded): void
@@ -190,60 +148,6 @@ class Json extends Value
     }
 
     /**
-     * @param mixed $decoded
-     * @throws LocalizedException
-     */
-    private function validateRequiredPaymentFields($decoded): void
-    {
-        if (!is_array($decoded)) {
-            throw new LocalizedException(__('Required payment fields must be a JSON object keyed by exact payment method code.'));
-        }
-
-        if ($decoded !== [] && array_is_list($decoded)) {
-            throw new LocalizedException(__('Required payment fields must be a JSON object keyed by exact payment method code.'));
-        }
-
-        foreach ($decoded as $paymentMethodCode => $fieldPaths) {
-            $this->validateExactPaymentMethodCode($paymentMethodCode);
-
-            if (!is_array($fieldPaths) || !array_is_list($fieldPaths)) {
-                throw new LocalizedException(__('Required payment field paths must be JSON arrays of strings.'));
-            }
-
-            foreach ($fieldPaths as $fieldPath) {
-                $this->validateRequiredFieldPath($fieldPath);
-            }
-        }
-    }
-
-    /**
-     * @param mixed $decoded
-     * @throws LocalizedException
-     */
-    private function validateRequiredShippingFields($decoded): void
-    {
-        if (!is_array($decoded)) {
-            throw new LocalizedException(__('Required shipping fields must be a JSON object keyed by shipping method code or rule.'));
-        }
-
-        if ($decoded !== [] && array_is_list($decoded)) {
-            throw new LocalizedException(__('Required shipping fields must be a JSON object keyed by shipping method code or rule.'));
-        }
-
-        foreach ($decoded as $shippingMethodRule => $fieldPaths) {
-            $this->validateShippingMethodRule($shippingMethodRule);
-
-            if (!is_array($fieldPaths) || !array_is_list($fieldPaths)) {
-                throw new LocalizedException(__('Required shipping field paths must be JSON arrays of strings.'));
-            }
-
-            foreach ($fieldPaths as $fieldPath) {
-                $this->validateRequiredFieldPath($fieldPath);
-            }
-        }
-    }
-
-    /**
      * @param mixed $paymentMethodCode
      * @throws LocalizedException
      */
@@ -256,37 +160,4 @@ class Json extends Value
         }
     }
 
-    /**
-     * @param mixed $shippingMethodRule
-     * @throws LocalizedException
-     */
-    private function validateShippingMethodRule($shippingMethodRule): void
-    {
-        $shippingMethodRule = trim((string)$shippingMethodRule);
-
-        if ($shippingMethodRule === '') {
-            throw new LocalizedException(__('Shipping method rules must not be empty.'));
-        }
-
-        if (strpos($shippingMethodRule, '*') !== false && substr($shippingMethodRule, -1) !== '*') {
-            throw new LocalizedException(__('Shipping method wildcards are supported only at the end of a rule.'));
-        }
-    }
-
-    /**
-     * @param mixed $fieldPath
-     * @throws LocalizedException
-     */
-    private function validateRequiredFieldPath($fieldPath): void
-    {
-        $fieldPath = trim((string)$fieldPath);
-
-        if ($fieldPath === '' || strpos($fieldPath, '*') !== false) {
-            throw new LocalizedException(__('Required field paths must be exact field paths.'));
-        }
-
-        if (!preg_match('/^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*$/', $fieldPath)) {
-            throw new LocalizedException(__('Required field paths may contain only letters, numbers, underscores, hyphens, and dots.'));
-        }
-    }
 }

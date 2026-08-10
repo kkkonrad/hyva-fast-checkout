@@ -8,28 +8,12 @@ use Magento\Framework\View\Element\Template\Context;
 use Magento\Checkout\Model\Session as CheckoutSession;
 use Magento\Sales\Model\Order\Config;
 use Magento\Framework\App\Http\Context as HttpContext;
-use Magento\Customer\Model\Registration;
-use Magento\Customer\Api\AccountManagementInterface;
 use Magento\Customer\Model\Session as CustomerSession;
-use Magento\Sales\Model\Order\Address\Validator;
-use Magento\Sales\Api\OrderRepositoryInterface;
 
 class Success extends CheckoutSuccess
 {
-    /** @var Registration */
-    public $registration;
-
-    /** @var AccountManagementInterface */
-    public $accountManagement;
-
     /** @var CustomerSession */
     public $customerSession;
-
-    /** @var Validator */
-    public $addressValidator;
-
-    /** @var OrderRepositoryInterface */
-    public $orderRepository;
 
     /** @var Helper */
     public $helper;
@@ -39,21 +23,13 @@ class Success extends CheckoutSuccess
         CheckoutSession $checkoutSession,
         Config $orderConfig,
         HttpContext $httpContext,
-        Registration $registration,
-        AccountManagementInterface $accountManagement,
         CustomerSession $customerSession,
-        Validator $addressValidator,
-        OrderRepositoryInterface $orderRepository,
         Helper $helper,
         array $data = []
     ) {
         $data['module_name'] = 'Magento_Checkout';
         parent::__construct($context, $checkoutSession, $orderConfig, $httpContext, $data);
-        $this->accountManagement = $accountManagement;
-        $this->registration = $registration;
         $this->customerSession = $customerSession;
-        $this->addressValidator = $addressValidator;
-        $this->orderRepository = $orderRepository;
         $this->helper = $helper;
     }
 
@@ -75,40 +51,9 @@ class Success extends CheckoutSuccess
         return $this->getUrl('customer/account');
     }
 
-    public function getLogInUrl()
-    {
-        return $this->getUrl('customer/account/login');
-    }
-
-    public function getStoreName()
-    {
-        return $this->_storeManager->getStore()->getName();
-    }
-
-    public function getEmailAddress()
-    {
-        return $this->_checkoutSession->getLastRealOrder()->getCustomerEmail();
-    }
-
     public function isCustomerLoggedIn()
     {
         return $this->customerSession->isLoggedIn();
     }
 
-    /**
-     * @return \Magento\Sales\Api\Data\OrderInterface|null
-     */
-    public function getOrder()
-    {
-        $orderId = (int)$this->_checkoutSession->getLastOrderId();
-        if ($orderId <= 0) {
-            return null;
-        }
-
-        try {
-            return $this->orderRepository->get($orderId);
-        } catch (\Magento\Framework\Exception\NoSuchEntityException $exception) {
-            return null;
-        }
-    }
 }

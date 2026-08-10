@@ -41,7 +41,10 @@ define([
             if (!virtual) {
                 shipping = registry.get('checkout.steps.shipping-step.shippingAddress');
 
-                if (!shipping || !shipping.validateShippingInformation()) {
+                if (!shipping || (
+                    !shipping.fastcheckoutValidatedForPlaceOrder &&
+                    !shipping.validateShippingInformation()
+                )) {
                     return $.Deferred().reject().promise();
                 }
             }

@@ -10,29 +10,6 @@
             </argument>
         </arguments>
     </type>
-    <type name="Kkkonrad\Fastcheckout\Model\CheckoutLayoutCollector">
-        <arguments>
-            <argument name="layoutFactory" xsi:type="object">Magento\Framework\View\LayoutFactory</argument>
-            <argument name="design" xsi:type="object">Magento\Framework\View\DesignInterface</argument>
-            <argument name="logger" xsi:type="object">Psr\Log\LoggerInterface</argument>
-            <argument name="themeSwitch" xsi:type="object">Hyva\ThemeFallback\Model\ThemeSwitch</argument>
-            <argument name="pageLayoutReaderFactory" xsi:type="object">Magento\Framework\View\Page\Layout\ReaderFactory</argument>
-        </arguments>
-    </type>
-    <type name="Kkkonrad\Fastcheckout\Block\Hyva\Checkout">
-        <arguments>
-            <argument name="configProvider" xsi:type="object">Magento\Checkout\Model\CompositeConfigProvider</argument>
-            <argument name="moduleList" xsi:type="object">Magento\Framework\Module\ModuleListInterface</argument>
-            <argument name="componentRegistrar" xsi:type="object">Magento\Framework\Component\ComponentRegistrarInterface</argument>
-            <argument name="localeResolver" xsi:type="object">Magento\Framework\Locale\ResolverInterface</argument>
-            <argument name="taxHelper" xsi:type="object">Magento\Tax\Helper\Data</argument>
-            <argument name="paymentMethodManagement" xsi:type="object">Magento\Quote\Api\PaymentMethodManagementInterface</argument>
-            <argument name="paymentHelper" xsi:type="object">Magento\Payment\Helper\Data</argument>
-            <argument name="serializer" xsi:type="object">Magento\Framework\Serialize\SerializerInterface</argument>
-            <argument name="blockFactory" xsi:type="object">Magento\Framework\View\Element\BlockFactory</argument>
-            <argument name="layoutCollector" xsi:type="object">Kkkonrad\Fastcheckout\Model\CheckoutLayoutCollector</argument>
-        </arguments>
-    </type>
     <type name="Magento\Checkout\Controller\Onepage\Failure">
         <plugin name="fastcheckout_checkout_failure"
                 type="Kkkonrad\Fastcheckout\Plugin\Checkout\Controller\Onepage\Failure"/>

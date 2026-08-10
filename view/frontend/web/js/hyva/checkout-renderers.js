@@ -492,14 +492,23 @@ define([
         return Boolean(quote.billingAddress());
     }
 
-    function submitActivePayment() {
+    function submitActivePayment(shipping) {
         window.setTimeout(function () {
             var active = activePlaceOrderButton();
 
             if (active && !active.disabled) {
-                active.click();
+                if (shipping) {
+                    shipping.fastcheckoutValidatedForPlaceOrder = true;
+                }
+                try {
+                    active.click();
+                } finally {
+                    if (shipping) {
+                        delete shipping.fastcheckoutValidatedForPlaceOrder;
+                    }
+                }
             }
-            if (active) {
+            if (active && !placeOrderProcessing) {
                 window.setTimeout(watchForPaymentError, 0);
             }
         }, 0);
@@ -634,7 +643,9 @@ define([
             emailValid = true,
             addressValid = true,
             shippingValid,
-            paymentValid;
+            paymentValid,
+            scroller = document.scrollingElement || document.documentElement,
+            scrollTop = scroller.scrollTop;
 
         setClientOrderError('');
 
@@ -653,12 +664,8 @@ define([
         addressValid = source ? !source.get('params.invalid') : addressValid;
         paymentValid = !shippingValid || validatePaymentMethod();
 
-        if (!emailValid) {
-            email.trigger('focus');
-        } else if (!addressValid && typeof shipping.focusInvalid === 'function') {
-            shipping.focusInvalid();
-        }
         if (!addressValid || !emailValid || !shippingValid || !paymentValid) {
+            scroller.scrollTop = scrollTop;
             window.setTimeout(function () {
                 watchForValidationError(
                     addressValid && emailValid && !shippingValid
@@ -672,7 +679,7 @@ define([
             return;
         }
 
-        submitActivePayment();
+        submitActivePayment(shipping);
     }
 
     function validateVirtualAndPlaceOrder() {
@@ -714,6 +721,11 @@ define([
 
     function saveShippingWhenMethodChanges() {
         function saveLatestShippingInformation() {
+            if (placeOrderProcessing) {
+                window.clearTimeout(shippingSaveTimer);
+                shippingSaveQueued = false;
+                return;
+            }
             if (shippingSavePending) {
                 return;
             }
@@ -721,9 +733,6 @@ define([
             window.clearTimeout(shippingSaveTimer);
             shippingSaveQueued = false;
             shippingSavePending = true;
-            if (quote.guestEmail) {
-                quote.shippingAddress().email = quote.guestEmail;
-            }
             setShippingInformation().always(function () {
                 shippingSavePending = false;
                 if (shippingSaveQueued) {

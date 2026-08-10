@@ -241,24 +241,6 @@
     text-decoration: underline;
 }
 
-/* Active payment option highlight — pure CSS, no delay or transition lag */
-[data-fastcheckout-payment-option] {
-    border: 2px solid #e5e7eb !important; /* border-gray-200, 2px */
-    background-color: transparent !important;
-    transition: all 0.2s ease-in-out !important;
-    box-shadow: none !important;
-}
-
-[data-fastcheckout-payment-option]:hover {
-    border-color: #d1d5db !important; /* hover:border-gray-300 */
-}
-
-[data-fastcheckout-payment-option]:has(input[name="payment_method"]:checked) {
-    border-color: var(--color-primary) !important;
-    background-color: color-mix(in srgb, var(--color-primary) 5%, transparent) !important;
-    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important; /* shadow-sm */
-}
-
 /* Premium styles for original offline payment contents (checkmo, banktransfer, cashondelivery) */
 .fastcheckout-payment-method-ko-container .payment-method-note,
 .fastcheckout-payment-method-ko-container .payment-method-content > p,
@@ -526,12 +508,6 @@ body.checkout-submitting [data-fastcheckout-processing="true"] {
 body.checkout-submitting [data-fastcheckout-processing="true"] .place-order-spinner {
     color: currentColor !important;
     flex: 0 0 auto;
-}
-
-/* Place-order scroll freeze (body position:fixed while the request is active). */
-body.fastcheckout-scroll-locked {
-    overscroll-behavior: none;
-    touch-action: none;
 }
 
 /* ── Braintree Payments Styling ─────────────────────────────────────────── */
