@@ -492,12 +492,21 @@ define([
         return Boolean(quote.billingAddress());
     }
 
-    function submitActivePayment() {
+    function submitActivePayment(shipping) {
         window.setTimeout(function () {
             var active = activePlaceOrderButton();
 
             if (active && !active.disabled) {
-                active.click();
+                if (shipping) {
+                    shipping.fastcheckoutValidatedForPlaceOrder = true;
+                }
+                try {
+                    active.click();
+                } finally {
+                    if (shipping) {
+                        delete shipping.fastcheckoutValidatedForPlaceOrder;
+                    }
+                }
             }
             if (active) {
                 window.setTimeout(watchForPaymentError, 0);
@@ -672,7 +681,7 @@ define([
             return;
         }
 
-        submitActivePayment();
+        submitActivePayment(shipping);
     }
 
     function validateVirtualAndPlaceOrder() {
@@ -714,6 +723,11 @@ define([
 
     function saveShippingWhenMethodChanges() {
         function saveLatestShippingInformation() {
+            if (placeOrderProcessing) {
+                window.clearTimeout(shippingSaveTimer);
+                shippingSaveQueued = false;
+                return;
+            }
             if (shippingSavePending) {
                 return;
             }

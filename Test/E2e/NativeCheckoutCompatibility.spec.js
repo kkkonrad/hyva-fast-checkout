@@ -170,10 +170,16 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         const shippingRoot = page.locator('.fastcheckout-native-shipping-address');
         await expect(shippingRoot.locator('input[name="firstname"]'))
             .toBeVisible({timeout: 45_000});
-        let paymentRequests = 0;
+        let paymentRequests = 0,
+            placeOrderRequests = null;
         page.on('request', (request) => {
             if (request.method() === 'POST' && request.url().includes('/payment-information')) {
                 paymentRequests += 1;
+            }
+            if (placeOrderRequests && request.method() === 'POST' &&
+                /\/(?:estimate-shipping-methods|shipping-information|payment-information)(?:\?|$)/
+                    .test(request.url())) {
+                placeOrderRequests.push(request.url());
             }
         });
 
@@ -900,9 +906,19 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             response.request().method() === 'POST' &&
             response.url().includes('/payment-information')
         ), {timeout: 60_000});
+        placeOrderRequests = [];
         await clickProxy();
         const orderResponse = await placeOrderResponse;
         expect(orderResponse.ok()).toBe(true);
         await page.waitForURL(/checkout\/onepage\/success/, {timeout: 60_000});
+        expect(placeOrderRequests.filter((url) => (
+            url.includes('/estimate-shipping-methods')
+        )).length).toBeLessThanOrEqual(1);
+        expect(placeOrderRequests.filter((url) => (
+            url.includes('/shipping-information')
+        ))).toHaveLength(1);
+        expect(placeOrderRequests.filter((url) => (
+            /\/payment-information(?:\?|$)/.test(url)
+        ))).toHaveLength(1);
     });
 });
