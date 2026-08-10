@@ -508,7 +508,7 @@
 #fastcheckout-checkout .fastcheckout-native-shipping-address .note {
     display: block;
     margin-top: 0.25rem;
-    color: var(--color-slate-500);
+    color: var(--color-slate-500, #64748b);
     font-size: var(--text-sm);
 }
 
@@ -626,16 +626,26 @@
     color: var(--color-slate-800);
 }
 
+#fastcheckout-checkout .fastcheckout-payment-after-methods .checkout-billing-address {
+    position: relative;
+    padding-block: var(--card-py, calc(var(--spacing) * 6));
+    padding-inline: var(--card-px, calc(var(--spacing) * 6));
+    border-width: 1px;
+    border-color: var(--card-stroke, var(--color-gray-300));
+    border-radius: var(--card-radius, var(--radius-lg));
+    background-color: var(--card-bg, var(--color-surface, #fff));
+}
+
 /*
  * Logged-in customer: after unchecking "same as shipping", Magento shows the
  * address list select and optionally the new-address form. Global field
  * rules set margin: 0, so checkbox / select / form / actions run together —
  * restore clear spacing and a light card around the list + new form.
  */
-#fastcheckout-checkout .checkout-billing-address > .billing-address-same-as-shipping-block,
-#fastcheckout-checkout .payment-method-billing-address .billing-address-same-as-shipping-block {
+#fastcheckout-checkout .checkout-billing-address > .billing-address-same-as-shipping-block.field.choice,
+#fastcheckout-checkout .payment-method-billing-address .billing-address-same-as-shipping-block.field.choice {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 0.5rem;
     margin: 0;
     padding: 0;
@@ -1392,11 +1402,8 @@
 }
 
 /*
- * Magento payment place-order toolbar hosted in the summary card.
- * Markup: .actions-toolbar > .primary > button.action.primary.checkout
- *
- * One fixed control size for SSR fallback AND Magento-hosted button so the
- * button does not jump taller→shorter when the native toolbar mounts.
+ * Fastcheckout place-order proxy following the native payment regions and summary.
+ * Keep one control size for the desktop proxy and mobile sticky action.
  */
 #fastcheckout-checkout {
     --fc-place-order-height: 3rem; /* 48px */

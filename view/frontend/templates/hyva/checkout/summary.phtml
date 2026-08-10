@@ -1,8 +1,7 @@
 <?php
 /**
- * Order summary, coupon and place-order controls.
+ * Order summary and order-comment control.
  *
- * Coupon uses Magento_SalesRule payment/discount (native KO).
  * Core OPC has no storefront order-comment field, so the existing FC textarea
  * is appended to payment data by the place-order mixin.
  *
@@ -11,9 +10,8 @@
  * @var array $items
  */
 $showComment = $block->isShowComment();
-$showSubscribe = $block->isShowSubscribe();
 ?>
-<!-- Container 4: Order Summary, Coupon & Place Order -->
+<!-- Container 4: Order Summary -->
 <div class="fc-container-4 space-y-6 min-w-0 w-full">
     <div class="card sticky top-6 space-y-6" data-fastcheckout-totals-card>
         <div class="relative space-y-6">
@@ -90,8 +88,21 @@ $showSubscribe = $block->isShowSubscribe();
                 </div>
             </div>
 
+            <div id="fastcheckout-ko-shipping-information-root"
+                 data-bind="scope: 'checkout.sidebar'"
+                 data-fastcheckout-shipping-information>
+                <!-- ko foreach: getRegion('shipping-information') -->
+                    <!-- ko template: getTemplate() --><!-- /ko -->
+                <!-- /ko -->
+            </div>
+
+            <?php /* Visual proxy; native KO agreements stay owned by the active payment method. */ ?>
+            <div class="fastcheckout-payment-method-ko-container"
+                 data-fastcheckout-agreements-summary-host
+                 hidden></div>
+
             <?php if ($showComment): ?>
-                <div class="border-t border-gray-200 pt-4">
+                <div class="border-t border-gray-200 pt-4" data-fastcheckout-order-comment>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1" for="fastcheckout-comment">
                             <?= $escaper->escapeHtml(__('Order Comment')) ?>
@@ -106,37 +117,8 @@ $showSubscribe = $block->isShowSubscribe();
                 </div>
             <?php endif; ?>
 
-            <?php if ($showSubscribe): ?>
-                <div class="border-t border-gray-200 pt-4" data-fastcheckout-newsletter>
-                    <label class="flex items-center gap-2 text-sm text-gray-700 mb-0 cursor-pointer">
-                        <input type="checkbox"
-                               id="fastcheckout-subscribe"
-                               name="fastcheckout_subscribe"
-                               data-fastcheckout-subscribe
-                               class="form-checkbox"
-                               value="1"
-                            <?= $block->getHelper()->isSubscribeByDefault() ? 'checked' : '' ?> />
-                        <span><?= $escaper->escapeHtml(__('Sign Up for Our Newsletter')) ?></span>
-                    </label>
-                </div>
-            <?php endif; ?>
-
-            <div class="fastcheckout-agreements-host fastcheckout-ko-payment-root payment-method _active border-t border-gray-200 pt-4"
-                 data-fastcheckout-agreements-host></div>
-
-            <?php
-            /**
-             * The visible FC button delegates to the active renderer's native
-             * place-order button. The native button stays in its original DOM so
-             * payment-specific and additional validators keep their context.
-             */
-            ?>
+            <?php /* The native payment renderer and its validators remain in place. */ ?>
             <div class="pt-2 fastcheckout-place-order-section">
-                <div id="fastcheckout-place-order-host"
-                     class="fastcheckout-place-order-host hidden md:block"
-                     data-fastcheckout-place-order-host>
-                </div>
-                <?php /* Always available; the native checkout validators run on click. */ ?>
                 <button class="btn btn-primary w-full items-center justify-center gap-2 hidden md:flex fastcheckout-place-order-btn"
                         type="button"
                         data-fastcheckout-place-order
@@ -153,10 +135,8 @@ $showSubscribe = $block->isShowSubscribe();
                         <?= $escaper->escapeHtml(__('Place Order')) ?>
                     </span>
                 </button>
-                <p class="text-sm text-red-600 font-medium text-center mt-2 hidden"
-                   data-fastcheckout-client-order-error
-                   role="alert"></p>
             </div>
+
         </div>
     </div>
 </div>

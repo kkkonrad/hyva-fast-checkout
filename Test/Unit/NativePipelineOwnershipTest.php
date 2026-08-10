@@ -94,6 +94,13 @@ class NativePipelineOwnershipTest extends TestCase
             $bootstrap
         );
         $this->assertSame(1, substr_count($bootstrap, 'shipping.validateShippingInformation()'));
+        $this->assertStringNotContainsString('wireAgreements', $bootstrap);
+        $this->assertStringNotContainsString('wireNewsletter', $bootstrap);
+        $this->assertStringNotContainsString('quote.billingAddress(null)', $bootstrap);
+        $this->assertStringContainsString('shippingSaveQueued', $bootstrap);
+        $this->assertStringNotContainsString('paymentErrorTimer', $bootstrap);
+        $this->assertStringContainsString('sourcePart.cloneNode(true)', $bootstrap);
+        $this->assertStringNotContainsString('host.appendChild(source', $bootstrap);
     }
 
     public function testDiDoesNotReplaceOrGloballyPatchCheckoutServices(): void
@@ -113,14 +120,34 @@ class NativePipelineOwnershipTest extends TestCase
         }
     }
 
-    public function testOrderExtrasStayInTheExistingSummaryMarkup(): void
+    public function testOrderExtrasUseTheSummaryAndNativePaymentRegion(): void
     {
-        $source = (string)file_get_contents(
+        $summary = (string)file_get_contents(
             $this->moduleRoot() . '/view/frontend/templates/hyva/checkout/summary.phtml'
         );
+        $payment = (string)file_get_contents(
+            $this->moduleRoot() . '/view/frontend/templates/hyva/checkout/payment-methods.phtml'
+        );
+        $layout = (string)file_get_contents(
+            $this->moduleRoot() . '/view/frontend/layout/checkout_index_index.xml'
+        );
+        $newsletter = (string)file_get_contents(
+            $this->moduleRoot() . '/view/frontend/web/template/hyva/newsletter.html'
+        );
+        $configProvider = (string)file_get_contents(
+            $this->moduleRoot() . '/Model/ExtendedCheckoutConfigProvider.php'
+        );
 
-        $this->assertStringContainsString('id="fastcheckout-comment"', $source);
-        $this->assertStringContainsString('id="fastcheckout-subscribe"', $source);
+        $this->assertStringContainsString('id="fastcheckout-comment"', $summary);
+        $this->assertStringContainsString('name="fastcheckout-newsletter"', $layout);
+        $this->assertStringContainsString('before-place-order', $layout);
+        $this->assertStringContainsString('data-fastcheckout-subscribe', $newsletter);
+        $this->assertStringContainsString("'newsletterLabel'", $configProvider);
+        $this->assertStringContainsString("__('Sign Up for Our Newsletter')", $configProvider);
+        $this->assertStringNotContainsString('data-fastcheckout-agreements-host', $summary);
+        $this->assertStringContainsString('data-fastcheckout-agreements-summary-host', $summary);
+        $this->assertStringNotContainsString('data-fastcheckout-place-order-ssr', $payment);
+        $this->assertStringContainsString('data-fastcheckout-place-order-ssr', $summary);
     }
 
     public function testModuleHasNoHyvaCheckoutOrMagewireRequirement(): void

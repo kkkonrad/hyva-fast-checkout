@@ -15,6 +15,9 @@ var config = {
             },
             'Magento_SalesRule/js/view/payment/discount': {
                 'Kkkonrad_Fastcheckout/js/mixin/discount-visibility-mixin': true
+            },
+            'Magento_CheckoutAgreements/js/view/checkout-agreements': {
+                'Kkkonrad_Fastcheckout/js/mixin/checkout-agreements-mixin': true
             }
         }
     }

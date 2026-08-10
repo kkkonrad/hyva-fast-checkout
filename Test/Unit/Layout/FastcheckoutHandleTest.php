@@ -25,8 +25,15 @@ class FastcheckoutHandleTest extends TestCase
         $this->assertStringContainsString('<update handle="checkout_index_index"/>', $source);
         $this->assertStringContainsString('Kkkonrad_Fastcheckout::js/requirejs-base.js', $checkout);
         $this->assertStringContainsString('requirejs/require.js', $checkout);
+        $this->assertStringContainsString('mage/requirejs/mixins.js', $checkout);
+        $this->assertStringContainsString('requirejs-config.js', $checkout);
         $this->assertStringContainsString('hyva-default-checkout.css', $source);
         $this->assertStringContainsString('Kkkonrad_Fastcheckout::hyva/checkout.phtml', $source);
+        $this->assertStringContainsString('name="fastcheckout-newsletter"', $checkout);
+        $this->assertStringContainsString(
+            'Kkkonrad_Fastcheckout/js/view/newsletter',
+            $checkout
+        );
         $this->assertStringContainsString('fastcheckout-checkout-page', $source);
         $this->assertStringContainsString('name="fallback.module.missing" remove="true"', $source);
         $this->assertStringContainsString('name="checkout.root" remove="true"', $source);
@@ -50,11 +57,13 @@ class FastcheckoutHandleTest extends TestCase
             'checkout.steps.shipping-step.shippingAddress',
             'checkout.steps.billing-step.payment',
             'checkout.sidebar.summary',
+            'checkout.sidebar',
             "getRegion('shippingAdditional')",
             "getRegion('before-shipping-method-form')",
             "getRegion('beforeMethods')",
             "getRegion('afterMethods')",
             "getRegion('payment-methods-list')",
+            "getRegion('shipping-information')",
         ] as $extensionPoint) {
             $this->assertStringContainsString($extensionPoint, $templates);
         }

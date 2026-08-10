@@ -22,7 +22,8 @@ class ExtendedCheckoutConfigProvider implements ConfigProviderInterface
                 'showDiscount' => $this->helper->isShowDiscount(),
                 'showComment' => $this->helper->isShowComment(),
                 'showSubscribe' => $this->helper->isShowSubscribe(),
-                'subscribeByDefault' => $this->helper->isSubscribeByDefault()
+                'subscribeByDefault' => $this->helper->isSubscribeByDefault(),
+                'newsletterLabel' => (string)__('Sign Up for Our Newsletter')
             ]
         ];
     }

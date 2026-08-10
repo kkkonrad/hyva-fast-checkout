@@ -28,6 +28,10 @@
                 <!-- ko foreach: getRegion('beforeMethods') -->
                     <!-- ko template: getTemplate() --><!-- /ko -->
                 <!-- /ko -->
+                <p class="rounded-lg border border-red-200 bg-red-50 px-3 py-2
+                          text-sm text-red-600 font-medium mb-4 hidden"
+                   data-fastcheckout-client-order-error
+                   role="alert"></p>
                 <div id="checkout-payment-method-load"
                      class="opc-payment"
                      data-bind="visible: isPaymentMethodsAvailable">
@@ -40,6 +44,7 @@
                               i18n: 'No Payment method available.'"></p>
             </form>
         </div>
+
     </div>
     <div class="fastcheckout-payment-after-methods space-y-6"
          data-bind="scope: 'checkout.steps.billing-step.payment'">
