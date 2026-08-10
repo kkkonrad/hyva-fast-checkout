@@ -378,6 +378,29 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             !region.closest('[data-fastcheckout-payment-methods-card]') &&
             region.previousElementSibling?.matches('[data-fastcheckout-payment-methods-card]')
         ))).toBe(true);
+        const missingPaymentError = page.locator('[data-fastcheckout-client-order-error]');
+        await expect(missingPaymentError).toHaveCount(1);
+        expect(await missingPaymentError.evaluate((error) => (
+            error.closest('#co-payment-form') !== null &&
+            error.nextElementSibling?.id === 'checkout-payment-method-load'
+        ))).toBe(true);
+        await page.evaluate(() => {
+            window.require('Magento_Checkout/js/model/quote').paymentMethod(null);
+        });
+        await initialProxy.click({force: true});
+        await expect(missingPaymentError).toBeVisible();
+        await expect(missingPaymentError).toContainText(
+            'Brakuje metody płatności. Wybierz metodę płatności i spróbuj ponownie.'
+        );
+        await expect.poll(() => missingPaymentError.evaluate((error) => {
+            const box = error.getBoundingClientRect();
+
+            return box.top >= 0 && box.bottom <= window.innerHeight;
+        })).toBe(true);
+        await page.locator(
+            '#checkout-payment-method-load input[name="payment[method]"]'
+        ).first().evaluate((input) => input.click());
+        await expect(missingPaymentError).toBeHidden();
         const activePayment = page.locator(
             '.fastcheckout-ko-payment-root .payment-method._active'
         );
