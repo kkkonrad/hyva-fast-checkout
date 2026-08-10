@@ -8,20 +8,52 @@ use PHPUnit\Framework\TestCase;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use SplFileInfo;
+use Magento\Framework\Component\ComponentRegistrar;
 
 class PolishCatalogTest extends TestCase
 {
-    public function testFrontendLiteralTranslationsExistInPolishCatalog(): void
+    /**
+     * @return array<string, true>
+     */
+    private function loadTranslations(string $file): array
     {
-        $moduleRoot = dirname(__DIR__, 3);
         $translations = [];
-        $handle = fopen($moduleRoot . '/i18n/pl_PL.csv', 'r');
+        if (!is_file($file)) {
+            return $translations;
+        }
+
+        $handle = fopen($file, 'r');
         while (($row = fgetcsv($handle, 0, ',', '"', '')) !== false) {
-            if (isset($row[0])) {
+            if (isset($row[0]) && $row[0] !== '') {
                 $translations[$row[0]] = true;
             }
         }
         fclose($handle);
+
+        return $translations;
+    }
+
+    public function testFrontendLiteralsComeFromLanguagePackOrFastcheckoutCatalog(): void
+    {
+        $moduleRoot = dirname(__DIR__, 3);
+        $moduleTranslations = $this->loadTranslations($moduleRoot . '/i18n/pl_PL.csv');
+        $standardTranslations = [];
+        $registrar = new ComponentRegistrar();
+
+        foreach ($registrar->getPaths(ComponentRegistrar::LANGUAGE) as $path) {
+            $standardTranslations += $this->loadTranslations($path . '/pl_PL.csv');
+        }
+
+        self::assertNotSame([], $standardTranslations, 'No pl_PL language pack is registered.');
+        $duplicates = array_keys(array_intersect_key($moduleTranslations, $standardTranslations));
+        sort($duplicates);
+        self::assertSame(
+            [],
+            $duplicates,
+            'Fastcheckout must not duplicate standard pl_PL translations.'
+        );
+
+        $translations = $moduleTranslations + $standardTranslations;
 
         $missing = [];
         $files = new RecursiveIteratorIterator(
