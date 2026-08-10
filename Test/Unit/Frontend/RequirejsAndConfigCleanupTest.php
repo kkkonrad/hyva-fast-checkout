@@ -20,6 +20,10 @@ class RequirejsAndConfigCleanupTest extends TestCase
         $this->assertStringNotContainsString('map:', $source);
         $this->assertStringContainsString("'Magento_Checkout/js/action/place-order'", $source);
         $this->assertStringContainsString("'Magento_Checkout/js/model/payment-service'", $source);
+        $this->assertStringContainsString(
+            "'Magento_Checkout/js/action/set-payment-information-extended'",
+            $source
+        );
         $this->assertStringContainsString("'Magento_Checkout/js/view/summary/abstract-total'", $source);
         $this->assertStringContainsString("'Magento_Checkout/js/view/summary/cart-items'", $source);
         $this->assertStringContainsString("'Magento_SalesRule/js/view/payment/discount'", $source);
@@ -27,7 +31,7 @@ class RequirejsAndConfigCleanupTest extends TestCase
             "'Magento_CheckoutAgreements/js/view/checkout-agreements'",
             $source
         );
-        $this->assertSame(6, substr_count($source, ': true'));
+        $this->assertSame(7, substr_count($source, ': true'));
 
         foreach ([
             'Magento_Checkout/js/checkout-data',

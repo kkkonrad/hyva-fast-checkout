@@ -7,6 +7,9 @@ var config = {
             'Magento_Checkout/js/model/payment-service': {
                 'Kkkonrad_Fastcheckout/js/mixin/payment-service-mixin': true
             },
+            'Magento_Checkout/js/action/set-payment-information-extended': {
+                'Kkkonrad_Fastcheckout/js/mixin/set-payment-information-extended-mixin': true
+            },
             'Magento_Checkout/js/view/summary/abstract-total': {
                 'Kkkonrad_Fastcheckout/js/mixin/summary-total-mixin': true
             },

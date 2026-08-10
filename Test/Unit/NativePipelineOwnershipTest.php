@@ -68,10 +68,17 @@ class NativePipelineOwnershipTest extends TestCase
             '/view/frontend/web/js/hyva/payment-host-bridge.js',
             '/view/frontend/web/js/mixin/storage-mixin.js',
             '/view/frontend/web/js/mixin/shipping-service-mixin.js',
-            '/view/frontend/web/js/mixin/set-payment-information-extended-mixin.js',
         ] as $removedFile) {
             $this->assertFileDoesNotExist($this->moduleRoot() . $removedFile);
         }
+
+        $paymentGuard = (string)file_get_contents(
+            $this->moduleRoot()
+            . '/view/frontend/web/js/mixin/set-payment-information-extended-mixin.js'
+        );
+        $this->assertStringContainsString('quote.guestEmail', $paymentGuard);
+        $this->assertStringNotContainsString('shippingAddress', $paymentGuard);
+        $this->assertStringNotContainsString('DEDUPE', $paymentGuard);
 
         $bootstrap = (string)file_get_contents(
             $this->moduleRoot() . '/view/frontend/web/js/hyva/checkout-renderers.js'

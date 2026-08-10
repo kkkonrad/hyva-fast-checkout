@@ -733,7 +733,11 @@ define([
             window.clearTimeout(shippingSaveTimer);
             shippingSaveQueued = false;
             shippingSavePending = true;
-            setShippingInformation().always(function () {
+            setShippingInformation().done(function () {
+                document.dispatchEvent(
+                    new Event('fastcheckout:shipping-information-saved')
+                );
+            }).always(function () {
                 shippingSavePending = false;
                 if (shippingSaveQueued) {
                     saveLatestShippingInformation();
