@@ -833,18 +833,19 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
                 resolve();
             }, reject);
         }));
-        await page.evaluate(() => {
-            window.setTimeout(() => {
-                const error = document.createElement('p');
-
-                error.className = 'msg msg__error';
-                error.dataset.fastcheckoutE2ePaymentError = '1';
-                error.textContent = 'Payment validation error';
-                document.querySelector('.payment-method._active .payment-method-content')
-                    .appendChild(error);
-            }, 250);
-        });
         await clickProxy();
+        await expect.poll(() => page.evaluate(() => (
+            window.fastcheckoutE2eValidationCalls
+        ))).toBe(1);
+        await page.evaluate(() => {
+            const error = document.createElement('p');
+
+            error.className = 'msg msg__error';
+            error.dataset.fastcheckoutE2ePaymentError = '1';
+            error.textContent = 'Payment validation error';
+            document.querySelector('.payment-method._active .payment-method-content')
+                .appendChild(error);
+        });
         const paymentError = page.locator('[data-fastcheckout-e2e-payment-error]');
         await expect(paymentError).toBeVisible();
         await expect.poll(() => paymentError.evaluate((error) => {
@@ -855,9 +856,6 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         await paymentError.evaluate((error) => {
             error.remove();
         });
-        await expect.poll(() => page.evaluate(() => (
-            window.fastcheckoutE2eValidationCalls
-        ))).toBe(1);
         await expect.poll(() => visibleErrorText(purchaseOrderNumber)).toEqual([]);
         expect(paymentRequests).toBe(0);
         expect(pageErrors.filter((message) => (
@@ -901,13 +899,36 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
 
         await page.evaluate(() => {
             window.fastcheckoutE2eAllowOrder = true;
+            const staleError = document.createElement('p');
+
+            staleError.className = 'msg__error';
+            staleError.dataset.fastcheckoutE2eStaleError = '1';
+            staleError.textContent = 'Previous validation error';
+            document.querySelector('.payment-method._active .payment-method-content')
+                .prepend(staleError);
         });
+        await page.route('**/payment-information*', async (route) => {
+            await new Promise((resolve) => setTimeout(resolve, 600));
+            await route.continue();
+        });
+        const paymentRequestStarted = page.waitForRequest((request) => (
+            request.method() === 'POST' &&
+            request.url().includes('/payment-information')
+        ), {timeout: 60_000});
+        await proxy.evaluate((button) => button.scrollIntoView({block: 'center'}));
+        await page.waitForTimeout(50);
+        const scrollBeforeSubmit = await page.evaluate(() => window.scrollY);
         const placeOrderResponse = page.waitForResponse((response) => (
             response.request().method() === 'POST' &&
             response.url().includes('/payment-information')
         ), {timeout: 60_000});
         placeOrderRequests = [];
         await clickProxy();
+        await paymentRequestStarted;
+        await page.waitForTimeout(350);
+        expect(Math.abs(
+            await page.evaluate(() => window.scrollY) - scrollBeforeSubmit
+        )).toBeLessThanOrEqual(2);
         const orderResponse = await placeOrderResponse;
         expect(orderResponse.ok()).toBe(true);
         await page.waitForURL(/checkout\/onepage\/success/, {timeout: 60_000});

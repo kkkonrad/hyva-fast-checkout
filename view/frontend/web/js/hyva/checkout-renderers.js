@@ -508,7 +508,7 @@ define([
                     }
                 }
             }
-            if (active) {
+            if (active && !placeOrderProcessing) {
                 window.setTimeout(watchForPaymentError, 0);
             }
         }, 0);
