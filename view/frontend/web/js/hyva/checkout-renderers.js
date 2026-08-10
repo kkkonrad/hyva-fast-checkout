@@ -735,9 +735,6 @@ define([
             window.clearTimeout(shippingSaveTimer);
             shippingSaveQueued = false;
             shippingSavePending = true;
-            if (quote.guestEmail) {
-                quote.shippingAddress().email = quote.guestEmail;
-            }
             setShippingInformation().always(function () {
                 shippingSavePending = false;
                 if (shippingSaveQueued) {

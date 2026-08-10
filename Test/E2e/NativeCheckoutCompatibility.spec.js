@@ -913,7 +913,7 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         await page.waitForURL(/checkout\/onepage\/success/, {timeout: 60_000});
         expect(placeOrderRequests.filter((url) => (
             url.includes('/estimate-shipping-methods')
-        )).length).toBeLessThanOrEqual(1);
+        ))).toHaveLength(0);
         expect(placeOrderRequests.filter((url) => (
             url.includes('/shipping-information')
         ))).toHaveLength(1);
