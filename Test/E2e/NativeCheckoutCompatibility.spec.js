@@ -155,6 +155,36 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             beforeMethods: true,
             afterMethods: true
         });
+
+        const configuredStylesheets = await page.evaluate(() => {
+            const hrefs = [];
+
+            function collect(config) {
+                Object.keys(config || {}).forEach((key) => {
+                    const value = config[key];
+
+                    if (key.toLowerCase() === 'addcss' && typeof value === 'string') {
+                        const container = document.createElement('div');
+
+                        container.innerHTML = value;
+                        container.querySelectorAll('link[rel~="stylesheet"][href]')
+                            .forEach((link) => hrefs.push(link.href));
+                    } else if (value && typeof value === 'object') {
+                        collect(value);
+                    }
+                });
+            }
+
+            collect(window.checkoutConfig);
+
+            return [...new Set(hrefs)];
+        });
+        await expect.poll(() => page.evaluate((hrefs) => (
+            hrefs.filter((href) => !Array.from(document.head.querySelectorAll(
+                'link[rel~="stylesheet"][href]'
+            )).some((link) => link.href === href))
+        ), configuredStylesheets), {timeout: 10_000}).toEqual([]);
+
         await page.setViewportSize({width: 390, height: 844});
         await expect(page.locator('[data-fastcheckout-place-order-mobile]')).toBeVisible();
         await expect(page.locator('[data-fastcheckout-place-order-mobile]')).toBeEnabled();

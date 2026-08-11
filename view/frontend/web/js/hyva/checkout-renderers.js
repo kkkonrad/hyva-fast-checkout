@@ -56,6 +56,52 @@ define([
         return method && method.method ? String(method.method) : '';
     }
 
+    function addStylesheetToHead(link) {
+        var duplicate;
+
+        if (!document.head || !link.href) {
+            return;
+        }
+
+        duplicate = Array.prototype.some.call(
+            document.head.querySelectorAll('link[rel~="stylesheet"][href]'),
+            function (candidate) {
+                return candidate.href === link.href;
+            }
+        );
+
+        if (duplicate) {
+            link.remove();
+        } else {
+            document.head.appendChild(link);
+        }
+    }
+
+    function addConfiguredStylesheets(config) {
+        Object.keys(config || {}).forEach(function (key) {
+            var value = config[key],
+                container;
+
+            if (key.toLowerCase() === 'addcss' && typeof value === 'string') {
+                container = document.createElement('div');
+                container.innerHTML = value;
+                container.querySelectorAll('link[rel~="stylesheet"][href]')
+                    .forEach(addStylesheetToHead);
+            } else if (value && typeof value === 'object') {
+                addConfiguredStylesheets(value);
+            }
+        });
+    }
+
+    function hoistCheckoutStylesheets() {
+        var root = document.getElementById('fastcheckout-checkout');
+
+        if (root) {
+            root.querySelectorAll('link[rel~="stylesheet"][href]')
+                .forEach(addStylesheetToHead);
+        }
+    }
+
     function placeOrderButton(method) {
         return method && method.querySelector(
             '.payment-method-content [data-role="review-save"], ' +
@@ -401,6 +447,8 @@ define([
             billingType = billingAddress && typeof billingAddress.getType === 'function' ?
                 billingAddress.getType() : '';
 
+        hoistCheckoutStylesheets();
+
         if (loader && document.querySelector(
             '.fastcheckout-native-shipping-address input[name="firstname"]'
         )) {
@@ -732,6 +780,7 @@ define([
             }, true);
         }
 
+        addConfiguredStylesheets(window.checkoutConfig);
         app(jsLayout);
         customerData.getInitCustomerData().done(function () {
             checkoutDataResolver.resolveBillingAddress();

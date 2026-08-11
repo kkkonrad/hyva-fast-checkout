@@ -144,6 +144,7 @@
 
 #fastcheckout-checkout .tpay-payment-method .payment-method-title .payment-icon {
     width: auto;
+    max-height: 2.125rem;
     margin-right: 0.5rem;
 }
 
