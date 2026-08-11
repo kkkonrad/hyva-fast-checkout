@@ -9,7 +9,7 @@ use Magento\Framework\Escaper;
 
 /** @var Checkout $block */
 /** @var Escaper $escaper */
-$items = $block->getVisibleItems();
+$hasItems = $block->getQuote()->hasItems();
 ?>
 <div id="checkout">
 <section class="space-y-8 max-w-7xl mx-auto px-0 py-4 pb-24 md:p-6 md:pb-6 overflow-x-hidden" id="fastcheckout-checkout">
@@ -31,7 +31,7 @@ $items = $block->getVisibleItems();
         <!-- ko template: getTemplate() --><!-- /ko -->
     </div>
 
-    <?php if (!$items): ?>
+    <?php if (!$hasItems): ?>
         <div class="card text-center py-16">
             <h2 class="text-2xl font-semibold text-gray-900">
                 <?= $escaper->escapeHtml(__('Your cart is empty.')) ?>
@@ -69,9 +69,9 @@ $items = $block->getVisibleItems();
             <div class="flex items-center justify-between">
                 <div class="min-w-0">
                     <span class="block text-xs text-gray-500 uppercase tracking-wider font-semibold"><?= $escaper->escapeHtml(__('Grand Total')) ?></span>
-                    <span class="block text-xl font-bold text-gray-950" data-fastcheckout-mobile-grand-total>
-                        <?= /* @noEscape */ $block->formatPrice($block->getQuote()->getGrandTotal()) ?>
-                    </span>
+                    <span class="block text-xl font-bold text-gray-950"
+                          data-fastcheckout-mobile-grand-total
+                          aria-live="polite"></span>
                 </div>
                 <div class="flex items-center gap-1 text-[11px] text-green-700 bg-green-50 px-2 py-1 rounded border border-green-150 font-medium">
                     <svg class="h-3.5 w-3.5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -101,3 +101,5 @@ $items = $block->getVisibleItems();
     <?php endif; ?>
 </section>
 </div>
+<?php // phpcs:ignore Magento2.Security.IncludeFile.FoundIncludeFile -- trusted module template. ?>
+<?php include $block->getTemplateFile('Kkkonrad_Fastcheckout::hyva/knockout/checkout-bridge.phtml'); ?>

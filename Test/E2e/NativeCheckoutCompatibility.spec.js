@@ -113,7 +113,7 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         );
         await expect(nativeSummary.locator('.product-item')).toBeVisible({timeout: 45_000});
         await expect(nativeSummary.locator('.table-totals tr.grand.totals').first()).toBeVisible();
-        await expect(page.locator('[data-fastcheckout-summary-ssr]')).toBeHidden();
+        await expect(page.locator('[data-fastcheckout-summary-ssr]')).toHaveCount(0);
         const initialPlaceOrder = page.locator('[data-fastcheckout-place-order-ssr]');
         await expect(initialPlaceOrder).toBeVisible();
         await expect(initialPlaceOrder).toBeEnabled();

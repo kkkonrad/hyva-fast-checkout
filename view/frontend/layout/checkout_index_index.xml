@@ -20,6 +20,14 @@
                                             <item name="children" xsi:type="array">
                                                 <item name="payment" xsi:type="array">
                                                     <item name="children" xsi:type="array">
+                                                        <item name="additional-payment-validators" xsi:type="array">
+                                                            <item name="children" xsi:type="array">
+                                                                <item name="fastcheckout-one-step-validator" xsi:type="array">
+                                                                    <item name="component" xsi:type="string">Kkkonrad_Fastcheckout/js/view/one-step-validator</item>
+                                                                    <item name="sortOrder" xsi:type="number">10</item>
+                                                                </item>
+                                                            </item>
+                                                        </item>
                                                         <item name="payments-list" xsi:type="array">
                                                             <item name="children" xsi:type="array">
                                                                 <item name="before-place-order" xsi:type="array">

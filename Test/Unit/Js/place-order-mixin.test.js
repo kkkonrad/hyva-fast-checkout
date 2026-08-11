@@ -10,7 +10,6 @@ test('adds checkout extras and invokes Magento place-order exactly once', () => 
     let mixin;
     let calls = 0;
     let shippingCalls = 0;
-    let validationCalls = 0;
     let captured;
     let fail;
     const events = [];
@@ -32,24 +31,6 @@ test('adds checkout extras and invokes Magento place-order exactly once', () => 
                     return callback();
                 }
             };
-        },
-        Deferred() {
-            return {
-                reject() {
-                    return this;
-                },
-                promise() {
-                    return this;
-                }
-            };
-        }
-    };
-
-    const shipping = {
-        fastcheckoutValidatedForPlaceOrder: true,
-        validateShippingInformation() {
-            validationCalls += 1;
-            return false;
         }
     };
 
@@ -81,7 +62,6 @@ test('adds checkout extras and invokes Magento place-order exactly once', () => 
                     shippingCalls += 1;
                     return {};
                 },
-                {get: () => shipping},
                 () => true
             );
         }
@@ -104,7 +84,6 @@ test('adds checkout extras and invokes Magento place-order exactly once', () => 
     assert.equal(typeof result.fail, 'function');
     assert.equal(calls, 1);
     assert.equal(shippingCalls, 1);
-    assert.equal(validationCalls, 0);
     assert.equal(captured.additional_data.token, 'preserved');
     assert.equal(captured.additional_data.fastcheckout_comment, 'Leave at reception');
     assert.equal(captured.additional_data.fastcheckout_subscribe, '1');
@@ -117,9 +96,4 @@ test('adds checkout extras and invokes Magento place-order exactly once', () => 
         'fastcheckout:order-submit-failed'
     ]);
 
-    shipping.fastcheckoutValidatedForPlaceOrder = false;
-    action({method: 'stripe'}, {});
-    assert.equal(validationCalls, 1);
-    assert.equal(calls, 1);
-    assert.equal(shippingCalls, 1);
 });

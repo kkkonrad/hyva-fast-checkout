@@ -132,18 +132,21 @@ pozostaje dostępna jako redirect do `/checkout/` ze względów zgodności wstec
 ## Walidacja i składanie zamówienia
 
 Widoczne przyciski desktop/mobile są proxy. Nie implementują płatności i nie
-wywołują endpointu samodzielnie: po pomyślnej walidacji klikają natywny przycisk
-`placeOrder` aktywnego renderera. Dzięki temu PayU, Przelewy24, Stripe i inne
-moduły zachowują własne tokenizacje, zgody oraz walidatory.
+wywołują endpointu samodzielnie: klikają natywny przycisk `placeOrder` aktywnego
+renderera. Dzięki temu PayU, Przelewy24, Stripe i inne moduły zachowują własne
+tokenizacje, zgody oraz walidatory.
 
 Przy próbie złożenia zamówienia Fastcheckout:
 
-1. uruchamia natywną walidację e-maila i adresu wysyłki;
-2. wywołuje `shipping.validateShippingInformation()`, łącznie z walidatorami
-   przewoźnika, np. wyborem paczkomatu;
-3. sprawdza wybór płatności dopiero po poprawnej dostawie;
-4. synchronizuje i waliduje adres rozliczeniowy, domyślnie równy adresowi wysyłki;
-5. przekazuje sterowanie aktywnemu rendererowi płatności i jego `validate()`.
+1. przy braku płatności wywołuje `shipping.validateShippingInformation()` i
+   pokazuje komunikat płatności dopiero po poprawnej dostawie;
+2. przy wybranej płatności przygotowuje adres rozliczeniowy przez natywny
+   komponent `Magento_Checkout/js/view/billing-address`;
+3. przekazuje sterowanie aktywnemu rendererowi i jego `validate()`;
+4. renderer uruchamia standardowy `additional-validators`, w którym Fastcheckout
+   rejestruje walidację shipping/billing obok walidatorów e-maila, zgód i modułów
+   zewnętrznych;
+5. dopiero po ich powodzeniu natywna akcja zapisuje informacje dostawy i zamówienie.
 
 Komunikat o braku płatności jest wyświetlany przed dynamiczną listą metod,
 przewijany do widoku i usuwany przez zmianę `quote.paymentMethod`. Podczas
@@ -170,6 +173,9 @@ Magento.
 - Pełny, scalony `jsLayout` jest uruchamiany dokładnie raz przez
   `Magento_Ui/js/core/app`; Fastcheckout zmienia wyłącznie trzy ścieżki szablonów
   odpowiedzialne za dotychczasowy wygląd.
+- Stronę renderuje jedna instancja bloku Fastcheckout. Stawki oraz podsumowanie
+  nie mają równoległego fallbacku PHP: ich jedynym źródłem są natywne
+  `shipping-service`, `totals` i komponenty `checkout.sidebar.summary`.
 - Magento zachowuje własne komponenty `shipping`, `payment`, `payments-list`,
   `renderer-list`, `shipping-service`, `checkout-data` i `quote` bez forków.
 - Integracje z core JS są rejestrowane wyłącznie jako mixiny RequireJS — bez
@@ -215,6 +221,9 @@ patchy ani wpisów DI w Kkkonrad_Fastcheckout.**
 - Mixiny nie są rejestrowane na akcjach wyboru adresu/metody, transporcie REST,
   rate processorach ani `customer-data`, więc łańcuchy innych vendorów pozostają
   nienaruszone.
+- Walidator one-step jest zwykłym dzieckiem kanonicznego węzła
+  `checkout.steps.billing-step.payment.additional-payment-validators`; nie
+  zastępuje listy ani walidatorów rejestrowanych przez inne moduły.
 
 Nie dodawaj per-vendor DI „pod Fastcheckout” w projekcie sklepu, jeśli standardowy
 checkout Magento w motywie fallback już ładuje ten sam renderer.

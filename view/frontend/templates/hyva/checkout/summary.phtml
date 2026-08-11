@@ -7,7 +7,6 @@
  *
  * @var \Kkkonrad\Fastcheckout\Block\Hyva\Checkout $block
  * @var \Magento\Framework\Escaper $escaper
- * @var array $items
  */
 $showComment = $block->isShowComment();
 ?>
@@ -25,67 +24,12 @@ $showComment = $block->isShowComment();
                 </span>
             </div>
 
-            <?php
-            /**
-             * Native Magento KO summary (cart items + totals, Magento_Tax templates).
-             * Mounted by checkout-renderers.js.
-             * SSR below is progressive enhancement until KO binds.
-             */
-            ?>
+            <?php /* Native Magento KO summary: cart items, totals and third-party children. */ ?>
             <div id="fastcheckout-ko-summary-root"
                  class="fastcheckout-ko-summary-root hidden"
                  data-bind="scope: 'checkout.sidebar.summary'"
                  data-fastcheckout-native-summary>
                 <!-- ko template: getTemplate() --><!-- /ko -->
-            </div>
-
-            <div data-fastcheckout-summary-ssr>
-                <ul class="space-y-3 max-h-60 overflow-y-auto pr-1">
-                    <?php foreach ($items as $item): ?>
-                        <li class="flex gap-3 py-1">
-                            <img class="h-14 w-14 shrink-0 rounded border border-gray-200 object-contain bg-gray-50"
-                                 src="<?= $escaper->escapeUrl($block->getItemImageUrl($item)) ?>"
-                                 alt="<?= $escaper->escapeHtmlAttr($item->getName()) ?>"
-                                 width="<?= (int)$block->getItemImageWidth($item) ?>"
-                                 height="<?= (int)$block->getItemImageHeight($item) ?>"
-                                 loading="lazy"/>
-                            <div class="min-w-0 flex-1">
-                                <h3 class="text-sm font-medium text-gray-800 truncate" title="<?= $escaper->escapeHtmlAttr($item->getName()) ?>">
-                                    <?= $escaper->escapeHtml($item->getName()) ?>
-                                </h3>
-                                <?php $options = $block->getItemOptions($item); ?>
-                                <?php if (!empty($options)): ?>
-                                    <div class="mt-1 space-y-0.5">
-                                        <?php foreach ($options as $option): ?>
-                                            <div class="text-[11px] text-gray-500">
-                                                <?= $escaper->escapeHtml($option['label'] ?? '') ?>:
-                                                <?= $escaper->escapeHtml(is_array($option['value'] ?? null) ? implode(', ', $option['value']) : ($option['value'] ?? '')) ?>
-                                            </div>
-                                        <?php endforeach; ?>
-                                    </div>
-                                <?php endif; ?>
-                                <div class="mt-1 text-xs text-gray-500">
-                                    × <?= (float)$item->getQty() ?>
-                                </div>
-                            </div>
-                            <div class="text-sm font-semibold text-gray-900 shrink-0 text-right">
-                                <?= /* @noEscape */ $block->formatPrice($block->getItemRowTotal($item)) ?>
-                            </div>
-                        </li>
-                    <?php endforeach; ?>
-                </ul>
-
-                <div class="border-t border-gray-200 pt-4 space-y-2" data-fastcheckout-summary-totals>
-                    <?php foreach ($block->getSummaryTotals() as $total): ?>
-                        <div class="flex justify-between text-sm <?= !empty($total['strong']) ? 'font-bold text-base pt-2 border-t border-gray-100' : 'text-gray-700' ?>"
-                             data-fastcheckout-total-row="<?= $escaper->escapeHtmlAttr($total['code']) ?>">
-                            <span><?= $escaper->escapeHtml($total['label']) ?></span>
-                            <span data-fastcheckout-total-value="<?= $escaper->escapeHtmlAttr($total['code']) ?>">
-                                <?= /* @noEscape */ $block->formatPrice($total['value']) ?>
-                            </span>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
             </div>
 
             <div id="fastcheckout-ko-shipping-information-root"

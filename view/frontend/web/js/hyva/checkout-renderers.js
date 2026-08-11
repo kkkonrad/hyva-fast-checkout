@@ -1,6 +1,5 @@
 define([
     'jquery',
-    'ko',
     'Magento_Ui/js/core/app',
     'Magento_Checkout/js/model/quote',
     'Magento_Checkout/js/model/checkout-data-resolver',
@@ -11,10 +10,10 @@ define([
     'Magento_Checkout/js/action/select-billing-address',
     'Magento_Catalog/js/price-utils',
     'mage/translate',
+    'Kkkonrad_Fastcheckout/js/model/one-step-validator',
     'uiRegistry'
 ], function (
     $,
-    ko,
     app,
     quote,
     checkoutDataResolver,
@@ -25,6 +24,7 @@ define([
     selectBillingAddress,
     priceUtils,
     $t,
+    oneStepValidator,
     registry
 ) {
     'use strict';
@@ -394,9 +394,8 @@ define([
     function revealNativeContent() {
         var loader = document.querySelector('[data-fastcheckout-startup-loader]'),
             summaryRoot = document.getElementById('fastcheckout-ko-summary-root'),
-            summaryFallback = document.querySelector('[data-fastcheckout-summary-ssr]'),
             nativeSummary = summaryRoot && summaryRoot.querySelector('.fastcheckout-native-summary'),
-            billingComponent = activeBillingAddressComponent(),
+            billingComponent = oneStepValidator.getBillingAddressComponent(),
             billingAddress = quote.billingAddress(),
             shippingAddress = quote.shippingAddress(),
             billingType = billingAddress && typeof billingAddress.getType === 'function' ?
@@ -413,9 +412,6 @@ define([
             nativeSummary.querySelector('.product-item') &&
             nativeSummary.querySelector('.table-totals tr')) {
             summaryRoot.classList.remove('hidden');
-            if (summaryFallback) {
-                summaryFallback.hidden = true;
-            }
         }
 
         if (!quote.isVirtual() && shippingAddress &&
@@ -456,59 +452,17 @@ define([
         });
     }
 
-    function activeBillingAddressComponent() {
-        var root = document.querySelector(
-            '.payment-method._active .checkout-billing-address, ' +
-            '.fastcheckout-payment-after-methods .checkout-billing-address'
-        );
-
-        return root ? ko.dataFor(root) : null;
-    }
-
-    function validateBillingAddress() {
-        var component = activeBillingAddressComponent();
-
-        if (component && component.isAddressSameAsShipping &&
-            component.isAddressSameAsShipping() && quote.shippingAddress()) {
-            selectBillingAddress(quote.shippingAddress());
-
-            return true;
-        }
-
-        if (quote.billingAddress()) {
-            return true;
-        }
-
-        if (!component) {
-            return false;
-        }
-
-        if (component.isAddressSameAsShipping && component.isAddressSameAsShipping()) {
-            component.useShippingAddress();
-        } else if (typeof component.updateAddress === 'function') {
-            component.updateAddress();
-        }
-
-        return Boolean(quote.billingAddress());
-    }
-
-    function submitActivePayment(shipping) {
+    function submitActivePayment() {
         window.setTimeout(function () {
-            var active = activePlaceOrderButton();
+            var active = activePlaceOrderButton(),
+                scroller = document.scrollingElement || document.documentElement,
+                scrollTop = scroller.scrollTop;
 
             if (active && !active.disabled) {
-                if (shipping) {
-                    shipping.fastcheckoutValidatedForPlaceOrder = true;
-                }
-                try {
-                    active.click();
-                } finally {
-                    if (shipping) {
-                        delete shipping.fastcheckoutValidatedForPlaceOrder;
-                    }
-                }
+                active.click();
             }
             if (active && !placeOrderProcessing) {
+                scroller.scrollTop = scrollTop;
                 window.setTimeout(watchForPaymentError, 0);
             }
         }, 0);
@@ -637,56 +591,38 @@ define([
         ].filter(Boolean));
     }
 
-    function validateAndPlaceOrder(shipping) {
-        var source = shipping.source,
-            email = $('form[data-role=email-with-possible-login] input[name=username]'),
-            emailValid = true,
-            addressValid = true,
-            shippingValid,
-            paymentValid,
+    function validateAndPlaceOrder() {
+        var shippingValid,
             scroller = document.scrollingElement || document.documentElement,
             scrollTop = scroller.scrollTop;
 
         setClientOrderError('');
 
-        if (source && typeof shipping.triggerShippingDataValidateEvent === 'function') {
-            source.set('params.invalid', false);
-            shipping.triggerShippingDataValidateEvent();
-            addressValid = !source.get('params.invalid');
-        }
-
-        if (email.length) {
-            email.closest('form').validation();
-            emailValid = Boolean(email.valid());
-        }
-
-        shippingValid = shipping.validateShippingInformation();
-        addressValid = source ? !source.get('params.invalid') : addressValid;
-        paymentValid = !shippingValid || validatePaymentMethod();
-
-        if (!addressValid || !emailValid || !shippingValid || !paymentValid) {
+        if (!activePaymentCode()) {
+            shippingValid = oneStepValidator.validateShippingInformation();
+            if (shippingValid) {
+                validatePaymentMethod();
+            }
             scroller.scrollTop = scrollTop;
             window.setTimeout(function () {
                 watchForValidationError(
-                    addressValid && emailValid && !shippingValid
+                    !shippingValid
                         ? document.getElementById('fastcheckout-ko-shipping-root')
                         : document.getElementById('fastcheckout-checkout')
                 );
             }, 0);
             return;
         }
-        if (!validateBillingAddress()) {
+
+        if (!oneStepValidator.validateBillingAddress()) {
+            scroller.scrollTop = scrollTop;
+            window.setTimeout(function () {
+                watchForValidationError(document.getElementById('fastcheckout-checkout'));
+            }, 0);
             return;
         }
 
-        submitActivePayment(shipping);
-    }
-
-    function validateVirtualAndPlaceOrder() {
-        setClientOrderError('');
-        if (validatePaymentMethod() && validateBillingAddress()) {
-            submitActivePayment();
-        }
+        submitActivePayment();
     }
 
     function bindPlaceOrderProxies() {
@@ -708,13 +644,7 @@ define([
                 if (placeOrderProcessing) {
                     return;
                 }
-                if (quote.isVirtual && quote.isVirtual()) {
-                    validateVirtualAndPlaceOrder();
-                    return;
-                }
-                registry.async('checkout.steps.shipping-step.shippingAddress')(
-                    validateAndPlaceOrder
-                );
+                validateAndPlaceOrder();
             });
         });
     }
