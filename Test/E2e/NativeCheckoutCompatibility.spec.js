@@ -112,8 +112,8 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             '#fastcheckout-ko-summary-root .fastcheckout-native-summary'
         );
         await expect(nativeSummary.locator('.product-item')).toBeVisible({timeout: 45_000});
-        await expect(nativeSummary.locator('.table-totals tr.grand.totals')).toBeVisible();
-        await expect(page.locator('[data-fastcheckout-summary-ssr]')).toBeHidden();
+        await expect(nativeSummary.locator('.table-totals tr.grand.totals').first()).toBeVisible();
+        await expect(page.locator('[data-fastcheckout-summary-ssr]')).toHaveCount(0);
         const initialPlaceOrder = page.locator('[data-fastcheckout-place-order-ssr]');
         await expect(initialPlaceOrder).toBeVisible();
         await expect(initialPlaceOrder).toBeEnabled();
@@ -361,12 +361,14 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
                 return method && method.carrier_code + '_' + method.method_code;
             })).toBe('tablerate_bestway');
         } else {
-            const shippingResponse = page.waitForResponse((response) => (
-                response.request().method() === 'POST' &&
-                response.url().includes('/shipping-information')
-            ), {timeout: 45_000});
-            await selected.click({force: true});
-            expect((await shippingResponse).ok()).toBe(true);
+            if (!await selected.isChecked()) {
+                const shippingResponse = page.waitForResponse((response) => (
+                    response.request().method() === 'POST' &&
+                    response.url().includes('/shipping-information')
+                ), {timeout: 45_000});
+                await selected.click({force: true});
+                expect((await shippingResponse).ok()).toBe(true);
+            }
         }
         await expect.poll(() => page.evaluate(() => {
             const quote = window.require('Magento_Checkout/js/model/quote');
@@ -951,6 +953,7 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         const orderResponse = await placeOrderResponse;
         expect(orderResponse.ok()).toBe(true);
         await page.waitForURL(/checkout\/onepage\/success/, {timeout: 60_000});
+        await expect(page.locator('.fastcheckout-success-card')).toBeVisible();
         expect(placeOrderRequests.filter((url) => (
             url.includes('/estimate-shipping-methods')
         ))).toHaveLength(0);

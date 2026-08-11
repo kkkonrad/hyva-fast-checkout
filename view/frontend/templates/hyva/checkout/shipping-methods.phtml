@@ -2,13 +2,8 @@
 /**
  * Shipping methods — the KO list owns rates after paint.
  *
- * @var \Kkkonrad\Fastcheckout\Block\Hyva\Checkout $block
  * @var \Magento\Framework\Escaper $escaper
- * @var \Hyva\Theme\ViewModel\HyvaCsp $hyvaCsp
  */
-// Collect rates with Magento default destination when quote has no country yet.
-$shippingMethods = $block->getShippingMethods();
-$selectedShipping = $block->getSelectedShippingMethodCode();
 ?>
 <!-- Container 2: Shipping Method -->
 <div class="fc-container-2 space-y-6 min-w-0 w-full" data-fastcheckout-shipping-methods>
@@ -23,9 +18,6 @@ $selectedShipping = $block->getSelectedShippingMethodCode();
             <?php
             /**
              * Bind to Magento's real shipping view (same instance as the address form).
-             * The legacy scope "fastcheckoutHyvaShippingRenderers.shippingList" was never
-             * registered, so KO never replaced this SSR markup — rates stayed frozen after
-             * the first paint even though shippingService already re-estimated correctly.
              * Explicit shipping-list template (not getTemplate()) so the address form template
              * is not rendered here a second time.
              */
@@ -33,59 +25,7 @@ $selectedShipping = $block->getSelectedShippingMethodCode();
             <div id="fastcheckout-ko-shipping-root"
                  class="fastcheckout-ko-shipping-root"
                  data-bind="scope: 'checkout.steps.shipping-step.shippingAddress'">
-                <!-- ko template: { name: 'Kkkonrad_Fastcheckout/hyva/shipping-list' } -->
-                <?php if (empty($shippingMethods)): ?>
-                    <p class="text-sm text-gray-500">
-                        <?= $escaper->escapeHtml(__('Please enter your shipping address details to estimate shipping rates.')) ?>
-                    </p>
-                <?php else: ?>
-                    <div class="grid gap-3 relative">
-                        <?php foreach ($shippingMethods as $carrierCode => $rates): ?>
-                            <?php foreach ($rates as $rate): ?>
-                                <?php
-                                    $rateCode = $rate->getCarrier() . '_' . $rate->getMethod();
-                                    $isSelected = ($selectedShipping === $rateCode);
-                                    $cssClass = $isSelected
-                                        ? 'border-2 border-primary bg-container'
-                                        : 'border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50/50';
-                                ?>
-                                <div class="fastcheckout-shipping-method-option rounded p-4 transition-all duration-200 cursor-pointer <?= $escaper->escapeHtmlAttr($cssClass) ?>">
-                                    <label class="flex items-center justify-between cursor-pointer mb-0 w-full">
-                                        <div class="flex items-center min-w-0">
-                                            <input type="radio"
-                                                   class="form-radio mr-4 shrink-0"
-                                                   name="shipping_method"
-                                                   value="<?= $escaper->escapeHtmlAttr($rateCode) ?>"
-                                                   <?= $isSelected ? 'checked' : '' ?>
-                                                   required />
-                                            <div class="min-w-0 pl-4">
-                                                <span class="block text-sm font-semibold text-gray-900 leading-tight">
-                                                    <?= $escaper->escapeHtml($rate->getMethodTitle()) ?>
-                                                </span>
-                                                <span class="block text-xs text-gray-500 mt-1" id="label_carrier_<?= $escaper->escapeHtmlAttr($rate->getMethod() . '_' . $rate->getCarrier()) ?>">
-                                                    <?= $escaper->escapeHtml($rate->getCarrierTitle()) ?>
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <div class="text-sm font-bold text-gray-900 shrink-0 pl-3 text-right">
-                                            <?= /* @noEscape */ $block->formatPrice($block->getShippingRateDisplayAmount($rate)) ?>
-                                            <?php if ($block->displayShippingBothPrices()
-                                                && $block->getShippingRateAmountExclTax($rate) != $block->getShippingRateAmountInclTax($rate)
-                                            ): ?>
-                                                <span class="block text-xs font-normal text-gray-500 mt-0.5">
-                                                    <?= $escaper->escapeHtml(__('Excl. Tax')) ?>:
-                                                    <?= /* @noEscape */ $block->formatPrice($block->getShippingRateAmountExclTax($rate)) ?>
-                                                </span>
-                                            <?php endif; ?>
-                                        </div>
-                                    </label>
-                                    <div id="label_method_<?= $escaper->escapeHtmlAttr($rate->getMethod() . '_' . $rate->getCarrier()) ?>"></div>
-                                </div>
-                            <?php endforeach; ?>
-                        <?php endforeach; ?>
-                    </div>
-                <?php endif; ?>
-                <!-- /ko -->
+                <!-- ko template: { name: 'Kkkonrad_Fastcheckout/hyva/shipping-list' } --><!-- /ko -->
             </div>
         </div>
     </div>

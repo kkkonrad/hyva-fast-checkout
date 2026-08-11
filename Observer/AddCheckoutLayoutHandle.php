@@ -21,12 +21,15 @@ class AddCheckoutLayoutHandle implements ObserverInterface
     public function execute(Observer $observer): void
     {
         $layout = $observer->getData('layout');
-        if (
-            $observer->getData('full_action_name') === 'checkout_index_index' &&
-            $this->helper->canUseHyvaNativeCheckout() &&
-            $layout instanceof LayoutInterface
-        ) {
+        if (!$layout instanceof LayoutInterface || !$this->helper->canUseHyvaNativeCheckout()) {
+            return;
+        }
+
+        $action = $observer->getData('full_action_name');
+        if ($action === 'checkout_index_index') {
             $layout->getUpdate()->addHandle('fastcheckout_index_index');
+        } elseif ($action === 'checkout_onepage_success') {
+            $layout->getUpdate()->addHandle('fastcheckout_checkout_onepage_success');
         }
     }
 }

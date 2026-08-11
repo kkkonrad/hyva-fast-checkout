@@ -6,6 +6,7 @@ namespace Kkkonrad\Fastcheckout\Model;
 
 use Hyva\ThemeFallback\Model\ThemeSwitch;
 use Magento\Checkout\Block\Onepage;
+use Magento\Framework\Serialize\SerializerInterface;
 use Magento\Framework\View\DesignInterface;
 use Magento\Framework\View\LayoutFactory;
 use Magento\Framework\View\Page\Layout\ReaderFactory as PageLayoutReaderFactory;
@@ -21,6 +22,7 @@ class CheckoutLayoutCollector
     private LoggerInterface $logger;
     private ThemeSwitch $themeSwitch;
     private PageLayoutReaderFactory $pageLayoutReaderFactory;
+    private SerializerInterface $serializer;
     private ?array $collected = null;
 
     public function __construct(
@@ -28,13 +30,15 @@ class CheckoutLayoutCollector
         DesignInterface $design,
         LoggerInterface $logger,
         ThemeSwitch $themeSwitch,
-        PageLayoutReaderFactory $pageLayoutReaderFactory
+        PageLayoutReaderFactory $pageLayoutReaderFactory,
+        SerializerInterface $serializer
     ) {
         $this->layoutFactory = $layoutFactory;
         $this->design = $design;
         $this->themeSwitch = $themeSwitch;
         $this->logger = $logger;
         $this->pageLayoutReaderFactory = $pageLayoutReaderFactory;
+        $this->serializer = $serializer;
     }
 
     /**
@@ -69,7 +73,7 @@ class CheckoutLayoutCollector
 
             $checkoutRoot = $layout->getBlock('checkout.root');
             if ($checkoutRoot instanceof Onepage) {
-                $jsLayout = $checkoutRoot->getData('jsLayout');
+                $jsLayout = $this->serializer->unserialize($checkoutRoot->getJsLayout());
                 $result = is_array($jsLayout) ? $jsLayout : [];
             }
         } catch (\Throwable $exception) {

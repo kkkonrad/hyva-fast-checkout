@@ -1,7 +1,15 @@
 <?xml version="1.0"?>
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
-    <preference for="Magento\Checkout\Block\Onepage\Success" type="Kkkonrad\Fastcheckout\Block\Onepage\Success" />
+    <type name="Magento\Checkout\Block\Onepage">
+        <arguments>
+            <argument name="layoutProcessors" xsi:type="array">
+                <item name="fastcheckout_presentation"
+                      xsi:type="object"
+                      sortOrder="1000">Kkkonrad\Fastcheckout\Block\Checkout\LayoutProcessor</item>
+            </argument>
+        </arguments>
+    </type>
     <type name="Magento\Checkout\Model\CompositeConfigProvider">
         <arguments>
             <argument name="configProviders" xsi:type="array">

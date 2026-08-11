@@ -853,7 +853,7 @@
 
 /*
  * Native Magento KO summary (checkout.sidebar.summary) inside Fastcheckout card.
- * Product list mirrors previous SSR: thumb | name/options/×qty | price.
+ * Product list: thumb | name/options/×qty | price.
  * Stock Tax templates (subtotal/shipping/grand-total/tax) keep Magento tax display.
  */
 #fastcheckout-checkout .fastcheckout-ko-summary-root,
@@ -1064,7 +1064,7 @@
     color: inherit;
 }
 
-/* Thumbnail: fixed 3.5rem like SSR h-14 w-14. */
+/* Thumbnail: fixed 3.5rem. */
 #fastcheckout-checkout .fastcheckout-native-summary .product-image-container,
 #fastcheckout-checkout .fastcheckout-native-summary .product-image-wrapper {
     display: block;
@@ -1429,7 +1429,7 @@
     padding: var(--fc-place-order-py) var(--fc-place-order-px) !important;
     margin: 0 !important;
     border-radius: var(--radius-lg, 0.5rem) !important;
-    /* Override Hyvä .btn 2px border so SSR and Magento match */
+    /* Override Hyvä .btn 2px border for the checkout action. */
     border-width: 0 !important;
     border-style: solid !important;
     font-size: 1rem !important;

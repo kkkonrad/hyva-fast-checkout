@@ -9,9 +9,10 @@ use Kkkonrad\Fastcheckout\Observer\QuoteSubmitSuccess;
 use Magento\Checkout\Model\Session as CheckoutSession;
 use Magento\Framework\Event;
 use Magento\Framework\Event\Observer;
+use Magento\Newsletter\Model\SubscriptionManagerInterface;
+use Magento\Sales\Api\OrderStatusHistoryRepositoryInterface;
 use Magento\Sales\Model\Order;
 use Magento\Sales\Model\Order\Status\History;
-use Magento\Sales\Model\Order\Status\HistoryFactory;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -24,14 +25,14 @@ class QuoteSubmitSuccessTest extends TestCase
     /** @var CheckoutSession&MockObject */
     private $checkoutSession;
 
-    /** @var HistoryFactory&MockObject */
-    private $historyFactory;
+    /** @var OrderStatusHistoryRepositoryInterface&MockObject */
+    private $historyRepository;
 
     /** @var LoggerInterface&MockObject */
     private $logger;
 
-    /** @var \Magento\Newsletter\Model\SubscriberFactory&MockObject */
-    private $subscriberFactory;
+    /** @var SubscriptionManagerInterface&MockObject */
+    private $subscriptionManager;
 
     protected function setUp(): void
     {
@@ -46,45 +47,31 @@ class QuoteSubmitSuccessTest extends TestCase
                 'setFastcheckoutSubscribe',
             ])
             ->getMock();
-        $this->historyFactory = $this->createMock(HistoryFactory::class);
+        $this->historyRepository = $this->createMock(OrderStatusHistoryRepositoryInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
-        $this->subscriberFactory = $this->getMockBuilder(\Magento\Newsletter\Model\SubscriberFactory::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['create'])
-            ->getMock();
+        $this->subscriptionManager = $this->createMock(SubscriptionManagerInterface::class);
     }
 
     public function testEnabledCommentIsPersistedAndRemovedFromSession(): void
     {
         $order = $this->createOrderMock();
-        $order->method('getId')->willReturn(42);
-        $order->method('getStatus')->willReturn('processing');
         $this->helper->method('isEnable')->willReturn(true);
         $this->helper->method('isShowComment')->willReturn(true);
         $this->checkoutSession->method('getFastcheckoutComment')->willReturn('  Leave at reception  ');
 
         $history = $this->createMock(History::class);
-        $historyData = [];
-        $history->expects($this->exactly(6))
-            ->method('setData')
-            ->willReturnCallback(function ($key, $value) use (&$historyData, $history) {
-                $historyData[$key] = $value;
-                return $history;
-            });
-        $history->expects($this->once())->method('save')->willReturnSelf();
-        $this->historyFactory->method('create')->willReturn($history);
+        $order->expects($this->once())
+            ->method('addCommentToStatusHistory')
+            ->with('Leave at reception', false, true)
+            ->willReturn($history);
+        $history->expects($this->once())
+            ->method('setIsCustomerNotified')
+            ->with(false)
+            ->willReturnSelf();
+        $this->historyRepository->expects($this->once())->method('save')->with($history);
         $this->checkoutSession->expects($this->once())->method('unsFastcheckoutComment');
 
         $this->createObserver()->execute($this->eventFor($order));
-
-        $this->assertSame([
-            'comment' => 'Leave at reception',
-            'parent_id' => 42,
-            'is_visible_on_front' => 1,
-            'is_customer_notified' => 0,
-            'entity_name' => 'order',
-            'status' => 'processing',
-        ], $historyData);
     }
 
     public function testEmptyCommentDoesNotCreateHistory(): void
@@ -93,7 +80,7 @@ class QuoteSubmitSuccessTest extends TestCase
         $this->helper->method('isEnable')->willReturn(true);
         $this->helper->method('isShowComment')->willReturn(true);
         $this->checkoutSession->method('getFastcheckoutComment')->willReturn('   ');
-        $this->historyFactory->expects($this->never())->method('create');
+        $this->historyRepository->expects($this->never())->method('save');
 
         $this->createObserver()->execute($this->eventFor($order));
     }
@@ -103,29 +90,27 @@ class QuoteSubmitSuccessTest extends TestCase
         $order = $this->createOrderMock();
         $this->helper->method('isEnable')->willReturn(false);
         $this->helper->expects($this->never())->method('isShowComment');
-        $this->historyFactory->expects($this->never())->method('create');
-        $this->subscriberFactory->expects($this->never())->method('create');
+        $this->historyRepository->expects($this->never())->method('save');
+        $this->subscriptionManager->expects($this->never())->method('subscribe');
 
         $this->createObserver()->execute($this->eventFor($order));
     }
 
     public function testNewsletterSubscribeWhenFlagSet(): void
     {
-        $order = $this->createOrderMock(['getCustomerEmail', 'getEntityId']);
+        $order = $this->createOrderMock(['getCustomerEmail', 'getEntityId', 'getStoreId']);
         $order->method('getCustomerEmail')->willReturn('guest@example.com');
         $order->method('getEntityId')->willReturn(55);
+        $order->method('getStoreId')->willReturn(3);
 
         $this->helper->method('isEnable')->willReturn(true);
         $this->helper->method('isShowComment')->willReturn(false);
         $this->helper->method('isShowSubscribe')->willReturn(true);
         $this->checkoutSession->method('getFastcheckoutSubscribe')->willReturn(1);
 
-        $subscriber = $this->getMockBuilder(\Magento\Newsletter\Model\Subscriber::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['subscribe'])
-            ->getMock();
-        $subscriber->expects($this->once())->method('subscribe')->with('guest@example.com');
-        $this->subscriberFactory->expects($this->once())->method('create')->willReturn($subscriber);
+        $this->subscriptionManager->expects($this->once())
+            ->method('subscribe')
+            ->with('guest@example.com', 3);
         $this->checkoutSession->expects($this->once())->method('unsFastcheckoutSubscribe');
 
         $this->createObserver()->execute($this->eventFor($order));
@@ -139,7 +124,7 @@ class QuoteSubmitSuccessTest extends TestCase
         $this->helper->method('isShowComment')->willReturn(false);
         $this->helper->method('isShowSubscribe')->willReturn(true);
         $this->checkoutSession->method('getFastcheckoutSubscribe')->willReturn(null);
-        $this->subscriberFactory->expects($this->never())->method('create');
+        $this->subscriptionManager->expects($this->never())->method('subscribe');
         $this->checkoutSession->expects($this->once())->method('unsFastcheckoutSubscribe');
 
         $this->createObserver()->execute($this->eventFor($order));
@@ -150,9 +135,9 @@ class QuoteSubmitSuccessTest extends TestCase
         return new QuoteSubmitSuccess(
             $this->helper,
             $this->checkoutSession,
-            $this->historyFactory,
+            $this->historyRepository,
             $this->logger,
-            $this->subscriberFactory
+            $this->subscriptionManager
         );
     }
 
@@ -172,6 +157,8 @@ class QuoteSubmitSuccessTest extends TestCase
             'getStatus',
             'getEntityId',
             'getCustomerEmail',
+            'getStoreId',
+            'addCommentToStatusHistory',
         ], $extraMethods)));
 
         return $this->getMockBuilder(Order::class)

@@ -3,9 +3,8 @@ define([
     'mage/utils/wrapper',
     'Magento_Checkout/js/model/quote',
     'Magento_Checkout/js/action/set-shipping-information',
-    'uiRegistry',
     'Kkkonrad_Fastcheckout/js/mixin/is-fastcheckout-active'
-], function ($, wrapper, quote, setShippingInformation, registry, isFastcheckoutActive) {
+], function ($, wrapper, quote, setShippingInformation, isFastcheckoutActive) {
     'use strict';
 
     return function (placeOrderAction) {
@@ -16,7 +15,6 @@ define([
                     '[data-fastcheckout-subscribe]'
                 ),
                 additional,
-                shipping,
                 result,
                 active = isFastcheckoutActive(),
                 virtual = quote.isVirtual && quote.isVirtual();
@@ -36,17 +34,6 @@ define([
 
             if (!active) {
                 return originalAction(paymentData, messageContainer);
-            }
-
-            if (!virtual) {
-                shipping = registry.get('checkout.steps.shipping-step.shippingAddress');
-
-                if (!shipping || (
-                    !shipping.fastcheckoutValidatedForPlaceOrder &&
-                    !shipping.validateShippingInformation()
-                )) {
-                    return $.Deferred().reject().promise();
-                }
             }
 
             document.dispatchEvent(new Event('fastcheckout:order-submit-started'));

@@ -13,7 +13,7 @@ class NativePipelineOwnershipTest extends TestCase
         return dirname(__DIR__, 2);
     }
 
-    public function testCheckoutKeepsCustomRouteWithoutSwitchingTheRenderedPageTheme(): void
+    public function testCheckoutKeepsLegacyRedirectWithoutSwitchingTheRenderedPageTheme(): void
     {
         $observer = (string)file_get_contents(
             $this->moduleRoot() . '/Observer/AddCheckoutLayoutHandle.php'
@@ -22,6 +22,10 @@ class NativePipelineOwnershipTest extends TestCase
         $di = (string)file_get_contents($this->moduleRoot() . '/etc/frontend/di.xml');
 
         $this->assertStringContainsString("addHandle('fastcheckout_index_index')", $observer);
+        $this->assertStringContainsString(
+            "addHandle('fastcheckout_checkout_onepage_success')",
+            $observer
+        );
         $this->assertStringContainsString("'checkout_index_index'", $observer);
         $this->assertStringContainsString('layout_load_before', $events);
         $this->assertStringNotContainsString('fastcheckout_checkout_controller', $di);
@@ -32,6 +36,11 @@ class NativePipelineOwnershipTest extends TestCase
         $this->assertFileDoesNotExist(
             $this->moduleRoot() . '/Plugin/Checkout/Controller/Index/UseFallbackThemePlugin.php'
         );
+        $this->assertFileDoesNotExist($this->moduleRoot() . '/Controller/Action.php');
+        $legacyController = (string)file_get_contents(
+            $this->moduleRoot() . '/Controller/Index/Index.php'
+        );
+        $this->assertStringContainsString("setPath('checkout')", $legacyController);
     }
 
     public function testOnlyAnIsolatedLayoutBuildUsesFallbackAndRestoresTheHyvaTheme(): void
@@ -43,12 +52,17 @@ class NativePipelineOwnershipTest extends TestCase
         $this->assertStringContainsString("\$update->addHandle('checkout_index_index')", $source);
         $this->assertStringNotContainsString("\$update->addHandle('default')", $source);
         $this->assertStringContainsString('<container name="content"/>', $source);
-        $this->assertStringContainsString("\$checkoutRoot->getData('jsLayout')", $source);
+        $this->assertStringContainsString('$checkoutRoot->getJsLayout()', $source);
+        $this->assertStringContainsString('$this->serializer->unserialize', $source);
         $this->assertStringContainsString('switchToFallback()', $source);
         $this->assertStringContainsString('setDesignTheme($originalTheme)', $source);
         $this->assertStringNotContainsString('DOMXPath', $source);
         $this->assertStringNotContainsString('parseJsLayoutItem', $source);
         $this->assertStringNotContainsString('mergeJsLayoutArrays', $source);
+
+        $checkout = (string)file_get_contents($this->moduleRoot() . '/Block/Hyva/Checkout.php');
+        $this->assertStringNotContainsString('createBlock(Onepage::class', $checkout);
+        $this->assertStringNotContainsString('getProcessedCheckoutLayout', $checkout);
     }
 
     public function testProcessedThirdPartyLayoutIsNotNormalizedRecursively(): void
@@ -100,7 +114,12 @@ class NativePipelineOwnershipTest extends TestCase
             'customerData.getInitCustomerData().done(',
             $bootstrap
         );
-        $this->assertSame(1, substr_count($bootstrap, 'shipping.validateShippingInformation()'));
+        $validator = (string)file_get_contents(
+            $this->moduleRoot() . '/view/frontend/web/js/model/one-step-validator.js'
+        );
+        $this->assertStringNotContainsString('shipping.validateShippingInformation()', $bootstrap);
+        $this->assertSame(1, substr_count($validator, 'shipping.validateShippingInformation()'));
+        $this->assertStringNotContainsString('fastcheckoutValidatedForPlaceOrder', $bootstrap);
         $this->assertStringNotContainsString('wireAgreements', $bootstrap);
         $this->assertStringNotContainsString('wireNewsletter', $bootstrap);
         $this->assertStringNotContainsString('quote.billingAddress(null)', $bootstrap);
@@ -120,11 +139,27 @@ class NativePipelineOwnershipTest extends TestCase
             'PaymentInformationManagementInterface',
             'Magento\Framework\View\Model\Layout\Merge',
             'Magento\Quote\Api\CartRepositoryInterface',
+            'preference for="Magento\Checkout\Block\Onepage\Success"',
             'Tpay\Magento2',
             'PreserveShippingExtensionAttributes',
         ] as $forbidden) {
             $this->assertStringNotContainsString($forbidden, $source);
         }
+
+        $this->assertStringContainsString('fastcheckout_presentation', $source);
+        $this->assertStringContainsString('sortOrder="1000"', $source);
+    }
+
+    public function testSuccessPageUsesTheNativeBlock(): void
+    {
+        $layout = (string)file_get_contents(
+            $this->moduleRoot() . '/view/frontend/layout/fastcheckout_checkout_onepage_success.xml'
+        );
+
+        $this->assertFileDoesNotExist($this->moduleRoot() . '/Block/Onepage/Success.php');
+        $this->assertStringContainsString('name="checkout.success"', $layout);
+        $this->assertStringContainsString('Kkkonrad_Fastcheckout::success/success.phtml', $layout);
+        $this->assertStringContainsString('Magento\Customer\ViewModel\Customer\Auth', $layout);
     }
 
     public function testOrderExtrasUseTheSummaryAndNativePaymentRegion(): void
@@ -148,6 +183,8 @@ class NativePipelineOwnershipTest extends TestCase
         $this->assertStringContainsString('id="fastcheckout-comment"', $summary);
         $this->assertStringContainsString('name="fastcheckout-newsletter"', $layout);
         $this->assertStringContainsString('before-place-order', $layout);
+        $this->assertStringContainsString('additional-payment-validators', $layout);
+        $this->assertStringContainsString('fastcheckout-one-step-validator', $layout);
         $this->assertStringContainsString('data-fastcheckout-subscribe', $newsletter);
         $this->assertStringContainsString("'newsletterLabel'", $configProvider);
         $this->assertStringContainsString("__('Sign Up for Our Newsletter')", $configProvider);
@@ -155,6 +192,33 @@ class NativePipelineOwnershipTest extends TestCase
         $this->assertStringContainsString('data-fastcheckout-agreements-summary-host', $summary);
         $this->assertStringNotContainsString('data-fastcheckout-place-order-ssr', $payment);
         $this->assertStringContainsString('data-fastcheckout-place-order-ssr', $summary);
+    }
+
+    public function testRatesAndSummaryHaveNoPhpFallbackOrSecondCheckoutBlock(): void
+    {
+        $block = (string)file_get_contents($this->moduleRoot() . '/Block/Hyva/Checkout.php');
+        $summary = (string)file_get_contents(
+            $this->moduleRoot() . '/view/frontend/templates/hyva/checkout/summary.phtml'
+        );
+        $shipping = (string)file_get_contents(
+            $this->moduleRoot() . '/view/frontend/templates/hyva/checkout/shipping-methods.phtml'
+        );
+        $layout = (string)file_get_contents(
+            $this->moduleRoot() . '/view/frontend/layout/fastcheckout_index_index.xml'
+        );
+
+        $this->assertStringNotContainsString('getSummaryTotals', $block);
+        $this->assertStringNotContainsString('getShippingMethods', $block);
+        $this->assertStringNotContainsString('TaxHelper', $block);
+        $this->assertStringNotContainsString('data-fastcheckout-summary-ssr', $summary);
+        $this->assertStringNotContainsString('$shippingMethods', $shipping);
+        $this->assertSame(1, substr_count(
+            $layout,
+            'class="Kkkonrad\Fastcheckout\Block\Hyva\Checkout"'
+        ));
+        $this->assertFileDoesNotExist(
+            $this->moduleRoot() . '/view/frontend/templates/hyva/knockout/checkout-renderers.phtml'
+        );
     }
 
     public function testModuleHasNoHyvaCheckoutOrMagewireRequirement(): void

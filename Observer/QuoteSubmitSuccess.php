@@ -8,9 +8,9 @@ use Kkkonrad\Fastcheckout\Helper\Data as Helper;
 use Magento\Checkout\Model\Session as CheckoutSession;
 use Magento\Framework\Event\Observer;
 use Magento\Framework\Event\ObserverInterface;
-use Magento\Newsletter\Model\SubscriberFactory;
+use Magento\Newsletter\Model\SubscriptionManagerInterface;
+use Magento\Sales\Api\OrderStatusHistoryRepositoryInterface;
 use Magento\Sales\Model\Order;
-use Magento\Sales\Model\Order\Status\HistoryFactory;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -32,27 +32,27 @@ class QuoteSubmitSuccess implements ObserverInterface
     /** @var CheckoutSession */
     private $checkoutSession;
 
-    /** @var HistoryFactory */
-    private $historyFactory;
+    /** @var OrderStatusHistoryRepositoryInterface */
+    private $historyRepository;
 
     /** @var LoggerInterface */
     private $logger;
 
-    /** @var SubscriberFactory */
-    private $subscriberFactory;
+    /** @var SubscriptionManagerInterface */
+    private $subscriptionManager;
 
     public function __construct(
         Helper $helper,
         CheckoutSession $checkoutSession,
-        HistoryFactory $historyFactory,
+        OrderStatusHistoryRepositoryInterface $historyRepository,
         LoggerInterface $logger,
-        SubscriberFactory $subscriberFactory
+        SubscriptionManagerInterface $subscriptionManager
     ) {
         $this->helper = $helper;
         $this->checkoutSession = $checkoutSession;
-        $this->historyFactory = $historyFactory;
+        $this->historyRepository = $historyRepository;
         $this->logger = $logger;
-        $this->subscriberFactory = $subscriberFactory;
+        $this->subscriptionManager = $subscriptionManager;
     }
 
     /**
@@ -83,14 +83,9 @@ class QuoteSubmitSuccess implements ObserverInterface
         }
 
         try {
-            $history = $this->historyFactory->create();
-            $history->setData('comment', $comment);
-            $history->setData('parent_id', $order->getId());
-            $history->setData('is_visible_on_front', 1);
-            $history->setData('is_customer_notified', 0);
-            $history->setData('entity_name', 'order');
-            $history->setData('status', $order->getStatus());
-            $history->save();
+            $history = $order->addCommentToStatusHistory($comment, false, true);
+            $history->setIsCustomerNotified(false);
+            $this->historyRepository->save($history);
             $this->checkoutSession->unsFastcheckoutComment();
         } catch (\Throwable $exception) {
             $this->logger->error('Fastcheckout order comment could not be saved.', [
@@ -123,7 +118,7 @@ class QuoteSubmitSuccess implements ObserverInterface
         }
 
         try {
-            $this->subscriberFactory->create()->subscribe($email);
+            $this->subscriptionManager->subscribe($email, (int)$order->getStoreId());
         } catch (\Throwable $exception) {
             // Never block order success on newsletter failures.
             $this->logger->warning('Fastcheckout newsletter subscribe failed.', [
