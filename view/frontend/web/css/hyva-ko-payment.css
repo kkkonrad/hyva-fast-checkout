@@ -136,12 +136,6 @@
     }
 }
 
-.fastcheckout-ko-payment-root img,
-.fastcheckout-payment-method-ko-container img {
-    max-width: 100%;
-    height: auto;
-}
-
 #fastcheckout-checkout .tpay-payment-method .payment-method-title .payment-icon {
     width: auto;
     max-height: 2.125rem;
