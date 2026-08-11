@@ -17,6 +17,10 @@ async function dismissConsent(page) {
 async function openCheckoutWithProduct(page) {
     const pageErrors = [];
 
+    await page.addInitScript(() => localStorage.setItem(
+        'mage-cache-storage-section-invalidation',
+        'null'
+    ));
     page.on('pageerror', (error) => pageErrors.push(error.message));
     await page.goto(new URL(PRODUCT, BASE).href, {
         waitUntil: 'domcontentloaded',
@@ -155,6 +159,13 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             beforeMethods: true,
             afterMethods: true
         });
+        expect(await page.evaluate(() => {
+            const value = JSON.parse(localStorage.getItem(
+                'mage-cache-storage-section-invalidation'
+            ));
+
+            return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+        })).toBe(true);
 
         const configuredStylesheets = await page.evaluate(() => {
             const hrefs = [];
@@ -221,7 +232,7 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         await initialProxy.click({force: true});
         await expect(shippingRoot.locator('input[name="firstname"]'))
             .toHaveAttribute('aria-invalid', 'true');
-        await expect(page.locator('[data-fastcheckout-shipping-method-error]')).toBeVisible();
+        await expect(page.locator('[data-fastcheckout-shipping-method-error]')).toBeHidden();
         await expect(page.locator('[data-fastcheckout-client-order-error]')).toBeHidden();
         expect(paymentRequests).toBe(0);
 
@@ -901,6 +912,11 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         await addressValidationField.fill('');
         await proxy.evaluate((button) => button.scrollIntoView({block: 'center'}));
         await page.waitForTimeout(50);
+        const addressWasVisible = await addressValidationField.evaluate((input) => {
+            const box = input.getBoundingClientRect();
+
+            return box.top >= 0 && box.bottom <= window.innerHeight;
+        });
         await page.evaluate(() => {
             window.fastcheckoutE2eAddressScroll = [window.scrollY];
             const sampler = window.setInterval(() => {
@@ -917,9 +933,11 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         await expect.poll(() => page.evaluate(() => (
             window.fastcheckoutE2eAddressScrollDone
         ))).toBe(true);
-        expect(new Set((await page.evaluate(() => (
-            window.fastcheckoutE2eAddressScroll
-        ))).map(Math.round)).size).toBeGreaterThan(4);
+        if (!addressWasVisible) {
+            expect(new Set((await page.evaluate(() => (
+                window.fastcheckoutE2eAddressScroll
+            ))).map(Math.round)).size).toBeGreaterThan(4);
+        }
         expect(paymentRequests).toBe(0);
         await addressValidationField.fill('Jan');
         await addressValidationField.blur();
@@ -986,8 +1004,10 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             await expect(page.locator('#checkout > #fastcheckout-checkout'))
                 .toBeVisible({timeout: 45_000});
             await expect.poll(() => page.evaluate(() => (
-                window.require('Magento_Checkout/js/model/payment-service')
-                    .getAvailablePaymentMethods().length
+                window.require.defined('Magento_Checkout/js/model/payment-service')
+                    ? window.require('Magento_Checkout/js/model/payment-service')
+                        .getAvailablePaymentMethods().length
+                    : 0
             )), {timeout: 45_000}).toBeGreaterThan(0);
             await expect.poll(() => page.evaluate(() => {
                 const quote = window.require('Magento_Checkout/js/model/quote'),

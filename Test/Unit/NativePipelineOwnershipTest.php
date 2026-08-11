@@ -114,6 +114,10 @@ class NativePipelineOwnershipTest extends TestCase
             'customerData.getInitCustomerData().done(',
             $bootstrap
         );
+        $this->assertGreaterThan(
+            strpos($bootstrap, 'customerData.getInitCustomerData().done('),
+            strpos($bootstrap, 'app(jsLayout)')
+        );
         $validator = (string)file_get_contents(
             $this->moduleRoot() . '/view/frontend/web/js/model/one-step-validator.js'
         );

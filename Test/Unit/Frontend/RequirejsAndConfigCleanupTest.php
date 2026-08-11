@@ -31,7 +31,7 @@ class RequirejsAndConfigCleanupTest extends TestCase
             "'Magento_CheckoutAgreements/js/view/checkout-agreements'",
             $source
         );
-        $this->assertSame(7, substr_count($source, ': true'));
+        $this->assertSame(9, substr_count($source, ': true'));
 
         foreach ([
             'Magento_Checkout/js/checkout-data',

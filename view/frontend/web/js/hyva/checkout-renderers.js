@@ -639,6 +639,7 @@ define([
         var root = document.getElementById('fastcheckout-checkout');
 
         watchForValidationError(root, [
+            document.querySelector('.fastcheckout-native-shipping-address'),
             document.querySelector('.fastcheckout-ko-payment-root .payment-method._active'),
             document.querySelector('[data-fastcheckout-agreements-summary-host]')
         ].filter(Boolean));
@@ -789,8 +790,13 @@ define([
         }
 
         addConfiguredStylesheets(window.checkoutConfig);
-        app(jsLayout);
         customerData.getInitCustomerData().done(function () {
+            if (!$.isPlainObject($.localStorage.get(
+                'mage-cache-storage-section-invalidation'
+            ))) {
+                $.localStorage.set('mage-cache-storage-section-invalidation', {});
+            }
+            app(jsLayout);
             checkoutDataResolver.resolveBillingAddress();
             bindPlaceOrderProxies();
             saveShippingWhenMethodChanges();
