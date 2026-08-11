@@ -17,6 +17,14 @@ if ($jsLayout === []) {
 (function () {
     'use strict';
 
+    if (window.location.hash) {
+        window.history.replaceState(
+            window.history.state,
+            document.title,
+            window.location.pathname + window.location.search
+        );
+    }
+
     window.checkoutConfig = <?= /* @noEscape */ $block->serializeForScript($checkoutConfig) ?>;
     window.isCustomerLoggedIn = Boolean(window.checkoutConfig.isCustomerLoggedIn);
     window.customerData = window.checkoutConfig.customerData || {};
