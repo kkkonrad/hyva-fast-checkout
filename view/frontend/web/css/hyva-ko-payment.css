@@ -57,6 +57,13 @@
     color: #1f2937;
 }
 
+.fastcheckout-ko-payment-root .payment-method-title .payment-icon,
+.fastcheckout-payment-method-ko-container .payment-method-title .payment-icon {
+    display: inline-block;
+    margin-right: 0.3125rem;
+    vertical-align: middle;
+}
+
 .fastcheckout-ko-payment-root .payment-group > .step-title,
 .fastcheckout-native-place-order-hidden,
 .fastcheckout-actions-toolbar-hidden {
