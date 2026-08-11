@@ -6,6 +6,7 @@ define([
     'Magento_Checkout/js/checkout-data',
     'Magento_Customer/js/customer-data',
     'Magento_Checkout/js/model/totals',
+    'Magento_Checkout/js/model/payment-service',
     'Magento_Checkout/js/action/set-shipping-information',
     'Magento_Checkout/js/action/select-billing-address',
     'Magento_Catalog/js/price-utils',
@@ -20,6 +21,7 @@ define([
     checkoutData,
     customerData,
     totals,
+    paymentService,
     setShippingInformation,
     selectBillingAddress,
     priceUtils,
@@ -724,7 +726,7 @@ define([
         }
 
         registry.async('checkout.steps.shipping-step.shippingAddress')(function () {
-            quote.shippingMethod.subscribe(function (method) {
+            function queueSave(method) {
                 window.clearTimeout(shippingSaveTimer);
                 if (!method) {
                     shippingSaveQueued = false;
@@ -736,7 +738,14 @@ define([
                     // Carrier-specific fields are validated by the place-order flow.
                     saveLatestShippingInformation();
                 }, 50);
-            });
+            }
+
+            quote.shippingMethod.subscribe(queueSave);
+            if (quote.shippingMethod() &&
+                !paymentService.getAvailablePaymentMethods().length &&
+                !(window.checkoutConfig.paymentMethods || []).length) {
+                queueSave(quote.shippingMethod());
+            }
         });
     }
 

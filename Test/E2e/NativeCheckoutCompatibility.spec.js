@@ -918,6 +918,10 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             await page.reload({waitUntil: 'domcontentloaded'});
             await expect(page.locator('#checkout > #fastcheckout-checkout'))
                 .toBeVisible({timeout: 45_000});
+            await expect.poll(() => page.evaluate(() => (
+                window.require('Magento_Checkout/js/model/payment-service')
+                    .getAvailablePaymentMethods().length
+            )), {timeout: 45_000}).toBeGreaterThan(0);
             await expect.poll(() => page.evaluate(() => {
                 const quote = window.require('Magento_Checkout/js/model/quote'),
                     input = Array.from(document.querySelectorAll(
