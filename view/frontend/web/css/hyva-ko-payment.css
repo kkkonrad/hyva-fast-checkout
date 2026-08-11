@@ -342,6 +342,15 @@
  * secureFormError(). Agreement failures use the same class. Keep both clearly
  * visible under the card fields / terms block.
  */
+#fastcheckout-checkout .payu-payment .payment__method > .payu-msg {
+    display: none !important;
+}
+
+#fastcheckout-checkout .payu-payment[data-fastcheckout-validation-attempted]
+    .payment__method > .payu-msg {
+    display: block !important;
+}
+
 #fastcheckout-checkout .payu-msg,
 .fastcheckout-payment-method-ko-container .payu-msg,
 .fastcheckout-ko-payment-root .payu-msg,

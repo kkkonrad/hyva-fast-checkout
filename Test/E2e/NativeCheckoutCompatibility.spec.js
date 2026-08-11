@@ -318,6 +318,27 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             await flatRate.click({force: true});
             expect((await flatRateResponse).ok()).toBe(true);
 
+            const payu = page.locator(
+                'input[name="payment[method]"][value="payu_gateway"]'
+            );
+            if (await payu.count()) {
+                await payu.evaluate((input) => input.click());
+                const activePayu = page.locator('.payu-payment._active');
+                const payuMethodError = activePayu.locator(
+                    '.payment__method > .payu-msg .msg__error'
+                );
+                const placeOrder = page.locator('[data-fastcheckout-place-order-ssr]');
+
+                await expect(payuMethodError).toBeHidden();
+                await expect(placeOrder).toBeEnabled();
+                await placeOrder.evaluate((button) => button.click());
+                await expect(payuMethodError).toBeVisible();
+                await activePayu.locator(
+                    '.method__single--content:not(._disabled)'
+                ).first().evaluate((method) => method.click());
+                await expect(payuMethodError).toBeHidden();
+            }
+
             const payuCard = page.locator(
                 'input[name="payment[method]"][value="payu_gateway_card"]'
             );

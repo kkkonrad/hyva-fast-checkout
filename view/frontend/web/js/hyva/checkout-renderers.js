@@ -168,9 +168,7 @@ define([
         document.querySelectorAll(
             '[data-fastcheckout-place-order-mobile], [data-fastcheckout-place-order-ssr]'
         ).forEach(function (button) {
-            button.disabled = placeOrderProcessing || Boolean(
-                activeButton && activeButton.disabled && quote.billingAddress()
-            );
+            button.disabled = placeOrderProcessing;
             button.setAttribute('aria-disabled', button.disabled ? 'true' : 'false');
             button.dataset.fastcheckoutNativeTargetReady = activeButton ? '1' : '0';
         });
@@ -505,9 +503,13 @@ define([
     function submitActivePayment() {
         window.setTimeout(function () {
             var active = activePlaceOrderButton(),
+                method = active && active.closest('.payment-method'),
                 scroller = document.scrollingElement || document.documentElement,
                 scrollTop = scroller.scrollTop;
 
+            if (method) {
+                method.setAttribute('data-fastcheckout-validation-attempted', 'true');
+            }
             if (active && !active.disabled) {
                 active.click();
             }
@@ -798,6 +800,10 @@ define([
 
             quote.paymentMethod.subscribe(function () {
                 setClientOrderError('');
+                document.querySelectorAll('[data-fastcheckout-validation-attempted]')
+                    .forEach(function (method) {
+                        method.removeAttribute('data-fastcheckout-validation-attempted');
+                    });
                 if (validationErrorObserver) {
                     validationErrorObserver.disconnect();
                     validationErrorObserver = null;
