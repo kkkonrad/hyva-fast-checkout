@@ -24,6 +24,9 @@ var config = {
             },
             'Magento_CheckoutAgreements/js/view/checkout-agreements': {
                 'Kkkonrad_Fastcheckout/js/mixin/checkout-agreements-mixin': true
+            },
+            'PayPal_Braintree/js/view/payment/method-renderer/hosted-fields': {
+                'Kkkonrad_Fastcheckout/js/mixin/braintree-hosted-fields-mixin': true
             }
         }
     }

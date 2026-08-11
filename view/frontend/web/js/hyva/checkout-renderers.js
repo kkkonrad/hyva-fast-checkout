@@ -582,6 +582,7 @@ define([
                 '.msg__error, ' +
                 '.message-error, ' +
                 '.message.error, ' +
+                '.braintree-hosted-fields-invalid, ' +
                 '[aria-invalid="true"], ' +
                 '[role="alert"]'
             ),

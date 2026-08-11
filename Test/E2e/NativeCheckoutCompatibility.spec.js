@@ -318,6 +318,52 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             await flatRate.click({force: true});
             expect((await flatRateResponse).ok()).toBe(true);
 
+            const braintree = page.locator(
+                'input[name="payment[method]"][value="braintree"]'
+            );
+            if (await braintree.count()) {
+                await braintree.evaluate((input) => input.click());
+                const activeBraintree = page.locator('.payment-method-braintree._active');
+                const hostedControls = activeBraintree.locator('.hosted-control');
+
+                await expect.poll(() => hostedControls.locator('iframe').count(), {
+                    timeout: 45_000
+                }).toBeGreaterThan(1);
+                await page.evaluate(() => window.scrollTo(
+                    0,
+                    document.scrollingElement.scrollHeight
+                ));
+                await page.evaluate(() => {
+                    window.fastcheckoutE2eBraintreeScroll = [window.scrollY];
+                    const sampler = window.setInterval(() => {
+                        window.fastcheckoutE2eBraintreeScroll.push(window.scrollY);
+                    }, 16);
+
+                    window.setTimeout(() => {
+                        window.clearInterval(sampler);
+                        window.fastcheckoutE2eBraintreeScrollDone = true;
+                    }, 650);
+                });
+                await page.locator('[data-fastcheckout-place-order-ssr]')
+                    .evaluate((button) => button.click());
+                await expect.poll(() => hostedControls.evaluateAll((controls) => (
+                    controls.length > 1 && controls.every((control) => (
+                        control.classList.contains('braintree-hosted-fields-invalid')
+                    ))
+                ))).toBe(true);
+                await expect.poll(() => page.evaluate(() => (
+                    window.fastcheckoutE2eBraintreeScrollDone
+                ))).toBe(true);
+                expect(new Set((await page.evaluate(() => (
+                    window.fastcheckoutE2eBraintreeScroll
+                ))).map(Math.round)).size).toBeGreaterThan(4);
+                await expect.poll(() => hostedControls.first().evaluate((control) => {
+                    const box = control.getBoundingClientRect();
+
+                    return box.top >= 0 && box.bottom <= window.innerHeight;
+                })).toBe(true);
+            }
+
             const payu = page.locator(
                 'input[name="payment[method]"][value="payu_gateway"]'
             );
