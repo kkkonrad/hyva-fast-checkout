@@ -658,11 +658,7 @@ define([
             }
             scroller.scrollTop = scrollTop;
             window.setTimeout(function () {
-                watchForValidationError(
-                    !shippingValid
-                        ? document.getElementById('fastcheckout-ko-shipping-root')
-                        : document.getElementById('fastcheckout-checkout')
-                );
+                watchForValidationError(document.getElementById('fastcheckout-checkout'));
             }, 0);
             return;
         }

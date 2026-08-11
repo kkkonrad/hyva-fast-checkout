@@ -1,8 +1,9 @@
 define([
+    'jquery',
     'Magento_Checkout/js/model/quote',
     'Magento_Checkout/js/action/select-billing-address',
     'uiRegistry'
-], function (quote, selectBillingAddress, registry) {
+], function ($, quote, selectBillingAddress, registry) {
     'use strict';
 
     var paymentPath = 'checkout.steps.billing-step.payment';
@@ -28,11 +29,53 @@ define([
 
         shipping = registry.get('checkout.steps.shipping-step.shippingAddress');
 
+        if (
+            shipping &&
+            (!quote.shippingMethod || !quote.shippingMethod()) &&
+            !validateShippingAddress(shipping)
+        ) {
+            return false;
+        }
+
         return Boolean(
             shipping &&
             typeof shipping.validateShippingInformation === 'function' &&
             shipping.validateShippingInformation()
         );
+    }
+
+    function validateShippingAddress(shipping) {
+        var email = $('form[data-role=email-with-possible-login] input[name=username]'),
+            emailValid = true;
+
+        if (
+            shipping.isFormInline === false ||
+            !shipping.source ||
+            typeof shipping.triggerShippingDataValidateEvent !== 'function'
+        ) {
+            return true;
+        }
+
+        shipping.source.set('params.invalid', false);
+        shipping.triggerShippingDataValidateEvent();
+
+        if (email.length) {
+            email.closest('form').validation();
+            emailValid = Boolean(email.valid());
+        }
+
+        if (shipping.source.get('params.invalid') || !emailValid) {
+            if (typeof shipping.focusInvalid === 'function') {
+                shipping.focusInvalid();
+            }
+            if (!emailValid) {
+                email.trigger('focus');
+            }
+
+            return false;
+        }
+
+        return true;
     }
 
     function validateBillingAddress() {

@@ -49,6 +49,7 @@ test('uses Magento shipping and billing components as one additional validator',
     vm.runInNewContext(source, {
         define(dependencies, factory) {
             validator = factory(
+                () => ({length: 0}),
                 quote,
                 (address) => {
                     billingAddress = address;
@@ -67,4 +68,72 @@ test('uses Magento shipping and billing components as one additional validator',
     assert.equal(shippingCalls, 2);
     assert.equal(billingAddress, shippingAddress);
     assert.equal(billingUpdates, 0);
+});
+
+test('validates the native shipping form before reporting a missing method', () => {
+    let validator;
+    let addressInvalid = true;
+    let shippingMethod = null;
+    let addressCalls = 0;
+    let shippingCalls = 0;
+    let focusCalls = 0;
+    const sourceProvider = {
+        invalid: false,
+        set(path, value) {
+            assert.equal(path, 'params.invalid');
+            this.invalid = value;
+        },
+        get(path) {
+            assert.equal(path, 'params.invalid');
+            return this.invalid;
+        }
+    };
+    const shipping = {
+        source: sourceProvider,
+        triggerShippingDataValidateEvent() {
+            addressCalls += 1;
+            sourceProvider.invalid = addressInvalid;
+        },
+        focusInvalid() {
+            focusCalls += 1;
+        },
+        validateShippingInformation() {
+            shippingCalls += 1;
+            return false;
+        }
+    };
+    const quote = {
+        isVirtual: () => false,
+        shippingMethod: () => shippingMethod
+    };
+    const source = fs.readFileSync(
+        path.resolve(__dirname, '../../../view/frontend/web/js/model/one-step-validator.js'),
+        'utf8'
+    );
+
+    vm.runInNewContext(source, {
+        define(dependencies, factory) {
+            validator = factory(
+                () => ({length: 0}),
+                quote,
+                () => {},
+                {get: () => shipping}
+            );
+        }
+    });
+
+    assert.equal(validator.validateShippingInformation(), false);
+    assert.equal(addressCalls, 1);
+    assert.equal(focusCalls, 1);
+    assert.equal(shippingCalls, 0);
+
+    addressInvalid = false;
+    assert.equal(validator.validateShippingInformation(), false);
+    assert.equal(addressCalls, 2);
+    assert.equal(shippingCalls, 1);
+
+    shippingMethod = {carrier_code: 'flatrate', method_code: 'flatrate'};
+    assert.equal(validator.validateShippingInformation(), false);
+    assert.equal(addressCalls, 2);
+    assert.equal(shippingCalls, 2);
 });
