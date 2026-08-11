@@ -142,6 +142,11 @@
     height: auto;
 }
 
+#fastcheckout-checkout .tpay-payment-method .payment-method-title .payment-icon {
+    width: auto;
+    margin-right: 0.5rem;
+}
+
 .fastcheckout-ko-payment-root input[type='text'],
 .fastcheckout-ko-payment-root input[type='tel'],
 .fastcheckout-ko-payment-root input[type='number'],
@@ -498,9 +503,9 @@ body.checkout-submitting .btn-primary {
     pointer-events: none !important;
 }
 body.checkout-submitting [data-fastcheckout-processing="true"] {
-    background-color: var(--fastcheckout-place-order-background) !important;
-    border-color: var(--fastcheckout-place-order-border) !important;
-    color: var(--fastcheckout-place-order-color) !important;
+    background-color: var(--btn-bg, var(--color-primary)) !important;
+    border-color: var(--btn-stroke, transparent) !important;
+    color: var(--btn-color, var(--color-on-primary, #fff)) !important;
     cursor: wait !important;
     filter: none !important;
     opacity: 1 !important;
@@ -508,6 +513,10 @@ body.checkout-submitting [data-fastcheckout-processing="true"] {
 body.checkout-submitting [data-fastcheckout-processing="true"] .place-order-spinner {
     color: currentColor !important;
     flex: 0 0 auto;
+}
+
+body.checkout-submitting [data-fastcheckout-processing="true"] .place-order-spinner svg {
+    color: currentColor !important;
 }
 
 /* ── Braintree Payments Styling ─────────────────────────────────────────── */
@@ -909,9 +918,9 @@ body.checkout-submitting [data-fastcheckout-processing="true"] .place-order-spin
 
 .modal-popup .modal-footer .action-primary,
 .modal-slide .modal-footer .action-primary {
-    background-color: var(--color-primary) !important;
-    color: #ffffff !important;
-    border: none !important;
+    background-color: var(--btn-bg, var(--color-primary)) !important;
+    color: var(--btn-color, var(--color-on-primary, #fff)) !important;
+    border-color: var(--btn-stroke, transparent) !important;
 }
 
 .modal-popup .modal-footer .action-secondary,

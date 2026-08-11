@@ -1,21 +1,7 @@
-/*
- * Keep the Fastcheckout form on the public Hyva/default design tokens.
- * Child themes can still style the surrounding page, while checkout controls,
- * buttons and validation retain the baseline Hyva appearance.
- */
+/* Inherit the active Hyva theme palette; only normalize checkout geometry. */
 #fastcheckout-checkout,
 .fastcheckout-ko-payment-root {
-    --color-primary-lighter: oklch(52% 0.2 265);
-    --color-primary: oklch(46% 0.2 265);
-    --color-primary-darker: oklch(28% 0.2 265);
-    --color-secondary-lighter: oklch(72% 0.2 150);
-    --color-secondary: oklch(53% 0.15 150);
-    --color-secondary-darker: oklch(39% 0.1 153);
-    --color-on-primary: #fff;
-    --color-on-secondary: #fff;
     --form-radius: var(--radius-lg);
-    --form-stroke: var(--color-slate-400);
-    --form-active-color: var(--color-primary);
 }
 
 #fastcheckout-checkout :is(.form-input, .form-textarea, .form-select, .form-multiselect) {
@@ -541,10 +527,10 @@
     align-items: center;
     justify-content: center;
     padding: 0.5rem 1rem;
-    border: 1px solid var(--color-primary);
+    border: 1px solid var(--btn-stroke, var(--color-primary));
     border-radius: var(--radius-lg);
-    background: var(--color-primary);
-    color: var(--color-on-primary);
+    background: var(--btn-bg, var(--color-primary));
+    color: var(--btn-color, var(--color-on-primary));
     font: inherit;
     font-weight: 500;
     line-height: 1.5;
@@ -558,8 +544,9 @@
     .checkout-billing-address
 ) .actions-toolbar .action:hover,
 #fastcheckout-checkout .billing-address-details .action-edit-address:hover {
-    background: var(--color-primary-darker);
-    border-color: var(--color-primary-darker);
+    background: var(--btn-hover-bg, var(--btn-bg, var(--color-primary-lighter)));
+    border-color: var(--btn-hover-stroke, var(--btn-stroke, var(--color-primary-lighter)));
+    color: var(--btn-hover-color, var(--btn-color, var(--color-on-primary)));
 }
 
 #fastcheckout-checkout :is(
@@ -602,10 +589,10 @@
     min-height: initial;
     margin-top: 0.75rem;
     padding: 0.5rem 1rem;
-    border: 1px solid var(--color-primary);
+    border: 1px solid var(--btn-stroke, var(--color-primary));
     border-radius: var(--radius-lg);
-    background: var(--color-primary);
-    color: var(--color-on-primary);
+    background: var(--btn-bg, var(--color-primary));
+    color: var(--btn-color, var(--color-on-primary));
     font: inherit;
     font-weight: 500;
     cursor: pointer;
@@ -1429,15 +1416,13 @@
     padding: var(--fc-place-order-py) var(--fc-place-order-px) !important;
     margin: 0 !important;
     border-radius: var(--radius-lg, 0.5rem) !important;
-    /* Override Hyvä .btn 2px border for the checkout action. */
-    border-width: 0 !important;
-    border-style: solid !important;
     font-size: 1rem !important;
     font-weight: 500 !important;
     line-height: 1.5 !important;
     cursor: pointer;
-    background-color: var(--color-primary) !important;
-    color: var(--color-on-primary, #fff) !important;
+    border-color: var(--btn-stroke, transparent) !important;
+    background-color: var(--btn-bg, var(--color-primary)) !important;
+    color: var(--btn-color, var(--color-on-primary, #fff)) !important;
     box-shadow: none !important;
 }
 
@@ -1450,7 +1435,17 @@
 #fastcheckout-checkout .fastcheckout-place-order-btn:hover,
 #fastcheckout-checkout [data-fastcheckout-place-order]:hover,
 #fastcheckout-checkout [data-fastcheckout-place-order-mobile]:hover {
-    background-color: var(--color-primary-lighter, var(--color-primary)) !important;
+    border-color: var(--btn-hover-stroke, var(--btn-stroke, transparent)) !important;
+    background-color: var(--btn-hover-bg, var(--btn-bg, var(--color-primary))) !important;
+    color: var(--btn-hover-color, var(--btn-color, var(--color-on-primary, #fff))) !important;
+}
+
+#fastcheckout-checkout .fastcheckout-place-order-btn:active,
+#fastcheckout-checkout [data-fastcheckout-place-order]:active,
+#fastcheckout-checkout [data-fastcheckout-place-order-mobile]:active {
+    border-color: var(--btn-active-stroke, var(--btn-stroke, transparent)) !important;
+    background-color: var(--btn-active-bg, var(--btn-bg, var(--color-primary))) !important;
+    color: var(--btn-active-color, var(--btn-color, var(--color-on-primary, #fff))) !important;
 }
 
 #fastcheckout-checkout [data-fastcheckout-place-order][data-fastcheckout-processing='true'],
@@ -1473,6 +1468,14 @@
     justify-content: center;
     flex: 0 0 auto;
     line-height: 0;
+}
+
+#fastcheckout-checkout .fastcheckout-place-order-btn .place-order-spinner svg {
+    color: currentColor;
+}
+
+#fastcheckout-checkout svg.animate-spin.text-primary {
+    color: var(--btn-bg, var(--color-primary));
 }
 
 #fastcheckout-checkout .fastcheckout-place-order-btn .place-order-spinner:not(.hidden),
