@@ -6,17 +6,15 @@ define([
     return function (Component) {
         return Component.extend({
             validateFormFields: function () {
-                if (!isFastcheckoutActive()) {
-                    return this._super();
+                var isValid = this._super();
+
+                if (isFastcheckoutActive() && !isValid) {
+                    this.validateCardType();
+                    this.validateExpirationDate();
+                    this.validateCvvNumber();
                 }
 
-                return [
-                    this.validateCardType(),
-                    this.validateExpirationDate(),
-                    this.validateCvvNumber()
-                ].every(function (isValid) {
-                    return isValid;
-                });
+                return isValid;
             }
         });
     };
