@@ -30,6 +30,14 @@ $hasItems = $block->getQuote()->hasItems();
     <div data-bind="scope: 'checkout.errors'" aria-live="polite">
         <!-- ko template: getTemplate() --><!-- /ko -->
     </div>
+    <div class="fastcheckout-extra-checkout-children space-y-6"
+         data-fastcheckout-extra-checkout-children>
+        <!-- ko foreach: elems() -->
+            <!-- ko if: ['errors', 'authentication', 'progressBar', 'estimation', 'steps', 'sidebar'].indexOf(index) === -1 -->
+                <!-- ko template: getTemplate() --><!-- /ko -->
+            <!-- /ko -->
+        <!-- /ko -->
+    </div>
 
     <?php if (!$hasItems): ?>
         <div class="card text-center py-16">
@@ -46,6 +54,16 @@ $hasItems = $block->getQuote()->hasItems();
         </div>
     <?php else: ?>
     <div id="co-checkout-form" class="contents" data-fastcheckout-native-form="1">
+
+        <div class="fastcheckout-extra-checkout-steps space-y-6"
+             data-bind="scope: 'checkout.steps'"
+             data-fastcheckout-extra-steps>
+            <!-- ko foreach: elems() -->
+                <!-- ko if: index !== 'shipping-step' && index !== 'billing-step' -->
+                    <!-- ko template: getTemplate() --><!-- /ko -->
+                <!-- /ko -->
+            <!-- /ko -->
+        </div>
 
         <div class="fc-grid grid gap-6 grid-cols-1 items-start w-full">
             <div class="fc-left-wrapper flex flex-col gap-6">

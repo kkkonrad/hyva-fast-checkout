@@ -91,7 +91,17 @@ test('waits on native email and the shared shipping save without replacing payme
     };
 
     vm.runInNewContext(source, {
-        window: {setTimeout: (callback) => callback()},
+        window: {
+            setTimeout(callback, delay) {
+                if (!delay) {
+                    callback();
+                    return 0;
+                }
+
+                return 1;
+            },
+            clearTimeout() {}
+        },
         define(dependencies, factory) {
             mixin = factory(
                 jquery,
@@ -130,4 +140,92 @@ test('waits on native email and the shared shipping save without replacing payme
     active = false;
     assert.equal(await action({}, {method: 'checkmo'}, true), 'checkmo');
     assert.equal(calls, 2);
+});
+
+test('does not hang set-payment-information when shipping method never arrives', async () => {
+    let mixin,
+        delayed;
+    const email = observable('guest@example.com');
+    const shippingMethod = observable(null);
+    const quote = {
+        guestEmail: 'guest@example.com',
+        shippingMethod,
+        isVirtual: () => false
+    };
+    const source = fs.readFileSync(path.resolve(
+        __dirname,
+        '../../../view/frontend/web/js/mixin/set-payment-information-extended-mixin.js'
+    ), 'utf8');
+    const jquery = {
+        Deferred() {
+            let resolve,
+                reject;
+            const promise = new Promise((onResolve, onReject) => {
+                resolve = onResolve;
+                reject = onReject;
+            });
+            const api = {
+                resolve() {
+                    resolve.apply(null, arguments);
+                    return api;
+                },
+                reject() {
+                    reject.apply(null, arguments);
+                    return api;
+                },
+                promise: () => promise
+            };
+
+            return api;
+        },
+        when: (value) => Promise.resolve(value)
+    };
+    const wrapper = {
+        wrap(original, interceptor) {
+            return function (...args) {
+                return interceptor.call(this, original.bind(this), ...args);
+            };
+        }
+    };
+
+    vm.runInNewContext(source, {
+        window: {
+            setTimeout(callback, delay) {
+                if (!delay) {
+                    callback();
+                    return 0;
+                }
+                delayed = callback;
+                return 1;
+            },
+            clearTimeout() {}
+        },
+        define(dependencies, factory) {
+            mixin = factory(
+                jquery,
+                wrapper,
+                quote,
+                {isLoggedIn: () => false},
+                {
+                    ensureSaved() {
+                        throw new Error('shipping must not be saved without a method');
+                    }
+                },
+                () => true,
+                {
+                    async() {
+                        return (callback) => callback({email});
+                    }
+                }
+            );
+        }
+    });
+
+    const pending = mixin(() => Promise.resolve('continued'))({}, {method: 'stripe'}, true);
+
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.equal(typeof delayed, 'function');
+    delayed();
+    assert.equal(await pending, 'continued');
 });

@@ -49,13 +49,30 @@ function loadMixin(active, initialHash = '') {
         }
     });
 
+    const processed = [];
+    const registered = [];
+    const steps = [];
     const navigator = mixin({
+        steps() {
+            return steps;
+        },
         setHash(hash) {
             nativeHashes.push(hash);
+        },
+        isProcessed(code) {
+            processed.push(code);
+            return code === 'payment';
+        },
+        registerStep(code, alias, title, isVisible) {
+            registered.push(code);
+            steps.push({
+                code,
+                isVisible
+            });
         }
     });
 
-    return {navigator, location, listeners, nativeHashes, replacements};
+    return {navigator, location, listeners, nativeHashes, replacements, processed, registered};
 }
 
 test('keeps the one-step Fastcheckout URL free of every hash', () => {
@@ -73,6 +90,28 @@ test('keeps the one-step Fastcheckout URL free of every hash', () => {
     context.location.hash = '#third-party-step';
     context.listeners.hashchange();
     assert.equal(context.location.hash, '');
+    assert.equal(context.navigator.isProcessed('shipping'), true);
+    assert.equal(context.navigator.isProcessed('payment'), true);
+    assert.deepEqual(context.processed, ['payment']);
+
+    const visibility = {};
+    const flag = (code, initial) => {
+        let value = initial;
+        const observable = (next) => {
+            if (!arguments.length) {
+                return value;
+            }
+            value = next;
+            visibility[code] = next;
+        };
+        visibility[code] = initial;
+        return observable;
+    };
+    context.navigator.registerStep('payment', null, 'Payment', flag('payment', false));
+    context.navigator.registerStep('shipping', '', 'Shipping', flag('shipping', true));
+    assert.deepEqual(context.registered, ['payment', 'shipping']);
+    assert.equal(visibility.payment, true);
+    assert.equal(visibility.shipping, true);
 });
 
 test('delegates unchanged outside Fastcheckout', () => {
@@ -83,4 +122,6 @@ test('delegates unchanged outside Fastcheckout', () => {
     assert.deepEqual(context.nativeHashes, ['shipping']);
     assert.equal(context.replacements.length, 0);
     assert.equal(context.listeners.hashchange, undefined);
+    assert.equal(context.navigator.isProcessed('shipping'), false);
+    assert.deepEqual(context.processed, ['shipping']);
 });

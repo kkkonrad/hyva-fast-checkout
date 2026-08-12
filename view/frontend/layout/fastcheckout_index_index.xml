@@ -20,8 +20,11 @@
         <referenceBlock name="messages" remove="true"/>
         <referenceBlock name="script-alpine-js" remove="true"/>
         <referenceBlock name="require-alpine-v3" remove="true"/>
-        <!-- The native tree is initialized once inside the existing Fastcheckout shell. -->
-        <referenceBlock name="checkout.root" remove="true"/>
+        <!-- Keep checkout.root so third-party PHTML children still render.
+             Replace Magento's onepage template so jsLayout is not started twice. -->
+        <referenceBlock name="checkout.root"
+                        template="Kkkonrad_Fastcheckout::hyva/checkout-root-children.phtml"/>
+        <move element="checkout.root" destination="before.body.end"/>
         <referenceContainer name="after.body.start">
             <block class="Magento\RequireJs\Block\Html\Head\Config"
                    name="kkkonrad.fastcheckout.requirejs.config"/>

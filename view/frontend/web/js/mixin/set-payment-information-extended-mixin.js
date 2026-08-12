@@ -9,26 +9,49 @@ define([
 ], function ($, wrapper, quote, customer, shippingSaveCoordinator, isFastcheckoutActive, registry) {
     'use strict';
 
+    var shippingMethodWaitMs = 10000;
+
     function resolvedPromise() {
         return $.Deferred().resolve().promise();
     }
 
-    function waitForObservable(observable, predicate) {
+    function waitForObservable(observable, predicate, timeoutMs) {
         var deferred,
-            subscription;
+            subscription,
+            timer,
+            settled = false;
 
         if (!observable || typeof observable.subscribe !== 'function' || predicate(observable())) {
             return resolvedPromise();
         }
 
         deferred = $.Deferred();
-        subscription = observable.subscribe(function (value) {
-            if (!predicate(value)) {
+
+        function finish() {
+            if (settled) {
                 return;
             }
-            subscription.dispose();
+            settled = true;
+            if (subscription) {
+                subscription.dispose();
+                subscription = null;
+            }
+            if (timer) {
+                window.clearTimeout(timer);
+                timer = null;
+            }
             deferred.resolve();
+        }
+
+        subscription = observable.subscribe(function (value) {
+            if (predicate(value)) {
+                finish();
+            }
         });
+
+        if (timeoutMs) {
+            timer = window.setTimeout(finish, timeoutMs);
+        }
 
         return deferred.promise();
     }
@@ -78,9 +101,14 @@ define([
                 return undefined;
             }
 
-            return waitForObservable(quote.shippingMethod, Boolean).then(function () {
-                return shippingSaveCoordinator.ensureSaved();
-            });
+            return waitForObservable(quote.shippingMethod, Boolean, shippingMethodWaitMs)
+                .then(function () {
+                    if (!quote.shippingMethod || !quote.shippingMethod()) {
+                        return undefined;
+                    }
+
+                    return shippingSaveCoordinator.ensureSaved();
+                });
         });
     }
 

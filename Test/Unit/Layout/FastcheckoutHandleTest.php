@@ -45,7 +45,15 @@ class FastcheckoutHandleTest extends TestCase
         $this->assertStringContainsString('fastcheckout.subscribe', $components);
         $this->assertStringContainsString('fastcheckout-checkout-page', $source);
         $this->assertStringContainsString('name="fallback.module.missing" remove="true"', $source);
-        $this->assertStringContainsString('name="checkout.root" remove="true"', $source);
+        $this->assertStringNotContainsString('name="checkout.root" remove="true"', $source);
+        $this->assertStringContainsString(
+            'Kkkonrad_Fastcheckout::hyva/checkout-root-children.phtml',
+            $source
+        );
+        $this->assertStringContainsString(
+            'destination="before.body.end"',
+            $source
+        );
         $this->assertStringNotContainsString('fastcheckout_native_checkout', $source);
     }
 
@@ -53,6 +61,7 @@ class FastcheckoutHandleTest extends TestCase
     {
         $templates = '';
         foreach ([
+            '/view/frontend/templates/hyva/checkout.phtml',
             '/view/frontend/templates/hyva/checkout/shipping-address.phtml',
             '/view/frontend/templates/hyva/checkout/shipping-methods.phtml',
             '/view/frontend/templates/hyva/checkout/payment-methods.phtml',
@@ -74,6 +83,10 @@ class FastcheckoutHandleTest extends TestCase
             "getRegion('afterMethods')",
             "getRegion('payment-methods-list')",
             "getRegion('shipping-information')",
+            "scope: 'checkout.steps'",
+            'table-checkout-shipping-method',
+            'data-fastcheckout-extra-checkout-children',
+            'data-fastcheckout-payment-extra-children',
         ] as $extensionPoint) {
             $this->assertStringContainsString($extensionPoint, $templates);
         }
@@ -94,5 +107,12 @@ class FastcheckoutHandleTest extends TestCase
 
         $this->assertStringContainsString('element.shippingMethodItemTemplate', $templates);
         $this->assertStringContainsString('let: { element: $data }', $templates);
+
+        $rootChildren = (string)file_get_contents(
+            $this->moduleRoot() . '/view/frontend/templates/hyva/checkout-root-children.phtml'
+        );
+        $this->assertStringContainsString('getChildHtml()', $rootChildren);
+        $this->assertStringNotContainsString('checkoutConfig', $rootChildren);
+        $this->assertStringNotContainsString('Magento_Ui/js/core/app', $rootChildren);
     }
 }

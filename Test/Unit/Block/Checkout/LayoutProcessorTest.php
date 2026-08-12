@@ -34,9 +34,13 @@ class LayoutProcessorTest extends TestCase
         );
         self::assertSame('third-party', $shipping['children']['shippingAdditional']['component']);
         self::assertSame('Kkkonrad_Fastcheckout/hyva/summary', $summary['template']);
-        self::assertSame(10, $summary['children']['cart_items']['sortOrder']);
-        self::assertSame(20, $summary['children']['itemsAfter']['sortOrder']);
-        self::assertSame(30, $summary['children']['totals']['sortOrder']);
+        self::assertArrayNotHasKey('sortOrder', $summary['children']['cart_items']);
+        self::assertArrayNotHasKey('sortOrder', $summary['children']['itemsAfter']);
+        self::assertArrayNotHasKey('sortOrder', $summary['children']['totals']);
+        self::assertSame(
+            '#fastcheckout-checkout .fastcheckout-native-shipping-address',
+            $shipping['config']['popUpForm']['options']['appendTo']
+        );
         self::assertSame('Kkkonrad_Fastcheckout/hyva/payment/discount', $discount['template']);
     }
 
@@ -61,6 +65,7 @@ class LayoutProcessorTest extends TestCase
         $shipping['shippingMethodListTemplate'] = 'Vendor_Module/shipping-list';
         $shipping['config']['shippingMethodItemTemplate'] = 'Vendor_Module/shipping-item';
         $shipping['config']['template'] = 'Vendor_Module/shipping';
+        $shipping['config']['popUpForm']['options']['appendTo'] = '#vendor-popup-host';
         $summary = &$layout['components']['checkout']['children']['sidebar']['children']['summary'];
         $summary['template'] = 'Vendor_Module/summary';
         $discount = &$layout['components']['checkout']['children']['steps']['children']
@@ -75,6 +80,7 @@ class LayoutProcessorTest extends TestCase
             ['billing-step']['children']['payment']['children']['afterMethods']['children']['discount'];
 
         self::assertSame('Vendor_Module/shipping', $shipping['template']);
+        self::assertSame('#vendor-popup-host', $shipping['config']['popUpForm']['options']['appendTo']);
         self::assertSame('Vendor_Module/shipping-list', $shipping['config']['shippingMethodListTemplate']);
         self::assertSame('Vendor_Module/shipping-list', $shipping['shippingMethodListTemplate']);
         self::assertSame('Vendor_Module/shipping-item', $shipping['config']['shippingMethodItemTemplate']);

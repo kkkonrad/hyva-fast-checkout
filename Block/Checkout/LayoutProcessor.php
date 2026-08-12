@@ -44,8 +44,11 @@ class LayoutProcessor implements LayoutProcessorInterface
                 self::CORE_SHIPPING_TEMPLATE,
                 'Kkkonrad_Fastcheckout/hyva/shipping-address'
             );
-            $shipping['config']['popUpForm']['options']['appendTo'] =
-                '#fastcheckout-checkout .fastcheckout-native-shipping-address';
+            $appendTo = $shipping['config']['popUpForm']['options']['appendTo'] ?? null;
+            if ($appendTo === null || $appendTo === '') {
+                $shipping['config']['popUpForm']['options']['appendTo'] =
+                    '#fastcheckout-checkout .fastcheckout-native-shipping-address';
+            }
             $this->setTemplateDefault(
                 $shipping,
                 'shippingMethodListTemplate',
@@ -69,11 +72,6 @@ class LayoutProcessor implements LayoutProcessorInterface
                 self::CORE_SUMMARY_TEMPLATE,
                 'Kkkonrad_Fastcheckout/hyva/summary'
             );
-            foreach (['cart_items' => 10, 'itemsAfter' => 20, 'totals' => 30] as $name => $sortOrder) {
-                if (isset($summary['children'][$name])) {
-                    $summary['children'][$name]['sortOrder'] = $sortOrder;
-                }
-            }
         }
 
         if (is_array($jsLayout['components']['checkout']['children']['steps']['children']

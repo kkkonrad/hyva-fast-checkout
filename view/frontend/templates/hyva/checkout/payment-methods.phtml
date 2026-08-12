@@ -34,6 +34,15 @@
                 <!-- ko foreach: getRegion('beforeMethods') -->
                     <!-- ko template: getTemplate() --><!-- /ko -->
                 <!-- /ko -->
+                <div class="fastcheckout-payment-extra-children space-y-4"
+                     data-fastcheckout-payment-extra-children>
+                    <!-- ko foreach: elems() -->
+                        <!-- ko if: ['renders', 'additional-payment-validators', 'customer-email', 'place-order-captcha', 'beforeMethods', 'payments-list', 'afterMethods'].indexOf(index) === -1
+                                    && ['beforeMethods', 'afterMethods', 'payment-methods-list', 'customer-email', 'place-order-captcha'].indexOf(displayArea) === -1 -->
+                            <!-- ko template: getTemplate() --><!-- /ko -->
+                        <!-- /ko -->
+                    <!-- /ko -->
+                </div>
                 <p class="rounded-lg border border-red-200 bg-red-50 px-3 py-2
                           text-sm text-red-600 font-medium mb-4 hidden"
                    data-fastcheckout-client-order-error

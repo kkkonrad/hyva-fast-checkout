@@ -10,6 +10,5 @@
             </arguments>
         </referenceBlock>
         <referenceBlock name="checkout.success.print.button" remove="true"/>
-        <referenceBlock name="checkout.tpay.order_status" remove="true"/>
     </body>
 </page>

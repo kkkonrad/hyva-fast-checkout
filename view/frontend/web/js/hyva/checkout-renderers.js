@@ -13,6 +13,7 @@ define([
     'mage/translate',
     'Kkkonrad_Fastcheckout/js/model/shipping-save-coordinator',
     'Kkkonrad_Fastcheckout/js/model/one-step-validator',
+    'Kkkonrad_Fastcheckout/js/model/shipping-additional-placement',
     'uiRegistry'
 ], function (
     $,
@@ -29,6 +30,7 @@ define([
     $t,
     shippingSaveCoordinator,
     oneStepValidator,
+    shippingAdditionalPlacement,
     registry
 ) {
     'use strict';
@@ -105,11 +107,66 @@ define([
         }
     }
 
+    function isWalletCheckoutControl(node) {
+        return Boolean(node && node.closest && node.closest(
+            '#paypal-button, .paypal-button, [data-funding-source], ' +
+            '.gpay-button, #gpay-button, apple-pay-button, .apple-pay-button, ' +
+            '.adyen-checkout__dropin, .adyen-checkout__button, ' +
+            '[data-adyen-checkout], .klarna-button'
+        ));
+    }
+
+    function activePaymentMethodElement() {
+        var activeCode = activePaymentCode(),
+            found = null;
+
+        document.querySelectorAll(
+            '.fastcheckout-ko-payment-root .payment-method'
+        ).forEach(function (method) {
+            if (!found && paymentCode(method) === activeCode) {
+                found = method;
+            }
+        });
+
+        return found;
+    }
+
+    function activeMethodHasOwnCheckoutCta() {
+        var method = activePaymentMethodElement();
+
+        if (!method) {
+            return false;
+        }
+
+        return Array.prototype.some.call(method.querySelectorAll(
+            'button, a.action, [role="button"], apple-pay-button, ' +
+            '#paypal-button, .paypal-button, .gpay-button, ' +
+            '.adyen-checkout__dropin, .adyen-checkout__button, .klarna-button'
+        ), function (node) {
+            return !node.classList.contains('fastcheckout-native-place-order-hidden') &&
+                !node.closest('.checkout-agreements-block') &&
+                !node.closest('.payment-method-billing-address') &&
+                !node.closest('[data-fastcheckout-newsletter]') &&
+                (isWalletCheckoutControl(node) ||
+                    node.matches(
+                        'apple-pay-button, #paypal-button, .paypal-button, ' +
+                        '.gpay-button, .adyen-checkout__button, .klarna-button, ' +
+                        '.adyen-checkout__dropin'
+                    ));
+        });
+    }
+
     function placeOrderButton(method) {
-        return method && method.querySelector(
+        var buttons = method ? method.querySelectorAll(
             '.payment-method-content [data-role="review-save"], ' +
-            '.payment-method-content .action.checkout'
-        );
+            '.payment-method-content .action.checkout, ' +
+            '.payment-method-content button.checkout, ' +
+            '.payment-method-content input.checkout[type="submit"]'
+        ) : [];
+
+        return Array.prototype.find.call(buttons, function (button) {
+            return !isWalletCheckoutControl(button);
+        }) || null;
     }
 
     function updatePlaceOrderToolbar(button) {
@@ -145,7 +202,8 @@ define([
     }
 
     function wirePlaceOrderButtons() {
-        var activeButton;
+        var activeButton,
+            walletOnly;
 
         document.querySelectorAll(
             '.fastcheckout-ko-payment-root .payment-method'
@@ -165,17 +223,31 @@ define([
         });
 
         activeButton = activePlaceOrderButton();
+        walletOnly = !activeButton && activeMethodHasOwnCheckoutCta();
 
         document.querySelectorAll(
             '[data-fastcheckout-place-order-mobile], [data-fastcheckout-place-order-ssr]'
         ).forEach(function (button) {
-            button.disabled = placeOrderProcessing;
+            button.hidden = walletOnly;
+            button.classList.toggle('hidden', walletOnly);
+            button.disabled = placeOrderProcessing || walletOnly;
             button.setAttribute('aria-disabled', button.disabled ? 'true' : 'false');
             button.dataset.fastcheckoutNativeTargetReady = activeButton ? '1' : '0';
+            if (walletOnly) {
+                button.setAttribute('data-fastcheckout-wallet-only', '1');
+            } else {
+                button.removeAttribute('data-fastcheckout-wallet-only');
+            }
         });
 
         document.querySelectorAll('[data-fastcheckout-place-order-ssr]').forEach(function (button) {
             button.classList.toggle('fastcheckout-place-order-proxy-ready', Boolean(activeButton));
+        });
+        document.querySelectorAll('.fastcheckout-place-order-section').forEach(function (section) {
+            section.classList.toggle('fastcheckout-place-order-wallet-only', walletOnly);
+        });
+        document.querySelectorAll('[data-fastcheckout-mobile-sticky]').forEach(function (bar) {
+            bar.classList.toggle('fastcheckout-place-order-wallet-only', walletOnly);
         });
     }
 
@@ -811,6 +883,7 @@ define([
             checkoutDataResolver.resolveBillingAddress();
             bindPlaceOrderProxies();
             saveShippingWhenMethodChanges();
+            shippingAdditionalPlacement.bind();
 
             quote.paymentMethod.subscribe(function () {
                 setClientOrderError('');

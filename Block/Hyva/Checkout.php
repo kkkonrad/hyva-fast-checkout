@@ -107,7 +107,7 @@ class Checkout extends Template
      */
     public function getCheckoutJsLayout(): array
     {
-        return $this->layoutCollector->collect();
+        return $this->layoutCollector->collect($this->getLayout()->getUpdate()->getHandles());
     }
 
     public function getItemsQty(): float

@@ -1,0 +1,12 @@
+<?php
+/**
+ * Keep checkout.root on the Hyvä page so third-party PHTML children
+ * (map modals, widgets) still render. Do not output Magento's onepage
+ * bootstrap — jsLayout is started once by Fastcheckout.
+ *
+ * @var \Magento\Framework\View\Element\AbstractBlock $block
+ */
+?>
+<div class="fastcheckout-checkout-root-children" data-fastcheckout-checkout-root-children>
+    <?= $block->getChildHtml() ?>
+</div>

@@ -57,6 +57,12 @@ class NativePipelineOwnershipTest extends TestCase
             $source
         );
         $this->assertStringNotContainsString("\$update->addHandle('default')", $source);
+        $this->assertStringContainsString('EXCLUDED_PAGE_HANDLES', $source);
+        $this->assertStringContainsString("'fastcheckout_index_index'", $source);
+        $this->assertStringContainsString("strpos(\$handle, 'hyva_checkout')", $source);
+        $this->assertStringContainsString('addPageHandles', $source);
+        $this->assertStringContainsString('buildJsLayout(false, $pageHandles)', $source);
+        $this->assertStringContainsString('buildJsLayout(true, $pageHandles)', $source);
         $this->assertStringContainsString('<container name="content"/>', $source);
         $this->assertStringContainsString('$checkoutRoot->getJsLayout()', $source);
         $this->assertStringContainsString('$this->serializer->unserialize', $source);
@@ -126,6 +132,8 @@ class NativePipelineOwnershipTest extends TestCase
             $bootstrap
         );
         $this->assertStringContainsString('shippingSaveCoordinator.ensureSaved()', $bootstrap);
+        $this->assertStringContainsString('shippingAdditionalPlacement.bind()', $bootstrap);
+        $this->assertStringContainsString('data-fastcheckout-wallet-only', $bootstrap);
         $this->assertStringContainsString(
             "'Magento_Customer/js/customer-data'",
             $bootstrap

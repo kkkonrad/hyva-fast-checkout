@@ -19,6 +19,15 @@ class CheckoutLayoutCollector
 {
     private const NATIVE_THEME_PATH = 'frontend/Magento/luma';
 
+    private const EXCLUDED_PAGE_HANDLES = [
+        'default',
+        'checkout_index_index',
+        'fastcheckout_index_index',
+        'fastcheckout_native_components',
+        'fastcheckout_checkout_onepage_success',
+        'fastcheckout_checkout_onepage_failure',
+    ];
+
     private LayoutFactory $layoutFactory;
     private DesignInterface $design;
     private LoggerInterface $logger;
@@ -44,29 +53,46 @@ class CheckoutLayoutCollector
     }
 
     /**
+     * @param string[] $pageHandles Handles already applied to the storefront page
      * @return array<string, mixed>
      */
-    public function collect(): array
+    public function collect(array $pageHandles = []): array
     {
         if ($this->collected !== null) {
             return $this->collected;
         }
 
-        $result = [];
+        $this->collected = $this->buildJsLayout(false, $pageHandles);
+        if ($this->collected === []) {
+            $this->collected = $this->buildJsLayout(true, $pageHandles);
+        }
 
+        return $this->collected;
+    }
+
+    /**
+     * @param string[] $pageHandles
+     * @return array<string, mixed>
+     */
+    private function buildJsLayout(bool $useLuma, array $pageHandles): array
+    {
+        $result = [];
         $originalTheme = $this->design->getDesignTheme();
 
         try {
-            $this->design->setDesignTheme(
-                $this->themeProvider->getThemeByFullPath(self::NATIVE_THEME_PATH)
-            );
+            if ($useLuma) {
+                $this->design->setDesignTheme(
+                    $this->themeProvider->getThemeByFullPath(self::NATIVE_THEME_PATH)
+                );
+            }
             $layout = $this->layoutFactory->create(['cacheable' => false]);
             $update = $layout->getUpdate();
             $update->addHandle('checkout_index_index');
             $update->addHandle('fastcheckout_native_components');
+            $this->addPageHandles($update, $pageHandles);
             // checkout.root targets `content`, normally declared by the global
             // default handle. Recreate only that parent to avoid preparing global
-            // RequireJS blocks inside this isolated Luma layout.
+            // RequireJS blocks inside this isolated layout.
             $update->addUpdate(
                 '<referenceContainer name="main"><container name="content"/></referenceContainer>'
             );
@@ -83,13 +109,35 @@ class CheckoutLayoutCollector
             }
         } catch (\Throwable $exception) {
             $this->logger->error('Fastcheckout could not build the native checkout layout.', [
-                'exception' => $exception
+                'exception' => $exception,
+                'use_luma' => $useLuma
             ]);
-            throw $exception;
+            if ($useLuma) {
+                throw $exception;
+            }
+            $result = [];
         } finally {
             $this->design->setDesignTheme($originalTheme);
         }
 
-        return $this->collected = $result;
+        return $result;
+    }
+
+    /**
+     * @param string[] $pageHandles
+     */
+    private function addPageHandles($update, array $pageHandles): void
+    {
+        foreach ($pageHandles as $handle) {
+            $handle = (string)$handle;
+            if ($handle === ''
+                || in_array($handle, self::EXCLUDED_PAGE_HANDLES, true)
+                || strpos($handle, 'fastcheckout_') === 0
+                || strpos($handle, 'hyva_checkout') === 0
+            ) {
+                continue;
+            }
+            $update->addHandle($handle);
+        }
     }
 }
