@@ -1,0 +1,311 @@
+[English](README.md) | Polski
+
+# Kkkonrad Fastcheckout
+
+Fastcheckout to moduł procesu zamówienia Magento 2 przeznaczony dla motywów Hyvä.
+Uruchamia standardowy checkout Knockout Magento przez oficjalny mechanizm Hyvä
+Theme Fallback i nakłada własną warstwę wizualną. Natywny koszyk Magento oraz
+operacje REST pozostają jedynym źródłem danych.
+
+Moduł nie wymaga Magewire i nie utrzymuje dodatkowego stanu procesu zamówienia.
+
+## Podgląd
+
+![Widok procesu zamówienia Kkkonrad Fastcheckout](docs/images/checkout.png)
+
+## Funkcje
+
+- responsywny układ procesu zamówienia zgodny z Hyvä;
+- standardowe formularze adresu wysyłki i adresu rozliczeniowego Magento wraz z
+  natywną walidacją;
+- zawsze dostępny przycisk „Złóż zamówienie” na desktopie i mobile, delegujący
+  wykonanie do przycisku aktywnego renderera płatności;
+- walidacja w kolejności adres → dostawa → płatność → walidatory aktywnego
+  renderera, z płynnym przewinięciem do pierwszego widocznego błędu;
+- natywny bootstrap RequireJS i dokładnie jeden, pełny `Magento_Ui/js/core/app`;
+- niezmienione ścieżki komponentów `checkout.*` i `checkoutProvider`, dzięki czemu
+  renderery płatności oraz dodatki dostawy działają tak samo jak w core;
+- dynamiczna lista metod płatności Magento; cała zamknięta karta metody jest
+  klikalna, a ukryte radio jedynej metody otrzymuje wizualny stan zaznaczenia;
+- mapowanie metod płatności do metod dostawy wykonywane przez standardowy
+  `Magento\Payment\Model\MethodList` po stronie serwera;
+- natywne podsumowanie i totals Magento, w tym Tax;
+- obsługa komentarzy, newslettera i `Magento_CheckoutAgreements` przed przyciskiem
+  zamówienia, bez odłączania ich od natywnej walidacji płatności;
+- opcjonalne przypisanie zamówienia gościa do istniejącego klienta o tym samym
+  adresie e-mail.
+
+## Wymagania
+
+- Magento 2.4 (`magento/framework` 103.x);
+- PHP 8.1–8.4;
+- Hyvä Theme Module 1.4 lub nowszy;
+- Hyvä Theme Fallback 1.x (instalowany jako zależność Composer modułu).
+
+## Instalacja
+
+Pakiet **nie jest dostępny na Packagist**. Instalacja odbywa się przez Composer
+bezpośrednio z GitHuba (repozytorium VCS).
+
+### Composer + GitHub
+
+W katalogu głównym Magento dodaj repozytorium i wymagaj pakietu:
+
+```bash
+composer config repositories.kkkonrad-fastcheckout vcs https://github.com/kkkonrad/hyva-fast-checkout.git
+composer require kkkonrad/fastcheckout:dev-master
+```
+
+Albo ręcznie w `composer.json` projektu:
+
+```json
+{
+  "repositories": [
+    {
+      "type": "vcs",
+      "url": "https://github.com/kkkonrad/hyva-fast-checkout.git"
+    }
+  ],
+  "require": {
+    "kkkonrad/fastcheckout": "dev-master"
+  }
+}
+```
+
+Następnie:
+
+```bash
+composer update kkkonrad/fastcheckout
+php bin/magento module:enable Kkkonrad_Fastcheckout
+php bin/magento setup:upgrade
+php bin/magento cache:clean
+```
+
+**Uwagi:**
+
+- dla prywatnego repozytorium użyj SSH (`git@github.com:kkkonrad/hyva-fast-checkout.git`)
+  albo tokenu GitHub w HTTPS i uprawnień Composer do `github.com`;
+- zamiast `dev-master` można wskazać gałąź (`dev-nazwa-galezi`) lub tag
+  (`"kkkonrad/fastcheckout": "8.0.0"`), jeśli jest opublikowany w repozytorium;
+- przy instalacji z gałęzi Composer często prosi o `minimum-stability: dev`
+  oraz `prefer-stable: true` w `composer.json` projektu.
+
+### Instalacja ręczna (app/code)
+
+Alternatywnie sklonuj moduł do `app/code`:
+
+```bash
+git clone https://github.com/kkkonrad/hyva-fast-checkout.git app/code/Kkkonrad/Fastcheckout
+php bin/magento module:enable Kkkonrad_Fastcheckout
+php bin/magento setup:upgrade
+php bin/magento cache:clean
+```
+
+### Środowisko produkcyjne
+
+W środowisku produkcyjnym należy dodatkowo skompilować DI i wdrożyć pliki
+statyczne:
+
+```bash
+php bin/magento setup:di:compile
+php bin/magento setup:static-content:deploy -f pl_PL en_US
+```
+
+Style checkoutu są dostarczane jako zwykły zasób CSS modułu; nie wymagają
+przebudowy konfiguracji Tailwind aktywnego motywu.
+
+## Konfiguracja
+
+Konfiguracja jest dostępna w panelu administracyjnym:
+
+`Stores > Configuration > Kkkonrad > Checkout`
+
+Ustawienia pozwalają włączyć moduł, sterować widocznością komentarza, rabatu i
+newslettera, opcjonalnie przypisywać zamówienia gości oraz definiować mapowanie
+metod płatności do metod dostawy.
+
+Przypisywanie zamówienia gościa do istniejącego konta jest domyślnie wyłączone.
+Włącz je tylko wtedy, gdy sklep niezależnie potwierdza własność adresu e-mail.
+
+Proces zamówienia jest dostępny pod standardową ścieżką `/checkout/`. Gdy moduł oraz
+zgodny motyw Hyvä są aktywne, Fastcheckout dodaje własny handle prezentacyjny do
+layoutu natywnego kontrolera Magento. Dotychczasowa ścieżka `/fast-checkout/`
+pozostaje dostępna jako redirect do `/checkout/` ze względów zgodności wstecznej.
+
+## Walidacja i składanie zamówienia
+
+Widoczne przyciski desktop/mobile są proxy. Nie implementują płatności i nie
+wywołują endpointu samodzielnie: klikają natywny przycisk `placeOrder` aktywnego
+renderera. Dzięki temu PayU, Przelewy24, Stripe i inne moduły zachowują własne
+tokenizacje, zgody oraz walidatory.
+
+Przy próbie złożenia zamówienia Fastcheckout:
+
+1. przy braku płatności wywołuje `shipping.validateShippingInformation()` i
+   pokazuje komunikat płatności dopiero po poprawnej dostawie;
+2. przy wybranej płatności przygotowuje adres rozliczeniowy przez natywny
+   komponent `Magento_Checkout/js/view/billing-address`;
+3. przekazuje sterowanie aktywnemu rendererowi i jego `validate()`;
+4. renderer uruchamia standardowy `additional-validators`, w którym Fastcheckout
+   rejestruje walidację shipping/billing obok walidatorów e-maila, zgód i modułów
+   zewnętrznych;
+5. współdzielony koordynator wywołuje natywną akcję
+   `Magento_Checkout/js/action/set-shipping-information` tylko wtedy, gdy adres
+   lub metoda dostawy zmieniły się od ostatniego poprawnego zapisu, po czym
+   renderer składa zamówienie własną akcją Magento.
+
+Komunikat o braku płatności jest wyświetlany przed dynamiczną listą metod,
+przewijany do widoku i usuwany przez zmianę `quote.paymentMethod`. Podczas
+wysyłania przyciski są blokowane i pokazują „Proszę czekać”; po błędzie wracają
+do stanu aktywnego.
+
+Zgody w trybie ręcznym pozostają aktywnymi checkboxami. Zgody automatyczne są
+widoczne, zaznaczone i zablokowane, a treść zgody otwiera się w natywnym modalu
+Magento.
+
+## Architektura
+
+- Kontroler `/checkout/` pozostaje `Magento\Checkout\Controller\Index\Index`.
+  Standardowy event `layout_load_before` dodaje handle `fastcheckout_index_index`
+  przed scaleniem layoutu; moduł nie pluginuje ani nie omija kontrolera checkoutu.
+- Fastcheckout buduje izolowany layout motywu fallback dla handle
+  `checkout_index_index` oraz prywatnego `fastcheckout_native_components`, dzięki
+  czemu jego walidator, newsletter i komentarz nie są rejestrowane w zwykłym
+  checkoutcie, a wszystkie layout processory i wpisy
+  `jsLayout` z modułów zewnętrznych trafiają do oryginalnego `checkout.root`.
+  Przetworzone drzewo jest pobierane przez `checkout.root::getJsLayout()` bez
+  tworzenia drugiego bloku `Onepage`; trzy zmiany prezentacyjne wykonuje końcowy
+  `LayoutProcessorInterface` Fastcheckout.
+  Izolowany layout nie ładuje globalnego handle `default`, więc nie regeneruje
+  assetów RequireJS aktywnego motywu podczas renderowania strony.
+- Pełny, scalony `jsLayout` jest uruchamiany dokładnie raz przez
+  `Magento_Ui/js/core/app`; Fastcheckout zmienia wyłącznie niezmodyfikowane
+  szablony core odpowiedzialne za dotychczasowy wygląd i zachowuje template’y
+  ustawione przez zewnętrzne layout processory. Własny szablon listy dostaw nadal
+  deleguje pojedynczy wiersz do `shippingMethodItemTemplate`, tak jak core.
+- Stronę renderuje jedna instancja bloku Fastcheckout. Stawki oraz podsumowanie
+  nie mają równoległego fallbacku PHP: ich jedynym źródłem są natywne
+  `shipping-service`, `totals` i komponenty `checkout.sidebar.summary`.
+- Magento zachowuje własne komponenty `shipping`, `payment`, `payments-list`,
+  `renderer-list`, `shipping-service`, `checkout-data` i `quote` bez forków.
+- Integracje z core JS są rejestrowane wyłącznie jako mixiny RequireJS — bez
+  `map` i bez forków. Dotyczą `Magento_Checkout/js/action/place-order`,
+  natywnego summary, `Magento_SalesRule/js/view/payment/discount` i
+  `Magento_CheckoutAgreements/js/view/checkout-agreements`.
+- Pole komentarza pozostaje w panelu podsumowania, a newsletter jest dzieckiem
+  regionu `before-place-order` z `sortOrder=90`. Standardowe zgody oraz newsletter
+  mają w podsumowaniu zsynchronizowane proxy prezentacyjne; ich oryginalne kontrolki,
+  nazwy pól, kontekst KO i walidatory pozostają w aktywnym rendererze płatności.
+  Zawartość rendererów zewnętrznych nie jest przenoszona ani klonowana. Stan
+  komentarza i newslettera należy do standardowego `checkoutProvider` pod
+  `fastcheckout.comment` oraz `fastcheckout.subscribe`; do płatności trafia wyłącznie
+  przez zarejestrowane `PaymentInterface.extension_attributes` i jest konsumowany
+  wyłącznie przez zamówienie o odpowiadającym `quote_id`.
+- Strona sukcesu zachowuje core `Magento\Checkout\Block\Onepage\Success`, a
+  komentarz i newsletter są zapisywane przez
+  `OrderStatusHistoryRepositoryInterface` i `SubscriptionManagerInterface`.
+
+Moduł nie zawiera komponentu Magewire, mechanizmu modyfikowania DOM przez Livewire
+ani orkiestratora stanu opartego na Alpine.
+
+## Zgodność z modułami zewnętrznymi (shipping / payment)
+
+Fastcheckout działa jak host natywnego checkoutu Magento Knockout + REST.
+**Instalacja standardowego modułu dostawy lub płatności nie powinna wymagać
+patchy ani wpisów DI w Kkkonrad_Fastcheckout.**
+
+- Renderery płatności i komponenty UI dostawy pochodzą ze standardowego,
+  dynamicznie scalonego handle `checkout_index_index`.
+- Zewnętrzny root `#checkout` i wewnętrzny `#fastcheckout-checkout` są obecne
+  równocześnie, dlatego selektory modułów ograniczone do `#checkout` nadal działają.
+- Standardowe identyfikatory `#shipping`, `#checkout-step-shipping`,
+  `#opc-shipping_method`, `#co-shipping-method-form`, `#payment`,
+  `#checkout-step-payment` i `#co-payment-form` pozostają dostępne bez zmiany
+  układu wizualnego.
+- `shippingAdditional`, `before-shipping-method-form`, `beforeMethods`,
+  `afterMethods`, `before-place-order`, `payments-list` i `renderer-list` pozostają
+  w oryginalnych miejscach. `checkout.sidebar.shipping-information` jest renderowany
+  przez kanoniczny region komponentu `checkout.sidebar`.
+- Każda metoda dostawy zachowuje standardowe identyfikatory etykiet oraz pusty host
+  `label_method_{method_code}_{carrier_code}` dla widgetów przewoźników.
+- Obcy `shippingMethodListTemplate` lub `shippingMethodItemTemplate` ustawiony
+  przez layout processor ma pierwszeństwo przed szablonem prezentacyjnym modułu.
+- Fastcheckout nie zastępuje `window.checkoutConfig`, nie zapisuje własnego checkout
+  store i nie odtwarza `extension_attributes` z bazy. Natywny przycisk zamówienia
+  pozostaje w rendererze wraz z handlerami i jest wywoływany przez widoczne proxy;
+  pozostałe akcje toolbara nie są ukrywane.
+- `ExtendedCheckoutConfigProvider` jest dopinany do
+  `Magento\Checkout\Model\CompositeConfigProvider` z `sortOrder=1000`; moduł nie
+  zastępuje interfejsów zarządzania informacjami dostawy ani płatności.
+- Mapowanie shipping→payment jest dodatkową specyfikacją
+  `Magento\Payment\Model\Checks\SpecificationInterface`; dzięki temu identyczna
+  lista metod trafia do początkowego `checkoutConfig` i odpowiedzi REST, bez mixina
+  na `payment-service`.
+- Mixiny nie są rejestrowane na akcjach wyboru adresu/metody, transporcie REST,
+  rate processorach ani `customer-data`, więc łańcuchy innych vendorów pozostają
+  nienaruszone.
+- Walidator one-step jest zwykłym dzieckiem kanonicznego węzła
+  `checkout.steps.billing-step.payment.additional-payment-validators`; nie
+  zastępuje listy ani walidatorów rejestrowanych przez inne moduły.
+
+Nie dodawaj per-vendor DI „pod Fastcheckout” w projekcie sklepu, jeśli standardowy
+checkout Magento w motywie fallback już ładuje ten sam renderer.
+
+## Testy
+
+Uruchomienie testów jednostkowych PHP z katalogu głównego Magento:
+
+```bash
+vendor/bin/phpunit --no-extensions -c dev/tests/unit/phpunit.xml.dist \
+    app/code/Kkkonrad/Fastcheckout/Test/Unit
+```
+
+Uruchomienie testów jednostkowych JavaScript:
+
+```bash
+node --test app/code/Kkkonrad/Fastcheckout/Test/Unit/Js/*.test.js
+```
+
+Uruchomienie testów Playwright:
+
+```bash
+cd app/code/Kkkonrad/Fastcheckout/Test/E2e
+npm ci
+npx playwright test
+```
+
+Testy E2E domyślnie nie składają zamówień. Sprawdzają natywny bootstrap,
+kanoniczne wpisy `uiRegistry`, regiony rozszerzeń, synchronizację billing=shipping,
+zgody/newsletter, dynamiczne płatności, przewijanie do błędów, loader oraz pełny
+łańcuch walidatorów.
+Jawny test końcowego zamówienia Purchase Order na izolowanym sklepie testowym
+uruchom przez:
+
+```bash
+FC_ALLOW_PLACE_ORDER=1 npx playwright test \
+    -g 'validates shipping and Purchase Order, optionally placing an order'
+```
+
+## Odświeżanie plików statycznych (developer / hosty on-demand)
+
+Po zmianach w `view/frontend/web` odśwież opublikowane kopie Magento w
+`pub/static`, żeby storefront nie serwował starego JS/CSS:
+
+```bash
+app/code/Kkkonrad/Fastcheckout/bin/sync-frontend-static.sh
+php bin/magento cache:flush
+```
+
+Skrypt jest wymagany, gdy katalogi
+`pub/static/frontend/*/Kkkonrad_Fastcheckout` już istnieją (również w trybie
+developer). `requirejs-config.js` leży poza `web/` — po jego zmianie skopiuj go
+do drzew static albo uruchom ponownie wdrożenie plików statycznych; samo przeładowanie
+strony nie zastąpi istniejącej kopii.
+Jeśli Magento używa Subresource Integrity i istnieje
+`pub/static/frontend/sri-hashes.json`, skrypt celowo przerwie pracę. W takim
+środowisku przenieś lub usuń wyłącznie istniejące katalogi
+`pub/static/frontend/<Vendor>/<theme>/<locale>/Kkkonrad_Fastcheckout`, a następnie
+uruchom `setup:static-content:deploy`. Magento może nie nadpisać już istniejącego
+pliku, a tylko natywne wdrożenie odtworzy go razem z poprawnym hashem SRI.
+Nie edytuj ręcznie `pub/static/deployed_version.txt`; skrypt zapisuje poprawną,
+pozbawioną końcowego znaku nowej linii wersję zasobów.
