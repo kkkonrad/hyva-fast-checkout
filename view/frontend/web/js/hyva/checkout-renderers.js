@@ -678,6 +678,7 @@ define([
 
         watchForValidationError(root, [
             document.querySelector('.fastcheckout-native-shipping-address'),
+            document.getElementById('checkout-step-shipping_method'),
             document.querySelector('.fastcheckout-ko-payment-root .payment-method._active'),
             document.querySelector('[data-fastcheckout-agreements-summary-host]')
         ].filter(Boolean));

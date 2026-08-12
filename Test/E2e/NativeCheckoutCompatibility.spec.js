@@ -299,11 +299,21 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         );
         await expect.poll(() => rates.count(), {timeout: 45_000}).toBeGreaterThan(0);
 
-        if (hasInPost && process.env.FC_ALLOW_PLACE_ORDER !== '1') {
+        const pickupRateValue = await rates.evaluateAll((inputs) => {
+            const configured = (window.checkoutConfig.FurgonetkaPl?.mapConfiguration || [])
+                .flatMap((entry) => entry.ids || [])
+                .map((id) => id.replace(':', '_'));
+
+            return inputs.map((input) => input.value).find((value) => (
+                value.includes('inpostlocker') || configured.includes(value)
+            )) || '';
+        });
+
+        if (pickupRateValue && process.env.FC_ALLOW_PLACE_ORDER !== '1') {
             const inPostRate = page.locator(
                 '#fastcheckout-ko-shipping-root ' +
-                'input[name="shipping_method"][value*="inpostlocker"]'
-            ).first();
+                `input[name="shipping_method"][value="${pickupRateValue}"]`
+            );
 
             await expect(inPostRate).toBeVisible();
             const inPostShippingResponse = page.waitForResponse((response) => (
@@ -317,26 +327,65 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             await expect.poll(() => page.locator(
                 '#checkout-payment-method-load .payment-method'
             ).count(), {timeout: 45_000}).toBeGreaterThan(0);
+            const pickupPayment = page.locator(
+                '#checkout-payment-method-load input[name="payment[method]"]'
+            ).first();
+            await expect(pickupPayment).toHaveCount(1);
+            await pickupPayment.evaluate((input) => input.click());
+            await expect.poll(() => page.evaluate(() => Boolean(
+                window.require('Magento_Checkout/js/model/quote').paymentMethod()?.method
+            ))).toBe(true);
             const placeOrder = page.locator('[data-fastcheckout-place-order-ssr]');
+            await placeOrder.evaluate((button) => button.scrollIntoView({block: 'center'}));
+            const rateWasVisible = await inPostRate.evaluate((input) => {
+                const box = input.getBoundingClientRect();
+
+                return box.top >= 0 && box.bottom <= window.innerHeight;
+            });
+            await page.evaluate(() => {
+                window.fastcheckoutE2ePickupScroll = [window.scrollY];
+                const sampler = window.setInterval(() => {
+                    window.fastcheckoutE2ePickupScroll.push(window.scrollY);
+                }, 16);
+
+                window.setTimeout(() => {
+                    window.clearInterval(sampler);
+                    window.fastcheckoutE2ePickupScrollDone = true;
+                }, 1_000);
+            });
             await placeOrder.click({force: true});
-            const inPostError = page.locator('[data-fastcheckout-shipping-method-error]');
+            const inPostError = page.locator(
+                '#checkout-step-shipping_method [data-fastcheckout-shipping-method-error]'
+            );
             await expect(inPostError).toBeVisible();
             await expect.poll(() => inPostError.evaluate((error) => {
                 const box = error.getBoundingClientRect();
 
                 return box.top >= 0 && box.bottom <= window.innerHeight;
             })).toBe(true);
+            await expect.poll(() => page.evaluate(() => (
+                window.fastcheckoutE2ePickupScrollDone
+            ))).toBe(true);
+            if (!rateWasVisible) {
+                expect(new Set((await page.evaluate(() => (
+                    window.fastcheckoutE2ePickupScroll
+                ))).map(Math.round)).size).toBeGreaterThan(2);
+            }
             const selectPoint = page.locator(
-                '[data-inpost-wrapper] [data-inpost-select-point]'
+                hasInPost
+                    ? '[data-inpost-wrapper] [data-inpost-select-point]'
+                    : '.fastcheckout-furgonetkapl-placement button'
             ).first();
 
             await expect(selectPoint).toBeVisible({timeout: 25_000});
-            await selectPoint.evaluate((button) => button.click());
-            await expect(page.locator('[data-inpost-modal] inpost-geowidget')).toBeVisible();
-            await page.locator('[data-inpost-modal-btn-close]').evaluate((button) => (
-                button.click()
-            ));
-            await expect(page.locator('[data-inpost-modal]')).toHaveCount(0);
+            if (hasInPost) {
+                await selectPoint.evaluate((button) => button.click());
+                await expect(page.locator('[data-inpost-modal] inpost-geowidget')).toBeVisible();
+                await page.locator('[data-inpost-modal-btn-close]').evaluate((button) => (
+                    button.click()
+                ));
+                await expect(page.locator('[data-inpost-modal]')).toHaveCount(0);
+            }
         }
 
         const flatRate = page.locator(
