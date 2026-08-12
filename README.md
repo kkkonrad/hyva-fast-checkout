@@ -53,10 +53,11 @@ methods must first be installed, configured and enabled correctly in Magento.
 - Magento 2.4 (`magento/framework` 103.x);
 - PHP 8.1–8.4;
 - Hyvä Theme Module 1.4 or newer;
-- Hyvä Theme Fallback 1.x, installed automatically as a Composer dependency.
+- Magento's standard Luma theme, installed automatically as a Composer
+  dependency and used only internally to build the checkout layout.
 
-The module does not require Hyvä Checkout or Magewire. It is intended for
-Magento's standard checkout running in a Hyvä theme through Theme Fallback.
+The module does not require Hyvä Theme Fallback, Hyvä Checkout or Magewire. The
+checkout page remains on the Hyvä theme; customers never see Luma.
 
 ## Magento Admin configuration
 
@@ -160,6 +161,9 @@ shipping or payment modules that were updated at the same time.
 - The module uses Magento's native KnockoutJS, RequireJS and REST checkout,
   including `Magento_Checkout`, `checkoutProvider` and the `quote` model. It
   does not maintain parallel checkout state.
+- The native `jsLayout` is built in an isolated `Magento/luma` layout and the
+  Hyvä theme is restored immediately afterwards. This does not require the Hyvä
+  Theme Fallback package or a global theme switch.
 - The `checkout_index_index` layout is merged with third-party module
   configuration, keeping their payment renderers, shipping components and
   validators active.

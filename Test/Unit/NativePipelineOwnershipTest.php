@@ -43,11 +43,13 @@ class NativePipelineOwnershipTest extends TestCase
         $this->assertStringContainsString("setPath('checkout')", $legacyController);
     }
 
-    public function testOnlyAnIsolatedLayoutBuildUsesFallbackAndRestoresTheHyvaTheme(): void
+    public function testOnlyAnIsolatedLayoutBuildUsesLumaAndRestoresTheHyvaTheme(): void
     {
         $source = (string)file_get_contents(
             $this->moduleRoot() . '/Model/CheckoutLayoutCollector.php'
         );
+        $composer = (string)file_get_contents($this->moduleRoot() . '/composer.json');
+        $module = (string)file_get_contents($this->moduleRoot() . '/etc/module.xml');
 
         $this->assertStringContainsString("\$update->addHandle('checkout_index_index')", $source);
         $this->assertStringContainsString(
@@ -58,8 +60,16 @@ class NativePipelineOwnershipTest extends TestCase
         $this->assertStringContainsString('<container name="content"/>', $source);
         $this->assertStringContainsString('$checkoutRoot->getJsLayout()', $source);
         $this->assertStringContainsString('$this->serializer->unserialize', $source);
-        $this->assertStringContainsString('switchToFallback()', $source);
+        $this->assertStringContainsString("NATIVE_THEME_PATH = 'frontend/Magento/luma'", $source);
+        $this->assertStringContainsString(
+            '$this->themeProvider->getThemeByFullPath(self::NATIVE_THEME_PATH)',
+            $source
+        );
         $this->assertStringContainsString('setDesignTheme($originalTheme)', $source);
+        $this->assertStringNotContainsString('Hyva\\ThemeFallback', $source);
+        $this->assertStringNotContainsString('hyva-themes/magento2-theme-fallback', $composer);
+        $this->assertStringContainsString('magento/theme-frontend-luma', $composer);
+        $this->assertStringNotContainsString('Hyva_ThemeFallback', $module);
         $this->assertStringNotContainsString('DOMXPath', $source);
         $this->assertStringNotContainsString('parseJsLayoutItem', $source);
         $this->assertStringNotContainsString('mergeJsLayoutArrays', $source);

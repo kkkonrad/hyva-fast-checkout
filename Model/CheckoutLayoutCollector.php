@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Kkkonrad\Fastcheckout\Model;
 
-use Hyva\ThemeFallback\Model\ThemeSwitch;
 use Magento\Checkout\Block\Onepage;
 use Magento\Framework\Serialize\SerializerInterface;
+use Magento\Framework\View\Design\Theme\ThemeProviderInterface;
 use Magento\Framework\View\DesignInterface;
 use Magento\Framework\View\LayoutFactory;
 use Magento\Framework\View\Page\Layout\ReaderFactory as PageLayoutReaderFactory;
@@ -17,10 +17,12 @@ use Psr\Log\LoggerInterface;
  */
 class CheckoutLayoutCollector
 {
+    private const NATIVE_THEME_PATH = 'frontend/Magento/luma';
+
     private LayoutFactory $layoutFactory;
     private DesignInterface $design;
     private LoggerInterface $logger;
-    private ThemeSwitch $themeSwitch;
+    private ThemeProviderInterface $themeProvider;
     private PageLayoutReaderFactory $pageLayoutReaderFactory;
     private SerializerInterface $serializer;
     private ?array $collected = null;
@@ -29,13 +31,13 @@ class CheckoutLayoutCollector
         LayoutFactory $layoutFactory,
         DesignInterface $design,
         LoggerInterface $logger,
-        ThemeSwitch $themeSwitch,
+        ThemeProviderInterface $themeProvider,
         PageLayoutReaderFactory $pageLayoutReaderFactory,
         SerializerInterface $serializer
     ) {
         $this->layoutFactory = $layoutFactory;
         $this->design = $design;
-        $this->themeSwitch = $themeSwitch;
+        $this->themeProvider = $themeProvider;
         $this->logger = $logger;
         $this->pageLayoutReaderFactory = $pageLayoutReaderFactory;
         $this->serializer = $serializer;
@@ -55,14 +57,16 @@ class CheckoutLayoutCollector
         $originalTheme = $this->design->getDesignTheme();
 
         try {
-            $this->themeSwitch->switchToFallback();
+            $this->design->setDesignTheme(
+                $this->themeProvider->getThemeByFullPath(self::NATIVE_THEME_PATH)
+            );
             $layout = $this->layoutFactory->create(['cacheable' => false]);
             $update = $layout->getUpdate();
             $update->addHandle('checkout_index_index');
             $update->addHandle('fastcheckout_native_components');
             // checkout.root targets `content`, normally declared by the global
             // default handle. Recreate only that parent to avoid preparing global
-            // RequireJS blocks inside this isolated fallback-theme layout.
+            // RequireJS blocks inside this isolated Luma layout.
             $update->addUpdate(
                 '<referenceContainer name="main"><container name="content"/></referenceContainer>'
             );
