@@ -45,6 +45,8 @@ class QuoteSubmitSuccessTest extends TestCase
                 'getFastcheckoutSubscribe',
                 'unsFastcheckoutSubscribe',
                 'setFastcheckoutSubscribe',
+                'getFastcheckoutQuoteId',
+                'unsFastcheckoutQuoteId',
             ])
             ->getMock();
         $this->historyRepository = $this->createMock(OrderStatusHistoryRepositoryInterface::class);
@@ -55,6 +57,7 @@ class QuoteSubmitSuccessTest extends TestCase
     public function testEnabledCommentIsPersistedAndRemovedFromSession(): void
     {
         $order = $this->createOrderMock();
+        $this->matchQuote($order);
         $this->helper->method('isEnable')->willReturn(true);
         $this->helper->method('isShowComment')->willReturn(true);
         $this->checkoutSession->method('getFastcheckoutComment')->willReturn('  Leave at reception  ');
@@ -70,6 +73,7 @@ class QuoteSubmitSuccessTest extends TestCase
             ->willReturnSelf();
         $this->historyRepository->expects($this->once())->method('save')->with($history);
         $this->checkoutSession->expects($this->once())->method('unsFastcheckoutComment');
+        $this->checkoutSession->expects($this->once())->method('unsFastcheckoutQuoteId');
 
         $this->createObserver()->execute($this->eventFor($order));
     }
@@ -77,6 +81,7 @@ class QuoteSubmitSuccessTest extends TestCase
     public function testEmptyCommentDoesNotCreateHistory(): void
     {
         $order = $this->createOrderMock();
+        $this->matchQuote($order);
         $this->helper->method('isEnable')->willReturn(true);
         $this->helper->method('isShowComment')->willReturn(true);
         $this->checkoutSession->method('getFastcheckoutComment')->willReturn('   ');
@@ -99,6 +104,7 @@ class QuoteSubmitSuccessTest extends TestCase
     public function testNewsletterSubscribeWhenFlagSet(): void
     {
         $order = $this->createOrderMock(['getCustomerEmail', 'getEntityId', 'getStoreId']);
+        $this->matchQuote($order);
         $order->method('getCustomerEmail')->willReturn('guest@example.com');
         $order->method('getEntityId')->willReturn(55);
         $order->method('getStoreId')->willReturn(3);
@@ -119,6 +125,7 @@ class QuoteSubmitSuccessTest extends TestCase
     public function testNewsletterIsSkippedWhenFlagAbsent(): void
     {
         $order = $this->createOrderMock();
+        $this->matchQuote($order);
 
         $this->helper->method('isEnable')->willReturn(true);
         $this->helper->method('isShowComment')->willReturn(false);
@@ -126,6 +133,21 @@ class QuoteSubmitSuccessTest extends TestCase
         $this->checkoutSession->method('getFastcheckoutSubscribe')->willReturn(null);
         $this->subscriptionManager->expects($this->never())->method('subscribe');
         $this->checkoutSession->expects($this->once())->method('unsFastcheckoutSubscribe');
+
+        $this->createObserver()->execute($this->eventFor($order));
+    }
+
+    public function testIgnoresExtrasCapturedForAnotherQuote(): void
+    {
+        $order = $this->createOrderMock();
+        $order->method('getQuoteId')->willReturn(8);
+        $this->helper->method('isEnable')->willReturn(true);
+        $this->checkoutSession->method('getFastcheckoutQuoteId')->willReturn('7');
+
+        $this->helper->expects($this->never())->method('isShowComment');
+        $this->historyRepository->expects($this->never())->method('save');
+        $this->subscriptionManager->expects($this->never())->method('subscribe');
+        $this->checkoutSession->expects($this->never())->method('unsFastcheckoutQuoteId');
 
         $this->createObserver()->execute($this->eventFor($order));
     }
@@ -146,6 +168,12 @@ class QuoteSubmitSuccessTest extends TestCase
         return new Observer(['event' => new Event(['order' => $order])]);
     }
 
+    private function matchQuote(Order $order): void
+    {
+        $order->method('getQuoteId')->willReturn(42);
+        $this->checkoutSession->method('getFastcheckoutQuoteId')->willReturn('42');
+    }
+
     /**
      * @param list<string> $extraMethods
      * @return Order&MockObject
@@ -158,6 +186,7 @@ class QuoteSubmitSuccessTest extends TestCase
             'getEntityId',
             'getCustomerEmail',
             'getStoreId',
+            'getQuoteId',
             'addCommentToStatusHistory',
         ], $extraMethods)));
 

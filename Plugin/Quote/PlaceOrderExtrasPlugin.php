@@ -9,7 +9,7 @@ use Magento\Checkout\Model\Session as CheckoutSession;
 use Magento\Quote\Api\Data\PaymentInterface;
 use Magento\Quote\Api\PaymentMethodManagementInterface;
 
-/** Capture Fastcheckout extras while Magento saves the native payment data. */
+/** Capture Fastcheckout extras for the quote whose native payment data is saved. */
 class PlaceOrderExtrasPlugin
 {
     private CheckoutSession $checkoutSession;
@@ -33,14 +33,26 @@ class PlaceOrderExtrasPlugin
             return [$cartId, $paymentMethod];
         }
 
-        $comment = $this->extractComment($paymentMethod);
+        $extensionAttributes = $paymentMethod->getExtensionAttributes();
+        $comment = $extensionAttributes && method_exists($extensionAttributes, 'getComment')
+            ? $extensionAttributes->getComment()
+            : null;
+        $subscribe = $extensionAttributes && method_exists($extensionAttributes, 'getSubscribe')
+            ? $extensionAttributes->getSubscribe()
+            : null;
+
+        if ($comment === null && $subscribe === null) {
+            return [$cartId, $paymentMethod];
+        }
+
+        $this->checkoutSession->setFastcheckoutQuoteId((string)$cartId);
+        $comment = trim((string)$comment);
         if ($comment === '') {
             $this->checkoutSession->unsFastcheckoutComment();
         } else {
             $this->checkoutSession->setFastcheckoutComment($comment);
         }
 
-        $subscribe = $this->extractSubscribe($paymentMethod);
         if ($subscribe === null) {
             $this->checkoutSession->unsFastcheckoutSubscribe();
         } else {
@@ -48,28 +60,5 @@ class PlaceOrderExtrasPlugin
         }
 
         return [$cartId, $paymentMethod];
-    }
-
-    private function extractComment(PaymentInterface $paymentMethod): string
-    {
-        $extensionAttributes = $paymentMethod->getExtensionAttributes();
-        if ($extensionAttributes && method_exists($extensionAttributes, 'getComment')) {
-            return trim((string)$extensionAttributes->getComment());
-        }
-
-        return '';
-    }
-
-    private function extractSubscribe(PaymentInterface $paymentMethod): ?bool
-    {
-        $extensionAttributes = $paymentMethod->getExtensionAttributes();
-        if ($extensionAttributes && method_exists($extensionAttributes, 'getSubscribe')) {
-            $subscribe = $extensionAttributes->getSubscribe();
-            if ($subscribe !== null) {
-                return (bool)$subscribe;
-            }
-        }
-
-        return null;
     }
 }

@@ -21,6 +21,9 @@ class FastcheckoutHandleTest extends TestCase
         $checkout = (string)file_get_contents(
             $this->moduleRoot() . '/view/frontend/layout/checkout_index_index.xml'
         );
+        $components = (string)file_get_contents(
+            $this->moduleRoot() . '/view/frontend/layout/fastcheckout_native_components.xml'
+        );
 
         $this->assertStringContainsString('<update handle="checkout_index_index"/>', $source);
         $this->assertStringContainsString('Kkkonrad_Fastcheckout::js/requirejs-base.js', $checkout);
@@ -29,14 +32,17 @@ class FastcheckoutHandleTest extends TestCase
         $this->assertStringContainsString('requirejs-config.js', $checkout);
         $this->assertStringContainsString('hyva-default-checkout.css', $source);
         $this->assertStringContainsString('Kkkonrad_Fastcheckout::hyva/checkout.phtml', $source);
-        $this->assertStringContainsString('name="fastcheckout-newsletter"', $checkout);
+        $this->assertStringNotContainsString('fastcheckout-one-step-validator', $checkout);
+        $this->assertStringNotContainsString('fastcheckout-newsletter', $checkout);
+        $this->assertStringNotContainsString('fastcheckout-order-comment', $checkout);
+        $this->assertStringContainsString('name="fastcheckout-newsletter"', $components);
         $this->assertStringContainsString(
             'Kkkonrad_Fastcheckout/js/view/newsletter',
-            $checkout
+            $components
         );
-        $this->assertStringContainsString('Magento_Ui/js/form/element/textarea', $checkout);
-        $this->assertStringContainsString('fastcheckout.comment', $checkout);
-        $this->assertStringContainsString('fastcheckout.subscribe', $checkout);
+        $this->assertStringContainsString('Magento_Ui/js/form/element/textarea', $components);
+        $this->assertStringContainsString('fastcheckout.comment', $components);
+        $this->assertStringContainsString('fastcheckout.subscribe', $components);
         $this->assertStringContainsString('fastcheckout-checkout-page', $source);
         $this->assertStringContainsString('name="fallback.module.missing" remove="true"', $source);
         $this->assertStringContainsString('name="checkout.root" remove="true"', $source);

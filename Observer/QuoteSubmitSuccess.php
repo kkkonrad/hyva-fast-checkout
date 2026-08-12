@@ -15,8 +15,8 @@ use Psr\Log\LoggerInterface;
 
 /**
  * After successful quote submit:
- * - persist Fastcheckout order comment from checkout session;
- * - subscribe guest/customer to newsletter when Fastcheckout checkbox was checked.
+ * - persist the matching quote's Fastcheckout order comment from checkout session;
+ * - subscribe guest/customer when that quote's Fastcheckout checkbox was checked.
  *
  * Attaching a guest order to an existing customer runs earlier, in
  * {@see QuoteSubmitBefore}, so the order is written only once and Magento's own
@@ -65,8 +65,17 @@ class QuoteSubmitSuccess implements ObserverInterface
             return $this;
         }
 
-        $this->saveComment($order);
-        $this->subscribeToNewsletter($order);
+        $quoteId = (string)$this->checkoutSession->getFastcheckoutQuoteId();
+        if ($quoteId === '' || $quoteId !== (string)$order->getQuoteId()) {
+            return $this;
+        }
+
+        try {
+            $this->saveComment($order);
+            $this->subscribeToNewsletter($order);
+        } finally {
+            $this->clearExtras();
+        }
 
         return $this;
     }
@@ -86,7 +95,6 @@ class QuoteSubmitSuccess implements ObserverInterface
             $history = $order->addCommentToStatusHistory($comment, false, true);
             $history->setIsCustomerNotified(false);
             $this->historyRepository->save($history);
-            $this->checkoutSession->unsFastcheckoutComment();
         } catch (\Throwable $exception) {
             $this->logger->error('Fastcheckout order comment could not be saved.', [
                 'order_id' => $order->getEntityId(),
@@ -101,19 +109,16 @@ class QuoteSubmitSuccess implements ObserverInterface
     private function subscribeToNewsletter(Order $order): void
     {
         if (!$this->helper->isShowSubscribe()) {
-            $this->clearSubscribeFlag();
             return;
         }
 
         $flag = $this->checkoutSession->getFastcheckoutSubscribe();
         if ($flag === null || (int)$flag !== 1) {
-            $this->clearSubscribeFlag();
             return;
         }
 
         $email = trim((string)$order->getCustomerEmail());
         if ($email === '') {
-            $this->clearSubscribeFlag();
             return;
         }
 
@@ -128,15 +133,20 @@ class QuoteSubmitSuccess implements ObserverInterface
             ]);
         }
 
-        $this->clearSubscribeFlag();
     }
 
-    private function clearSubscribeFlag(): void
+    private function clearExtras(): void
     {
-        try {
-            $this->checkoutSession->unsFastcheckoutSubscribe();
-        } catch (\Throwable $exception) {
-            // ignore session cleanup errors
+        foreach ([
+            'unsFastcheckoutComment',
+            'unsFastcheckoutSubscribe',
+            'unsFastcheckoutQuoteId',
+        ] as $method) {
+            try {
+                $this->checkoutSession->{$method}();
+            } catch (\Throwable $exception) {
+                // Never block order success on session cleanup failures.
+            }
         }
     }
 }

@@ -12,10 +12,13 @@ use Magento\Checkout\Block\Checkout\LayoutProcessorInterface;
  */
 class LayoutProcessor implements LayoutProcessorInterface
 {
+    private const CORE_SHIPPING_TEMPLATE = 'Magento_Checkout/shipping';
     private const CORE_SHIPPING_METHOD_LIST_TEMPLATE =
         'Magento_Checkout/shipping-address/shipping-method-list';
     private const CORE_SHIPPING_METHOD_ITEM_TEMPLATE =
         'Magento_Checkout/shipping-address/shipping-method-item';
+    private const CORE_SUMMARY_TEMPLATE = 'Magento_Checkout/summary';
+    private const CORE_DISCOUNT_TEMPLATE = 'Magento_SalesRule/payment/discount';
 
     private Helper $helper;
 
@@ -35,17 +38,21 @@ class LayoutProcessor implements LayoutProcessorInterface
             $shipping = &$jsLayout['components']['checkout']['children']['steps']['children']
                 ['shipping-step']['children']['shippingAddress'];
             $shipping['config'] = is_array($shipping['config'] ?? null) ? $shipping['config'] : [];
-            $shipping['config']['template'] = 'Kkkonrad_Fastcheckout/hyva/shipping-address';
-            $shipping['template'] = 'Kkkonrad_Fastcheckout/hyva/shipping-address';
+            $this->setTemplateDefault(
+                $shipping,
+                'template',
+                self::CORE_SHIPPING_TEMPLATE,
+                'Kkkonrad_Fastcheckout/hyva/shipping-address'
+            );
             $shipping['config']['popUpForm']['options']['appendTo'] =
                 '#fastcheckout-checkout .fastcheckout-native-shipping-address';
-            $this->setShippingTemplateDefault(
+            $this->setTemplateDefault(
                 $shipping,
                 'shippingMethodListTemplate',
                 self::CORE_SHIPPING_METHOD_LIST_TEMPLATE,
                 'Kkkonrad_Fastcheckout/hyva/shipping-list'
             );
-            $this->setShippingTemplateDefault(
+            $this->setTemplateDefault(
                 $shipping,
                 'shippingMethodItemTemplate',
                 self::CORE_SHIPPING_METHOD_ITEM_TEMPLATE,
@@ -56,8 +63,12 @@ class LayoutProcessor implements LayoutProcessorInterface
         if (is_array($jsLayout['components']['checkout']['children']['sidebar']['children']['summary'] ?? null)) {
             $summary = &$jsLayout['components']['checkout']['children']['sidebar']['children']['summary'];
             $summary['config'] = is_array($summary['config'] ?? null) ? $summary['config'] : [];
-            $summary['config']['template'] = 'Kkkonrad_Fastcheckout/hyva/summary';
-            $summary['template'] = 'Kkkonrad_Fastcheckout/hyva/summary';
+            $this->setTemplateDefault(
+                $summary,
+                'template',
+                self::CORE_SUMMARY_TEMPLATE,
+                'Kkkonrad_Fastcheckout/hyva/summary'
+            );
             foreach (['cart_items' => 10, 'itemsAfter' => 20, 'totals' => 30] as $name => $sortOrder) {
                 if (isset($summary['children'][$name])) {
                     $summary['children'][$name]['sortOrder'] = $sortOrder;
@@ -70,32 +81,36 @@ class LayoutProcessor implements LayoutProcessorInterface
             $discount = &$jsLayout['components']['checkout']['children']['steps']['children']
                 ['billing-step']['children']['payment']['children']['afterMethods']['children']['discount'];
             $discount['config'] = is_array($discount['config'] ?? null) ? $discount['config'] : [];
-            $discount['config']['template'] = 'Kkkonrad_Fastcheckout/hyva/payment/discount';
-            $discount['template'] = 'Kkkonrad_Fastcheckout/hyva/payment/discount';
+            $this->setTemplateDefault(
+                $discount,
+                'template',
+                self::CORE_DISCOUNT_TEMPLATE,
+                'Kkkonrad_Fastcheckout/hyva/payment/discount'
+            );
         }
 
         return $jsLayout;
     }
 
-    private function setShippingTemplateDefault(
-        array &$shipping,
+    private function setTemplateDefault(
+        array &$component,
         string $key,
         string $coreTemplate,
         string $fastcheckoutTemplate
     ): void {
-        $configured = $shipping['config'][$key] ?? null;
-        $direct = $shipping[$key] ?? null;
+        $configured = $component['config'][$key] ?? null;
+        $direct = $component[$key] ?? null;
         $custom = $configured !== null && $configured !== $coreTemplate
             ? $configured
             : ($direct !== null && $direct !== $coreTemplate ? $direct : null);
 
         if ($custom !== null) {
-            $shipping['config'][$key] = $custom;
-            $shipping[$key] = $custom;
+            $component['config'][$key] = $custom;
+            $component[$key] = $custom;
             return;
         }
 
-        $shipping['config'][$key] = $fastcheckoutTemplate;
-        $shipping[$key] = $fastcheckoutTemplate;
+        $component['config'][$key] = $fastcheckoutTemplate;
+        $component[$key] = $fastcheckoutTemplate;
     }
 }

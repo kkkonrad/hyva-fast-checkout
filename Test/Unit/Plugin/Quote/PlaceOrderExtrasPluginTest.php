@@ -30,6 +30,8 @@ class PlaceOrderExtrasPluginTest extends TestCase
                 'unsFastcheckoutComment',
                 'setFastcheckoutSubscribe',
                 'unsFastcheckoutSubscribe',
+                'setFastcheckoutQuoteId',
+                'unsFastcheckoutQuoteId',
             ])
             ->getMock();
         $this->helper = $this->createMock(Helper::class);
@@ -57,6 +59,8 @@ class PlaceOrderExtrasPluginTest extends TestCase
             ->method('setFastcheckoutComment')->with('Leave at reception');
         $this->checkoutSession->expects(self::once())
             ->method('setFastcheckoutSubscribe')->with(1);
+        $this->checkoutSession->expects(self::once())
+            ->method('setFastcheckoutQuoteId')->with('42');
 
         $result = $this->plugin->beforeSet(
             $this->createMock(PaymentMethodManagementInterface::class),
@@ -70,12 +74,24 @@ class PlaceOrderExtrasPluginTest extends TestCase
     public function testDoesNotReadPaymentMethodAdditionalData(): void
     {
         $this->helper->method('isEnable')->willReturn(true);
+        $extensionAttributes = new class implements ExtensionAttributesInterface {
+            public function getComment(): ?string
+            {
+                return null;
+            }
+
+            public function getSubscribe(): ?bool
+            {
+                return null;
+            }
+        };
         $payment = $this->createMock(PaymentInterface::class);
-        $payment->method('getExtensionAttributes')->willReturn(null);
+        $payment->method('getExtensionAttributes')->willReturn($extensionAttributes);
         $payment->expects(self::never())->method('getAdditionalData');
 
-        $this->checkoutSession->expects(self::once())->method('unsFastcheckoutComment');
-        $this->checkoutSession->expects(self::once())->method('unsFastcheckoutSubscribe');
+        $this->checkoutSession->expects(self::never())->method('setFastcheckoutQuoteId');
+        $this->checkoutSession->expects(self::never())->method('unsFastcheckoutComment');
+        $this->checkoutSession->expects(self::never())->method('unsFastcheckoutSubscribe');
 
         $this->plugin->beforeSet(
             $this->createMock(PaymentMethodManagementInterface::class),
@@ -84,14 +100,26 @@ class PlaceOrderExtrasPluginTest extends TestCase
         );
     }
 
-    public function testClearsMissingExtrasWithoutTouchingTheQuote(): void
+    public function testStoresExplicitEmptyExtrasForTheMatchingQuote(): void
     {
         $this->helper->method('isEnable')->willReturn(true);
-        $payment = $this->createMock(PaymentInterface::class);
-        $payment->method('getExtensionAttributes')->willReturn(null);
+        $extensionAttributes = new class implements ExtensionAttributesInterface {
+            public function getComment(): string
+            {
+                return ' ';
+            }
 
+            public function getSubscribe(): bool
+            {
+                return false;
+            }
+        };
+        $payment = $this->createMock(PaymentInterface::class);
+        $payment->method('getExtensionAttributes')->willReturn($extensionAttributes);
+
+        $this->checkoutSession->expects(self::once())->method('setFastcheckoutQuoteId')->with('7');
         $this->checkoutSession->expects(self::once())->method('unsFastcheckoutComment');
-        $this->checkoutSession->expects(self::once())->method('unsFastcheckoutSubscribe');
+        $this->checkoutSession->expects(self::once())->method('setFastcheckoutSubscribe')->with(0);
 
         $this->plugin->beforeSet(
             $this->createMock(PaymentMethodManagementInterface::class),

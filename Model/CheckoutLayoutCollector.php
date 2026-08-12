@@ -59,6 +59,7 @@ class CheckoutLayoutCollector
             $layout = $this->layoutFactory->create(['cacheable' => false]);
             $update = $layout->getUpdate();
             $update->addHandle('checkout_index_index');
+            $update->addHandle('fastcheckout_native_components');
             // checkout.root targets `content`, normally declared by the global
             // default handle. Recreate only that parent to avoid preparing global
             // RequireJS blocks inside this isolated fallback-theme layout.

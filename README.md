@@ -167,7 +167,9 @@ Magento.
   Standardowy event `layout_load_before` dodaje handle `fastcheckout_index_index`
   przed scaleniem layoutu; moduł nie pluginuje ani nie omija kontrolera checkoutu.
 - Fastcheckout buduje izolowany layout motywu fallback dla handle
-  `checkout_index_index`, dzięki czemu wszystkie layout processory i wpisy
+  `checkout_index_index` oraz prywatnego `fastcheckout_native_components`, dzięki
+  czemu jego walidator, newsletter i komentarz nie są rejestrowane w zwykłym
+  checkoutcie, a wszystkie layout processory i wpisy
   `jsLayout` z modułów zewnętrznych trafiają do oryginalnego `checkout.root`.
   Przetworzone drzewo jest pobierane przez `checkout.root::getJsLayout()` bez
   tworzenia drugiego bloku `Onepage`; trzy zmiany prezentacyjne wykonuje końcowy
@@ -175,8 +177,9 @@ Magento.
   Izolowany layout nie ładuje globalnego handle `default`, więc nie regeneruje
   assetów RequireJS aktywnego motywu podczas renderowania strony.
 - Pełny, scalony `jsLayout` jest uruchamiany dokładnie raz przez
-  `Magento_Ui/js/core/app`; Fastcheckout zmienia wyłącznie szablony
-  odpowiedzialne za dotychczasowy wygląd. Własny szablon listy dostaw nadal
+  `Magento_Ui/js/core/app`; Fastcheckout zmienia wyłącznie niezmodyfikowane
+  szablony core odpowiedzialne za dotychczasowy wygląd i zachowuje template’y
+  ustawione przez zewnętrzne layout processory. Własny szablon listy dostaw nadal
   deleguje pojedynczy wiersz do `shippingMethodItemTemplate`, tak jak core.
 - Stronę renderuje jedna instancja bloku Fastcheckout. Stawki oraz podsumowanie
   nie mają równoległego fallbacku PHP: ich jedynym źródłem są natywne
@@ -194,7 +197,8 @@ Magento.
   Zawartość rendererów zewnętrznych nie jest przenoszona ani klonowana. Stan
   komentarza i newslettera należy do standardowego `checkoutProvider` pod
   `fastcheckout.comment` oraz `fastcheckout.subscribe`; do płatności trafia wyłącznie
-  przez zarejestrowane `PaymentInterface.extension_attributes`.
+  przez zarejestrowane `PaymentInterface.extension_attributes` i jest konsumowany
+  wyłącznie przez zamówienie o odpowiadającym `quote_id`.
 - Strona sukcesu zachowuje core `Magento\Checkout\Block\Onepage\Success`, a
   komentarz i newsletter są zapisywane przez
   `OrderStatusHistoryRepositoryInterface` i `SubscriptionManagerInterface`.

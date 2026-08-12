@@ -50,6 +50,10 @@ class NativePipelineOwnershipTest extends TestCase
         );
 
         $this->assertStringContainsString("\$update->addHandle('checkout_index_index')", $source);
+        $this->assertStringContainsString(
+            "\$update->addHandle('fastcheckout_native_components')",
+            $source
+        );
         $this->assertStringNotContainsString("\$update->addHandle('default')", $source);
         $this->assertStringContainsString('<container name="content"/>', $source);
         $this->assertStringContainsString('$checkoutRoot->getJsLayout()', $source);
@@ -199,7 +203,7 @@ class NativePipelineOwnershipTest extends TestCase
             $this->moduleRoot() . '/view/frontend/templates/hyva/checkout/payment-methods.phtml'
         );
         $layout = (string)file_get_contents(
-            $this->moduleRoot() . '/view/frontend/layout/checkout_index_index.xml'
+            $this->moduleRoot() . '/view/frontend/layout/fastcheckout_native_components.xml'
         );
         $newsletter = (string)file_get_contents(
             $this->moduleRoot() . '/view/frontend/web/template/hyva/newsletter.html'
