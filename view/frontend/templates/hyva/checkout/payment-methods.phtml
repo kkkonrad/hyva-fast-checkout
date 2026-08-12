@@ -5,7 +5,9 @@
  * @var \Magento\Framework\Escaper $escaper
  */
 ?>
-<div class="fc-container-3 space-y-6 min-w-0 w-full">
+<div id="payment"
+     class="fc-container-3 space-y-6 min-w-0 w-full"
+     role="presentation">
     <div class="card relative" data-fastcheckout-payment-methods-card>
         <div class="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
             <h2 class="text-xl font-semibold text-gray-900">
@@ -13,7 +15,11 @@
             </h2>
         </div>
 
-        <div class="fastcheckout-ko-payment-root"
+        <div id="checkout-step-payment"
+             class="fastcheckout-ko-payment-root"
+             data-role="content"
+             role="tabpanel"
+             aria-hidden="false"
              data-bind="scope: 'checkout.steps.billing-step.payment'">
             <!-- ko if: quoteIsVirtual -->
                 <!-- ko foreach: getRegion('customer-email') -->

@@ -80,6 +80,7 @@ class CheckoutLayoutCollector
             $this->logger->error('Fastcheckout could not build the native checkout layout.', [
                 'exception' => $exception
             ]);
+            throw $exception;
         } finally {
             $this->design->setDesignTheme($originalTheme);
         }

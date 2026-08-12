@@ -5,91 +5,42 @@ declare(strict_types=1);
 namespace Kkkonrad\Fastcheckout\Plugin\Quote;
 
 use Kkkonrad\Fastcheckout\Helper\Data as Helper;
-use Magento\Checkout\Model\AddressComparatorInterface;
 use Magento\Checkout\Model\Session as CheckoutSession;
-use Magento\Framework\App\RequestInterface;
-use Magento\Quote\Api\CartManagementInterface;
-use Magento\Quote\Api\CartRepositoryInterface;
 use Magento\Quote\Api\Data\PaymentInterface;
+use Magento\Quote\Api\PaymentMethodManagementInterface;
 
-/**
- * Capture Fastcheckout extras (comment / newsletter) before native placeOrder.
- * Comment is later persisted by QuoteSubmitSuccess from checkout session.
- *
- * Client must send registered PaymentInterface extension attributes only:
- * comment, subscribe (see etc/extension_attributes.xml). Legacy keys
- * fastcheckout_comment / fastcheckout_subscribe are still accepted from
- * additional_data and raw JSON for backward compatibility.
- */
+/** Capture Fastcheckout extras while Magento saves the native payment data. */
 class PlaceOrderExtrasPlugin
 {
-    /** @var CheckoutSession */
-    private $checkoutSession;
+    private CheckoutSession $checkoutSession;
+    private Helper $helper;
 
-    /** @var Helper */
-    private $helper;
-
-    /** @var RequestInterface */
-    private $request;
-
-    /** @var CartRepositoryInterface */
-    private $quoteRepository;
-
-    /** @var AddressComparatorInterface */
-    private $addressComparator;
-
-    public function __construct(
-        CheckoutSession $checkoutSession,
-        Helper $helper,
-        RequestInterface $request,
-        CartRepositoryInterface $quoteRepository,
-        AddressComparatorInterface $addressComparator
-    ) {
+    public function __construct(CheckoutSession $checkoutSession, Helper $helper)
+    {
         $this->checkoutSession = $checkoutSession;
         $this->helper = $helper;
-        $this->request = $request;
-        $this->quoteRepository = $quoteRepository;
-        $this->addressComparator = $addressComparator;
     }
 
     /**
-     * @param CartManagementInterface $subject
-     * @param int $cartId
-     * @param PaymentInterface|null $paymentMethod
-     * @return array
+     * @return array{0: int|string, 1: PaymentInterface}
      */
-    public function beforePlaceOrder(
-        CartManagementInterface $subject,
+    public function beforeSet(
+        PaymentMethodManagementInterface $subject,
         $cartId,
-        ?PaymentInterface $paymentMethod = null
+        PaymentInterface $paymentMethod
     ): array {
         if (!$this->helper->isEnable()) {
             return [$cartId, $paymentMethod];
         }
 
-        $quote = $this->quoteRepository->getActive($cartId);
-        $shipping = $quote->getShippingAddress();
-        $billing = $quote->getBillingAddress();
-        if (
-            $shipping->getSaveInAddressBook()
-            && $billing->getSaveInAddressBook()
-            && $this->addressComparator->isEqual($shipping, $billing)
-        ) {
-            $billing->setSaveInAddressBook(0);
-            $this->quoteRepository->save($quote);
-        }
-
-        // The raw body is the backward-compatible fallback for both extras; decode it once.
-        $payload = $this->decodeRequestPayload();
-
-        $comment = $this->extractComment($paymentMethod, $payload);
+        $comment = $this->extractComment($paymentMethod);
         if ($comment === '') {
             $this->checkoutSession->unsFastcheckoutComment();
         } else {
             $this->checkoutSession->setFastcheckoutComment($comment);
         }
 
-        $subscribe = $this->extractSubscribe($paymentMethod, $payload);
+        $subscribe = $this->extractSubscribe($paymentMethod);
         if ($subscribe === null) {
             $this->checkoutSession->unsFastcheckoutSubscribe();
         } else {
@@ -99,71 +50,21 @@ class PlaceOrderExtrasPlugin
         return [$cartId, $paymentMethod];
     }
 
-    /**
-     * Decoded place-order request body, or an empty array when there is none.
-     *
-     * @return array
-     */
-    private function decodeRequestPayload(): array
+    private function extractComment(PaymentInterface $paymentMethod): string
     {
-        $content = (string)$this->request->getContent();
-        if ($content === '') {
-            return [];
-        }
-
-        $json = json_decode($content, true);
-
-        return is_array($json) ? $json : [];
-    }
-
-    /**
-     * @param array $payload
-     */
-    private function extractComment(?PaymentInterface $paymentMethod, array $payload): string
-    {
-        if ($paymentMethod) {
-            $additional = $paymentMethod->getAdditionalData();
-            if (is_array($additional)) {
-                foreach (['fastcheckout_comment', 'comment'] as $key) {
-                    if (!empty($additional[$key])) {
-                        return trim((string)$additional[$key]);
-                    }
-                }
-            }
-            $ext = $paymentMethod->getExtensionAttributes();
-            if ($ext && is_object($ext)) {
-                if (method_exists($ext, 'getComment')) {
-                    $value = $ext->getComment();
-                    if ($value !== null && trim((string)$value) !== '') {
-                        return trim((string)$value);
-                    }
-                }
-                $data = method_exists($ext, '__toArray') ? $ext->__toArray() : [];
-                foreach (['comment', 'fastcheckout_comment'] as $key) {
-                    if (!empty($data[$key])) {
-                        return trim((string)$data[$key]);
-                    }
-                }
+        $extensionAttributes = $paymentMethod->getExtensionAttributes();
+        if ($extensionAttributes && method_exists($extensionAttributes, 'getComment')) {
+            $comment = trim((string)$extensionAttributes->getComment());
+            if ($comment !== '') {
+                return $comment;
             }
         }
 
-        $ext = $payload['paymentMethod']['extension_attributes']
-            ?? $payload['payment_method']['extension_attributes']
-            ?? [];
-        if (is_array($ext)) {
-            foreach (['comment', 'fastcheckout_comment'] as $key) {
-                if (!empty($ext[$key])) {
-                    return trim((string)$ext[$key]);
-                }
-            }
-        }
-        $additional = $payload['paymentMethod']['additional_data']
-            ?? $payload['payment_method']['additional_data']
-            ?? [];
-        if (is_array($additional)) {
+        $additionalData = $paymentMethod->getAdditionalData();
+        if (is_array($additionalData)) {
             foreach (['fastcheckout_comment', 'comment'] as $key) {
-                if (!empty($additional[$key])) {
-                    return trim((string)$additional[$key]);
+                if (!empty($additionalData[$key])) {
+                    return trim((string)$additionalData[$key]);
                 }
             }
         }
@@ -171,54 +72,21 @@ class PlaceOrderExtrasPlugin
         return '';
     }
 
-    /**
-     * @param array $payload
-     */
-    private function extractSubscribe(?PaymentInterface $paymentMethod, array $payload): ?bool
+    private function extractSubscribe(PaymentInterface $paymentMethod): ?bool
     {
-        if ($paymentMethod) {
-            $additional = $paymentMethod->getAdditionalData();
-            if (is_array($additional)) {
-                foreach (['fastcheckout_subscribe', 'subscribe'] as $key) {
-                    if (array_key_exists($key, $additional)) {
-                        return (bool)$additional[$key];
-                    }
-                }
-            }
-            $ext = $paymentMethod->getExtensionAttributes();
-            if ($ext && is_object($ext)) {
-                if (method_exists($ext, 'getSubscribe')) {
-                    $value = $ext->getSubscribe();
-                    if ($value !== null) {
-                        return (bool)$value;
-                    }
-                }
-                $data = method_exists($ext, '__toArray') ? $ext->__toArray() : [];
-                foreach (['subscribe', 'fastcheckout_subscribe'] as $key) {
-                    if (array_key_exists($key, $data) && $data[$key] !== null) {
-                        return (bool)$data[$key];
-                    }
-                }
+        $extensionAttributes = $paymentMethod->getExtensionAttributes();
+        if ($extensionAttributes && method_exists($extensionAttributes, 'getSubscribe')) {
+            $subscribe = $extensionAttributes->getSubscribe();
+            if ($subscribe !== null) {
+                return (bool)$subscribe;
             }
         }
 
-        $ext = $payload['paymentMethod']['extension_attributes']
-            ?? $payload['payment_method']['extension_attributes']
-            ?? [];
-        if (is_array($ext)) {
-            foreach (['subscribe', 'fastcheckout_subscribe'] as $key) {
-                if (array_key_exists($key, $ext) && $ext[$key] !== null) {
-                    return (bool)$ext[$key];
-                }
-            }
-        }
-        $additional = $payload['paymentMethod']['additional_data']
-            ?? $payload['payment_method']['additional_data']
-            ?? [];
-        if (is_array($additional)) {
+        $additionalData = $paymentMethod->getAdditionalData();
+        if (is_array($additionalData)) {
             foreach (['fastcheckout_subscribe', 'subscribe'] as $key) {
-                if (array_key_exists($key, $additional)) {
-                    return (bool)$additional[$key];
+                if (array_key_exists($key, $additionalData)) {
+                    return (bool)$additionalData[$key];
                 }
             }
         }

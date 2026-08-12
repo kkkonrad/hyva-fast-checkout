@@ -49,6 +49,7 @@ class FastcheckoutHandleTest extends TestCase
             '/view/frontend/templates/hyva/checkout/payment-methods.phtml',
             '/view/frontend/templates/hyva/checkout/summary.phtml',
             '/view/frontend/web/template/hyva/shipping-list.html',
+            '/view/frontend/web/template/hyva/shipping-method-item.html',
         ] as $file) {
             $templates .= (string)file_get_contents($this->moduleRoot() . $file);
         }
@@ -70,5 +71,19 @@ class FastcheckoutHandleTest extends TestCase
 
         $this->assertStringNotContainsString('data-fastcheckout-payment-option=', $templates);
         $this->assertStringNotContainsString('fastcheckoutHyvaPaymentRenderers', $templates);
+
+        foreach ([
+            'id="checkout-step-shipping"',
+            'id="opc-shipping_method"',
+            'id="checkout-step-shipping_method"',
+            'id="co-shipping-method-form"',
+            'id="payment"',
+            'id="checkout-step-payment"',
+        ] as $nativeSelector) {
+            $this->assertStringContainsString($nativeSelector, $templates);
+        }
+
+        $this->assertStringContainsString('element.shippingMethodItemTemplate', $templates);
+        $this->assertStringContainsString('let: { element: $data }', $templates);
     }
 }

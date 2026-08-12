@@ -18,7 +18,6 @@ class ExtendedCheckoutConfigProvider implements ConfigProviderInterface
     {
         return [
             'fastcheckoutSettings' => [
-                'shippingPaymentMapping' => $this->helper->getShippingPaymentMapping(),
                 'showDiscount' => $this->helper->isShowDiscount(),
                 'showComment' => $this->helper->isShowComment(),
                 'showSubscribe' => $this->helper->isShowSubscribe(),

@@ -6,7 +6,10 @@
  */
 ?>
 <!-- Container 2: Shipping Method -->
-<div class="fc-container-2 space-y-6 min-w-0 w-full" data-fastcheckout-shipping-methods>
+<div id="opc-shipping_method"
+     class="fc-container-2 space-y-6 min-w-0 w-full"
+     role="presentation"
+     data-fastcheckout-shipping-methods>
     <div class="card relative">
         <div class="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
             <h2 class="text-xl font-semibold text-gray-900">
@@ -14,7 +17,11 @@
             </h2>
         </div>
 
-        <div class="fastcheckout-ko-shipping-container">
+        <div id="checkout-step-shipping_method"
+             class="fastcheckout-ko-shipping-container"
+             data-role="content"
+             role="tabpanel"
+             aria-hidden="false">
             <?php
             /**
              * Bind to Magento's real shipping view (same instance as the address form).
@@ -25,7 +32,52 @@
             <div id="fastcheckout-ko-shipping-root"
                  class="fastcheckout-ko-shipping-root"
                  data-bind="scope: 'checkout.steps.shipping-step.shippingAddress'">
-                <!-- ko template: { name: 'Kkkonrad_Fastcheckout/hyva/shipping-list' } --><!-- /ko -->
+                <!-- ko let: { element: $data } -->
+                <form id="co-shipping-method-form"
+                      novalidate="novalidate"
+                      data-bind="submit: setShippingInformation">
+                    <div class="grid gap-3 relative">
+                        <!-- ko if: isLoading -->
+                        <div class="absolute inset-0 bg-white/70 backdrop-blur-[1px] z-20 rounded pointer-events-none"
+                             role="status"
+                             aria-live="polite">
+                            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+                                <svg class="animate-spin h-8 w-8 text-primary"
+                                     fill="none"
+                                     viewBox="0 0 24 24"
+                                     aria-hidden="true">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10"
+                                            stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor"
+                                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                            </div>
+                        </div>
+                        <!-- /ko -->
+
+                        <!-- ko foreach: getRegion('before-shipping-method-form') -->
+                            <!-- ko template: getTemplate() --><!-- /ko -->
+                        <!-- /ko -->
+
+                        <!-- ko if: errorValidationMessage().length -->
+                        <div class="rounded-lg border border-red-200 bg-red-50 px-3 py-2"
+                             role="alert"
+                             data-fastcheckout-shipping-method-error="1">
+                            <span class="field-error shipping-field-error text-sm text-red-600 font-medium block"
+                                  data-bind="text: errorValidationMessage"></span>
+                        </div>
+                        <!-- /ko -->
+
+                        <!-- ko template: { name: shippingMethodListTemplate } --><!-- /ko -->
+
+                        <div id="onepage-checkout-shipping-method-additional-load">
+                            <!-- ko foreach: getRegion('shippingAdditional') -->
+                                <!-- ko template: getTemplate() --><!-- /ko -->
+                            <!-- /ko -->
+                        </div>
+                    </div>
+                </form>
+                <!-- /ko -->
             </div>
         </div>
     </div>

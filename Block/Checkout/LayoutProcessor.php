@@ -12,6 +12,11 @@ use Magento\Checkout\Block\Checkout\LayoutProcessorInterface;
  */
 class LayoutProcessor implements LayoutProcessorInterface
 {
+    private const CORE_SHIPPING_METHOD_LIST_TEMPLATE =
+        'Magento_Checkout/shipping-address/shipping-method-list';
+    private const CORE_SHIPPING_METHOD_ITEM_TEMPLATE =
+        'Magento_Checkout/shipping-address/shipping-method-item';
+
     private Helper $helper;
 
     public function __construct(Helper $helper)
@@ -34,6 +39,18 @@ class LayoutProcessor implements LayoutProcessorInterface
             $shipping['template'] = 'Kkkonrad_Fastcheckout/hyva/shipping-address';
             $shipping['config']['popUpForm']['options']['appendTo'] =
                 '#fastcheckout-checkout .fastcheckout-native-shipping-address';
+            $this->setShippingTemplateDefault(
+                $shipping,
+                'shippingMethodListTemplate',
+                self::CORE_SHIPPING_METHOD_LIST_TEMPLATE,
+                'Kkkonrad_Fastcheckout/hyva/shipping-list'
+            );
+            $this->setShippingTemplateDefault(
+                $shipping,
+                'shippingMethodItemTemplate',
+                self::CORE_SHIPPING_METHOD_ITEM_TEMPLATE,
+                'Kkkonrad_Fastcheckout/hyva/shipping-method-item'
+            );
         }
 
         if (is_array($jsLayout['components']['checkout']['children']['sidebar']['children']['summary'] ?? null)) {
@@ -58,5 +75,27 @@ class LayoutProcessor implements LayoutProcessorInterface
         }
 
         return $jsLayout;
+    }
+
+    private function setShippingTemplateDefault(
+        array &$shipping,
+        string $key,
+        string $coreTemplate,
+        string $fastcheckoutTemplate
+    ): void {
+        $configured = $shipping['config'][$key] ?? null;
+        $direct = $shipping[$key] ?? null;
+        $custom = $configured !== null && $configured !== $coreTemplate
+            ? $configured
+            : ($direct !== null && $direct !== $coreTemplate ? $direct : null);
+
+        if ($custom !== null) {
+            $shipping['config'][$key] = $custom;
+            $shipping[$key] = $custom;
+            return;
+        }
+
+        $shipping['config'][$key] = $fastcheckoutTemplate;
+        $shipping[$key] = $fastcheckoutTemplate;
     }
 }

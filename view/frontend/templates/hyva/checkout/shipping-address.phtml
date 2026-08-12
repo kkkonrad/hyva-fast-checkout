@@ -33,7 +33,7 @@
     </div>
 </div>
 
-<div class="fc-container-1 min-w-0 w-full">
+<div id="shipping" class="fc-container-1 min-w-0 w-full">
     <div class="card relative">
         <div class="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
             <h2 class="text-xl font-semibold text-gray-900">
@@ -41,7 +41,11 @@
             </h2>
         </div>
 
-        <div class="fastcheckout-native-shipping-address"
+        <div id="checkout-step-shipping"
+             class="fastcheckout-native-shipping-address"
+             data-role="content"
+             role="tabpanel"
+             aria-hidden="false"
              data-bind="scope: 'checkout.steps.shipping-step.shippingAddress'">
             <!-- ko template: getTemplate() --><!-- /ko -->
         </div>

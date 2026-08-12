@@ -1,0 +1,52 @@
+<!-- ko ifnot: method.error_message -->
+<div class="fastcheckout-shipping-method-option rounded p-4 transition-all duration-200 cursor-pointer border-2"
+     data-bind="
+         click: element.selectShippingMethod,
+         css: {
+             'border-primary bg-container': element.isSelected() === method.carrier_code + '_' + method.method_code,
+             'border-gray-200 hover:border-gray-300 hover:bg-gray-50/50':
+                 element.isSelected() !== method.carrier_code + '_' + method.method_code
+         }
+     ">
+    <label class="flex items-center justify-between cursor-pointer mb-0 w-full">
+        <span class="flex items-center min-w-0">
+            <input type="radio"
+                   class="form-radio mr-4 shrink-0"
+                   name="shipping_method"
+                   required
+                   data-bind="
+                       checked: element.isSelected,
+                       value: method.carrier_code + '_' + method.method_code,
+                       attr: {
+                           'aria-labelledby':
+                               'label_method_title_' + method.method_code + '_' + method.carrier_code + ' ' +
+                               'label_carrier_' + method.method_code + '_' + method.carrier_code
+                       }
+                   "/>
+            <span class="min-w-0 pl-4">
+                <span class="block text-sm font-semibold text-gray-900 leading-tight"
+                      data-bind="
+                          text: method.method_title,
+                          attr: {id: 'label_method_title_' + method.method_code + '_' + method.carrier_code}
+                      "></span>
+                <span class="block text-xs text-gray-500 mt-1"
+                      data-bind="
+                          text: method.carrier_title,
+                          attr: {id: 'label_carrier_' + method.method_code + '_' + method.carrier_code}
+                      "></span>
+            </span>
+        </span>
+        <span class="text-sm font-bold text-gray-900 shrink-0 pl-3 text-right">
+            <each args="element.getRegion('price')" render=""></each>
+        </span>
+    </label>
+    <div data-bind="attr: {id: 'label_method_' + method.method_code + '_' + method.carrier_code}"></div>
+    <div data-bind="attr: {id: 'label_method_' + method.method_code + '_' + method.carrier_code + '_additional'}"></div>
+</div>
+<!-- /ko -->
+
+<!-- ko if: method.error_message -->
+<div class="message error" role="alert">
+    <div data-bind="text: method.error_message"></div>
+</div>
+<!-- /ko -->

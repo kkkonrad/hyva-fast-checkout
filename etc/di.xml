@@ -2,11 +2,27 @@
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
         xsi:noNamespaceSchemaLocation="urn:magento:framework:ObjectManager/etc/config.xsd">
 
-    <type name="Magento\Quote\Api\CartManagementInterface">
+    <type name="Magento\Quote\Api\PaymentMethodManagementInterface">
         <plugin name="fastcheckout_place_order_extras"
                 type="Kkkonrad\Fastcheckout\Plugin\Quote\PlaceOrderExtrasPlugin"/>
     </type>
     <type name="Magento\Quote\Model\CustomerManagement">
         <plugin name="fastcheckout_quote_customermanagement" type="Kkkonrad\Fastcheckout\Plugin\Quote\CustomerManagementPlugin"/>
+    </type>
+    <type name="Magento\Payment\Model\Checks\SpecificationFactory">
+        <arguments>
+            <argument name="mapping" xsi:type="array">
+                <item name="fastcheckout_shipping_method_mapping"
+                      xsi:type="object">Kkkonrad\Fastcheckout\Model\Payment\Checks\ShippingMethodMapping</item>
+            </argument>
+        </arguments>
+    </type>
+    <type name="Magento\Payment\Model\MethodList">
+        <arguments>
+            <argument name="additionalChecks" xsi:type="array">
+                <item name="fastcheckout_shipping_method_mapping"
+                      xsi:type="string">fastcheckout_shipping_method_mapping</item>
+            </argument>
+        </arguments>
     </type>
 </config>

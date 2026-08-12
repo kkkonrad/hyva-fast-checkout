@@ -57,10 +57,11 @@ test('adds checkout extras and invokes Magento place-order exactly once', () => 
             mixin = factory(
                 jquery,
                 wrapper,
-                {isVirtual: () => false},
-                () => {
-                    shippingCalls += 1;
-                    return {};
+                {
+                    ensureSaved() {
+                        shippingCalls += 1;
+                        return {};
+                    }
                 },
                 () => true
             );
