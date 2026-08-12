@@ -62,7 +62,7 @@ test('renders automatic agreements as checked disabled checkboxes', () => {
             }
         },
         define(dependencies, factory) {
-            mixin = factory()({
+            mixin = factory(() => true)({
                 extend(extension) {
                     return extension;
                 }
@@ -101,6 +101,39 @@ test('renders automatic agreements as checked disabled checkboxes', () => {
         }
     });
     assert.equal(dispatchedEvent, 'transitionend');
+});
+
+test('delegates unchanged outside Fastcheckout', () => {
+    let mixin;
+    const source = fs.readFileSync(
+        path.resolve(__dirname, '../../../view/frontend/web/js/mixin/checkout-agreements-mixin.js'),
+        'utf8'
+    );
+
+    vm.runInNewContext(source, {
+        define(dependencies, factory) {
+            mixin = factory(() => false)({
+                extend(extension) {
+                    return extension;
+                }
+            });
+        }
+    });
+
+    const calls = [];
+    const component = Object.assign({
+        _super(argument) {
+            calls.push(argument);
+
+            return 'native';
+        }
+    }, mixin);
+    const agreement = {agreementId: 1};
+    const elements = [];
+
+    assert.equal(component.isAgreementRequired(agreement), 'native');
+    component.initModal(elements);
+    assert.deepEqual(calls, [agreement, elements]);
 });
 
 function input(value) {

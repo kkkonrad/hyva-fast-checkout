@@ -636,6 +636,30 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         ).evaluateAll((parts) => parts.every((part) => (
             part.classList.contains('fastcheckout-agreements-native-source')
         )))).toBe(true);
+        const orderComment = page.locator('#fastcheckout-comment');
+        const newsletterProxy = agreementsPortal.locator(
+            '[data-fastcheckout-newsletter-proxy] input[type="checkbox"]'
+        );
+        await expect(orderComment).toBeVisible();
+        await orderComment.fill('Fastcheckout provider comment');
+        await expect(newsletterProxy).toHaveCount(1);
+        await newsletterProxy.evaluate((input) => input.click());
+        await expect.poll(() => page.evaluate(() => {
+            const provider = window.require('uiRegistry').get('checkoutProvider');
+
+            return {
+                comment: provider.get('fastcheckout.comment'),
+                subscribe: provider.get('fastcheckout.subscribe')
+            };
+        })).toEqual({
+            comment: 'Fastcheckout provider comment',
+            subscribe: true
+        });
+        await newsletterProxy.evaluate((input) => input.click());
+        await expect.poll(() => page.evaluate(() => (
+            window.require('uiRegistry').get('checkoutProvider')
+                .get('fastcheckout.subscribe')
+        ))).toBe(false);
 
         const nativeAgreementInputs = nativeAgreements.locator(
             'input[type="checkbox"][name^="agreement["]'
@@ -1143,7 +1167,16 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         ), {timeout: 60_000});
         placeOrderRequests = [];
         await clickProxy();
-        await paymentRequestStarted;
+        const paymentRequest = await paymentRequestStarted;
+        const paymentPayload = paymentRequest.postDataJSON();
+        const submittedPayment = paymentPayload.paymentMethod || paymentPayload.payment_method;
+        const submittedAdditional = submittedPayment.additional_data || {};
+        expect(submittedPayment.extension_attributes).toMatchObject({
+            comment: 'Fastcheckout provider comment',
+            subscribe: false
+        });
+        expect(submittedAdditional.fastcheckout_comment).toBeUndefined();
+        expect(submittedAdditional.fastcheckout_subscribe).toBeUndefined();
         await page.waitForTimeout(350);
         expect(Math.abs(
             await page.evaluate(() => window.scrollY) - scrollBeforeSubmit

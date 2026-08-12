@@ -52,7 +52,6 @@ class PlaceOrderExtrasPluginTest extends TestCase
         };
         $payment = $this->createMock(PaymentInterface::class);
         $payment->method('getExtensionAttributes')->willReturn($extensionAttributes);
-        $payment->method('getAdditionalData')->willReturn([]);
 
         $this->checkoutSession->expects(self::once())
             ->method('setFastcheckoutComment')->with('Leave at reception');
@@ -68,20 +67,15 @@ class PlaceOrderExtrasPluginTest extends TestCase
         self::assertSame([42, $payment], $result);
     }
 
-    public function testKeepsAdditionalDataAsBackwardCompatibleFallback(): void
+    public function testDoesNotReadPaymentMethodAdditionalData(): void
     {
         $this->helper->method('isEnable')->willReturn(true);
         $payment = $this->createMock(PaymentInterface::class);
         $payment->method('getExtensionAttributes')->willReturn(null);
-        $payment->method('getAdditionalData')->willReturn([
-            'fastcheckout_comment' => 'Legacy comment',
-            'fastcheckout_subscribe' => '1',
-        ]);
+        $payment->expects(self::never())->method('getAdditionalData');
 
-        $this->checkoutSession->expects(self::once())
-            ->method('setFastcheckoutComment')->with('Legacy comment');
-        $this->checkoutSession->expects(self::once())
-            ->method('setFastcheckoutSubscribe')->with(1);
+        $this->checkoutSession->expects(self::once())->method('unsFastcheckoutComment');
+        $this->checkoutSession->expects(self::once())->method('unsFastcheckoutSubscribe');
 
         $this->plugin->beforeSet(
             $this->createMock(PaymentMethodManagementInterface::class),
@@ -95,7 +89,6 @@ class PlaceOrderExtrasPluginTest extends TestCase
         $this->helper->method('isEnable')->willReturn(true);
         $payment = $this->createMock(PaymentInterface::class);
         $payment->method('getExtensionAttributes')->willReturn(null);
-        $payment->method('getAdditionalData')->willReturn([]);
 
         $this->checkoutSession->expects(self::once())->method('unsFastcheckoutComment');
         $this->checkoutSession->expects(self::once())->method('unsFastcheckoutSubscribe');

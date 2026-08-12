@@ -54,19 +54,7 @@ class PlaceOrderExtrasPlugin
     {
         $extensionAttributes = $paymentMethod->getExtensionAttributes();
         if ($extensionAttributes && method_exists($extensionAttributes, 'getComment')) {
-            $comment = trim((string)$extensionAttributes->getComment());
-            if ($comment !== '') {
-                return $comment;
-            }
-        }
-
-        $additionalData = $paymentMethod->getAdditionalData();
-        if (is_array($additionalData)) {
-            foreach (['fastcheckout_comment', 'comment'] as $key) {
-                if (!empty($additionalData[$key])) {
-                    return trim((string)$additionalData[$key]);
-                }
-            }
+            return trim((string)$extensionAttributes->getComment());
         }
 
         return '';
@@ -79,15 +67,6 @@ class PlaceOrderExtrasPlugin
             $subscribe = $extensionAttributes->getSubscribe();
             if ($subscribe !== null) {
                 return (bool)$subscribe;
-            }
-        }
-
-        $additionalData = $paymentMethod->getAdditionalData();
-        if (is_array($additionalData)) {
-            foreach (['fastcheckout_subscribe', 'subscribe'] as $key) {
-                if (array_key_exists($key, $additionalData)) {
-                    return (bool)$additionalData[$key];
-                }
             }
         }
 

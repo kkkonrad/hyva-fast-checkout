@@ -204,18 +204,31 @@ class NativePipelineOwnershipTest extends TestCase
         $newsletter = (string)file_get_contents(
             $this->moduleRoot() . '/view/frontend/web/template/hyva/newsletter.html'
         );
+        $comment = (string)file_get_contents(
+            $this->moduleRoot() . '/view/frontend/web/template/hyva/order-comment.html'
+        );
+        $placeOrder = (string)file_get_contents(
+            $this->moduleRoot() . '/view/frontend/web/js/mixin/place-order-mixin.js'
+        );
         $configProvider = (string)file_get_contents(
             $this->moduleRoot() . '/Model/ExtendedCheckoutConfigProvider.php'
         );
 
-        $this->assertStringContainsString('id="fastcheckout-comment"', $summary);
+        $this->assertStringContainsString('checkout.sidebar.fastcheckout-order-comment', $summary);
+        $this->assertStringContainsString('id="fastcheckout-comment"', $comment);
         $this->assertStringContainsString('name="fastcheckout-newsletter"', $layout);
+        $this->assertStringContainsString('fastcheckout.comment', $layout);
+        $this->assertStringContainsString('fastcheckout.subscribe', $layout);
+        $this->assertStringContainsString('checkoutProvider', $layout);
         $this->assertStringContainsString('before-place-order', $layout);
         $this->assertStringContainsString('additional-payment-validators', $layout);
         $this->assertStringContainsString('fastcheckout-one-step-validator', $layout);
         $this->assertStringContainsString('data-fastcheckout-subscribe', $newsletter);
         $this->assertStringContainsString("'newsletterLabel'", $configProvider);
         $this->assertStringContainsString("__('Sign Up for Our Newsletter')", $configProvider);
+        $this->assertStringContainsString("provider.get('fastcheckout')", $placeOrder);
+        $this->assertStringNotContainsString('fastcheckout_comment', $placeOrder);
+        $this->assertStringNotContainsString('fastcheckout_subscribe', $placeOrder);
         $this->assertStringNotContainsString('data-fastcheckout-agreements-host', $summary);
         $this->assertStringContainsString('data-fastcheckout-agreements-summary-host', $summary);
         $this->assertStringNotContainsString('data-fastcheckout-place-order-ssr', $payment);

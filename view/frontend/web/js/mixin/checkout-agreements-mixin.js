@@ -1,12 +1,14 @@
-define([], function () {
+define([
+    'Kkkonrad_Fastcheckout/js/mixin/is-fastcheckout-active'
+], function (isFastcheckoutActive) {
     'use strict';
 
     var manualMode = 1;
 
     return function (Component) {
         return Component.extend({
-            isAgreementRequired: function () {
-                return true;
+            isAgreementRequired: function (agreement) {
+                return isFastcheckoutActive() ? true : this._super(agreement);
             },
 
             initModal: function (elements) {
@@ -20,6 +22,9 @@ define([], function () {
                     modes = {};
 
                 this._super(elements);
+                if (!isFastcheckoutActive()) {
+                    return;
+                }
                 modal = element && element.closest('.agreements-modal');
                 if (modal && typeof modal.addEventListener === 'function' &&
                     !modal.hasAttribute('data-fastcheckout-close-fallback')) {

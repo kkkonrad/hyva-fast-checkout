@@ -34,6 +34,9 @@ class FastcheckoutHandleTest extends TestCase
             'Kkkonrad_Fastcheckout/js/view/newsletter',
             $checkout
         );
+        $this->assertStringContainsString('Magento_Ui/js/form/element/textarea', $checkout);
+        $this->assertStringContainsString('fastcheckout.comment', $checkout);
+        $this->assertStringContainsString('fastcheckout.subscribe', $checkout);
         $this->assertStringContainsString('fastcheckout-checkout-page', $source);
         $this->assertStringContainsString('name="fallback.module.missing" remove="true"', $source);
         $this->assertStringContainsString('name="checkout.root" remove="true"', $source);

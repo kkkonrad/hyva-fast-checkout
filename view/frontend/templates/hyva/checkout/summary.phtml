@@ -46,18 +46,10 @@ $showComment = $block->isShowComment();
                  hidden></div>
 
             <?php if ($showComment): ?>
-                <div class="border-t border-gray-200 pt-4" data-fastcheckout-order-comment>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1" for="fastcheckout-comment">
-                            <?= $escaper->escapeHtml(__('Order Comment')) ?>
-                        </label>
-                        <textarea id="fastcheckout-comment"
-                                  name="fastcheckout_comment"
-                                  data-fastcheckout-comment
-                                  class="form-input w-full"
-                                  rows="2"
-                                  placeholder="<?= $escaper->escapeHtmlAttr(__('Optional comment for this order')) ?>"></textarea>
-                    </div>
+                <div class="border-t border-gray-200 pt-4"
+                     data-fastcheckout-order-comment
+                     data-bind="scope: 'checkout.sidebar.fastcheckout-order-comment'">
+                    <!-- ko template: getTemplate() --><!-- /ko -->
                 </div>
             <?php endif; ?>
 

@@ -1,8 +1,7 @@
 define([
-    'ko',
-    'uiComponent',
+    'Magento_Ui/js/form/element/single-checkbox',
     'Kkkonrad_Fastcheckout/js/mixin/is-fastcheckout-active'
-], function (ko, Component, isFastcheckoutActive) {
+], function (Component, isFastcheckoutActive) {
     'use strict';
 
     var settings = window.checkoutConfig &&
@@ -11,15 +10,18 @@ define([
     return Component.extend({
         defaults: {
             template: 'Kkkonrad_Fastcheckout/hyva/newsletter',
+            provider: 'checkoutProvider',
+            dataScope: 'fastcheckout.subscribe',
             visible: isFastcheckoutActive() && Boolean(settings.showSubscribe),
-            label: settings.newsletterLabel || 'Sign Up for Our Newsletter'
-        },
-
-        initObservable: function () {
-            this._super();
-            this.isChecked = ko.observable(Boolean(settings.subscribeByDefault));
-
-            return this;
+            label: settings.newsletterLabel || 'Sign Up for Our Newsletter',
+            default: Boolean(settings.subscribeByDefault),
+            valueMap: {
+                true: true,
+                false: false
+            },
+            links: {
+                value: '${ $.provider }:fastcheckout.subscribe'
+            }
         }
     });
 });

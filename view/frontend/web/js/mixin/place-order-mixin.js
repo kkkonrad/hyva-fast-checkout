@@ -2,32 +2,22 @@ define([
     'jquery',
     'mage/utils/wrapper',
     'Kkkonrad_Fastcheckout/js/model/shipping-save-coordinator',
-    'Kkkonrad_Fastcheckout/js/mixin/is-fastcheckout-active'
-], function ($, wrapper, shippingSaveCoordinator, isFastcheckoutActive) {
+    'Kkkonrad_Fastcheckout/js/mixin/is-fastcheckout-active',
+    'uiRegistry'
+], function ($, wrapper, shippingSaveCoordinator, isFastcheckoutActive, registry) {
     'use strict';
 
     return function (placeOrderAction) {
         return wrapper.wrap(placeOrderAction, function (originalAction, paymentData, messageContainer) {
-            var comment = document.getElementById('fastcheckout-comment'),
-                subscribe = document.querySelector(
-                    '.fastcheckout-ko-payment-root .payment-method._active ' +
-                    '[data-fastcheckout-subscribe]'
-                ),
-                additional,
+            var provider = registry.get('checkoutProvider'),
+                extras = provider && provider.get('fastcheckout') || {},
                 result,
                 active = isFastcheckoutActive();
 
             if (active && paymentData && typeof paymentData === 'object') {
                 paymentData.extension_attributes = paymentData.extension_attributes || {};
-                paymentData.extension_attributes.comment = comment ? String(comment.value || '').trim() : '';
-                paymentData.extension_attributes.subscribe = !!(subscribe && subscribe.checked);
-
-                additional = paymentData.additional_data;
-                if (!additional || typeof additional !== 'object' || Array.isArray(additional)) {
-                    additional = paymentData.additional_data = {};
-                }
-                additional.fastcheckout_comment = paymentData.extension_attributes.comment;
-                additional.fastcheckout_subscribe = paymentData.extension_attributes.subscribe ? '1' : '0';
+                paymentData.extension_attributes.comment = String(extras.comment || '').trim();
+                paymentData.extension_attributes.subscribe = Boolean(extras.subscribe);
             }
 
             if (!active) {

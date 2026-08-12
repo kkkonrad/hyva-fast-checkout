@@ -191,7 +191,10 @@ Magento.
   regionu `before-place-order` z `sortOrder=90`. Standardowe zgody oraz newsletter
   mają w podsumowaniu zsynchronizowane proxy prezentacyjne; ich oryginalne kontrolki,
   nazwy pól, kontekst KO i walidatory pozostają w aktywnym rendererze płatności.
-  Zawartość rendererów zewnętrznych nie jest przenoszona ani klonowana.
+  Zawartość rendererów zewnętrznych nie jest przenoszona ani klonowana. Stan
+  komentarza i newslettera należy do standardowego `checkoutProvider` pod
+  `fastcheckout.comment` oraz `fastcheckout.subscribe`; do płatności trafia wyłącznie
+  przez zarejestrowane `PaymentInterface.extension_attributes`.
 - Strona sukcesu zachowuje core `Magento\Checkout\Block\Onepage\Success`, a
   komentarz i newsletter są zapisywane przez
   `OrderStatusHistoryRepositoryInterface` i `SubscriptionManagerInterface`.

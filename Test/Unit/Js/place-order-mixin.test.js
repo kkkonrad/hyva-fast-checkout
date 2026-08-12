@@ -38,14 +38,6 @@ test('adds checkout extras and invokes Magento place-order exactly once', () => 
         document: {
             dispatchEvent(event) {
                 events.push(event.type);
-            },
-            getElementById(id) {
-                return id === 'fastcheckout-comment'
-                    ? {value: '  Leave at reception  '}
-                    : null;
-            },
-            querySelector() {
-                return {checked: true};
             }
         },
         Event: class Event {
@@ -63,7 +55,23 @@ test('adds checkout extras and invokes Magento place-order exactly once', () => 
                         return {};
                     }
                 },
-                () => true
+                () => true,
+                {
+                    get(name) {
+                        assert.equal(name, 'checkoutProvider');
+
+                        return {
+                            get(path) {
+                                assert.equal(path, 'fastcheckout');
+
+                                return {
+                                    comment: '  Leave at reception  ',
+                                    subscribe: true
+                                };
+                            }
+                        };
+                    }
+                }
             );
         }
     });
@@ -86,8 +94,8 @@ test('adds checkout extras and invokes Magento place-order exactly once', () => 
     assert.equal(calls, 1);
     assert.equal(shippingCalls, 1);
     assert.equal(captured.additional_data.token, 'preserved');
-    assert.equal(captured.additional_data.fastcheckout_comment, 'Leave at reception');
-    assert.equal(captured.additional_data.fastcheckout_subscribe, '1');
+    assert.equal(captured.additional_data.fastcheckout_comment, undefined);
+    assert.equal(captured.additional_data.fastcheckout_subscribe, undefined);
     assert.equal(captured.extension_attributes.comment, 'Leave at reception');
     assert.equal(captured.extension_attributes.subscribe, true);
     assert.deepEqual(events, ['fastcheckout:order-submit-started']);

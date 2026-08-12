@@ -272,18 +272,22 @@ define([
             proxy.removeAttribute('aria-required');
             proxy.removeAttribute('data-validate');
             proxy.classList.remove('required-entry');
-            ['input', 'change'].forEach(function (eventName) {
-                proxy.addEventListener(eventName, function () {
-                    if (type === 'checkbox' || type === 'radio') {
-                        source.checked = proxy.checked;
-                    } else {
-                        source.value = proxy.value;
+            if (type === 'checkbox' || type === 'radio') {
+                proxy.addEventListener('change', function () {
+                    if (source.checked !== proxy.checked) {
+                        source.click();
                     }
-                    source.dispatchEvent(new Event(eventName, {bubbles: true}));
-                    if (eventName === 'change' && source.checked &&
-                        String(source.name || '').indexOf('agreement[') === 0) {
+                    if (source.checked && String(source.name || '').indexOf('agreement[') === 0) {
                         $(source).valid();
                     }
+                });
+
+                return;
+            }
+            ['input', 'change'].forEach(function (eventName) {
+                proxy.addEventListener(eventName, function () {
+                    source.value = proxy.value;
+                    source.dispatchEvent(new Event(eventName, {bubbles: true}));
                 });
             });
         } else if (tag === 'button' || tag === 'a') {
