@@ -94,11 +94,7 @@ class Checkout extends Template
             return [];
         }
 
-        try {
-            return $this->configProvider->getConfig();
-        } catch (\Throwable $exception) {
-            return [];
-        }
+        return $this->configProvider->getConfig();
     }
 
     public function getLocaleCode(): string

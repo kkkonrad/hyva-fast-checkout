@@ -25,7 +25,8 @@ Moduł nie wymaga Magewire i nie utrzymuje dodatkowego stanu procesu zamówienia
   renderery płatności oraz dodatki dostawy działają tak samo jak w core;
 - dynamiczna lista metod płatności Magento; cała zamknięta karta metody jest
   klikalna, a ukryte radio jedynej metody otrzymuje wizualny stan zaznaczenia;
-- mapowanie metod płatności do metod dostawy;
+- mapowanie metod płatności do metod dostawy wykonywane przez standardowy
+  `Magento\Payment\Model\MethodList` po stronie serwera;
 - natywne podsumowanie i totals Magento, w tym Tax;
 - obsługa komentarzy, newslettera i `Magento_CheckoutAgreements` przed przyciskiem
   zamówienia, bez odłączania ich od natywnej walidacji płatności;
@@ -146,7 +147,10 @@ Przy próbie złożenia zamówienia Fastcheckout:
 4. renderer uruchamia standardowy `additional-validators`, w którym Fastcheckout
    rejestruje walidację shipping/billing obok walidatorów e-maila, zgód i modułów
    zewnętrznych;
-5. dopiero po ich powodzeniu natywna akcja zapisuje informacje dostawy i zamówienie.
+5. współdzielony koordynator wywołuje natywną akcję
+   `Magento_Checkout/js/action/set-shipping-information` tylko wtedy, gdy adres
+   lub metoda dostawy zmieniły się od ostatniego poprawnego zapisu, po czym
+   renderer składa zamówienie własną akcją Magento.
 
 Komunikat o braku płatności jest wyświetlany przed dynamiczną listą metod,
 przewijany do widoku i usuwany przez zmianę `quote.paymentMethod`. Podczas
@@ -171,8 +175,9 @@ Magento.
   Izolowany layout nie ładuje globalnego handle `default`, więc nie regeneruje
   assetów RequireJS aktywnego motywu podczas renderowania strony.
 - Pełny, scalony `jsLayout` jest uruchamiany dokładnie raz przez
-  `Magento_Ui/js/core/app`; Fastcheckout zmienia wyłącznie trzy ścieżki szablonów
-  odpowiedzialne za dotychczasowy wygląd.
+  `Magento_Ui/js/core/app`; Fastcheckout zmienia wyłącznie szablony
+  odpowiedzialne za dotychczasowy wygląd. Własny szablon listy dostaw nadal
+  deleguje pojedynczy wiersz do `shippingMethodItemTemplate`, tak jak core.
 - Stronę renderuje jedna instancja bloku Fastcheckout. Stawki oraz podsumowanie
   nie mają równoległego fallbacku PHP: ich jedynym źródłem są natywne
   `shipping-service`, `totals` i komponenty `checkout.sidebar.summary`.
@@ -180,8 +185,7 @@ Magento.
   `renderer-list`, `shipping-service`, `checkout-data` i `quote` bez forków.
 - Integracje z core JS są rejestrowane wyłącznie jako mixiny RequireJS — bez
   `map` i bez forków. Dotyczą `Magento_Checkout/js/action/place-order`,
-  `Magento_Checkout/js/model/payment-service`, natywnego summary,
-  `Magento_SalesRule/js/view/payment/discount` i
+  natywnego summary, `Magento_SalesRule/js/view/payment/discount` i
   `Magento_CheckoutAgreements/js/view/checkout-agreements`.
 - Pole komentarza pozostaje w panelu podsumowania, a newsletter jest dzieckiem
   regionu `before-place-order` z `sortOrder=90`. Standardowe zgody oraz newsletter
@@ -205,12 +209,18 @@ patchy ani wpisów DI w Kkkonrad_Fastcheckout.**
   dynamicznie scalonego handle `checkout_index_index`.
 - Zewnętrzny root `#checkout` i wewnętrzny `#fastcheckout-checkout` są obecne
   równocześnie, dlatego selektory modułów ograniczone do `#checkout` nadal działają.
+- Standardowe identyfikatory `#shipping`, `#checkout-step-shipping`,
+  `#opc-shipping_method`, `#co-shipping-method-form`, `#payment`,
+  `#checkout-step-payment` i `#co-payment-form` pozostają dostępne bez zmiany
+  układu wizualnego.
 - `shippingAdditional`, `before-shipping-method-form`, `beforeMethods`,
   `afterMethods`, `before-place-order`, `payments-list` i `renderer-list` pozostają
   w oryginalnych miejscach. `checkout.sidebar.shipping-information` jest renderowany
   przez kanoniczny region komponentu `checkout.sidebar`.
 - Każda metoda dostawy zachowuje standardowe identyfikatory etykiet oraz pusty host
   `label_method_{method_code}_{carrier_code}` dla widgetów przewoźników.
+- Obcy `shippingMethodListTemplate` lub `shippingMethodItemTemplate` ustawiony
+  przez layout processor ma pierwszeństwo przed szablonem prezentacyjnym modułu.
 - Fastcheckout nie zastępuje `window.checkoutConfig`, nie zapisuje własnego checkout
   store i nie odtwarza `extension_attributes` z bazy. Natywny przycisk zamówienia
   pozostaje w rendererze wraz z handlerami i jest wywoływany przez widoczne proxy;
@@ -218,6 +228,10 @@ patchy ani wpisów DI w Kkkonrad_Fastcheckout.**
 - `ExtendedCheckoutConfigProvider` jest dopinany do
   `Magento\Checkout\Model\CompositeConfigProvider` z `sortOrder=1000`; moduł nie
   zastępuje interfejsów zarządzania informacjami dostawy ani płatności.
+- Mapowanie shipping→payment jest dodatkową specyfikacją
+  `Magento\Payment\Model\Checks\SpecificationInterface`; dzięki temu identyczna
+  lista metod trafia do początkowego `checkoutConfig` i odpowiedzi REST, bez mixina
+  na `payment-service`.
 - Mixiny nie są rejestrowane na akcjach wyboru adresu/metody, transporcie REST,
   rate processorach ani `customer-data`, więc łańcuchy innych vendorów pozostają
   nienaruszone.
@@ -278,5 +292,11 @@ Skrypt jest wymagany, gdy katalogi
 developer). `requirejs-config.js` leży poza `web/` — po jego zmianie skopiuj go
 do drzew static albo uruchom ponownie wdrożenie plików statycznych; samo przeładowanie
 strony nie zastąpi istniejącej kopii.
+Jeśli Magento używa Subresource Integrity i istnieje
+`pub/static/frontend/sri-hashes.json`, skrypt celowo przerwie pracę. W takim
+środowisku przenieś lub usuń wyłącznie istniejące katalogi
+`pub/static/frontend/<Vendor>/<theme>/<locale>/Kkkonrad_Fastcheckout`, a następnie
+uruchom `setup:static-content:deploy`. Magento może nie nadpisać już istniejącego
+pliku, a tylko natywne wdrożenie odtworzy go razem z poprawnym hashem SRI.
 Nie edytuj ręcznie `pub/static/deployed_version.txt`; skrypt zapisuje poprawną,
 pozbawioną końcowego znaku nowej linii wersję zasobów.

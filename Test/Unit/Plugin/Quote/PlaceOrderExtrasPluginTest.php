@@ -6,45 +6,20 @@ namespace Kkkonrad\Fastcheckout\Test\Unit\Plugin\Quote;
 
 use Kkkonrad\Fastcheckout\Helper\Data as Helper;
 use Kkkonrad\Fastcheckout\Plugin\Quote\PlaceOrderExtrasPlugin;
-use Magento\Checkout\Model\AddressComparatorInterface;
 use Magento\Checkout\Model\Session as CheckoutSession;
-use Magento\Framework\App\Request\Http as HttpRequest;
-use Magento\Quote\Api\CartManagementInterface;
-use Magento\Quote\Api\CartRepositoryInterface;
+use Magento\Framework\Api\ExtensionAttributesInterface;
 use Magento\Quote\Api\Data\PaymentInterface;
-use Magento\Quote\Model\Quote;
-use Magento\Quote\Model\Quote\Address;
+use Magento\Quote\Api\PaymentMethodManagementInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
 class PlaceOrderExtrasPluginTest extends TestCase
 {
-    /** @var CheckoutSession|MockObject */
+    /** @var CheckoutSession&MockObject */
     private $checkoutSession;
-
-    /** @var Helper|MockObject */
+    /** @var Helper&MockObject */
     private $helper;
-
-    /** @var HttpRequest|MockObject */
-    private $request;
-
-    /** @var PlaceOrderExtrasPlugin */
-    private $plugin;
-
-    /** @var CartRepositoryInterface|MockObject */
-    private $quoteRepository;
-
-    /** @var AddressComparatorInterface|MockObject */
-    private $addressComparator;
-
-    /** @var Quote|MockObject */
-    private $quote;
-
-    /** @var Address|MockObject */
-    private $shippingAddress;
-
-    /** @var Address|MockObject */
-    private $billingAddress;
+    private PlaceOrderExtrasPlugin $plugin;
 
     protected function setUp(): void
     {
@@ -58,136 +33,94 @@ class PlaceOrderExtrasPluginTest extends TestCase
             ])
             ->getMock();
         $this->helper = $this->createMock(Helper::class);
-        $this->request = $this->getMockBuilder(HttpRequest::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['getContent'])
-            ->getMock();
-        $this->quoteRepository = $this->createMock(CartRepositoryInterface::class);
-        $this->addressComparator = $this->createMock(AddressComparatorInterface::class);
-        $this->shippingAddress = $this->createMock(Address::class);
-        $this->billingAddress = $this->createMock(Address::class);
-        $this->quote = $this->createMock(Quote::class);
-        $this->quote->method('getShippingAddress')->willReturn($this->shippingAddress);
-        $this->quote->method('getBillingAddress')->willReturn($this->billingAddress);
-        $this->quoteRepository->method('getActive')->willReturn($this->quote);
-        $this->plugin = new PlaceOrderExtrasPlugin(
-            $this->checkoutSession,
-            $this->helper,
-            $this->request,
-            $this->quoteRepository,
-            $this->addressComparator
+        $this->plugin = new PlaceOrderExtrasPlugin($this->checkoutSession, $this->helper);
+    }
+
+    public function testStoresRegisteredPaymentExtensionAttributes(): void
+    {
+        $this->helper->method('isEnable')->willReturn(true);
+        $extensionAttributes = new class implements ExtensionAttributesInterface {
+            public function getComment(): string
+            {
+                return ' Leave at reception ';
+            }
+
+            public function getSubscribe(): bool
+            {
+                return true;
+            }
+        };
+        $payment = $this->createMock(PaymentInterface::class);
+        $payment->method('getExtensionAttributes')->willReturn($extensionAttributes);
+        $payment->method('getAdditionalData')->willReturn([]);
+
+        $this->checkoutSession->expects(self::once())
+            ->method('setFastcheckoutComment')->with('Leave at reception');
+        $this->checkoutSession->expects(self::once())
+            ->method('setFastcheckoutSubscribe')->with(1);
+
+        $result = $this->plugin->beforeSet(
+            $this->createMock(PaymentMethodManagementInterface::class),
+            42,
+            $payment
+        );
+
+        self::assertSame([42, $payment], $result);
+    }
+
+    public function testKeepsAdditionalDataAsBackwardCompatibleFallback(): void
+    {
+        $this->helper->method('isEnable')->willReturn(true);
+        $payment = $this->createMock(PaymentInterface::class);
+        $payment->method('getExtensionAttributes')->willReturn(null);
+        $payment->method('getAdditionalData')->willReturn([
+            'fastcheckout_comment' => 'Legacy comment',
+            'fastcheckout_subscribe' => '1',
+        ]);
+
+        $this->checkoutSession->expects(self::once())
+            ->method('setFastcheckoutComment')->with('Legacy comment');
+        $this->checkoutSession->expects(self::once())
+            ->method('setFastcheckoutSubscribe')->with(1);
+
+        $this->plugin->beforeSet(
+            $this->createMock(PaymentMethodManagementInterface::class),
+            7,
+            $payment
         );
     }
 
-    public function testBeforePlaceOrderStoresCommentFromPaymentAdditionalData(): void
+    public function testClearsMissingExtrasWithoutTouchingTheQuote(): void
     {
         $this->helper->method('isEnable')->willReturn(true);
-        $this->request->method('getContent')->willReturn('');
-
         $payment = $this->createMock(PaymentInterface::class);
-        $payment->method('getAdditionalData')->willReturn([
-            'fastcheckout_comment' => ' Leave at door ',
-        ]);
         $payment->method('getExtensionAttributes')->willReturn(null);
+        $payment->method('getAdditionalData')->willReturn([]);
 
-        $this->checkoutSession->expects($this->once())
-            ->method('setFastcheckoutComment')
-            ->with('Leave at door');
+        $this->checkoutSession->expects(self::once())->method('unsFastcheckoutComment');
+        $this->checkoutSession->expects(self::once())->method('unsFastcheckoutSubscribe');
 
-        $subject = $this->createMock(CartManagementInterface::class);
-        $result = $this->plugin->beforePlaceOrder($subject, 42, $payment);
-
-        $this->assertSame([42, $payment], $result);
+        $this->plugin->beforeSet(
+            $this->createMock(PaymentMethodManagementInterface::class),
+            7,
+            $payment
+        );
     }
 
-    public function testBeforePlaceOrderReadsCommentFromJsonBody(): void
-    {
-        $this->helper->method('isEnable')->willReturn(true);
-        $this->request->method('getContent')->willReturn(json_encode([
-            'paymentMethod' => [
-                'method' => 'checkmo',
-                'extension_attributes' => [
-                    // Registered PaymentInterface extension attributes
-                    'comment' => 'Gift wrap please',
-                    'subscribe' => 1,
-                ],
-            ],
-        ]));
-
-        $this->checkoutSession->expects($this->once())
-            ->method('setFastcheckoutComment')
-            ->with('Gift wrap please');
-        $this->checkoutSession->expects($this->once())
-            ->method('setFastcheckoutSubscribe')
-            ->with(1);
-
-        $subject = $this->createMock(CartManagementInterface::class);
-        $this->plugin->beforePlaceOrder($subject, 7, null);
-    }
-
-    public function testBeforePlaceOrderReadsLegacyFastcheckoutKeysFromJsonBody(): void
-    {
-        $this->helper->method('isEnable')->willReturn(true);
-        $this->request->method('getContent')->willReturn(json_encode([
-            'paymentMethod' => [
-                'method' => 'checkmo',
-                'additional_data' => [
-                    'fastcheckout_comment' => 'Legacy bag',
-                    'fastcheckout_subscribe' => '1',
-                ],
-            ],
-        ]));
-
-        $this->checkoutSession->expects($this->once())
-            ->method('setFastcheckoutComment')
-            ->with('Legacy bag');
-        $this->checkoutSession->expects($this->once())
-            ->method('setFastcheckoutSubscribe')
-            ->with(1);
-
-        $subject = $this->createMock(CartManagementInterface::class);
-        $this->plugin->beforePlaceOrder($subject, 7, null);
-    }
-
-    public function testBeforePlaceOrderClearsExtrasMissingFromCurrentRequest(): void
-    {
-        $this->helper->method('isEnable')->willReturn(true);
-        $this->request->method('getContent')->willReturn('');
-        $this->checkoutSession->expects($this->once())->method('unsFastcheckoutComment');
-        $this->checkoutSession->expects($this->once())->method('unsFastcheckoutSubscribe');
-
-        $subject = $this->createMock(CartManagementInterface::class);
-        $this->plugin->beforePlaceOrder($subject, 7, null);
-    }
-
-    public function testBeforePlaceOrderNoopWhenModuleDisabled(): void
+    public function testDoesNothingWhenModuleIsDisabled(): void
     {
         $this->helper->method('isEnable')->willReturn(false);
-        $this->checkoutSession->expects($this->never())->method('setFastcheckoutComment');
-        $this->checkoutSession->expects($this->never())->method('unsFastcheckoutComment');
+        $payment = $this->createMock(PaymentInterface::class);
+        $this->checkoutSession->expects(self::never())->method('setFastcheckoutComment');
+        $this->checkoutSession->expects(self::never())->method('unsFastcheckoutComment');
 
-        $subject = $this->createMock(CartManagementInterface::class);
-        $result = $this->plugin->beforePlaceOrder($subject, 1, null);
-        $this->assertSame([1, null], $result);
-    }
-
-    public function testBeforePlaceOrderPreventsDuplicateAddressBookSave(): void
-    {
-        $this->helper->method('isEnable')->willReturn(true);
-        $this->request->method('getContent')->willReturn('');
-
-        $this->shippingAddress->method('getSaveInAddressBook')->willReturn(1);
-        $this->billingAddress->method('getSaveInAddressBook')->willReturn(1);
-        $this->billingAddress->expects($this->once())->method('setSaveInAddressBook')->with(0);
-        $this->quoteRepository->expects($this->once())->method('save')->with($this->quote);
-        $this->addressComparator->method('isEqual')
-            ->with($this->shippingAddress, $this->billingAddress)
-            ->willReturn(true);
-
-        $this->plugin->beforePlaceOrder(
-            $this->createMock(CartManagementInterface::class),
-            42,
-            null
+        self::assertSame(
+            [1, $payment],
+            $this->plugin->beforeSet(
+                $this->createMock(PaymentMethodManagementInterface::class),
+                1,
+                $payment
+            )
         );
     }
 }

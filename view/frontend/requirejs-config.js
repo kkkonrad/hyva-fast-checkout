@@ -4,9 +4,6 @@ var config = {
             'Magento_Checkout/js/action/place-order': {
                 'Kkkonrad_Fastcheckout/js/mixin/place-order-mixin': true
             },
-            'Magento_Checkout/js/model/payment-service': {
-                'Kkkonrad_Fastcheckout/js/mixin/payment-service-mixin': true
-            },
             'Magento_Checkout/js/model/error-processor': {
                 'Kkkonrad_Fastcheckout/js/mixin/error-processor-mixin': true
             },

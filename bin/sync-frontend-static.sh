@@ -34,6 +34,13 @@ if [[ -z "${MAGENTO_ROOT}" || ! -d "${MAGENTO_ROOT}/pub/static/frontend" ]]; the
   exit 1
 fi
 
+if [[ -f "${MAGENTO_ROOT}/pub/static/frontend/sri-hashes.json" ]]; then
+  echo "ERROR: Magento Subresource Integrity is active; direct asset sync would invalidate SRI hashes." >&2
+  echo "       Clean only existing pub/static/.../Kkkonrad_Fastcheckout targets, then run" >&2
+  echo "       bin/magento setup:static-content:deploy -f for the required locales." >&2
+  exit 1
+fi
+
 SYNCED=0
 while IFS= read -r -d '' dest; do
   mkdir -p "${dest}/js" "${dest}/css" "${dest}/template" 2>/dev/null || true

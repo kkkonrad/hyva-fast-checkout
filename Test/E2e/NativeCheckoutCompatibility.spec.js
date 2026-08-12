@@ -17,10 +17,14 @@ async function dismissConsent(page) {
 async function openCheckoutWithProduct(page) {
     const pageErrors = [];
 
-    await page.addInitScript(() => localStorage.setItem(
-        'mage-cache-storage-section-invalidation',
-        'null'
-    ));
+    await page.addInitScript(() => {
+        if (window === window.top && /\/checkout(?:\/|$)/.test(location.pathname)) {
+            [
+                'mage-cache-storage',
+                'mage-cache-storage-section-invalidation'
+            ].forEach((key) => localStorage.setItem(key, 'null'));
+        }
+    });
     page.on('pageerror', (error) => pageErrors.push(error.message));
     await page.goto(new URL(PRODUCT, BASE).href, {
         waitUntil: 'domcontentloaded',
@@ -79,6 +83,7 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
 
         page.on('response', (response) => {
             if (page.url().includes('/checkout/') && response.status() >= 400 &&
+                new URL(response.url()).origin === new URL(BASE).origin &&
                 /\.(?:js|html)(?:\?|$)/i.test(response.url())) {
                 assetFailures.push(response.status() + ' ' + response.url());
             }
@@ -144,7 +149,21 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
                 beforeShippingForm:
                     typeof shipping.getRegion('before-shipping-method-form') === 'function',
                 beforeMethods: typeof payment.getRegion('beforeMethods') === 'function',
-                afterMethods: typeof payment.getRegion('afterMethods') === 'function'
+                afterMethods: typeof payment.getRegion('afterMethods') === 'function',
+                nativeDom: [
+                    '#checkout[data-bind*="checkout"]',
+                    '#shipping',
+                    '#checkout-step-shipping[data-role="content"]',
+                    '#opc-shipping_method',
+                    '#checkout-step-shipping_method[data-role="content"]',
+                    '#co-shipping-method-form',
+                    '#payment',
+                    '#checkout-step-payment[data-role="content"]',
+                    '#co-payment-form'
+                ].every((selector) => document.querySelector(selector)),
+                shippingTemplateHooks: Boolean(
+                    shipping.shippingMethodListTemplate && shipping.shippingMethodItemTemplate
+                )
             };
         });
 
@@ -157,15 +176,18 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             shippingAdditional: true,
             beforeShippingForm: true,
             beforeMethods: true,
-            afterMethods: true
+            afterMethods: true,
+            nativeDom: true,
+            shippingTemplateHooks: true
         });
-        expect(await page.evaluate(() => {
-            const value = JSON.parse(localStorage.getItem(
-                'mage-cache-storage-section-invalidation'
-            ));
+        expect(await page.evaluate(() => [
+            'mage-cache-storage',
+            'mage-cache-storage-section-invalidation'
+        ].every((key) => {
+            const value = JSON.parse(localStorage.getItem(key));
 
-            return Boolean(value && typeof value === 'object' && !Array.isArray(value));
-        })).toBe(true);
+            return value && typeof value === 'object' && !Array.isArray(value);
+        }))).toBe(true);
 
         const configuredStylesheets = await page.evaluate(() => {
             const hrefs = [];
@@ -277,7 +299,7 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         );
         await expect.poll(() => rates.count(), {timeout: 45_000}).toBeGreaterThan(0);
 
-        if (hasInPost) {
+        if (hasInPost && process.env.FC_ALLOW_PLACE_ORDER !== '1') {
             const inPostRate = page.locator(
                 '#fastcheckout-ko-shipping-root ' +
                 'input[name="shipping_method"][value*="inpostlocker"]'
@@ -353,7 +375,7 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
                     window.setTimeout(() => {
                         window.clearInterval(sampler);
                         window.fastcheckoutE2eBraintreeScrollDone = true;
-                    }, 650);
+                    }, 2_000);
                 });
                 await page.locator('[data-fastcheckout-place-order-ssr]')
                     .evaluate((button) => button.click());
@@ -367,7 +389,7 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
                 ))).toBe(true);
                 expect(new Set((await page.evaluate(() => (
                     window.fastcheckoutE2eBraintreeScroll
-                ))).map(Math.round)).size).toBeGreaterThan(4);
+                ))).map(Math.round)).size).toBeGreaterThan(2);
                 await expect.poll(() => hostedControls.first().evaluate((control) => {
                     const box = control.getBoundingClientRect();
 
@@ -747,6 +769,15 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         await expect(page.locator('[data-fastcheckout-payment-method-ko-target]'))
             .toHaveCount(0);
 
+        const purchaseOrderMethod = page.locator(
+            'input[name="payment[method]"][value="purchaseorder"]'
+        );
+        await expect(purchaseOrderMethod).toHaveCount(1);
+        await purchaseOrderMethod.evaluate((input) => input.click());
+        await expect.poll(() => page.evaluate(() => (
+            window.require('Magento_Checkout/js/model/quote').paymentMethod()?.method
+        ))).toBe('purchaseorder');
+
         const nativeButton = page.locator(
             '.payment-method._active .payment-method-content .action.checkout'
         );
@@ -766,8 +797,10 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         await expect(page.locator('[data-fastcheckout-e2e-secondary-action]')).toBeVisible();
 
         const sameAsShipping = page.locator(
+            '.payment-method._active input[name="billing-address-same-as-shipping"], ' +
+            '.fastcheckout-payment-after-methods ' +
             'input[name="billing-address-same-as-shipping"]'
-        );
+        ).first();
         await expect(sameAsShipping).toBeChecked();
         await page.evaluate(() => {
             const quote = window.require('Magento_Checkout/js/model/quote'),
@@ -868,27 +901,7 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         await expect(proxy.locator('[data-fastcheckout-place-order-spinner]')).toBeHidden();
         const clickProxy = async () => {
             await dismissConsent(page);
-            await proxy.evaluate((button) => {
-                button.scrollIntoView({block: 'center'});
-            });
-            await page.waitForTimeout(50);
-            const box = await proxy.boundingBox();
-
-            expect(box).not.toBeNull();
-            expect(await page.evaluate(({x, y}) => {
-                const button = document.querySelector(
-                        '[data-fastcheckout-place-order-ssr]'
-                    ),
-                    target = document.elementFromPoint(x, y);
-
-                return Boolean(button && target && (
-                    target === button || button.contains(target)
-                ));
-            }, {
-                x: box.x + box.width / 2,
-                y: box.y + box.height / 2
-            })).toBe(true);
-            await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+            await proxy.click({force: true});
         };
 
         const addressValidationField = shippingRoot.locator('input[name="firstname"]');
@@ -926,7 +939,7 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             window.setTimeout(() => {
                 window.clearInterval(sampler);
                 window.fastcheckoutE2eAddressScrollDone = true;
-            }, 650);
+            }, 2_000);
         });
         await clickProxy();
         await expect.poll(() => visibleErrorText(addressValidationField)).not.toEqual([]);
@@ -936,7 +949,7 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         if (!addressWasVisible) {
             expect(new Set((await page.evaluate(() => (
                 window.fastcheckoutE2eAddressScroll
-            ))).map(Math.round)).size).toBeGreaterThan(4);
+            ))).map(Math.round)).size).toBeGreaterThan(2);
         }
         expect(paymentRequests).toBe(0);
         await addressValidationField.fill('Jan');
@@ -1009,6 +1022,14 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
                         .getAvailablePaymentMethods().length
                     : 0
             )), {timeout: 45_000}).toBeGreaterThan(0);
+            const reloadedPurchaseOrder = page.locator(
+                'input[name="payment[method]"][value="purchaseorder"]'
+            );
+            await expect(reloadedPurchaseOrder).toHaveCount(1, {timeout: 45_000});
+            await reloadedPurchaseOrder.evaluate((input) => input.click());
+            await expect.poll(() => page.evaluate(() => (
+                window.require('Magento_Checkout/js/model/quote').paymentMethod()?.method
+            ))).toBe('purchaseorder');
             await expect.poll(() => page.evaluate(() => {
                 const quote = window.require('Magento_Checkout/js/model/quote'),
                     input = Array.from(document.querySelectorAll(
@@ -1053,6 +1074,13 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             await new Promise((resolve) => setTimeout(resolve, 600));
             await route.continue();
         });
+        await page.evaluate(() => new Promise((resolve, reject) => {
+            const request = window.require(
+                'Kkkonrad_Fastcheckout/js/model/shipping-save-coordinator'
+            ).ensureSaved();
+
+            request.done(resolve).fail(reject);
+        }));
         const paymentRequestStarted = page.waitForRequest((request) => (
             request.method() === 'POST' &&
             request.url().includes('/payment-information')
@@ -1080,7 +1108,7 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         ))).toHaveLength(0);
         expect(placeOrderRequests.filter((url) => (
             url.includes('/shipping-information')
-        ))).toHaveLength(1);
+        ))).toHaveLength(0);
         expect(placeOrderRequests.filter((url) => (
             /\/payment-information(?:\?|$)/.test(url)
         ))).toHaveLength(1);

@@ -7,10 +7,11 @@ define([
     'Magento_Customer/js/customer-data',
     'Magento_Checkout/js/model/totals',
     'Magento_Checkout/js/model/payment-service',
-    'Magento_Checkout/js/action/set-shipping-information',
+    'Magento_Checkout/js/model/payment/method-list',
     'Magento_Checkout/js/action/select-billing-address',
     'Magento_Catalog/js/price-utils',
     'mage/translate',
+    'Kkkonrad_Fastcheckout/js/model/shipping-save-coordinator',
     'Kkkonrad_Fastcheckout/js/model/one-step-validator',
     'uiRegistry'
 ], function (
@@ -22,26 +23,26 @@ define([
     customerData,
     totals,
     paymentService,
-    setShippingInformation,
+    paymentMethodList,
     selectBillingAddress,
     priceUtils,
     $t,
+    shippingSaveCoordinator,
     oneStepValidator,
     registry
 ) {
     'use strict';
 
     var initialized = false,
-        observer,
+        paymentDomObserver,
+        startupDomObserver,
         validationErrorObserver,
         agreementsPortalObserver,
         agreementsPortalSource,
         agreementsPortalParts = [],
         scrollAnimationTimer,
         shippingSaveTimer,
-        shippingSavePending = false,
-        shippingSaveQueued = false,
-        billingAddressChoiceTouched = false,
+        billingAddressFollowsShipping = null,
         placeOrderProcessing = false;
 
     function paymentCode(method) {
@@ -437,17 +438,10 @@ define([
         }
     }
 
-    function revealNativeContent() {
+    function revealStartupContent() {
         var loader = document.querySelector('[data-fastcheckout-startup-loader]'),
             summaryRoot = document.getElementById('fastcheckout-ko-summary-root'),
-            nativeSummary = summaryRoot && summaryRoot.querySelector('.fastcheckout-native-summary'),
-            billingComponent = oneStepValidator.getBillingAddressComponent(),
-            billingAddress = quote.billingAddress(),
-            shippingAddress = quote.shippingAddress(),
-            billingType = billingAddress && typeof billingAddress.getType === 'function' ?
-                billingAddress.getType() : '';
-
-        hoistCheckoutStylesheets();
+            nativeSummary = summaryRoot && summaryRoot.querySelector('.fastcheckout-native-summary');
 
         if (loader && document.querySelector(
             '.fastcheckout-native-shipping-address input[name="firstname"]'
@@ -462,9 +456,20 @@ define([
             summaryRoot.classList.remove('hidden');
         }
 
+        return (!loader || loader.hidden) &&
+            (!summaryRoot || !summaryRoot.classList.contains('hidden'));
+    }
+
+    function syncBillingAddress() {
+        var billingComponent = oneStepValidator.getBillingAddressComponent(),
+            billingAddress = quote.billingAddress(),
+            shippingAddress = quote.shippingAddress(),
+            billingType = billingAddress && typeof billingAddress.getType === 'function' ?
+                billingAddress.getType() : '';
+
         if (!quote.isVirtual() && shippingAddress &&
             (!billingAddress || billingAddress.getCacheKey() !== shippingAddress.getCacheKey()) &&
-            !billingAddressChoiceTouched &&
+            billingAddressFollowsShipping !== false &&
             !checkoutData.getSelectedBillingAddress() &&
             (!billingAddress || billingType === 'new-customer-address' ||
                 billingType === 'new-customer-billing-address')) {
@@ -478,9 +483,50 @@ define([
                 billingAddress.getCacheKey() === shippingAddress.getCacheKey()
             ));
         }
+    }
+
+    function syncPaymentContent() {
+        hoistCheckoutStylesheets();
+        syncBillingAddress();
 
         syncAgreementsPortal(false);
         wirePlaceOrderButtons();
+    }
+
+    function revealNativeContent() {
+        revealStartupContent();
+        syncPaymentContent();
+    }
+
+    function observeNativeContent() {
+        var paymentRoot = document.querySelector('.fastcheckout-ko-payment-root'),
+            startupRoots = [
+                document.querySelector('.fastcheckout-native-shipping-address'),
+                document.getElementById('fastcheckout-ko-summary-root')
+            ].filter(Boolean);
+
+        if (!window.MutationObserver) {
+            return;
+        }
+
+        if (paymentRoot) {
+            paymentDomObserver = new MutationObserver(function () {
+                window.setTimeout(syncPaymentContent, 0);
+            });
+            paymentDomObserver.observe(paymentRoot, {childList: true, subtree: true});
+        }
+
+        if (startupRoots.length && !revealStartupContent()) {
+            startupDomObserver = new MutationObserver(function () {
+                if (revealStartupContent()) {
+                    startupDomObserver.disconnect();
+                    startupDomObserver = null;
+                }
+            });
+            startupRoots.forEach(function (root) {
+                startupDomObserver.observe(root, {childList: true, subtree: true});
+            });
+        }
     }
 
     function updateMobileTotal() {
@@ -540,8 +586,7 @@ define([
             )),
             start = scroller.scrollTop,
             distance = target - start,
-            startedAt = Date.now(),
-            lastApplied = start;
+            startedAt = Date.now();
 
         if (scrollAnimationTimer) {
             window.clearInterval(scrollAnimationTimer);
@@ -556,15 +601,8 @@ define([
         scrollAnimationTimer = window.setInterval(function () {
             var progress;
 
-            if (Math.abs(scroller.scrollTop - lastApplied) > 2) {
-                window.clearInterval(scrollAnimationTimer);
-                scrollAnimationTimer = null;
-                return;
-            }
-
             progress = Math.min((Date.now() - startedAt) / 300, 1);
-            lastApplied = start + distance * (1 - Math.pow(1 - progress, 3));
-            scroller.scrollTop = lastApplied;
+            scroller.scrollTop = start + distance * (1 - Math.pow(1 - progress, 3));
 
             if (progress === 1) {
                 window.clearInterval(scrollAnimationTimer);
@@ -700,43 +738,16 @@ define([
     }
 
     function saveShippingWhenMethodChanges() {
-        function saveLatestShippingInformation() {
-            if (placeOrderProcessing) {
-                window.clearTimeout(shippingSaveTimer);
-                shippingSaveQueued = false;
-                return;
-            }
-            if (shippingSavePending) {
-                return;
-            }
-
-            window.clearTimeout(shippingSaveTimer);
-            shippingSaveQueued = false;
-            shippingSavePending = true;
-            setShippingInformation().done(function () {
-                document.dispatchEvent(
-                    new Event('fastcheckout:shipping-information-saved')
-                );
-            }).always(function () {
-                shippingSavePending = false;
-                if (shippingSaveQueued) {
-                    saveLatestShippingInformation();
-                }
-            });
-        }
-
         registry.async('checkout.steps.shipping-step.shippingAddress')(function () {
             function queueSave(method) {
                 window.clearTimeout(shippingSaveTimer);
                 if (!method) {
-                    shippingSaveQueued = false;
                     return;
                 }
 
-                shippingSaveQueued = true;
                 shippingSaveTimer = window.setTimeout(function () {
                     // Carrier-specific fields are validated by the place-order flow.
-                    saveLatestShippingInformation();
+                    shippingSaveCoordinator.ensureSaved();
                 }, 50);
             }
 
@@ -765,7 +776,7 @@ define([
                 if (event.target.matches && event.target.matches(
                     'input[name="billing-address-same-as-shipping"]'
                 )) {
-                    billingAddressChoiceTouched = true;
+                    billingAddressFollowsShipping = event.target.checked;
                 }
 
                 if (!event.target.closest || event.target.closest(
@@ -791,11 +802,6 @@ define([
 
         addConfiguredStylesheets(window.checkoutConfig);
         customerData.getInitCustomerData().done(function () {
-            if (!$.isPlainObject($.localStorage.get(
-                'mage-cache-storage-section-invalidation'
-            ))) {
-                $.localStorage.set('mage-cache-storage-section-invalidation', {});
-            }
             app(jsLayout);
             checkoutDataResolver.resolveBillingAddress();
             bindPlaceOrderProxies();
@@ -812,22 +818,30 @@ define([
                     validationErrorObserver = null;
                 }
                 window.setTimeout(function () {
-                    revealNativeContent();
+                    syncPaymentContent();
                 }, 0);
             });
-            if (totals.totals && typeof totals.totals.subscribe === 'function') {
-                totals.totals.subscribe(updateMobileTotal);
-            }
-
-            if (root && window.MutationObserver) {
-                observer = new MutationObserver(function () {
-                    window.setTimeout(revealNativeContent, 0);
+            quote.shippingAddress.subscribe(function () {
+                window.setTimeout(syncBillingAddress, 0);
+            });
+            quote.billingAddress.subscribe(function () {
+                window.setTimeout(syncBillingAddress, 0);
+            });
+            if (paymentMethodList && typeof paymentMethodList.subscribe === 'function') {
+                paymentMethodList.subscribe(function () {
+                    window.setTimeout(syncPaymentContent, 0);
                 });
-                observer.observe(root, {childList: true, subtree: true});
+            }
+            if (totals.totals && typeof totals.totals.subscribe === 'function') {
+                totals.totals.subscribe(function () {
+                    updateMobileTotal();
+                    revealStartupContent();
+                });
             }
 
             window.setTimeout(function () {
                 revealNativeContent();
+                observeNativeContent();
                 updateMobileTotal();
                 window.dispatchEvent(new CustomEvent('fastcheckout:ready'));
             }, 0);

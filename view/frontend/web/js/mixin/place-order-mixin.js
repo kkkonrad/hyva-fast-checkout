@@ -1,10 +1,9 @@
 define([
     'jquery',
     'mage/utils/wrapper',
-    'Magento_Checkout/js/model/quote',
-    'Magento_Checkout/js/action/set-shipping-information',
+    'Kkkonrad_Fastcheckout/js/model/shipping-save-coordinator',
     'Kkkonrad_Fastcheckout/js/mixin/is-fastcheckout-active'
-], function ($, wrapper, quote, setShippingInformation, isFastcheckoutActive) {
+], function ($, wrapper, shippingSaveCoordinator, isFastcheckoutActive) {
     'use strict';
 
     return function (placeOrderAction) {
@@ -16,8 +15,7 @@ define([
                 ),
                 additional,
                 result,
-                active = isFastcheckoutActive(),
-                virtual = quote.isVirtual && quote.isVirtual();
+                active = isFastcheckoutActive();
 
             if (active && paymentData && typeof paymentData === 'object') {
                 paymentData.extension_attributes = paymentData.extension_attributes || {};
@@ -37,10 +35,9 @@ define([
             }
 
             document.dispatchEvent(new Event('fastcheckout:order-submit-started'));
-            result = virtual ? originalAction(paymentData, messageContainer) :
-                $.when(setShippingInformation()).then(function () {
-                    return originalAction(paymentData, messageContainer);
-                });
+            result = $.when(shippingSaveCoordinator.ensureSaved()).then(function () {
+                return originalAction(paymentData, messageContainer);
+            });
             if (result && typeof result.fail === 'function') {
                 result.fail(function () {
                     document.dispatchEvent(new Event('fastcheckout:order-submit-failed'));

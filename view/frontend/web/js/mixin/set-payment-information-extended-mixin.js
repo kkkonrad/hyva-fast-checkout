@@ -3,62 +3,86 @@ define([
     'mage/utils/wrapper',
     'Magento_Checkout/js/model/quote',
     'Magento_Customer/js/model/customer',
-    'Kkkonrad_Fastcheckout/js/mixin/is-fastcheckout-active'
-], function ($, wrapper, quote, customer, isFastcheckoutActive) {
+    'Kkkonrad_Fastcheckout/js/model/shipping-save-coordinator',
+    'Kkkonrad_Fastcheckout/js/mixin/is-fastcheckout-active',
+    'uiRegistry'
+], function ($, wrapper, quote, customer, shippingSaveCoordinator, isFastcheckoutActive, registry) {
     'use strict';
 
-    var pending,
-        shippingInformationSaved = false;
-
-    function defer(originalAction, messageContainer, paymentData, skipBilling) {
-        pending = pending || {deferred: $.Deferred()};
-        pending.action = originalAction;
-        pending.args = [messageContainer, paymentData, skipBilling];
-
-        return pending.deferred.promise();
+    function resolvedPromise() {
+        return $.Deferred().resolve().promise();
     }
 
-    function flush() {
-        var request,
-            result;
+    function waitForObservable(observable, predicate) {
+        var deferred,
+            subscription;
 
-        if (
-            !pending ||
-            !quote.guestEmail ||
-            (!(quote.isVirtual && quote.isVirtual()) && !shippingInformationSaved)
-        ) {
-            return;
+        if (!observable || typeof observable.subscribe !== 'function' || predicate(observable())) {
+            return resolvedPromise();
         }
 
-        request = pending;
-        pending = null;
+        deferred = $.Deferred();
+        subscription = observable.subscribe(function (value) {
+            if (!predicate(value)) {
+                return;
+            }
+            subscription.dispose();
+            deferred.resolve();
+        });
 
-        try {
-            result = request.action.apply(null, request.args);
-        } catch (error) {
-            request.deferred.reject(error);
-            return;
+        return deferred.promise();
+    }
+
+    function waitForGuestEmail() {
+        var deferred,
+            subscriptions = [],
+            paths = [
+                'checkout.steps.shipping-step.shippingAddress.customer-email',
+                'checkout.steps.billing-step.payment.customer-email'
+            ];
+
+        if (customer.isLoggedIn() || quote.guestEmail) {
+            return resolvedPromise();
         }
 
-        $.when(result).then(function () {
-            request.deferred.resolve.apply(request.deferred, arguments);
-        }, function () {
-            request.deferred.reject.apply(request.deferred, arguments);
+        deferred = $.Deferred();
+
+        function resolveWhenValid() {
+            if (!quote.guestEmail) {
+                return;
+            }
+            subscriptions.forEach(function (subscription) {
+                subscription.dispose();
+            });
+            subscriptions = [];
+            deferred.resolve();
+        }
+
+        paths.forEach(function (path) {
+            registry.async(path)(function (component) {
+                if (component && component.email && typeof component.email.subscribe === 'function') {
+                    subscriptions.push(component.email.subscribe(function () {
+                        window.setTimeout(resolveWhenValid, 0);
+                    }));
+                }
+                resolveWhenValid();
+            });
+        });
+
+        return deferred.promise();
+    }
+
+    function waitForCheckoutReady() {
+        return $.when(waitForGuestEmail()).then(function () {
+            if (quote.isVirtual && quote.isVirtual()) {
+                return undefined;
+            }
+
+            return waitForObservable(quote.shippingMethod, Boolean).then(function () {
+                return shippingSaveCoordinator.ensureSaved();
+            });
         });
     }
-
-    function flushAfterNativeEmailValidation(event) {
-        if (event.target && event.target.id === 'customer-email') {
-            window.setTimeout(flush, 0);
-        }
-    }
-
-    document.addEventListener('input', flushAfterNativeEmailValidation);
-    document.addEventListener('change', flushAfterNativeEmailValidation);
-    document.addEventListener('fastcheckout:shipping-information-saved', function () {
-        shippingInformationSaved = true;
-        flush();
-    });
 
     return function (setPaymentInformationExtended) {
         return wrapper.wrap(setPaymentInformationExtended, function (
@@ -67,27 +91,13 @@ define([
             paymentData,
             skipBilling
         ) {
-            var deferred;
-
-            if (!isFastcheckoutActive() || customer.isLoggedIn()) {
+            if (!isFastcheckoutActive()) {
                 return originalAction(messageContainer, paymentData, skipBilling);
             }
 
-            if (
-                !quote.guestEmail ||
-                (!(quote.isVirtual && quote.isVirtual()) && !shippingInformationSaved)
-            ) {
-                return defer(originalAction, messageContainer, paymentData, skipBilling);
-            }
-
-            if (pending) {
-                deferred = defer(originalAction, messageContainer, paymentData, skipBilling);
-                flush();
-
-                return deferred;
-            }
-
-            return originalAction(messageContainer, paymentData, skipBilling);
+            return waitForCheckoutReady().then(function () {
+                return originalAction(messageContainer, paymentData, skipBilling);
+            });
         });
     };
 });

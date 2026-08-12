@@ -63,6 +63,13 @@ class NativePipelineOwnershipTest extends TestCase
         $checkout = (string)file_get_contents($this->moduleRoot() . '/Block/Hyva/Checkout.php');
         $this->assertStringNotContainsString('createBlock(Onepage::class', $checkout);
         $this->assertStringNotContainsString('getProcessedCheckoutLayout', $checkout);
+        $this->assertStringNotContainsString('catch (\\Throwable', $checkout);
+        $this->assertStringContainsString('return $this->configProvider->getConfig();', $checkout);
+
+        $collector = (string)file_get_contents(
+            $this->moduleRoot() . '/Model/CheckoutLayoutCollector.php'
+        );
+        $this->assertStringContainsString('throw $exception;', $collector);
     }
 
     public function testProcessedThirdPartyLayoutIsNotNormalizedRecursively(): void
@@ -91,8 +98,10 @@ class NativePipelineOwnershipTest extends TestCase
             . '/view/frontend/web/js/mixin/set-payment-information-extended-mixin.js'
         );
         $this->assertStringContainsString('quote.guestEmail', $paymentGuard);
-        $this->assertStringNotContainsString('shippingAddress', $paymentGuard);
-        $this->assertStringNotContainsString('DEDUPE', $paymentGuard);
+        $this->assertStringContainsString('shippingSaveCoordinator.ensureSaved()', $paymentGuard);
+        $this->assertStringNotContainsString('var pending', $paymentGuard);
+        $this->assertStringNotContainsString("document.addEventListener('input'", $paymentGuard);
+        $this->assertStringNotContainsString('fastcheckout:shipping-information-saved', $paymentGuard);
 
         $bootstrap = (string)file_get_contents(
             $this->moduleRoot() . '/view/frontend/web/js/hyva/checkout-renderers.js'
@@ -102,10 +111,7 @@ class NativePipelineOwnershipTest extends TestCase
             "'Magento_Checkout/js/model/quote'",
             $bootstrap
         );
-        $this->assertStringContainsString(
-            "'Magento_Checkout/js/action/set-shipping-information'",
-            $bootstrap
-        );
+        $this->assertStringContainsString('shippingSaveCoordinator.ensureSaved()', $bootstrap);
         $this->assertStringContainsString(
             "'Magento_Customer/js/customer-data'",
             $bootstrap
@@ -127,10 +133,28 @@ class NativePipelineOwnershipTest extends TestCase
         $this->assertStringNotContainsString('wireAgreements', $bootstrap);
         $this->assertStringNotContainsString('wireNewsletter', $bootstrap);
         $this->assertStringNotContainsString('quote.billingAddress(null)', $bootstrap);
-        $this->assertStringContainsString('shippingSaveQueued', $bootstrap);
+        $this->assertStringNotContainsString('observer.observe(root', $bootstrap);
+        $this->assertStringContainsString('paymentDomObserver.observe(paymentRoot', $bootstrap);
         $this->assertStringNotContainsString('paymentErrorTimer', $bootstrap);
         $this->assertStringContainsString('sourcePart.cloneNode(true)', $bootstrap);
         $this->assertStringNotContainsString('host.appendChild(source', $bootstrap);
+
+        $earlyBootstrap = (string)file_get_contents(
+            $this->moduleRoot() . '/view/frontend/web/js/requirejs-base.js'
+        );
+        $this->assertStringContainsString(
+            "'mage-cache-storage'",
+            $earlyBootstrap
+        );
+        $this->assertStringContainsString(
+            "'mage-cache-storage-section-invalidation'",
+            $earlyBootstrap
+        );
+        $this->assertStringContainsString("setItem(storageKey, '{}')", $earlyBootstrap);
+        $this->assertStringNotContainsString(
+            'mage-cache-storage-section-invalidation',
+            $bootstrap
+        );
     }
 
     public function testDiDoesNotReplaceOrGloballyPatchCheckoutServices(): void

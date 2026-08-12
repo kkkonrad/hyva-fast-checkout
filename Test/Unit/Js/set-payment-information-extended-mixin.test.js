@@ -6,14 +6,45 @@ const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
 
-test('defers guest payment information until native checkout prerequisites are ready', async () => {
+function observable(initial) {
+    let value = initial;
+    const subscribers = [];
+    const result = function (next) {
+        if (!arguments.length) {
+            return value;
+        }
+        value = next;
+        subscribers.slice().forEach((callback) => callback(value));
+    };
+
+    result.subscribe = (callback) => {
+        subscribers.push(callback);
+        return {
+            dispose() {
+                const index = subscribers.indexOf(callback);
+
+                if (index !== -1) {
+                    subscribers.splice(index, 1);
+                }
+            }
+        };
+    };
+
+    return result;
+}
+
+test('waits on native email and the shared shipping save without replacing payment calls', async () => {
     let mixin,
-        loggedIn = false,
         active = true,
         calls = 0,
-        captured;
-    const listeners = {};
-    const quote = {guestEmail: null, isVirtual: () => false};
+        shippingCalls = 0;
+    const email = observable('');
+    const shippingMethod = observable(null);
+    const quote = {
+        guestEmail: null,
+        shippingMethod,
+        isVirtual: () => false
+    };
     const source = fs.readFileSync(path.resolve(
         __dirname,
         '../../../view/frontend/web/js/mixin/set-payment-information-extended-mixin.js'
@@ -26,8 +57,19 @@ test('defers guest payment information until native checkout prerequisites are r
                 resolve = onResolve;
                 reject = onReject;
             });
+            const api = {
+                resolve() {
+                    resolve.apply(null, arguments);
+                    return api;
+                },
+                reject() {
+                    reject.apply(null, arguments);
+                    return api;
+                },
+                promise: () => promise
+            };
 
-            return {resolve, reject, promise: () => promise};
+            return api;
         },
         when: (value) => Promise.resolve(value)
     };
@@ -38,51 +80,54 @@ test('defers guest payment information until native checkout prerequisites are r
             };
         }
     };
+    const registry = {
+        async(name) {
+            return (callback) => {
+                if (name.endsWith('customer-email')) {
+                    callback({email});
+                }
+            };
+        }
+    };
 
     vm.runInNewContext(source, {
         window: {setTimeout: (callback) => callback()},
-        document: {
-            addEventListener(name, callback) {
-                listeners[name] = callback;
-            }
-        },
         define(dependencies, factory) {
             mixin = factory(
                 jquery,
                 wrapper,
                 quote,
-                {isLoggedIn: () => loggedIn},
-                () => active
+                {isLoggedIn: () => false},
+                {
+                    ensureSaved() {
+                        shippingCalls += 1;
+                        return Promise.resolve();
+                    }
+                },
+                () => active,
+                registry
             );
         }
     });
 
     const action = mixin((...args) => {
         calls += 1;
-        captured = args;
-        return Promise.resolve('saved');
+        return Promise.resolve(args[1].method);
     });
     const pending = action({scope: 'discount'}, {method: 'purchaseorder'}, true);
 
     assert.equal(calls, 0);
-    listeners.input({target: {id: 'another-field'}});
-    assert.equal(calls, 0);
-
     quote.guestEmail = 'guest@example.com';
-    listeners.input({target: {id: 'customer-email'}});
+    email('guest@example.com');
+    await Promise.resolve();
     assert.equal(calls, 0);
-    listeners['fastcheckout:shipping-information-saved']();
 
-    assert.equal(await pending, 'saved');
+    shippingMethod({carrier_code: 'flatrate', method_code: 'flatrate'});
+    assert.equal(await pending, 'purchaseorder');
+    assert.equal(shippingCalls, 1);
     assert.equal(calls, 1);
-    assert.equal(captured[1].method, 'purchaseorder');
-    assert.equal(captured[2], true);
 
-    quote.guestEmail = null;
-    loggedIn = true;
-    await action({}, {method: 'checkmo'}, true);
     active = false;
-    loggedIn = false;
-    await action({}, {method: 'banktransfer'}, true);
-    assert.equal(calls, 3);
+    assert.equal(await action({}, {method: 'checkmo'}, true), 'checkmo');
+    assert.equal(calls, 2);
 });
