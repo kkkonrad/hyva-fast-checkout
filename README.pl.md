@@ -156,34 +156,8 @@ php bin/magento cache:flush
 Po aktualizacji należy ponownie wykonać najważniejsze scenariusze z checklisty,
 zwłaszcza dla modułów dostawy i płatności, które również zostały zaktualizowane.
 
-<details>
-<summary>Informacje dla opiekuna technicznego</summary>
+## Dokumentacja techniczna
 
-- Moduł korzysta z natywnego checkoutu Magento opartego na KnockoutJS, RequireJS
-  i REST, w tym z `Magento_Checkout`, `checkoutProvider` oraz modelu `quote`. Nie
-  utrzymuje równoległego stanu zamówienia.
-- Natywny `jsLayout` jest budowany w izolowanym layoucie `Magento/luma`, po czym
-  natychmiast przywracany jest motyw Hyvä. Nie jest do tego potrzebny pakiet ani
-  globalne przełączenie Hyvä Theme Fallback.
-- Layout `checkout_index_index` jest scalany z konfiguracją zewnętrznych modułów,
-  a ich renderery płatności, komponenty dostawy i walidatory pozostają aktywne.
-- Integracje JavaScript z core są realizowane przez mixiny RequireJS, bez
-  podmiany core za pomocą `map`.
-- Widoczny przycisk zamówienia przekazuje sterowanie do natywnego przycisku
-  aktywnego renderera płatności.
-- Do szybkiego odświeżenia opublikowanych zasobów w środowisku developerskim
-  można użyć:
-
-```bash
-app/code/Kkkonrad/Fastcheckout/bin/sync-frontend-static.sh
-php bin/magento cache:flush
-```
-
-W środowisku z Subresource Integrity należy użyć standardowego
-`setup:static-content:deploy`, aby Magento odtworzyło również poprawne hashe SRI.
-Nie należy ręcznie edytować `pub/static/deployed_version.txt`.
-
-Testy jednostkowe i E2E znajdują się w katalogu `Test/` modułu. Testy E2E
-domyślnie nie składają zamówienia.
-
-</details>
+Szczegóły architektury, walidacji, zgodności z rozszerzeniami, testów oraz
+publikowania plików statycznych znajdują się w
+[dokumentacji technicznej](docs/TECHNICAL.pl.md).

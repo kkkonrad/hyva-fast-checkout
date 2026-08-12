@@ -155,34 +155,8 @@ php bin/magento cache:flush
 After an update, repeat the most important go-live checks, especially for any
 shipping or payment modules that were updated at the same time.
 
-<details>
-<summary>Information for the technical partner</summary>
+## Technical documentation
 
-- The module uses Magento's native KnockoutJS, RequireJS and REST checkout,
-  including `Magento_Checkout`, `checkoutProvider` and the `quote` model. It
-  does not maintain parallel checkout state.
-- The native `jsLayout` is built in an isolated `Magento/luma` layout and the
-  Hyvä theme is restored immediately afterwards. This does not require the Hyvä
-  Theme Fallback package or a global theme switch.
-- The `checkout_index_index` layout is merged with third-party module
-  configuration, keeping their payment renderers, shipping components and
-  validators active.
-- Core JavaScript integrations use RequireJS mixins and do not replace core
-  modules through `map`.
-- The visible order button delegates to the native button of the active payment
-  renderer.
-- To refresh published assets quickly in a development environment, run:
-
-```bash
-app/code/Kkkonrad/Fastcheckout/bin/sync-frontend-static.sh
-php bin/magento cache:flush
-```
-
-In an environment using Subresource Integrity, use the standard
-`setup:static-content:deploy` process so Magento also regenerates valid SRI
-hashes. Do not edit `pub/static/deployed_version.txt` manually.
-
-Unit and E2E tests are available under the module's `Test/` directory. E2E tests
-do not place orders by default.
-
-</details>
+Architecture, validation, third-party compatibility, testing and static asset
+deployment are documented in the
+[technical documentation](docs/TECHNICAL.md).
