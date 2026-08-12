@@ -14,7 +14,7 @@ płatności, podatków, rabatów i integracji zainstalowanych w Magento.
 
 ## Podgląd
 
-![Widok procesu zamówienia Kkkonrad Fastcheckout](docs/images/checkout.png)
+![Widok procesu zamówienia Kkkonrad Fastcheckout](docs/images/checkout-pl.png)
 
 ## Co zyskuje sklep
 

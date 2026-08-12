@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Capture docs/images/checkout.png for README (headless Chromium + system fonts).
+ * Capture docs/images/checkout-pl.png for the Polish README (headless Chromium + system fonts).
  *
  * Usage (from Magento root or module):
  *   node app/code/Kkkonrad/Fastcheckout/bin/capture-readme-screenshot.mjs
@@ -16,7 +16,7 @@ const require = createRequire(resolve(__dirname, '../Test/E2e/package.json'));
 const { chromium } = require('playwright');
 const BASE = process.env.FC_SHOT_BASE_URL || 'https://m10625.app-on-demand.net/';
 const PRODUCT = process.env.FC_SHOT_PRODUCT || 'aim-analog-watch.html';
-const out = resolve(__dirname, '../docs/images/checkout.png');
+const out = resolve(__dirname, '../docs/images/checkout-pl.png');
 
 const FONT_CSS = `
   html, body, button, input, select, textarea, label, span, p, h1, h2, h3, h4, a, li, td, th, div {

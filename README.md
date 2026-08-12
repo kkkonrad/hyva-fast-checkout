@@ -14,7 +14,7 @@ shipping methods, payment providers, taxes, discounts and Magento integrations.
 
 ## Preview
 
-![Kkkonrad Fastcheckout checkout view](docs/images/checkout.png)
+![Kkkonrad Fastcheckout checkout view](docs/images/checkout-en.png)
 
 ## Benefits for your store
 
