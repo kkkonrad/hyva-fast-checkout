@@ -53,11 +53,12 @@ methods must first be installed, configured and enabled correctly in Magento.
 - Magento 2.4 (`magento/framework` 103.x);
 - PHP 8.1–8.4;
 - Hyvä Theme Module 1.4 or newer;
-- Magento's standard Luma theme, installed automatically as a Composer
-  dependency and used only internally to build the checkout layout.
+- Magento's standard Blank theme, installed automatically as a Composer
+  dependency and retained only as an internal fallback while collecting the
+  native checkout layout.
 
 The module does not require Hyvä Theme Fallback, Hyvä Checkout or Magewire. The
-checkout page remains on the Hyvä theme; customers never see Luma.
+checkout page remains on the Hyvä theme; customers never see Blank.
 
 ## Magento Admin configuration
 
@@ -71,6 +72,13 @@ The store administrator can:
 - show or hide the order comment, discount code and newsletter option;
 - limit payment methods according to the selected shipping method;
 - optionally assign guest orders to an existing customer account.
+
+Shipping-to-payment mapping is opt-in per payment code. Once a payment code is
+listed, it is available only for matching shipping rules. A payment method that
+is not listed remains available, so installing a new provider does not hide it
+before the administrator deliberately adds it to the mapping. Rules accept a
+full shipping method, a carrier code or a prefix wildcard, for example
+`tablerate_bestway`, `furgonetkapl` or `flatrate_*`.
 
 Guest-order assignment is disabled by default. Enable it only when the store
 independently verifies that the shopper owns the supplied email address.
@@ -106,9 +114,8 @@ On a test copy of the store, verify:
 
 ## Installation
 
-Installation should be performed by the store's technical partner. The package
-is not available on Packagist and is downloaded directly from its GitHub
-repository.
+Installation should be performed by the store's technical partner. The commands
+below configure the package directly from its GitHub repository.
 
 From the Magento root directory:
 

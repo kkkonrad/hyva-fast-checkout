@@ -54,11 +54,12 @@ najpierw poprawnie zainstalowane, skonfigurowane i aktywowane w Magento.
 - Magento 2.4 (`magento/framework` 103.x);
 - PHP 8.1–8.4;
 - Hyvä Theme Module 1.4 lub nowszy;
-- standardowy motyw Magento Luma, instalowany automatycznie jako zależność
-  Composer i używany wyłącznie wewnętrznie do budowy layoutu checkoutu.
+- standardowy motyw Magento Blank, instalowany automatycznie jako zależność
+  Composer i zachowany wyłącznie jako wewnętrzny fallback podczas pobierania
+  natywnego layoutu checkoutu.
 
 Moduł nie wymaga Hyvä Theme Fallback, Hyvä Checkout ani Magewire. Strona
-checkoutu pozostaje w motywie Hyvä — Luma nie jest wyświetlana klientowi.
+checkoutu pozostaje w motywie Hyvä — Blank nie jest wyświetlany klientowi.
 
 ## Konfiguracja w panelu Magento
 
@@ -72,6 +73,14 @@ Administrator sklepu może:
 - pokazać albo ukryć pole komentarza, kod rabatowy i zapis do newslettera;
 - ograniczyć dostępne płatności zależnie od wybranej metody dostawy;
 - opcjonalnie przypisywać zamówienia gości do istniejącego konta klienta.
+
+Mapowanie dostawa→płatność działa tylko dla jawnie wskazanych kodów płatności.
+Po dodaniu kodu do mapowania dana płatność jest dostępna wyłącznie dla
+pasujących reguł dostawy. Płatność, której nie ma w mapowaniu, pozostaje
+dostępna, dlatego instalacja nowego operatora nie ukrywa go przed świadomą
+konfiguracją administratora. Reguła może zawierać pełny kod metody dostawy, kod
+przewoźnika albo wildcard prefiksu, na przykład `tablerate_bestway`,
+`furgonetkapl` lub `flatrate_*`.
 
 Przypisywanie zamówień gościa jest domyślnie wyłączone. Należy je włączyć tylko
 wtedy, gdy sklep niezależnie potwierdza, że kupujący jest właścicielem podanego
@@ -108,8 +117,8 @@ Na kopii testowej sklepu warto sprawdzić:
 
 ## Instalacja
 
-Instalację powinien wykonać opiekun techniczny sklepu. Pakiet nie jest dostępny
-na Packagist i jest pobierany bezpośrednio z repozytorium GitHub.
+Instalację powinien wykonać opiekun techniczny sklepu. Poniższe polecenia
+konfigurują pakiet bezpośrednio z repozytorium GitHub.
 
 W katalogu głównym Magento:
 

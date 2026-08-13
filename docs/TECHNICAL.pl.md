@@ -11,9 +11,13 @@ oraz sposób jego utrzymania i testowania.
 ## Walidacja i składanie zamówienia
 
 Widoczne przyciski desktop/mobile są proxy. Nie implementują płatności i nie
-wywołują endpointu samodzielnie: klikają natywny przycisk `placeOrder` aktywnego
-renderera. Dzięki temu PayU, Przelewy24, Stripe i inne moduły zachowują własne
-tokenizacje, zgody oraz walidatory.
+wywołują endpointu samodzielnie. Proxy pobiera aktywny komponent z kanonicznej
+ścieżki `checkout.steps.billing-step.payment.payments-list.{code}` i wywołuje
+jego publiczną metodę `placeOrder()`. Natywny przycisk renderera klika wyłącznie
+jako fallback dla niestandardowego komponentu niedostępnego w `uiRegistry`.
+Płatności wallet i drop-in zachowują własny przycisk finalizacji. Dzięki temu
+PayU, Przelewy24, Stripe i inne moduły zachowują własne tokenizacje, zgody oraz
+walidatory.
 
 Przy próbie złożenia zamówienia Fastcheckout:
 
@@ -45,17 +49,21 @@ Magento.
   Standardowy event `layout_load_before` dodaje handle
   `fastcheckout_index_index` przed scaleniem layoutu; moduł nie pluginuje ani nie
   omija kontrolera checkoutu.
-- Fastcheckout przełącza kontekst motywu wyłącznie na czas zbudowania
-  izolowanego layoutu `Magento/luma` dla handle `checkout_index_index` oraz
-  prywatnego `fastcheckout_native_components`. Robi to bezpośrednio przez
-  `Magento\Framework\View\Design\Theme\ThemeProviderInterface`, bez pakietu
-  Hyvä Theme Fallback. Oryginalny motyw Hyvä jest zawsze przywracany w `finally`;
-  Luma nie renderuje strony ani nie publikuje swoich zasobów klientowi.
+- Fastcheckout najpierw buduje izolowany layout w aktywnym kontekście motywu dla
+  `checkout_index_index`, prywatnego handle
+  `fastcheckout_native_components` oraz właściwych handle strony storefrontu.
+  Jeśli nie powstanie drzewo checkoutu, tylko izolowany build jest tymczasowo
+  przełączany na `Magento/blank` przez
+  `Magento\Framework\View\Design\Theme\ThemeProviderInterface`. Oryginalny motyw
+  Hyvä jest zawsze przywracany w `finally`; Blank nie renderuje strony ani nie
+  publikuje swoich zasobów klientowi, a pakiet Hyvä Theme Fallback nie jest
+  wymagany.
 - Izolowany layout sprawia, że walidator, newsletter i komentarz Fastcheckout nie
   są rejestrowane w zwykłym checkoutcie, natomiast wszystkie layout processory i
   wpisy `jsLayout` modułów zewnętrznych trafiają do oryginalnego `checkout.root`.
   Przetworzone drzewo jest pobierane przez `checkout.root::getJsLayout()` bez
-  tworzenia drugiego bloku `Onepage`; zmiany prezentacyjne wykonuje końcowy
+  własnego parsera i rekurencyjnego merge, a blok strony Fastcheckout nie tworzy
+  kolejnego bloku `Onepage`. Zmiany prezentacyjne wykonuje końcowy
   `LayoutProcessorInterface` Fastcheckout.
 - Izolowany layout nie ładuje globalnego handle `default`, więc nie przygotowuje
   globalnych bloków RequireJS aktywnego motywu podczas renderowania strony.
@@ -69,10 +77,18 @@ Magento.
   `shipping-service`, `totals` i komponenty `checkout.sidebar.summary`.
 - Magento zachowuje własne komponenty `shipping`, `payment`, `payments-list`,
   `renderer-list`, `shipping-service`, `checkout-data` i `quote` bez forków.
-- Integracje z core JS są rejestrowane wyłącznie jako mixiny RequireJS — bez
-  `map` i bez forków. Dotyczą `Magento_Checkout/js/action/place-order`,
-  natywnego summary, `Magento_SalesRule/js/view/payment/discount` i
-  `Magento_CheckoutAgreements/js/view/checkout-agreements`.
+- Integracje JavaScript są rejestrowane wyłącznie jako mixiny RequireJS — bez
+  `map` i bez forków core. Obejmują komponenty Magento `place-order`,
+  `error-processor`, `step-navigator`, `set-payment-information-extended`,
+  totals/produkty summary, discount oraz checkout-agreements. Jeden wąski mixin
+  Braintree Hosted Fields uruchamia wszystkie natywne walidacje pól karty po
+  zgłoszeniu przez renderer niepoprawnego formularza; nie zastępuje renderera.
+- Strona Hyvä uruchamia natywne inicjalizatory Magento `section-config` i
+  `customer-data` przed aplikacją checkoutu. Wczesny bootstrap jedynie
+  normalizuje uszkodzone
+  kontenery `mage-cache-storage`; nie zastępuje magazynu Magento. Brakujący lub
+  wygasły quote jest obsługiwany przez natywny `error-processor`, który unieważnia
+  sekcje checkoutu i przekierowuje do koszyka.
 - Pole komentarza pozostaje w panelu podsumowania, a newsletter jest dzieckiem
   regionu `before-place-order` z `sortOrder=90`. Standardowe zgody oraz
   newsletter mają w podsumowaniu zsynchronizowane proxy prezentacyjne; ich
@@ -86,6 +102,8 @@ Magento.
 - Strona sukcesu zachowuje core `Magento\Checkout\Block\Onepage\Success`, a
   komentarz i newsletter są zapisywane przez
   `OrderStatusHistoryRepositoryInterface` i `SubscriptionManagerInterface`.
+  Arkusz strony sukcesu ukrywa również starszy placeholder Tpay
+  `#tpay_success_status`, nie zmieniając procesu płatności Tpay.
 
 Moduł nie zawiera komponentu Magewire, mechanizmu modyfikowania DOM przez
 Livewire ani orkiestratora stanu opartego na Alpine.
@@ -97,7 +115,10 @@ Fastcheckout działa jak host natywnego checkoutu Magento Knockout + REST.
 patchy ani wpisów DI w Kkkonrad_Fastcheckout.**
 
 - Renderery płatności i komponenty UI dostawy pochodzą ze standardowego,
-  dynamicznie scalonego handle `checkout_index_index`.
+  dynamicznie scalonego handle `checkout_index_index`. Renderowana strona Hyvä
+  również scala ten handle, aby zachować assety `<head>` i bloki potomne PHTML
+  modułów zewnętrznych; `checkout.root` używa szablonu renderującego wyłącznie
+  dzieci, więc core nie uruchamia aplikacji drugi raz.
 - Zewnętrzny root `#checkout` i wewnętrzny `#fastcheckout-checkout` są obecne
   równocześnie, dlatego selektory modułów ograniczone do `#checkout` nadal
   działają.
@@ -115,15 +136,18 @@ patchy ani wpisów DI w Kkkonrad_Fastcheckout.**
   przez layout processor ma pierwszeństwo przed szablonem prezentacyjnym modułu.
 - Fastcheckout nie zastępuje `window.checkoutConfig`, nie zapisuje własnego
   checkout store i nie odtwarza `extension_attributes` z bazy. Natywny przycisk
-  zamówienia pozostaje w rendererze wraz z handlerami i jest wywoływany przez
-  widoczne proxy; pozostałe akcje toolbara nie są ukrywane.
+  zamówienia pozostaje w rendererze wraz z handlerami. Widoczne proxy wywołuje
+  publiczne `placeOrder()` renderera, a przycisku używa tylko jako fallbacku
+  kompatybilności; pozostałe akcje toolbara nie są ukrywane.
 - `ExtendedCheckoutConfigProvider` jest dopinany do
   `Magento\Checkout\Model\CompositeConfigProvider` z `sortOrder=1000`; moduł nie
   zastępuje interfejsów zarządzania informacjami dostawy ani płatności.
 - Mapowanie shipping→payment jest dodatkową specyfikacją
   `Magento\Payment\Model\Checks\SpecificationInterface`; dzięki temu identyczna
   lista metod trafia do początkowego `checkoutConfig` i odpowiedzi REST, bez
-  mixina na `payment-service`.
+  mixina na `payment-service`. Ograniczana jest tylko płatność, której kod jawnie
+  występuje w mapowaniu; metody niewymienione pozostają dostępne, więc istniejące
+  mapowanie nie ukrywa nowo zainstalowanego operatora.
 - Mixiny nie są rejestrowane na akcjach wyboru adresu lub metody, transporcie
   REST, rate processorach ani `customer-data`, więc łańcuchy innych vendorów
   pozostają nienaruszone.
@@ -179,11 +203,12 @@ app/code/Kkkonrad/Fastcheckout/bin/sync-frontend-static.sh
 php bin/magento cache:flush
 ```
 
-Skrypt jest potrzebny, gdy katalogi
-`pub/static/frontend/*/Kkkonrad_Fastcheckout` już istnieją, również w trybie
-developer. `requirejs-config.js` leży poza `web/`; po jego zmianie skopiuj go do
-drzew static albo ponownie uruchom wdrożenie plików statycznych. Samo przeładowanie
-strony nie zastąpi istniejącej kopii.
+Skrypt pomocniczy jest przeznaczony dla środowisk developerskich, gdy istniejące
+katalogi `pub/static/frontend/*/Kkkonrad_Fastcheckout` nie są odświeżane
+automatycznie. Na produkcji należy używać natywnego
+`setup:static-content:deploy` Magento. `requirejs-config.js` leży poza `web/`; po
+jego zmianie skopiuj go do drzew static albo ponownie uruchom wdrożenie plików
+statycznych. Samo przeładowanie strony nie zastąpi istniejącej kopii.
 
 Jeśli Magento używa Subresource Integrity i istnieje
 `pub/static/frontend/sri-hashes.json`, skrypt celowo przerwie pracę. W takim

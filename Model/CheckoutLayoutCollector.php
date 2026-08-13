@@ -17,7 +17,7 @@ use Psr\Log\LoggerInterface;
  */
 class CheckoutLayoutCollector
 {
-    private const NATIVE_THEME_PATH = 'frontend/Magento/luma';
+    private const NATIVE_THEME_PATH = 'frontend/Magento/blank';
 
     private const EXCLUDED_PAGE_HANDLES = [
         'default',
@@ -74,13 +74,13 @@ class CheckoutLayoutCollector
      * @param string[] $pageHandles
      * @return array<string, mixed>
      */
-    private function buildJsLayout(bool $useLuma, array $pageHandles): array
+    private function buildJsLayout(bool $useFallbackTheme, array $pageHandles): array
     {
         $result = [];
         $originalTheme = $this->design->getDesignTheme();
 
         try {
-            if ($useLuma) {
+            if ($useFallbackTheme) {
                 $this->design->setDesignTheme(
                     $this->themeProvider->getThemeByFullPath(self::NATIVE_THEME_PATH)
                 );
@@ -110,9 +110,9 @@ class CheckoutLayoutCollector
         } catch (\Throwable $exception) {
             $this->logger->error('Fastcheckout could not build the native checkout layout.', [
                 'exception' => $exception,
-                'use_luma' => $useLuma
+                'use_fallback_theme' => $useFallbackTheme
             ]);
-            if ($useLuma) {
+            if ($useFallbackTheme) {
                 throw $exception;
             }
             $result = [];

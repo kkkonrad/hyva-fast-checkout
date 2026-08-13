@@ -11,9 +11,13 @@ to maintain and test them.
 ## Validation and placing an order
 
 The visible desktop and mobile buttons are proxies. They do not implement
-payments or call an endpoint directly: they click the native `placeOrder` button
-of the active renderer. This allows PayU, Przelewy24, Stripe and other modules to
-retain their own tokenization, agreements and validators.
+payments or call an endpoint directly. The proxy resolves the active component
+from the canonical `checkout.steps.billing-step.payment.payments-list.{code}`
+path and calls its public `placeOrder()` method. It clicks the renderer's native
+button only as a fallback for a non-standard component that is not available in
+`uiRegistry`. Wallet and drop-in methods keep their own checkout CTA. This lets
+PayU, Przelewy24, Stripe and other modules retain their tokenization, agreements
+and validators.
 
 When placing an order, Fastcheckout:
 
@@ -46,18 +50,20 @@ checked and disabled, and their content opens in Magento's native modal.
   `Magento\Checkout\Controller\Index\Index`. The standard `layout_load_before`
   event adds the `fastcheckout_index_index` handle before layout merging; the
   module neither plugins nor bypasses the checkout controller.
-- Fastcheckout switches theme context only while building an isolated
-  `Magento/luma` layout for the `checkout_index_index` and private
-  `fastcheckout_native_components` handles. It uses
-  `Magento\Framework\View\Design\Theme\ThemeProviderInterface` directly and
-  does not require the Hyvä Theme Fallback package. The original Hyvä theme is
-  always restored in `finally`; Luma neither renders the page nor publishes its
-  assets to the customer.
+- Fastcheckout first builds an isolated layout in the active design context for
+  `checkout_index_index`, the private `fastcheckout_native_components` handle
+  and applicable storefront page handles. If that produces no checkout tree,
+  only the isolated build is temporarily switched to `Magento/blank` through
+  `Magento\Framework\View\Design\Theme\ThemeProviderInterface`. The original
+  Hyvä theme is always restored in `finally`; Blank neither renders the page nor
+  publishes its assets to the customer, and the Hyvä Theme Fallback package is
+  not required.
 - The isolated layout keeps Fastcheckout's validator, newsletter and comment
   out of regular checkout while merging every third-party layout processor and
   `jsLayout` entry into the original `checkout.root`. The processed tree is
-  obtained through `checkout.root::getJsLayout()` without creating a second
-  `Onepage` block; a final Fastcheckout `LayoutProcessorInterface` applies the
+  obtained through `checkout.root::getJsLayout()` without a custom parser or
+  recursive merge, and the Fastcheckout page block does not instantiate another
+  `Onepage` block. A final Fastcheckout `LayoutProcessorInterface` applies the
   presentation changes.
 - The isolated layout does not load the global `default` handle, so it does not
   prepare the active theme's global RequireJS blocks while rendering the page.
@@ -72,11 +78,19 @@ checked and disabled, and their content opens in Magento's native modal.
 - Magento retains its own `shipping`, `payment`, `payments-list`,
   `renderer-list`, `shipping-service`, `checkout-data` and `quote` components
   without forks.
-- Core JavaScript integrations are registered exclusively as RequireJS mixins,
-  with no `map` entries or forks. They cover
-  `Magento_Checkout/js/action/place-order`, the native summary,
-  `Magento_SalesRule/js/view/payment/discount` and
-  `Magento_CheckoutAgreements/js/view/checkout-agreements`.
+- JavaScript integrations are registered exclusively as RequireJS mixins, with
+  no `map` entries or core forks. They cover Magento's `place-order`,
+  `error-processor`, `step-navigator`, `set-payment-information-extended`,
+  summary totals/cart items, discount and checkout-agreements components. One
+  narrowly scoped Braintree Hosted Fields mixin completes all native card-field
+  validations after the renderer reports an invalid form; it does not replace
+  the renderer.
+- The Hyvä page starts Magento's native `section-config` and `customer-data`
+  initializers before the checkout application. The early bootstrap only
+  normalizes malformed `mage-cache-storage` containers; it does not replace
+  Magento's storage. A missing or expired quote is handled through the native
+  `error-processor`, which invalidates checkout sections and redirects to the
+  cart.
 - The order comment remains in the summary panel, while the newsletter is a
   child of the `before-place-order` region with `sortOrder=90`. Standard
   agreements and the newsletter have synchronized presentation proxies in the
@@ -90,6 +104,8 @@ checked and disabled, and their content opens in Magento's native modal.
 - The success page retains the core `Magento\Checkout\Block\Onepage\Success`
   block, while comments and newsletter subscriptions are saved through
   `OrderStatusHistoryRepositoryInterface` and `SubscriptionManagerInterface`.
+  Its success-page stylesheet also hides Tpay's legacy
+  `#tpay_success_status` placeholder without changing Tpay's payment flow.
 
 The module contains no Magewire component, Livewire DOM mutation mechanism or
 Alpine-based state orchestrator.
@@ -101,7 +117,10 @@ Fastcheckout acts as a host for Magento's native Knockout + REST checkout.
 or Fastcheckout-specific DI entries.**
 
 - Payment renderers and shipping UI components come from the standard,
-  dynamically merged `checkout_index_index` handle.
+  dynamically merged `checkout_index_index` handle. The rendered Hyvä page also
+  merges that handle to retain third-party `<head>` assets and child PHTML
+  blocks; `checkout.root` uses a children-only template so its core application
+  bootstrap is not started a second time.
 - The outer `#checkout` root and inner `#fastcheckout-checkout` root are both
   present, so module selectors scoped to `#checkout` continue to work.
 - Standard IDs `#shipping`, `#checkout-step-shipping`, `#opc-shipping_method`,
@@ -118,15 +137,19 @@ or Fastcheckout-specific DI entries.**
   presentation template.
 - Fastcheckout does not replace `window.checkoutConfig`, maintain a custom
   checkout store or reconstruct `extension_attributes` from the database. The
-  native place-order button remains in its renderer with its handlers and is
-  invoked by the visible proxy; other toolbar actions are not hidden.
+  native place-order button remains in its renderer with its handlers. The
+  visible proxy calls the renderer's public `placeOrder()` method and uses that
+  button only as a compatibility fallback; other toolbar actions are not
+  hidden.
 - `ExtendedCheckoutConfigProvider` is appended to
   `Magento\Checkout\Model\CompositeConfigProvider` with `sortOrder=1000`; the
   module does not replace shipping or payment information management interfaces.
 - Shipping→payment mapping is an additional
   `Magento\Payment\Model\Checks\SpecificationInterface`, so the same method list
   reaches the initial `checkoutConfig` and REST responses without a mixin on
-  `payment-service`.
+  `payment-service`. Only a payment code explicitly present in the mapping is
+  restricted; unlisted payment methods remain available so newly installed
+  providers are not hidden by an existing mapping.
 - Mixins are not registered on address or method selection actions, REST
   transport, rate processors or `customer-data`, leaving other vendors' chains
   intact.
@@ -182,9 +205,10 @@ app/code/Kkkonrad/Fastcheckout/bin/sync-frontend-static.sh
 php bin/magento cache:flush
 ```
 
-The script is required when
-`pub/static/frontend/*/Kkkonrad_Fastcheckout` directories already exist,
-including in developer mode. `requirejs-config.js` lives outside `web/`; after
+The helper is intended for developer environments when existing
+`pub/static/frontend/*/Kkkonrad_Fastcheckout` directories are not refreshed
+automatically. Production deployments should use Magento's
+`setup:static-content:deploy`. `requirejs-config.js` lives outside `web/`; after
 changing it, copy it into the static trees or run static-content deployment
 again. Reloading the page alone will not replace an existing copy.
 

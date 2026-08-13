@@ -43,7 +43,7 @@ class NativePipelineOwnershipTest extends TestCase
         $this->assertStringContainsString("setPath('checkout')", $legacyController);
     }
 
-    public function testOnlyAnIsolatedLayoutBuildUsesLumaAndRestoresTheHyvaTheme(): void
+    public function testOnlyAnIsolatedLayoutBuildUsesBlankAndRestoresTheHyvaTheme(): void
     {
         $source = (string)file_get_contents(
             $this->moduleRoot() . '/Model/CheckoutLayoutCollector.php'
@@ -66,7 +66,7 @@ class NativePipelineOwnershipTest extends TestCase
         $this->assertStringContainsString('<container name="content"/>', $source);
         $this->assertStringContainsString('$checkoutRoot->getJsLayout()', $source);
         $this->assertStringContainsString('$this->serializer->unserialize', $source);
-        $this->assertStringContainsString("NATIVE_THEME_PATH = 'frontend/Magento/luma'", $source);
+        $this->assertStringContainsString("NATIVE_THEME_PATH = 'frontend/Magento/blank'", $source);
         $this->assertStringContainsString(
             '$this->themeProvider->getThemeByFullPath(self::NATIVE_THEME_PATH)',
             $source
@@ -74,7 +74,8 @@ class NativePipelineOwnershipTest extends TestCase
         $this->assertStringContainsString('setDesignTheme($originalTheme)', $source);
         $this->assertStringNotContainsString('Hyva\\ThemeFallback', $source);
         $this->assertStringNotContainsString('hyva-themes/magento2-theme-fallback', $composer);
-        $this->assertStringContainsString('magento/theme-frontend-luma', $composer);
+        $this->assertStringContainsString('magento/theme-frontend-blank', $composer);
+        $this->assertStringNotContainsString('magento/theme-frontend-luma', $composer);
         $this->assertStringNotContainsString('Hyva_ThemeFallback', $module);
         $this->assertStringNotContainsString('DOMXPath', $source);
         $this->assertStringNotContainsString('parseJsLayoutItem', $source);

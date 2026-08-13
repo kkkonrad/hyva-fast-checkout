@@ -140,8 +140,9 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
                 ),
                 hyvaAssets: Array.from(document.querySelectorAll('link[href], script[src]'))
                     .some((node) => (node.href || node.src || '').includes('/Hyva/default/')),
-                lumaAssets: Array.from(document.querySelectorAll('link[href], script[src]'))
-                    .some((node) => (node.href || node.src || '').includes('/Magento/luma/')),
+                fallbackThemeAssets: Array.from(
+                    document.querySelectorAll('link[href], script[src]')
+                ).some((node) => /\/Magento\/(?:blank|luma)\//.test(node.href || node.src || '')),
                 noFallbackNotice: !document.body.textContent.includes('No Checkout module installed.'),
                 noAuthenticationChrome:
                     !document.querySelector('#fastcheckout-checkout .authentication-wrapper'),
@@ -170,7 +171,7 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         expect(geometry).toEqual({
             twoColumns: true,
             hyvaAssets: true,
-            lumaAssets: false,
+            fallbackThemeAssets: false,
             noFallbackNotice: true,
             noAuthenticationChrome: true,
             shippingAdditional: true,
