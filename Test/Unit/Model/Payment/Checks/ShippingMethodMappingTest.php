@@ -36,8 +36,9 @@ class ShippingMethodMappingTest extends TestCase
             'shipping wildcard' => ['flatrate_flatrate', 'checkmo', true],
             'carrier code' => ['furgonetkapl_furgonetka_f_inpost', 'payu_gateway', true],
             'exact shipping code' => ['tablerate_bestway', 'banktransfer', true],
-            'payment not mapped' => ['flatrate_flatrate', 'banktransfer', false],
-            'shipping not mapped' => ['freeshipping_freeshipping', 'checkmo', false],
+            'listed payment on other shipping' => ['flatrate_flatrate', 'banktransfer', false],
+            'listed payment on unmapped shipping' => ['freeshipping_freeshipping', 'checkmo', false],
+            'new payment not in mapping' => ['flatrate_flatrate', 'payu_card', true],
         ];
     }
 
