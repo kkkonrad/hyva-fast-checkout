@@ -82,6 +82,10 @@ body.checkout-onepage-success .page-title-wrapper .order-print {
     display: none;
 }
 
+body.checkout-onepage-success #tpay_success_status {
+    display: none !important;
+}
+
 /* --- Registration (#registration) --- */
 .fastcheckout-success-card .fastcheckout-success-registration,
 .fastcheckout-success-registration,
