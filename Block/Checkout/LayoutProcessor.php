@@ -72,6 +72,13 @@ class LayoutProcessor implements LayoutProcessorInterface
                 self::CORE_SUMMARY_TEMPLATE,
                 'Kkkonrad_Fastcheckout/hyva/summary'
             );
+            foreach (['cart_items' => 10, 'itemsAfter' => 20, 'totals' => 30] as $name => $sortOrder) {
+                if (isset($summary['children'][$name])
+                    && !array_key_exists('sortOrder', $summary['children'][$name])
+                ) {
+                    $summary['children'][$name]['sortOrder'] = $sortOrder;
+                }
+            }
         }
 
         if (is_array($jsLayout['components']['checkout']['children']['steps']['children']

@@ -137,3 +137,109 @@ test('validates the native shipping form before reporting a missing method', () 
     assert.equal(addressCalls, 2);
     assert.equal(shippingCalls, 2);
 });
+
+function loadValidator(quote, selectBillingAddress, registry) {
+    let validator;
+    const source = fs.readFileSync(
+        path.resolve(__dirname, '../../../view/frontend/web/js/model/one-step-validator.js'),
+        'utf8'
+    );
+
+    vm.runInNewContext(source, {
+        define(dependencies, factory) {
+            validator = factory(
+                () => ({length: 0}),
+                quote,
+                selectBillingAddress,
+                registry
+            );
+        }
+    });
+
+    return validator;
+}
+
+test('re-applies shipping as billing when cache keys drift', () => {
+    let billingAddress = {
+        getCacheKey: () => 'billing-old',
+        getType: () => 'new-customer-address'
+    };
+    const shippingAddress = {
+        getCacheKey: () => 'shipping-new',
+        getType: () => 'new-customer-address'
+    };
+    let sameAsShipping = false;
+    let detailsVisible = false;
+    const billing = {
+        isAddressSameAsShipping(value) {
+            if (typeof value === 'undefined') {
+                return sameAsShipping;
+            }
+            sameAsShipping = value;
+        },
+        isAddressDetailsVisible(value) {
+            if (typeof value === 'undefined') {
+                return detailsVisible;
+            }
+            detailsVisible = value;
+        }
+    };
+    const validator = loadValidator(
+        {
+            isVirtual: () => false,
+            paymentMethod: () => ({method: 'purchaseorder'}),
+            shippingAddress: () => shippingAddress,
+            billingAddress: () => billingAddress
+        },
+        (address) => {
+            billingAddress = address;
+        },
+        {
+            get(name) {
+                return name.endsWith('.payments-list.purchaseorder-form') ? billing : null;
+            }
+        }
+    );
+
+    assert.equal(validator.validateBillingAddress(), true);
+    assert.equal(billingAddress, shippingAddress);
+    assert.equal(sameAsShipping, true);
+    assert.equal(detailsVisible, true);
+});
+
+test('does not overwrite a separate billing address the customer opened', () => {
+    let billingAddress = null;
+    let billingUpdates = 0;
+    const shippingAddress = {
+        getCacheKey: () => 'shipping',
+        getType: () => 'new-customer-address'
+    };
+    const billing = {
+        isAddressSameAsShipping: () => false,
+        updateAddress() {
+            billingUpdates += 1;
+        }
+    };
+    const validator = loadValidator(
+        {
+            isVirtual: () => false,
+            paymentMethod: () => ({method: 'purchaseorder'}),
+            shippingAddress: () => shippingAddress,
+            billingAddress: () => billingAddress
+        },
+        (address) => {
+            billingAddress = address;
+        },
+        {
+            get(name) {
+                return name.endsWith('.payments-list.purchaseorder-form') ? billing : null;
+            }
+        }
+    );
+
+    validator.setBillingFollowsShipping(false);
+    assert.equal(validator.doesBillingFollowShipping(), false);
+    assert.equal(validator.validateBillingAddress(), false);
+    assert.equal(billingUpdates, 1);
+    assert.equal(billingAddress, null);
+});

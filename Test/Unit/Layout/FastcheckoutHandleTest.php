@@ -85,8 +85,6 @@ class FastcheckoutHandleTest extends TestCase
             "getRegion('shipping-information')",
             "scope: 'checkout.steps'",
             'table-checkout-shipping-method',
-            'data-fastcheckout-extra-checkout-children',
-            'data-fastcheckout-payment-extra-children',
         ] as $extensionPoint) {
             $this->assertStringContainsString($extensionPoint, $templates);
         }

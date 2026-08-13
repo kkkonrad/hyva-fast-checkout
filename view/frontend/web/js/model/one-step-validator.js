@@ -6,18 +6,94 @@ define([
 ], function ($, quote, selectBillingAddress, registry) {
     'use strict';
 
-    var paymentPath = 'checkout.steps.billing-step.payment';
+    var paymentPath = 'checkout.steps.billing-step.payment',
+        billingFollowsShipping = true;
 
     function getBillingAddressComponent() {
+        var components = getBillingAddressComponents();
+
+        return components.length ? components[0] : null;
+    }
+
+    function getBillingAddressComponents() {
         var method = quote.paymentMethod && quote.paymentMethod(),
             code = method && method.method ? String(method.method) : '',
-            component = code ? registry.get(
-                paymentPath + '.payments-list.' + code + '-form'
-            ) : null;
+            names = [paymentPath + '.afterMethods.billing-address-form'],
+            components = [];
 
-        return component || registry.get(
-            paymentPath + '.afterMethods.billing-address-form'
+        if (code) {
+            names.unshift(paymentPath + '.payments-list.' + code + '-form');
+        }
+
+        names.forEach(function (name) {
+            var component = registry.get(name);
+
+            if (component && components.indexOf(component) === -1) {
+                components.push(component);
+            }
+        });
+
+        return components;
+    }
+
+    function setBillingFollowsShipping(follows) {
+        billingFollowsShipping = follows !== false;
+    }
+
+    function doesBillingFollowShipping() {
+        return billingFollowsShipping;
+    }
+
+    function addressesShareCacheKey(left, right) {
+        return Boolean(
+            left && right &&
+            typeof left.getCacheKey === 'function' &&
+            typeof right.getCacheKey === 'function' &&
+            left.getCacheKey() === right.getCacheKey()
         );
+    }
+
+    function syncBillingComponent(component, billingAddress, shippingAddress) {
+        var sameAsShipping;
+
+        if (!component) {
+            return;
+        }
+
+        sameAsShipping = billingFollowsShipping &&
+            addressesShareCacheKey(billingAddress, shippingAddress);
+
+        if (typeof component.isAddressSameAsShipping === 'function' &&
+            component.isAddressSameAsShipping() !== sameAsShipping) {
+            component.isAddressSameAsShipping(sameAsShipping);
+        }
+
+        if (billingAddress &&
+            typeof component.isAddressDetailsVisible === 'function' &&
+            !component.isAddressDetailsVisible()) {
+            component.isAddressDetailsVisible(true);
+        }
+    }
+
+    function applyShippingAsBilling() {
+        var shippingAddress = quote.shippingAddress && quote.shippingAddress(),
+            billingAddress = quote.billingAddress && quote.billingAddress();
+
+        if (quote.isVirtual && quote.isVirtual()) {
+            return Boolean(quote.billingAddress && quote.billingAddress());
+        }
+
+        if (billingFollowsShipping && shippingAddress &&
+            !addressesShareCacheKey(billingAddress, shippingAddress)) {
+            selectBillingAddress(shippingAddress);
+            billingAddress = quote.billingAddress && quote.billingAddress();
+        }
+
+        getBillingAddressComponents().forEach(function (component) {
+            syncBillingComponent(component, billingAddress, shippingAddress);
+        });
+
+        return Boolean(quote.billingAddress && quote.billingAddress());
     }
 
     function validateShippingInformation() {
@@ -79,25 +155,19 @@ define([
     }
 
     function validateBillingAddress() {
-        var component = getBillingAddressComponent(),
-            shippingAddress = quote.shippingAddress && quote.shippingAddress();
+        var component;
+
+        if (billingFollowsShipping) {
+            return applyShippingAsBilling();
+        }
 
         if (quote.billingAddress && quote.billingAddress()) {
             return true;
         }
 
-        if (!component) {
-            return false;
-        }
+        component = getBillingAddressComponent();
 
-        if (
-            !quote.isVirtual() &&
-            shippingAddress &&
-            component.isAddressSameAsShipping &&
-            component.isAddressSameAsShipping()
-        ) {
-            selectBillingAddress(shippingAddress);
-        } else if (typeof component.updateAddress === 'function') {
+        if (component && typeof component.updateAddress === 'function') {
             component.updateAddress();
         }
 
@@ -106,6 +176,9 @@ define([
 
     return {
         getBillingAddressComponent: getBillingAddressComponent,
+        setBillingFollowsShipping: setBillingFollowsShipping,
+        doesBillingFollowShipping: doesBillingFollowShipping,
+        applyShippingAsBilling: applyShippingAsBilling,
         validateShippingInformation: validateShippingInformation,
         validateBillingAddress: validateBillingAddress,
         validate: function () {

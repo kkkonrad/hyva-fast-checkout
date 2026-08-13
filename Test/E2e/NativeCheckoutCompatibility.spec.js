@@ -892,7 +892,7 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             return Boolean(billing && shipping &&
                 billing.getCacheKey() === shipping.getCacheKey());
         })).toBe(true);
-        await sameAsShipping.evaluate((input) => input.click());
+        await sameAsShipping.click({force: true});
         await expect(sameAsShipping).not.toBeChecked();
         const billingFieldset = page.locator(
             '.payment-method._active .checkout-billing-address ' +
@@ -947,7 +947,7 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             inputWidth: expect.any(Number)
         });
         expect(billingLayout.inputWidth).toBeGreaterThan(150);
-        await sameAsShipping.evaluate((input) => input.click());
+        await sameAsShipping.click({force: true});
         await expect(sameAsShipping).toBeChecked();
 
         const proxy = page.locator('[data-fastcheckout-place-order-ssr]');
@@ -1028,6 +1028,15 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         await addressValidationField.fill('Jan');
         await addressValidationField.blur();
         await expect.poll(() => visibleErrorText(addressValidationField)).toEqual([]);
+        await expect(sameAsShipping).toBeChecked();
+        await expect.poll(() => page.evaluate(() => {
+            const quote = window.require('Magento_Checkout/js/model/quote'),
+                billing = quote.billingAddress(),
+                shipping = quote.shippingAddress();
+
+            return Boolean(billing && shipping &&
+                billing.getCacheKey() === shipping.getCacheKey());
+        })).toBe(true);
         await expect.poll(() => nativeButton.isEnabled()).toBe(true);
 
         await purchaseOrderNumber.fill('');
@@ -1055,10 +1064,20 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
                 resolve();
             }, reject);
         }));
+        await expect(sameAsShipping).toBeChecked();
+        await expect.poll(() => page.evaluate(() => {
+            const quote = window.require('Magento_Checkout/js/model/quote'),
+                billing = quote.billingAddress(),
+                shipping = quote.shippingAddress();
+
+            return Boolean(billing && shipping &&
+                billing.getCacheKey() === shipping.getCacheKey());
+        })).toBe(true);
         await clickProxy();
         await expect.poll(() => page.evaluate(() => (
             window.fastcheckoutE2eValidationCalls
         ))).toBe(1);
+        await expect(sameAsShipping).toBeChecked();
         await page.evaluate(() => {
             const error = document.createElement('p');
 

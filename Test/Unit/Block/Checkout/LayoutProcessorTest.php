@@ -34,9 +34,9 @@ class LayoutProcessorTest extends TestCase
         );
         self::assertSame('third-party', $shipping['children']['shippingAdditional']['component']);
         self::assertSame('Kkkonrad_Fastcheckout/hyva/summary', $summary['template']);
-        self::assertArrayNotHasKey('sortOrder', $summary['children']['cart_items']);
-        self::assertArrayNotHasKey('sortOrder', $summary['children']['itemsAfter']);
-        self::assertArrayNotHasKey('sortOrder', $summary['children']['totals']);
+        self::assertSame(10, $summary['children']['cart_items']['sortOrder']);
+        self::assertSame(20, $summary['children']['itemsAfter']['sortOrder']);
+        self::assertSame(30, $summary['children']['totals']['sortOrder']);
         self::assertSame(
             '#fastcheckout-checkout .fastcheckout-native-shipping-address',
             $shipping['config']['popUpForm']['options']['appendTo']
@@ -68,6 +68,7 @@ class LayoutProcessorTest extends TestCase
         $shipping['config']['popUpForm']['options']['appendTo'] = '#vendor-popup-host';
         $summary = &$layout['components']['checkout']['children']['sidebar']['children']['summary'];
         $summary['template'] = 'Vendor_Module/summary';
+        $summary['children']['totals']['sortOrder'] = 5;
         $discount = &$layout['components']['checkout']['children']['steps']['children']
             ['billing-step']['children']['payment']['children']['afterMethods']['children']['discount'];
         $discount['config']['template'] = 'Vendor_Module/discount';
@@ -86,6 +87,8 @@ class LayoutProcessorTest extends TestCase
         self::assertSame('Vendor_Module/shipping-item', $shipping['config']['shippingMethodItemTemplate']);
         self::assertSame('Vendor_Module/shipping-item', $shipping['shippingMethodItemTemplate']);
         self::assertSame('Vendor_Module/summary', $summary['template']);
+        self::assertSame(5, $summary['children']['totals']['sortOrder']);
+        self::assertSame(10, $summary['children']['cart_items']['sortOrder']);
         self::assertSame('Vendor_Module/discount', $discount['template']);
     }
 

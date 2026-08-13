@@ -30,14 +30,6 @@ $hasItems = $block->getQuote()->hasItems();
     <div data-bind="scope: 'checkout.errors'" aria-live="polite">
         <!-- ko template: getTemplate() --><!-- /ko -->
     </div>
-    <div class="fastcheckout-extra-checkout-children space-y-6"
-         data-fastcheckout-extra-checkout-children>
-        <!-- ko foreach: elems() -->
-            <!-- ko if: ['errors', 'authentication', 'progressBar', 'estimation', 'steps', 'sidebar'].indexOf(index) === -1 -->
-                <!-- ko template: getTemplate() --><!-- /ko -->
-            <!-- /ko -->
-        <!-- /ko -->
-    </div>
 
     <?php if (!$hasItems): ?>
         <div class="card text-center py-16">

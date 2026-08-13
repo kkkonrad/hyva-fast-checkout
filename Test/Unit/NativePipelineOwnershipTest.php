@@ -109,6 +109,7 @@ class NativePipelineOwnershipTest extends TestCase
             '/view/frontend/web/js/hyva/payment-host-bridge.js',
             '/view/frontend/web/js/mixin/storage-mixin.js',
             '/view/frontend/web/js/mixin/shipping-service-mixin.js',
+            '/view/frontend/web/js/mixin/payment-visibility-mixin.js',
         ] as $removedFile) {
             $this->assertFileDoesNotExist($this->moduleRoot() . $removedFile);
         }
@@ -132,8 +133,14 @@ class NativePipelineOwnershipTest extends TestCase
             $bootstrap
         );
         $this->assertStringContainsString('shippingSaveCoordinator.ensureSaved()', $bootstrap);
-        $this->assertStringContainsString('shippingAdditionalPlacement.bind()', $bootstrap);
+        $this->assertStringNotContainsString('shippingAdditionalPlacement', $bootstrap);
         $this->assertStringContainsString('data-fastcheckout-wallet-only', $bootstrap);
+        $this->assertFileDoesNotExist(
+            $this->moduleRoot() . '/view/frontend/web/js/model/shipping-additional-placement.js'
+        );
+        $this->assertFileDoesNotExist(
+            $this->moduleRoot() . '/Test/E2e/PlaceOrder.spec.js'
+        );
         $this->assertStringContainsString(
             "'Magento_Customer/js/customer-data'",
             $bootstrap

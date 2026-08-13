@@ -9,10 +9,14 @@ define([
 ], function ($, wrapper, quote, customer, shippingSaveCoordinator, isFastcheckoutActive, registry) {
     'use strict';
 
-    var shippingMethodWaitMs = 10000;
+    var readyWaitMs = 10000;
 
     function resolvedPromise() {
         return $.Deferred().resolve().promise();
+    }
+
+    function rejectedPromise() {
+        return $.Deferred().reject().promise();
     }
 
     function waitForObservable(observable, predicate, timeoutMs) {
@@ -27,7 +31,7 @@ define([
 
         deferred = $.Deferred();
 
-        function finish() {
+        function finish(rejectWait) {
             if (settled) {
                 return;
             }
@@ -40,17 +44,23 @@ define([
                 window.clearTimeout(timer);
                 timer = null;
             }
-            deferred.resolve();
+            if (rejectWait) {
+                deferred.reject();
+            } else {
+                deferred.resolve();
+            }
         }
 
         subscription = observable.subscribe(function (value) {
             if (predicate(value)) {
-                finish();
+                finish(false);
             }
         });
 
         if (timeoutMs) {
-            timer = window.setTimeout(finish, timeoutMs);
+            timer = window.setTimeout(function () {
+                finish(true);
+            }, timeoutMs);
         }
 
         return deferred.promise();
@@ -59,6 +69,8 @@ define([
     function waitForGuestEmail() {
         var deferred,
             subscriptions = [],
+            timer,
+            settled = false,
             paths = [
                 'checkout.steps.shipping-step.shippingAddress.customer-email',
                 'checkout.steps.billing-step.payment.customer-email'
@@ -70,19 +82,37 @@ define([
 
         deferred = $.Deferred();
 
-        function resolveWhenValid() {
-            if (!quote.guestEmail) {
+        function finish(rejectWait) {
+            if (settled) {
                 return;
             }
+            settled = true;
             subscriptions.forEach(function (subscription) {
                 subscription.dispose();
             });
             subscriptions = [];
-            deferred.resolve();
+            if (timer) {
+                window.clearTimeout(timer);
+                timer = null;
+            }
+            if (rejectWait) {
+                deferred.reject();
+            } else {
+                deferred.resolve();
+            }
+        }
+
+        function resolveWhenValid() {
+            if (quote.guestEmail) {
+                finish(false);
+            }
         }
 
         paths.forEach(function (path) {
             registry.async(path)(function (component) {
+                if (settled) {
+                    return;
+                }
                 if (component && component.email && typeof component.email.subscribe === 'function') {
                     subscriptions.push(component.email.subscribe(function () {
                         window.setTimeout(resolveWhenValid, 0);
@@ -91,6 +121,10 @@ define([
                 resolveWhenValid();
             });
         });
+
+        timer = window.setTimeout(function () {
+            finish(true);
+        }, readyWaitMs);
 
         return deferred.promise();
     }
@@ -101,10 +135,10 @@ define([
                 return undefined;
             }
 
-            return waitForObservable(quote.shippingMethod, Boolean, shippingMethodWaitMs)
+            return waitForObservable(quote.shippingMethod, Boolean, readyWaitMs)
                 .then(function () {
                     if (!quote.shippingMethod || !quote.shippingMethod()) {
-                        return undefined;
+                        return rejectedPromise();
                     }
 
                     return shippingSaveCoordinator.ensureSaved();

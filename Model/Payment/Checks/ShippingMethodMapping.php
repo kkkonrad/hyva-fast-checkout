@@ -32,22 +32,17 @@ class ShippingMethodMapping implements SpecificationInterface
             return true;
         }
 
-        $paymentCode = (string)$paymentMethod->getCode();
-        $mentionsPayment = false;
-
         foreach ($mapping as $rule) {
-            if (!is_array($rule) || (string)($rule['payment_method'] ?? '') !== $paymentCode) {
-                continue;
-            }
-            $mentionsPayment = true;
-            if ($this->matches((string)($rule['shipping_method'] ?? ''), $shippingCode)) {
+            if (
+                is_array($rule)
+                && (string)($rule['payment_method'] ?? '') === (string)$paymentMethod->getCode()
+                && $this->matches((string)($rule['shipping_method'] ?? ''), $shippingCode)
+            ) {
                 return true;
             }
         }
 
-        // Payments never listed in admin mapping stay available so a newly
-        // installed PayU/Stripe/etc. is not hidden until someone edits the grid.
-        return !$mentionsPayment;
+        return false;
     }
 
     private function matches(string $rule, string $shippingCode): bool

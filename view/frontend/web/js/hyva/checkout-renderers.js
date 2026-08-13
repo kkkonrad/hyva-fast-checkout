@@ -8,12 +8,10 @@ define([
     'Magento_Checkout/js/model/totals',
     'Magento_Checkout/js/model/payment-service',
     'Magento_Checkout/js/model/payment/method-list',
-    'Magento_Checkout/js/action/select-billing-address',
     'Magento_Catalog/js/price-utils',
     'mage/translate',
     'Kkkonrad_Fastcheckout/js/model/shipping-save-coordinator',
     'Kkkonrad_Fastcheckout/js/model/one-step-validator',
-    'Kkkonrad_Fastcheckout/js/model/shipping-additional-placement',
     'uiRegistry'
 ], function (
     $,
@@ -25,12 +23,10 @@ define([
     totals,
     paymentService,
     paymentMethodList,
-    selectBillingAddress,
     priceUtils,
     $t,
     shippingSaveCoordinator,
     oneStepValidator,
-    shippingAdditionalPlacement,
     registry
 ) {
     'use strict';
@@ -44,7 +40,6 @@ define([
         agreementsPortalParts = [],
         scrollAnimationTimer,
         shippingSaveTimer,
-        billingAddressFollowsShipping = null,
         placeOrderProcessing = false;
 
     function paymentCode(method) {
@@ -536,29 +531,16 @@ define([
             (!summaryRoot || !summaryRoot.classList.contains('hidden'));
     }
 
+    function getActivePaymentRenderer() {
+        var code = activePaymentCode();
+
+        return code ? registry.get(
+            'checkout.steps.billing-step.payment.payments-list.' + code
+        ) : null;
+    }
+
     function syncBillingAddress() {
-        var billingComponent = oneStepValidator.getBillingAddressComponent(),
-            billingAddress = quote.billingAddress(),
-            shippingAddress = quote.shippingAddress(),
-            billingType = billingAddress && typeof billingAddress.getType === 'function' ?
-                billingAddress.getType() : '';
-
-        if (!quote.isVirtual() && shippingAddress &&
-            (!billingAddress || billingAddress.getCacheKey() !== shippingAddress.getCacheKey()) &&
-            billingAddressFollowsShipping !== false &&
-            !checkoutData.getSelectedBillingAddress() &&
-            (!billingAddress || billingType === 'new-customer-address' ||
-                billingType === 'new-customer-billing-address')) {
-            selectBillingAddress(shippingAddress);
-            billingAddress = quote.billingAddress();
-        }
-
-        if (billingComponent && typeof billingComponent.isAddressSameAsShipping === 'function') {
-            billingComponent.isAddressSameAsShipping(Boolean(
-                !quote.isVirtual() && billingAddress && shippingAddress &&
-                billingAddress.getCacheKey() === shippingAddress.getCacheKey()
-            ));
-        }
+        oneStepValidator.applyShippingAsBilling();
     }
 
     function syncPaymentContent() {
@@ -623,19 +605,24 @@ define([
     }
 
     function submitActivePayment() {
+        var method = activePaymentMethodElement();
+
+        if (method) {
+            method.setAttribute('data-fastcheckout-validation-attempted', 'true');
+        }
+
         window.setTimeout(function () {
-            var active = activePlaceOrderButton(),
-                method = active && active.closest('.payment-method'),
+            var renderer = getActivePaymentRenderer(),
+                active = activePlaceOrderButton(),
                 scroller = document.scrollingElement || document.documentElement,
                 scrollTop = scroller.scrollTop;
 
-            if (method) {
-                method.setAttribute('data-fastcheckout-validation-attempted', 'true');
-            }
-            if (active && !active.disabled) {
+            if (renderer && typeof renderer.placeOrder === 'function') {
+                renderer.placeOrder();
+            } else if (active && !active.disabled) {
                 active.click();
             }
-            if (active && !placeOrderProcessing) {
+            if (!placeOrderProcessing) {
                 scroller.scrollTop = scrollTop;
                 window.setTimeout(watchForPaymentError, 0);
             }
@@ -779,6 +766,9 @@ define([
             return;
         }
 
+        // Shipping edits can clear quote.billingAddress or desync the
+        // "same as shipping" checkbox before the native renderer validates.
+        syncBillingAddress();
         if (!oneStepValidator.validateBillingAddress()) {
             scroller.scrollTop = scrollTop;
             window.setTimeout(function () {
@@ -850,10 +840,10 @@ define([
                 var method,
                     radio;
 
-                if (event.target.matches && event.target.matches(
+                if (event.isTrusted && event.target.matches && event.target.matches(
                     'input[name="billing-address-same-as-shipping"]'
                 )) {
-                    billingAddressFollowsShipping = event.target.checked;
+                    oneStepValidator.setBillingFollowsShipping(event.target.checked);
                 }
 
                 if (!event.target.closest || event.target.closest(
@@ -883,7 +873,6 @@ define([
             checkoutDataResolver.resolveBillingAddress();
             bindPlaceOrderProxies();
             saveShippingWhenMethodChanges();
-            shippingAdditionalPlacement.bind();
 
             quote.paymentMethod.subscribe(function () {
                 setClientOrderError('');

@@ -227,5 +227,103 @@ test('does not hang set-payment-information when shipping method never arrives',
     await Promise.resolve();
     assert.equal(typeof delayed, 'function');
     delayed();
-    assert.equal(await pending, 'continued');
+    await assert.rejects(pending);
+});
+
+test('does not subscribe to guest email after the wait has timed out', async () => {
+    let mixin,
+        delayed,
+        lateAsync,
+        subscribeCalls = 0;
+    const email = {
+        subscribe() {
+            subscribeCalls += 1;
+            return {dispose() {}};
+        }
+    };
+    const quote = {
+        guestEmail: null,
+        shippingMethod: observable(null),
+        isVirtual: () => false
+    };
+    const source = fs.readFileSync(path.resolve(
+        __dirname,
+        '../../../view/frontend/web/js/mixin/set-payment-information-extended-mixin.js'
+    ), 'utf8');
+    const jquery = {
+        Deferred() {
+            let resolve,
+                reject;
+            const promise = new Promise((onResolve, onReject) => {
+                resolve = onResolve;
+                reject = onReject;
+            });
+            const api = {
+                resolve() {
+                    resolve.apply(null, arguments);
+                    return api;
+                },
+                reject() {
+                    reject.apply(null, arguments);
+                    return api;
+                },
+                promise: () => promise
+            };
+
+            return api;
+        },
+        when: (value) => Promise.resolve(value)
+    };
+    const wrapper = {
+        wrap(original, interceptor) {
+            return function (...args) {
+                return interceptor.call(this, original.bind(this), ...args);
+            };
+        }
+    };
+
+    vm.runInNewContext(source, {
+        window: {
+            setTimeout(callback, delay) {
+                if (!delay) {
+                    callback();
+                    return 0;
+                }
+                delayed = callback;
+                return 1;
+            },
+            clearTimeout() {}
+        },
+        define(dependencies, factory) {
+            mixin = factory(
+                jquery,
+                wrapper,
+                quote,
+                {isLoggedIn: () => false},
+                {
+                    ensureSaved() {
+                        throw new Error('shipping must not be saved after email timeout');
+                    }
+                },
+                () => true,
+                {
+                    async() {
+                        return (callback) => {
+                            lateAsync = callback;
+                        };
+                    }
+                }
+            );
+        }
+    });
+
+    const pending = mixin(() => Promise.resolve('continued'))({}, {method: 'stripe'}, true);
+
+    await Promise.resolve();
+    assert.equal(typeof delayed, 'function');
+    delayed();
+    await assert.rejects(pending);
+
+    lateAsync({email});
+    assert.equal(subscribeCalls, 0);
 });
