@@ -1096,7 +1096,7 @@
 
 #fastcheckout-checkout .fastcheckout-native-summary .table-totals tbody tr {
     display: grid;
-    grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 13fr) minmax(0, 7fr);
     align-items: baseline;
     gap: 0.75rem;
     padding: 0.35rem 0;

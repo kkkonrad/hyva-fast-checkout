@@ -1,0 +1,77 @@
+diff --git a/view/frontend/web/css/hyva-default-checkout.css b/view/frontend/web/css/hyva-default-checkout.css
+index e455171..18027a1 100644
+--- a/view/frontend/web/css/hyva-default-checkout.css
++++ b/view/frontend/web/css/hyva-default-checkout.css
+@@ -4,6 +4,43 @@
+     --form-radius: var(--radius-lg);
+ }
+ 
++/* Match Hyva Checkout's flat sections; only the order summary is highlighted. */
++#fastcheckout-checkout :is(
++    #shipping,
++    #opc-shipping_method,
++    #payment,
++    .fc-container-4
++) > .card,
++#fastcheckout-checkout .fastcheckout-payment-after-methods > :is(
++    .checkout-billing-address,
++    .fastcheckout-native-discount
++) {
++    border: 0;
++    border-radius: 0;
++    box-shadow: none;
++}
++
++#fastcheckout-checkout :is(
++    #shipping,
++    #opc-shipping_method,
++    #payment
++) > .card,
++#fastcheckout-checkout .fastcheckout-payment-after-methods > :is(
++    .checkout-billing-address,
++    .fastcheckout-native-discount
++) {
++    padding: 0;
++    background: transparent;
++}
++
++#fastcheckout-checkout .fc-container-4 > .card {
++    background: var(--color-gray-100, #f3f4f6);
++}
++
++#fastcheckout-checkout .fastcheckout-shipping-method-option {
++    background-color: var(--color-white, #fff);
++}
++
+ #fastcheckout-checkout :is(.form-input, .form-textarea, .form-select, .form-multiselect) {
+     min-height: initial;
+     border-color: var(--form-stroke);
+@@ -613,16 +650,6 @@
+     color: var(--color-slate-800);
+ }
+ 
+-#fastcheckout-checkout .fastcheckout-payment-after-methods .checkout-billing-address {
+-    position: relative;
+-    padding-block: var(--card-py, calc(var(--spacing) * 6));
+-    padding-inline: var(--card-px, calc(var(--spacing) * 6));
+-    border-width: 1px;
+-    border-color: var(--card-stroke, var(--color-gray-300));
+-    border-radius: var(--card-radius, var(--radius-lg));
+-    background-color: var(--card-bg, var(--color-surface, #fff));
+-}
+-
+ /*
+  * Logged-in customer: after unchecking "same as shipping", Magento shows the
+  * address list select and optionally the new-address form. Global field
+diff --git a/view/frontend/web/css/hyva-ko-payment.css b/view/frontend/web/css/hyva-ko-payment.css
+index 98b9e9d..91d2e2f 100644
+--- a/view/frontend/web/css/hyva-ko-payment.css
++++ b/view/frontend/web/css/hyva-ko-payment.css
+@@ -147,6 +147,7 @@
+     .fc-grid {
+         display: grid !important;
+         grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
++        column-gap: 3rem;
+     }
+ 
+     #fastcheckout-checkout[data-fastcheckout-mode='two-step'] .fc-grid {
