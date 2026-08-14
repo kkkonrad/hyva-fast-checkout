@@ -17,7 +17,9 @@ if ($jsLayout === []) {
 (function () {
     'use strict';
 
-    if (window.location.hash) {
+    window.checkoutConfig = <?= /* @noEscape */ $block->serializeForScript($checkoutConfig) ?>;
+
+    if (!(window.checkoutConfig.fastcheckoutSettings || {}).twoStep && window.location.hash) {
         window.history.replaceState(
             window.history.state,
             document.title,
@@ -25,7 +27,6 @@ if ($jsLayout === []) {
         );
     }
 
-    window.checkoutConfig = <?= /* @noEscape */ $block->serializeForScript($checkoutConfig) ?>;
     window.isCustomerLoggedIn = Boolean(window.checkoutConfig.isCustomerLoggedIn);
     window.customerData = window.checkoutConfig.customerData || {};
     window.LOCALE = window.LOCALE ||

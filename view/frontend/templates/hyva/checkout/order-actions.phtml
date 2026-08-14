@@ -1,0 +1,61 @@
+<?php
+/**
+ * Fastcheckout presentation proxies for checkout extras and place order.
+ *
+ * Native agreement, newsletter and payment controls remain owned by their
+ * Magento UI components.
+ *
+ * @var \Kkkonrad\Fastcheckout\Block\Hyva\Checkout $block
+ * @var \Magento\Framework\Escaper $escaper
+ */
+$showComment = $block->isShowComment();
+$orderActionsStandalone = $orderActionsStandalone ?? false;
+?>
+<?php if ($orderActionsStandalone): ?>
+<div class="card space-y-6" data-fastcheckout-order-actions>
+<?php endif; ?>
+    <?php /* Visual proxy; native KO agreements stay owned by the active payment method. */ ?>
+    <div class="fastcheckout-payment-method-ko-container"
+         data-fastcheckout-agreements-summary-host
+         hidden></div>
+
+    <?php if ($showComment): ?>
+        <div class="pt-4"
+             data-fastcheckout-order-comment
+             data-bind="scope: 'checkout.sidebar.fastcheckout-order-comment'">
+            <!-- ko template: getTemplate() --><!-- /ko -->
+        </div>
+    <?php endif; ?>
+
+    <?php /* The native payment renderer and its validators remain in place. */ ?>
+    <div class="pt-2 fastcheckout-place-order-section">
+        <button class="btn btn-primary w-full items-center justify-center gap-2
+                       hidden md:flex fastcheckout-place-order-btn"
+                type="button"
+                data-fastcheckout-place-order
+                data-fastcheckout-place-order-ssr>
+            <span class="place-order-spinner hidden"
+                  data-fastcheckout-place-order-spinner
+                  aria-hidden="true">
+                <svg class="animate-spin h-5 w-5 text-white"
+                     fill="none"
+                     viewBox="0 0 24 24"
+                     aria-hidden="true">
+                    <circle class="opacity-25" cx="12" cy="12" r="10"
+                            stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z
+                             m2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824
+                             3 7.938l3-2.647z"></path>
+                </svg>
+            </span>
+            <span data-fastcheckout-place-order-label
+                  data-fastcheckout-ready-text="<?= $escaper->escapeHtmlAttr(__('Place Order')) ?>"
+                  data-fastcheckout-processing-text="<?= $escaper->escapeHtmlAttr(__('Please wait...')) ?>">
+                <?= $escaper->escapeHtml(__('Place Order')) ?>
+            </span>
+        </button>
+    </div>
+<?php if ($orderActionsStandalone): ?>
+</div>
+<?php endif; ?>

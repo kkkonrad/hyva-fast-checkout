@@ -39,8 +39,15 @@ define([
         agreementsPortalSource,
         agreementsPortalParts = [],
         scrollAnimationTimer,
+        scrollAnimationBehavior = null,
         shippingSaveTimer,
         placeOrderProcessing = false;
+
+    function isTwoStep() {
+        var settings = window.checkoutConfig && window.checkoutConfig.fastcheckoutSettings;
+
+        return Boolean(settings && settings.twoStep);
+    }
 
     function paymentCode(method) {
         var input = method.querySelector(
@@ -198,7 +205,10 @@ define([
 
     function wirePlaceOrderButtons() {
         var activeButton,
-            walletOnly;
+            walletOnly,
+            root = document.getElementById('fastcheckout-checkout'),
+            paymentStepInactive = isTwoStep() && root &&
+                root.dataset.fastcheckoutActiveStep !== 'payment';
 
         document.querySelectorAll(
             '.fastcheckout-ko-payment-root .payment-method'
@@ -223,9 +233,9 @@ define([
         document.querySelectorAll(
             '[data-fastcheckout-place-order-mobile], [data-fastcheckout-place-order-ssr]'
         ).forEach(function (button) {
-            button.hidden = walletOnly;
-            button.classList.toggle('hidden', walletOnly);
-            button.disabled = placeOrderProcessing || walletOnly;
+            button.hidden = walletOnly || paymentStepInactive;
+            button.classList.toggle('hidden', walletOnly || paymentStepInactive);
+            button.disabled = placeOrderProcessing || walletOnly || paymentStepInactive;
             button.setAttribute('aria-disabled', button.disabled ? 'true' : 'false');
             button.dataset.fastcheckoutNativeTargetReady = activeButton ? '1' : '0';
             if (walletOnly) {
@@ -312,6 +322,31 @@ define([
         agreementsPortalParts = [];
     }
 
+    function clearAgreementError(source) {
+        var describedBy = String(source.getAttribute('aria-describedby') || '')
+            .split(/\s+/)
+            .filter(Boolean)
+            .filter(function (id) {
+                var message = document.getElementById(id);
+
+                if (message && message.classList.contains('mage-error')) {
+                    message.remove();
+
+                    return false;
+                }
+
+                return true;
+            });
+
+        source.classList.remove('mage-error');
+        source.setAttribute('aria-invalid', 'false');
+        if (describedBy.length) {
+            source.setAttribute('aria-describedby', describedBy.join(' '));
+        } else {
+            source.removeAttribute('aria-describedby');
+        }
+    }
+
     function proxyAgreementControl(source, proxy) {
         var tag = proxy.tagName.toLowerCase(),
             type = String(proxy.type || '').toLowerCase(),
@@ -344,8 +379,9 @@ define([
                     if (source.checked !== proxy.checked) {
                         source.click();
                     }
-                    if (source.checked && String(source.name || '').indexOf('agreement[') === 0) {
-                        $(source).valid();
+                    if (source.checked && String(source.name || '').indexOf('agreement[') === 0 &&
+                        $(source).valid()) {
+                        clearAgreementError(source);
                     }
                 });
 
@@ -540,7 +576,9 @@ define([
     }
 
     function syncBillingAddress() {
-        oneStepValidator.applyShippingAsBilling();
+        if (!isTwoStep()) {
+            oneStepValidator.applyShippingAsBilling();
+        }
     }
 
     function syncPaymentContent() {
@@ -615,14 +653,32 @@ define([
             var renderer = getActivePaymentRenderer(),
                 active = activePlaceOrderButton(),
                 scroller = document.scrollingElement || document.documentElement,
-                scrollTop = scroller.scrollTop;
+                scrollTop = scroller.scrollTop,
+                nativeFocus;
 
-            if (renderer && typeof renderer.placeOrder === 'function') {
-                renderer.placeOrder();
-            } else if (active && !active.disabled) {
-                active.click();
+            if (isTwoStep() && method && window.HTMLElement) {
+                nativeFocus = window.HTMLElement.prototype.focus;
+                window.HTMLElement.prototype.focus = function (options) {
+                    return nativeFocus.call(this, method.contains(this) ? Object.assign(
+                        {},
+                        options || {},
+                        {preventScroll: true}
+                    ) : options);
+                };
+            }
+            try {
+                if (active && !active.disabled) {
+                    active.click();
+                } else if (renderer && typeof renderer.placeOrder === 'function') {
+                    renderer.placeOrder();
+                }
+            } finally {
+                if (nativeFocus) {
+                    window.HTMLElement.prototype.focus = nativeFocus;
+                }
             }
             if (!placeOrderProcessing) {
+                $('html, body').stop(true);
                 scroller.scrollTop = scrollTop;
                 window.setTimeout(watchForPaymentError, 0);
             }
@@ -653,23 +709,30 @@ define([
 
         if (scrollAnimationTimer) {
             window.clearInterval(scrollAnimationTimer);
+            scrollAnimationTimer = null;
         }
-        if (!distance || window.matchMedia(
-            '(prefers-reduced-motion: reduce)'
-        ).matches) {
+        if (scrollAnimationBehavior !== null) {
+            scroller.style.scrollBehavior = scrollAnimationBehavior;
+        }
+        scrollAnimationBehavior = scroller.style.scrollBehavior;
+        scroller.style.scrollBehavior = 'auto';
+
+        if (!distance || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
             scroller.scrollTop = target;
+            scroller.style.scrollBehavior = scrollAnimationBehavior;
+            scrollAnimationBehavior = null;
             return;
         }
 
         scrollAnimationTimer = window.setInterval(function () {
-            var progress;
+            var progress = Math.min((Date.now() - startedAt) / 300, 1);
 
-            progress = Math.min((Date.now() - startedAt) / 300, 1);
             scroller.scrollTop = start + distance * (1 - Math.pow(1 - progress, 3));
-
             if (progress === 1) {
                 window.clearInterval(scrollAnimationTimer);
                 scrollAnimationTimer = null;
+                scroller.style.scrollBehavior = scrollAnimationBehavior;
+                scrollAnimationBehavior = null;
             }
         }, 16);
     }
@@ -754,15 +817,26 @@ define([
 
         setClientOrderError('');
 
+        if (isTwoStep()) {
+            if (validatePaymentMethod()) {
+                submitActivePayment();
+            } else {
+                window.setTimeout(function () {
+                    watchForValidationError(document.getElementById('fastcheckout-checkout'));
+                }, 0);
+            }
+            return;
+        }
+
         if (!activePaymentCode()) {
             shippingValid = oneStepValidator.validateShippingInformation();
             if (shippingValid) {
                 validatePaymentMethod();
+                scroller.scrollTop = scrollTop;
+                window.setTimeout(function () {
+                    watchForValidationError(document.getElementById('fastcheckout-checkout'));
+                }, 0);
             }
-            scroller.scrollTop = scrollTop;
-            window.setTimeout(function () {
-                watchForValidationError(document.getElementById('fastcheckout-checkout'));
-            }, 0);
             return;
         }
 
@@ -781,6 +855,16 @@ define([
     }
 
     function bindPlaceOrderProxies() {
+        document.addEventListener('fastcheckout:shipping-validation-failed', function () {
+            var root = document.getElementById('fastcheckout-checkout');
+
+            window.setTimeout(function () {
+                watchForValidationError(root, [
+                    document.querySelector('.fastcheckout-native-shipping-address'),
+                    document.getElementById('checkout-step-shipping_method')
+                ].filter(Boolean));
+            }, 0);
+        });
         document.addEventListener('fastcheckout:order-submit-started', function () {
             setPlaceOrderProcessing(true);
         });
@@ -805,6 +889,10 @@ define([
     }
 
     function saveShippingWhenMethodChanges() {
+        if (isTwoStep()) {
+            return;
+        }
+
         registry.async('checkout.steps.shipping-step.shippingAddress')(function () {
             function queueSave(method) {
                 window.clearTimeout(shippingSaveTimer);
@@ -827,6 +915,60 @@ define([
         });
     }
 
+    function bindStepPresentation() {
+        var root = document.getElementById('fastcheckout-checkout'),
+            shippingComponent,
+            paymentComponent;
+
+        if (!isTwoStep() || !root) {
+            return;
+        }
+
+        function update() {
+            var shippingVisible,
+                paymentVisible,
+                activeStep,
+                shippingHost,
+                paymentHost;
+
+            if (!shippingComponent || !paymentComponent) {
+                return;
+            }
+
+            shippingVisible = typeof shippingComponent.visible === 'function' &&
+                shippingComponent.visible();
+            paymentVisible = typeof paymentComponent.isVisible === 'function' &&
+                paymentComponent.isVisible();
+            activeStep = paymentVisible ? 'payment' : (shippingVisible ? 'shipping' : 'other');
+            root.dataset.fastcheckoutActiveStep = activeStep;
+
+            shippingHost = root.querySelector('[data-fastcheckout-shipping-step]');
+            paymentHost = root.querySelector('[data-fastcheckout-payment-step]');
+            if (shippingHost) {
+                shippingHost.setAttribute('aria-hidden', activeStep === 'shipping' ? 'false' : 'true');
+            }
+            if (paymentHost) {
+                paymentHost.setAttribute('aria-hidden', activeStep === 'payment' ? 'false' : 'true');
+            }
+            wirePlaceOrderButtons();
+        }
+
+        registry.async('checkout.steps.shipping-step.shippingAddress')(function (component) {
+            shippingComponent = component;
+            if (component.visible && typeof component.visible.subscribe === 'function') {
+                component.visible.subscribe(update);
+            }
+            update();
+        });
+        registry.async('checkout.steps.billing-step.payment')(function (component) {
+            paymentComponent = component;
+            if (component.isVisible && typeof component.isVisible.subscribe === 'function') {
+                component.isVisible.subscribe(update);
+            }
+            update();
+        });
+    }
+
     return function (jsLayout) {
         var root = document.getElementById('fastcheckout-checkout');
 
@@ -840,7 +982,8 @@ define([
                 var method,
                     radio;
 
-                if (event.isTrusted && event.target.matches && event.target.matches(
+                if (!isTwoStep() && event.isTrusted &&
+                    event.target.matches && event.target.matches(
                     'input[name="billing-address-same-as-shipping"]'
                 )) {
                     oneStepValidator.setBillingFollowsShipping(event.target.checked);
@@ -870,8 +1013,11 @@ define([
         addConfiguredStylesheets(window.checkoutConfig);
         customerData.getInitCustomerData().done(function () {
             app(jsLayout);
-            checkoutDataResolver.resolveBillingAddress();
+            if (!isTwoStep()) {
+                checkoutDataResolver.resolveBillingAddress();
+            }
             bindPlaceOrderProxies();
+            bindStepPresentation();
             saveShippingWhenMethodChanges();
 
             quote.paymentMethod.subscribe(function () {
@@ -888,12 +1034,14 @@ define([
                     syncPaymentContent();
                 }, 0);
             });
-            quote.shippingAddress.subscribe(function () {
-                window.setTimeout(syncBillingAddress, 0);
-            });
-            quote.billingAddress.subscribe(function () {
-                window.setTimeout(syncBillingAddress, 0);
-            });
+            if (!isTwoStep()) {
+                quote.shippingAddress.subscribe(function () {
+                    window.setTimeout(syncBillingAddress, 0);
+                });
+                quote.billingAddress.subscribe(function () {
+                    window.setTimeout(syncBillingAddress, 0);
+                });
+            }
             if (paymentMethodList && typeof paymentMethodList.subscribe === 'function') {
                 paymentMethodList.subscribe(function () {
                     window.setTimeout(syncPaymentContent, 0);

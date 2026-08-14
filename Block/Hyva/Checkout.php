@@ -61,6 +61,11 @@ class Checkout extends Template
         return $this->helper->isShowComment();
     }
 
+    public function isTwoStep(): bool
+    {
+        return $this->helper->isTwoStep();
+    }
+
     /**
      * JSON for an inline script, escaped like Magento's JsonHexTag serializer.
      *

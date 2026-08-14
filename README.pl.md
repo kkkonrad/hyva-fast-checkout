@@ -4,9 +4,11 @@
 
 ## Prostsze zamówienia w sklepach Magento 2 z motywem Hyvä
 
-Fastcheckout porządkuje cały proces zamówienia na jednej, responsywnej stronie.
-Klient może uzupełnić adres, wybrać dostawę i płatność, sprawdzić podsumowanie
-oraz złożyć zamówienie bez przechodzenia między kolejnymi krokami.
+Fastcheckout prezentuje proces zamówienia w responsywnym interfejsie Hyvä.
+Domyślnie klient uzupełnia adres, wybiera dostawę i płatność, sprawdza
+podsumowanie oraz składa zamówienie na jednej stronie. Właściciel sklepu może
+zamiast tego włączyć znany z Magento dwukrokowy proces Dostawa / Podsumowanie i
+płatność bez zmiany wyglądu checkoutu.
 
 Moduł zmienia prezentację standardowego checkoutu Magento, ale nie zastępuje
 jego silnika. Dzięki temu sklep nadal korzysta z własnych metod dostawy,
@@ -18,10 +20,11 @@ płatności, podatków, rabatów i integracji zainstalowanych w Magento.
 
 ## Co zyskuje sklep
 
-- cały proces zamówienia na jednej stronie, na komputerach i urządzeniach
-  mobilnych;
+- wybór między szybkim procesem na jednej stronie a znanym z Magento procesem
+  dwukrokowym, na komputerach i urządzeniach mobilnych;
 - mniej przełączania między ekranami podczas składania zamówienia;
-- przycisk „Złóż zamówienie” widoczny od początku procesu;
+- w trybie jednokrokowym przycisk „Złóż zamówienie” widoczny od początku
+  procesu;
 - jasne komunikaty walidacyjne i płynne przewijanie do miejsca wymagającego
   poprawy;
 - adres rozliczeniowy domyślnie zgodny z adresem dostawy, z możliwością jego
@@ -70,6 +73,8 @@ Ustawienia znajdują się w:
 Administrator sklepu może:
 
 - włączyć lub wyłączyć Fastcheckout;
+- przełączyć domyślny proces jednokrokowy na natywną nawigację Magento
+  Dostawa / Podsumowanie i płatność;
 - pokazać albo ukryć pole komentarza, kod rabatowy i zapis do newslettera;
 - ograniczyć dostępne płatności zależnie od wybranej metody dostawy;
 - opcjonalnie przypisywać zamówienia gości do istniejącego konta klienta.
@@ -91,6 +96,8 @@ Checkout pozostaje dostępny pod standardowym adresem `/checkout/`. Stary adres
 
 ## Jak wygląda proces dla klienta
 
+W domyślnym trybie jednokrokowym:
+
 1. Klient podaje adres e-mail i adres dostawy.
 2. Magento pobiera dostępne dla tego adresu metody dostawy.
 3. Po wyborze dostawy pojawiają się właściwe metody płatności.
@@ -100,6 +107,11 @@ Checkout pozostaje dostępny pod standardowym adresem `/checkout/`. Stary adres
    płatności.
 6. Jeżeli czegoś brakuje, checkout przewija ekran do pierwszego błędu i wskazuje,
    co należy poprawić.
+
+W trybie dwukrokowym klient korzysta z tych samych pól i integracji, ale Magento
+najpierw waliduje i zapisuje dostawę po kliknięciu „Dalej”, a następnie otwiera
+Podsumowanie i płatność. Podsumowanie zamówienia pozostaje widoczne w obu
+krokach.
 
 ## Checklista przed uruchomieniem
 

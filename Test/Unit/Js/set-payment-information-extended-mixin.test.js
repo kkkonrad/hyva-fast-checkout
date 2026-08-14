@@ -327,3 +327,44 @@ test('does not subscribe to guest email after the wait has timed out', async () 
     lateAsync({email});
     assert.equal(subscribeCalls, 0);
 });
+
+test('delegates immediately to Magento in two-step mode', async () => {
+    let mixin,
+        calls = 0,
+        shippingCalls = 0;
+    const source = fs.readFileSync(path.resolve(
+        __dirname,
+        '../../../view/frontend/web/js/mixin/set-payment-information-extended-mixin.js'
+    ), 'utf8');
+    const wrapper = {
+        wrap(original, interceptor) {
+            return function (...args) {
+                return interceptor.call(this, original.bind(this), ...args);
+            };
+        }
+    };
+
+    vm.runInNewContext(source, {
+        window: {checkoutConfig: {fastcheckoutSettings: {twoStep: true}}},
+        define(dependencies, factory) {
+            mixin = factory(
+                {},
+                wrapper,
+                {},
+                {},
+                {ensureSaved: () => shippingCalls++},
+                () => true,
+                {}
+            );
+        }
+    });
+
+    const action = mixin((messageContainer, paymentData) => {
+        calls += 1;
+        return Promise.resolve(paymentData.method);
+    });
+
+    assert.equal(await action({}, {method: 'checkmo'}, true), 'checkmo');
+    assert.equal(calls, 1);
+    assert.equal(shippingCalls, 0);
+});

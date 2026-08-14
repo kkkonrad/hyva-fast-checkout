@@ -4,9 +4,11 @@ English | [Polski](README.pl.md)
 
 ## A simpler checkout for Magento 2 stores using Hyvä
 
-Fastcheckout keeps the complete ordering process on one responsive page.
-Customers can enter their address, select delivery and payment, review the
-summary and place the order without moving through separate checkout steps.
+Fastcheckout presents the ordering process in a responsive Hyvä interface. By
+default, customers enter their address, select delivery and payment, review the
+summary and place the order on one page. The store owner can instead enable
+Magento's familiar two-step Shipping / Review & Payments flow without changing
+the checkout design.
 
 The module changes how Magento's standard checkout is presented, but it does
 not replace the checkout engine. The store continues to use its existing
@@ -18,9 +20,11 @@ shipping methods, payment providers, taxes, discounts and Magento integrations.
 
 ## Benefits for your store
 
-- the complete ordering process on one page, on desktop and mobile;
+- a choice between a fast one-page flow and Magento's familiar two-step flow,
+  on desktop and mobile;
 - fewer screens and interruptions while placing an order;
-- a “Place Order” button available from the beginning of checkout;
+- in one-page mode, a “Place Order” button available from the beginning of
+  checkout;
 - clear validation messages with smooth scrolling to the field that needs
   attention;
 - billing address set to the shipping address by default, with an option to
@@ -69,6 +73,8 @@ Settings are available under:
 The store administrator can:
 
 - enable or disable Fastcheckout;
+- switch between the default one-page flow and Magento's native two-step
+  Shipping / Review & Payments navigation;
 - show or hide the order comment, discount code and newsletter option;
 - limit payment methods according to the selected shipping method;
 - optionally assign guest orders to an existing customer account.
@@ -88,6 +94,8 @@ Checkout remains available at the standard `/checkout/` URL. The legacy
 
 ## The customer journey
 
+In the default one-page mode:
+
 1. The customer enters an email address and shipping address.
 2. Magento loads the shipping methods available for that address.
 3. Selecting a shipping method displays the applicable payment methods.
@@ -96,6 +104,10 @@ Checkout remains available at the standard `/checkout/` URL. The legacy
 5. “Place Order” starts the standard flow of the selected payment provider.
 6. If information is missing, checkout scrolls to the first error and explains
    what needs to be corrected.
+
+In two-step mode, the same fields and integrations are used, but Magento first
+validates and saves Shipping after the customer clicks “Next”, then opens
+Review & Payments. The order summary remains available in both steps.
 
 ## Before going live
 

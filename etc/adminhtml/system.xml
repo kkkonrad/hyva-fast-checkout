@@ -17,6 +17,12 @@
                     <label>Enable Module?</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                 </field>
+                <field id="two_step" translate="label comment" type="select"
+                       sortOrder="4" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Use Magento two-step checkout flow?</label>
+                    <comment>No keeps the current one-step layout. Yes uses Magento's native Shipping and Review &amp; Payments navigation with the same Fastcheckout styling.</comment>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
             </group>
             <group id="extended" translate="label" type="text"
                    sortOrder="2" showInDefault="1" showInWebsite="1" showInStore="1">

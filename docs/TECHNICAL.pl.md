@@ -8,18 +8,38 @@ Fastcheckout jest hostem natywnego checkoutu Magento opartego na KnockoutJS,
 RequireJS i REST. Dokument opisuje kontrakty techniczne zachowywane przez moduł
 oraz sposób jego utrzymania i testowania.
 
+## Tryby checkoutu
+
+Ustawienie `fastcheckout/general/two_step` steruje wyłącznie prezentacją i
+domyślnie ma wartość `0`. Oba tryby uruchamiają ten sam scalony `jsLayout`,
+quote, checkout provider oraz komponenty dostawy i renderery płatności.
+
+- W trybie jednokrokowym Fastcheckout utrzymuje oba natywne kroki jako widoczne,
+  koordynuje walidację i wykonuje minimalny wymagany zapis dostawy przed
+  przekazaniem sterowania wybranemu rendererowi płatności.
+- W trybie dwukrokowym natywny `step-navigator` Magento, hashe URL i widoczność
+  komponentów pozostają źródłem prawdy. Istniejący formularz dostawy wysyła się
+  przez `shipping.setShippingInformation()`, więc natywna akcja jednokrotnie
+  waliduje i zapisuje Dostawę, zanim `stepNavigator.next()` otworzy Podsumowanie
+  i płatność. Fastcheckout jedynie odzwierciedla `shipping.visible` i
+  `payment.isVisible` w kontenerach Tailwind; nie utrzymuje równoległego stanu
+  kroków.
+
+Zmiana ustawienia wymaga wyczyszczenia cache konfiguracji i full-page cache,
+ale nie ponownego wdrożenia plików statycznych.
+
 ## Walidacja i składanie zamówienia
 
 Widoczne przyciski desktop/mobile są proxy. Nie implementują płatności i nie
-wywołują endpointu samodzielnie. Proxy pobiera aktywny komponent z kanonicznej
-ścieżki `checkout.steps.billing-step.payment.payments-list.{code}` i wywołuje
-jego publiczną metodę `placeOrder()`. Natywny przycisk renderera klika wyłącznie
-jako fallback dla niestandardowego komponentu niedostępnego w `uiRegistry`.
+wywołują endpointu samodzielnie. Proxy klika natywny przycisk aktywnego
+renderera, zachowując handlery vendora, na przykład `placeOrderClick()`
+Braintree. Publiczną metodę komponentu `placeOrder()` wywołuje tylko jako
+fallback, gdy renderer nie udostępnia standardowego CTA.
 Płatności wallet i drop-in zachowują własny przycisk finalizacji. Dzięki temu
 PayU, Przelewy24, Stripe i inne moduły zachowują własne tokenizacje, zgody oraz
 walidatory.
 
-Przy próbie złożenia zamówienia Fastcheckout:
+W trybie jednokrokowym przy próbie złożenia zamówienia Fastcheckout:
 
 1. przy braku płatności wywołuje `shipping.validateShippingInformation()` i
    pokazuje komunikat płatności dopiero po poprawnej dostawie;
@@ -42,6 +62,13 @@ do stanu aktywnego.
 Zgody w trybie ręcznym pozostają aktywnymi checkboxami. Zgody automatyczne są
 widoczne, zaznaczone i zablokowane, a treść zgody otwiera się w natywnym modalu
 Magento.
+
+W trybie dwukrokowym walidacja Dostawy należy do natywnej akcji „Dalej”. W
+Podsumowaniu i płatności widoczne proxy klika natywne CTA wybranego renderera;
+walidator one-step staje się no-op, a mixin
+`set-payment-information-extended` deleguje bezpośrednio do Magento. Dzięki temu
+zakończony krok Dostawy nie jest ponownie walidowany ani zapisywany podczas
+płatności.
 
 ## Architektura
 
@@ -89,12 +116,14 @@ Magento.
   kontenery `mage-cache-storage`; nie zastępuje magazynu Magento. Brakujący lub
   wygasły quote jest obsługiwany przez natywny `error-processor`, który unieważnia
   sekcje checkoutu i przekierowuje do koszyka.
-- Pole komentarza pozostaje w panelu podsumowania, a newsletter jest dzieckiem
-  regionu `before-place-order` z `sortOrder=90`. Standardowe zgody oraz
-  newsletter mają w podsumowaniu zsynchronizowane proxy prezentacyjne; ich
-  oryginalne kontrolki, nazwy pól, kontekst KO i walidatory pozostają w aktywnym
-  rendererze płatności. Zawartość rendererów zewnętrznych nie jest przenoszona
-  ani klonowana.
+- Newsletter pozostaje dzieckiem regionu `before-place-order` z `sortOrder=90`.
+  W trybie jednokrokowym jego zsynchronizowane proxy, proxy standardowych zgód,
+  komentarz oraz proxy złożenia zamówienia pozostają w karcie podsumowania. W
+  trybie dwukrokowym ta wyłącznie prezentacyjna grupa akcji jest renderowana pod
+  płatnościami w pierwszej kolumnie, a druga zawiera tylko natywne podsumowanie
+  i informacje o dostawie. Oryginalne kontrolki, nazwy pól, kontekst KO i
+  walidatory pozostają w aktywnym rendererze płatności. Zawartość rendererów
+  zewnętrznych nie jest przenoszona ani klonowana.
 - Stan komentarza i newslettera należy do standardowego `checkoutProvider` pod
   `fastcheckout.comment` oraz `fastcheckout.subscribe`; do płatności trafia
   wyłącznie przez zarejestrowane `PaymentInterface.extension_attributes` i jest
@@ -130,6 +159,9 @@ patchy ani wpisów DI w Kkkonrad_Fastcheckout.**
   `afterMethods`, `before-place-order`, `payments-list` i `renderer-list`
   pozostają w oryginalnych miejscach. `checkout.sidebar.shipping-information`
   jest renderowany przez kanoniczny region komponentu `checkout.sidebar`.
+  Jego DOM pozostaje zamontowany, ale jest wizualnie ukryty w trybie
+  jednokrokowym; w trybie dwukrokowym korzysta z natywnej widoczności i akcji
+  nawigacji Magento.
 - Każda metoda dostawy zachowuje standardowe identyfikatory etykiet oraz pusty
   host `label_method_{method_code}_{carrier_code}` dla widgetów przewoźników.
 - Obcy `shippingMethodListTemplate` lub `shippingMethodItemTemplate` ustawiony
@@ -137,7 +169,7 @@ patchy ani wpisów DI w Kkkonrad_Fastcheckout.**
 - Fastcheckout nie zastępuje `window.checkoutConfig`, nie zapisuje własnego
   checkout store i nie odtwarza `extension_attributes` z bazy. Natywny przycisk
   zamówienia pozostaje w rendererze wraz z handlerami. Widoczne proxy wywołuje
-  publiczne `placeOrder()` renderera, a przycisku używa tylko jako fallbacku
+  ten przycisk, a publicznego `placeOrder()` renderera używa tylko jako fallbacku
   kompatybilności; pozostałe akcje toolbara nie są ukrywane.
 - `ExtendedCheckoutConfigProvider` jest dopinany do
   `Magento\Checkout\Model\CompositeConfigProvider` z `sortOrder=1000`; moduł nie
@@ -153,7 +185,8 @@ patchy ani wpisów DI w Kkkonrad_Fastcheckout.**
   pozostają nienaruszone.
 - Walidator one-step jest zwykłym dzieckiem kanonicznego węzła
   `checkout.steps.billing-step.payment.additional-payment-validators`; nie
-  zastępuje listy ani walidatorów rejestrowanych przez inne moduły.
+  zastępuje listy ani walidatorów rejestrowanych przez inne moduły. W trybie
+  dwukrokowym jest no-op bez zmiany kolejności rejestracji.
 
 Nie dodawaj per-vendor DI „pod Fastcheckout” w projekcie sklepu, jeśli ten sam
 renderer jest już ładowany przez standardowy `checkout_index_index` Magento.
@@ -179,6 +212,12 @@ Testy Playwright:
 cd app/code/Kkkonrad/Fastcheckout/Test/E2e
 npm ci
 npx playwright test
+```
+
+Test natywnego trybu dwukrokowego po włączeniu go w konfiguracji Magento:
+
+```bash
+FC_EXPECT_TWO_STEP=1 npx playwright test NativeCheckoutCompatibility.spec.js
 ```
 
 Testy E2E domyślnie nie składają zamówień. Sprawdzają natywny bootstrap,

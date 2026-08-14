@@ -2,8 +2,10 @@
 /**
  * Native Magento payment regions in the Fastcheckout payment section.
  *
+ * @var \Kkkonrad\Fastcheckout\Block\Hyva\Checkout $block
  * @var \Magento\Framework\Escaper $escaper
  */
+$isTwoStep = $block->isTwoStep();
 ?>
 <div id="payment"
      class="fc-container-3 space-y-6 min-w-0 w-full"
@@ -58,4 +60,9 @@
             <!-- ko template: getTemplate() --><!-- /ko -->
         <!-- /ko -->
     </div>
+    <?php if ($isTwoStep): ?>
+        <?php $orderActionsStandalone = true; ?>
+        <?php // phpcs:ignore Magento2.Security.IncludeFile.FoundIncludeFile -- trusted module template. ?>
+        <?php include $block->getTemplateFile('Kkkonrad_Fastcheckout::hyva/checkout/order-actions.phtml'); ?>
+    <?php endif; ?>
 </div>

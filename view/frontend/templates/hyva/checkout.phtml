@@ -10,9 +10,16 @@ use Magento\Framework\Escaper;
 /** @var Checkout $block */
 /** @var Escaper $escaper */
 $hasItems = $block->getQuote()->hasItems();
+$isTwoStep = $block->isTwoStep();
+$initialStep = $isTwoStep
+    ? ($block->getQuote()->isVirtual() ? 'payment' : 'shipping')
+    : 'all';
 ?>
 <div id="checkout" data-bind="scope: 'checkout'">
-<section class="space-y-8 max-w-7xl mx-auto px-0 py-4 pb-24 md:p-6 md:pb-6 overflow-x-hidden" id="fastcheckout-checkout">
+<section class="space-y-8 max-w-7xl mx-auto px-0 py-4 pb-24 md:p-6 md:pb-6 overflow-x-hidden"
+         id="fastcheckout-checkout"
+         data-fastcheckout-mode="<?= $isTwoStep ? 'two-step' : 'one-step' ?>"
+         data-fastcheckout-active-step="<?= $escaper->escapeHtmlAttr($initialStep) ?>">
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-gray-200 pb-6 px-4 md:px-0">
         <div>
             <h1 class="text-3xl font-semibold text-gray-900">
@@ -30,6 +37,14 @@ $hasItems = $block->getQuote()->hasItems();
     <div data-bind="scope: 'checkout.errors'" aria-live="polite">
         <!-- ko template: getTemplate() --><!-- /ko -->
     </div>
+
+    <?php if ($isTwoStep && $hasItems): ?>
+        <nav class="fastcheckout-progress" aria-label="<?= $escaper->escapeHtmlAttr(__('Checkout')) ?>">
+            <!-- ko foreach: getRegion('progressBar') -->
+                <!-- ko template: getTemplate() --><!-- /ko -->
+            <!-- /ko -->
+        </nav>
+    <?php endif; ?>
 
     <?php if (!$hasItems): ?>
         <div class="card text-center py-16">
@@ -58,7 +73,8 @@ $hasItems = $block->getQuote()->hasItems();
         </div>
 
         <div class="fc-grid grid gap-6 grid-cols-1 items-start w-full">
-            <div class="fc-left-wrapper flex flex-col gap-6">
+            <div class="fc-left-wrapper flex flex-col gap-6"
+                 data-fastcheckout-shipping-step>
                 <?php // phpcs:ignore Magento2.Security.IncludeFile.FoundIncludeFile -- trusted module template. ?>
                 <?php include $block->getTemplateFile('Kkkonrad_Fastcheckout::hyva/checkout/shipping-address.phtml'); ?>
                 <?php // phpcs:ignore Magento2.Security.IncludeFile.FoundIncludeFile -- trusted module template. ?>
@@ -66,8 +82,11 @@ $hasItems = $block->getQuote()->hasItems();
             </div>
 
             <div class="fc-right-wrapper flex flex-col gap-6">
-                <?php // phpcs:ignore Magento2.Security.IncludeFile.FoundIncludeFile -- trusted module template. ?>
-                <?php include $block->getTemplateFile('Kkkonrad_Fastcheckout::hyva/checkout/payment-methods.phtml'); ?>
+                <div class="fastcheckout-payment-column"
+                     data-fastcheckout-payment-step>
+                    <?php // phpcs:ignore Magento2.Security.IncludeFile.FoundIncludeFile -- trusted module template. ?>
+                    <?php include $block->getTemplateFile('Kkkonrad_Fastcheckout::hyva/checkout/payment-methods.phtml'); ?>
+                </div>
                 <?php // phpcs:ignore Magento2.Security.IncludeFile.FoundIncludeFile -- trusted module template. ?>
                 <?php include $block->getTemplateFile('Kkkonrad_Fastcheckout::hyva/checkout/summary.phtml'); ?>
             </div>
@@ -76,7 +95,8 @@ $hasItems = $block->getQuote()->hasItems();
         <div class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 p-4 mb-0 shadow-2xl flex flex-col gap-3 transition-all duration-200"
              style="margin-bottom: 0 !important;"
              data-fastcheckout-mobile-sticky>
-            <div class="flex items-center justify-between">
+            <div class="flex items-center justify-between"
+                 data-fastcheckout-mobile-sticky-info>
                 <div class="min-w-0">
                     <span class="block text-xs text-gray-500 uppercase tracking-wider font-semibold"><?= $escaper->escapeHtml(__('Grand Total')) ?></span>
                     <span class="block text-xl font-bold text-gray-950"
@@ -106,6 +126,21 @@ $hasItems = $block->getQuote()->hasItems();
                     <?= $escaper->escapeHtml(__('Place Order')) ?>
                 </span>
             </button>
+            <?php if ($isTwoStep): ?>
+                <div data-fastcheckout-next-step-mobile-container
+                     data-bind="scope: 'checkout.steps.shipping-step.shippingAddress'">
+                    <button class="btn btn-primary w-full flex items-center justify-center gap-2
+                                   transition-all duration-200 fastcheckout-place-order-btn"
+                            type="submit"
+                            form="co-shipping-method-form"
+                            aria-controls="checkout-step-payment"
+                            data-fastcheckout-next-step-mobile
+                            data-bind="disable: isLoading"
+                            disabled>
+                        <span><?= $escaper->escapeHtml(__('Next')) ?></span>
+                    </button>
+                </div>
+            <?php endif; ?>
         </div>
     </div>
     <?php endif; ?>

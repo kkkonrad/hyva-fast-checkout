@@ -105,6 +105,11 @@ class FastcheckoutHandleTest extends TestCase
 
         $this->assertStringContainsString('element.shippingMethodItemTemplate', $templates);
         $this->assertStringContainsString('let: { element: $data }', $templates);
+        $this->assertStringContainsString("getRegion('progressBar')", $templates);
+        $this->assertStringContainsString('data-fastcheckout-next-step', $templates);
+        $this->assertStringContainsString('data-fastcheckout-next-step-mobile', $templates);
+        $this->assertStringContainsString('form="co-shipping-method-form"', $templates);
+        $this->assertStringContainsString('data-fastcheckout-mode=', $templates);
 
         $rootChildren = (string)file_get_contents(
             $this->moduleRoot() . '/view/frontend/templates/hyva/checkout-root-children.phtml'

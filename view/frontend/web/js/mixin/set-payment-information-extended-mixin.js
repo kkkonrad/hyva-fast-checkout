@@ -11,6 +11,12 @@ define([
 
     var readyWaitMs = 10000;
 
+    function isTwoStep() {
+        var settings = window.checkoutConfig && window.checkoutConfig.fastcheckoutSettings;
+
+        return Boolean(settings && settings.twoStep);
+    }
+
     function resolvedPromise() {
         return $.Deferred().resolve().promise();
     }
@@ -153,7 +159,7 @@ define([
             paymentData,
             skipBilling
         ) {
-            if (!isFastcheckoutActive()) {
+            if (!isFastcheckoutActive() || isTwoStep()) {
                 return originalAction(messageContainer, paymentData, skipBilling);
             }
 

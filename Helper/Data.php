@@ -17,6 +17,7 @@ class Data extends AbstractHelper
 {
 
     const XML_PATH_ENABLE = 'fastcheckout/general/enable';
+    const XML_PATH_TWO_STEP = 'fastcheckout/general/two_step';
 
     const XML_PATH_DISCOUNT_VISIBILITY = 'fastcheckout/extended/show_discount';
     const XML_PATH_COMMENT_VISIBILITY = 'fastcheckout/extended/show_comment';
@@ -54,6 +55,14 @@ class Data extends AbstractHelper
     public function isEnable()
     {
         return (bool)$this->scopeConfig->getValue(self::XML_PATH_ENABLE, ScopeInterface::SCOPE_STORE);
+    }
+
+    public function isTwoStep(): bool
+    {
+        return (bool)$this->scopeConfig->getValue(
+            self::XML_PATH_TWO_STEP,
+            ScopeInterface::SCOPE_STORE
+        );
     }
 
     public function getShippingPaymentMapping()

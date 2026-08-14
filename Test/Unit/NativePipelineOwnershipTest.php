@@ -121,6 +121,7 @@ class NativePipelineOwnershipTest extends TestCase
         );
         $this->assertStringContainsString('quote.guestEmail', $paymentGuard);
         $this->assertStringContainsString('shippingSaveCoordinator.ensureSaved()', $paymentGuard);
+        $this->assertStringContainsString('isTwoStep()', $paymentGuard);
         $this->assertStringNotContainsString('var pending', $paymentGuard);
         $this->assertStringNotContainsString("document.addEventListener('input'", $paymentGuard);
         $this->assertStringNotContainsString('fastcheckout:shipping-information-saved', $paymentGuard);
@@ -134,8 +135,21 @@ class NativePipelineOwnershipTest extends TestCase
             $bootstrap
         );
         $this->assertStringContainsString('shippingSaveCoordinator.ensureSaved()', $bootstrap);
+        $this->assertStringContainsString('bindStepPresentation()', $bootstrap);
+        $this->assertStringContainsString('component.visible.subscribe(update)', $bootstrap);
+        $this->assertStringContainsString('component.isVisible.subscribe(update)', $bootstrap);
         $this->assertStringNotContainsString('shippingAdditionalPlacement', $bootstrap);
         $this->assertStringContainsString('data-fastcheckout-wallet-only', $bootstrap);
+        $this->assertTrue(
+            strpos($bootstrap, 'active.click();') < strpos($bootstrap, 'renderer.placeOrder();'),
+            'The native renderer CTA must run before the generic placeOrder fallback.'
+        );
+        $this->assertStringContainsString(
+            "$('html, body').stop(true);",
+            $bootstrap,
+            'Fastcheckout must stop Magento validation scrolling before starting its own.'
+        );
+        $this->assertStringContainsString('{preventScroll: true}', $bootstrap);
         $this->assertFileDoesNotExist(
             $this->moduleRoot() . '/view/frontend/web/js/model/shipping-additional-placement.js'
         );
@@ -228,6 +242,9 @@ class NativePipelineOwnershipTest extends TestCase
         $payment = (string)file_get_contents(
             $this->moduleRoot() . '/view/frontend/templates/hyva/checkout/payment-methods.phtml'
         );
+        $actions = (string)file_get_contents(
+            $this->moduleRoot() . '/view/frontend/templates/hyva/checkout/order-actions.phtml'
+        );
         $layout = (string)file_get_contents(
             $this->moduleRoot() . '/view/frontend/layout/fastcheckout_native_components.xml'
         );
@@ -244,7 +261,7 @@ class NativePipelineOwnershipTest extends TestCase
             $this->moduleRoot() . '/Model/ExtendedCheckoutConfigProvider.php'
         );
 
-        $this->assertStringContainsString('checkout.sidebar.fastcheckout-order-comment', $summary);
+        $this->assertStringContainsString('checkout.sidebar.fastcheckout-order-comment', $actions);
         $this->assertStringContainsString('id="fastcheckout-comment"', $comment);
         $this->assertStringContainsString('name="fastcheckout-newsletter"', $layout);
         $this->assertStringContainsString('fastcheckout.comment', $layout);
@@ -255,14 +272,19 @@ class NativePipelineOwnershipTest extends TestCase
         $this->assertStringContainsString('fastcheckout-one-step-validator', $layout);
         $this->assertStringContainsString('data-fastcheckout-subscribe', $newsletter);
         $this->assertStringContainsString("'newsletterLabel'", $configProvider);
+        $this->assertStringContainsString("'twoStep'", $configProvider);
         $this->assertStringContainsString("__('Sign Up for Our Newsletter')", $configProvider);
         $this->assertStringContainsString("provider.get('fastcheckout')", $placeOrder);
         $this->assertStringNotContainsString('fastcheckout_comment', $placeOrder);
         $this->assertStringNotContainsString('fastcheckout_subscribe', $placeOrder);
-        $this->assertStringNotContainsString('data-fastcheckout-agreements-host', $summary);
-        $this->assertStringContainsString('data-fastcheckout-agreements-summary-host', $summary);
+        $this->assertStringNotContainsString('data-fastcheckout-agreements-host', $actions);
+        $this->assertStringContainsString('data-fastcheckout-agreements-summary-host', $actions);
         $this->assertStringNotContainsString('data-fastcheckout-place-order-ssr', $payment);
-        $this->assertStringContainsString('data-fastcheckout-place-order-ssr', $summary);
+        $this->assertStringContainsString('data-fastcheckout-place-order-ssr', $actions);
+        $this->assertStringContainsString('hyva/checkout/order-actions.phtml', $summary);
+        $this->assertStringContainsString('hyva/checkout/order-actions.phtml', $payment);
+        $this->assertStringNotContainsString('data-fastcheckout-order-comment', $summary);
+        $this->assertStringNotContainsString('data-fastcheckout-place-order-ssr', $summary);
     }
 
     public function testRatesAndSummaryHaveNoPhpFallbackOrSecondCheckoutBlock(): void

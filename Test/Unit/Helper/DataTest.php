@@ -12,6 +12,7 @@ use Magento\Framework\Json\Helper\Data as JsonHelper;
 use Magento\Framework\Module\Manager as ModuleManager;
 use Magento\Framework\View\DesignInterface;
 use Magento\Framework\View\Design\ThemeInterface;
+use Magento\Store\Model\ScopeInterface;
 use Magento\Theme\Model\ThemeFactory;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -95,6 +96,28 @@ class DataTest extends TestCase
         );
 
         $this->assertTrue($helper->canUseHyvaNativeCheckout());
+    }
+
+    public function testTwoStepUsesStoreScopedConfiguration(): void
+    {
+        $context = $this->createMock(Context::class);
+        $scopeConfig = $this->createMock(ScopeConfigInterface::class);
+        $scopeConfig->expects($this->once())
+            ->method('getValue')
+            ->with(Data::XML_PATH_TWO_STEP, ScopeInterface::SCOPE_STORE)
+            ->willReturn('1');
+        $context->method('getScopeConfig')->willReturn($scopeConfig);
+        $context->method('getLogger')->willReturn($this->createMock(LoggerInterface::class));
+
+        $helper = new Data(
+            $context,
+            $this->createMock(JsonHelper::class),
+            $this->createMock(DesignInterface::class),
+            $this->createMock(ThemeFactory::class),
+            $this->createMock(HyvaThemes::class)
+        );
+
+        $this->assertTrue($helper->isTwoStep());
     }
 
     private function createHelper(

@@ -8,18 +8,36 @@ Fastcheckout hosts Magento's native KnockoutJS, RequireJS and REST checkout.
 This document describes the technical contracts preserved by the module and how
 to maintain and test them.
 
+## Checkout modes
+
+`fastcheckout/general/two_step` controls presentation only and defaults to
+`0`. Both modes start the same merged `jsLayout`, quote, checkout provider,
+shipping components and payment renderers.
+
+- In one-step mode, Fastcheckout keeps both native steps visible and coordinates
+  validation and the minimal required shipping save before delegating to the
+  selected payment renderer.
+- In two-step mode, Magento's original `step-navigator`, URL hashes and component
+  visibility remain authoritative. The existing shipping form submits through
+  `shipping.setShippingInformation()`, so the native action validates and saves
+  Shipping once before `stepNavigator.next()` opens Review & Payments.
+  Fastcheckout only reflects `shipping.visible` and `payment.isVisible` in its
+  Tailwind containers; it does not maintain a parallel step state.
+
+Changing the setting requires a configuration/full-page cache clean, not a
+static-content deployment.
+
 ## Validation and placing an order
 
 The visible desktop and mobile buttons are proxies. They do not implement
-payments or call an endpoint directly. The proxy resolves the active component
-from the canonical `checkout.steps.billing-step.payment.payments-list.{code}`
-path and calls its public `placeOrder()` method. It clicks the renderer's native
-button only as a fallback for a non-standard component that is not available in
-`uiRegistry`. Wallet and drop-in methods keep their own checkout CTA. This lets
-PayU, Przelewy24, Stripe and other modules retain their tokenization, agreements
-and validators.
+payments or call an endpoint directly. The proxy clicks the active renderer's
+native checkout button, preserving vendor-specific handlers such as Braintree's
+`placeOrderClick()`. It falls back to the component's public `placeOrder()` only
+when no standard CTA exists. Wallet and drop-in methods keep their own checkout
+CTA. This lets PayU, Przelewy24, Stripe and other modules retain their
+tokenization, agreements and validators.
 
-When placing an order, Fastcheckout:
+In one-step mode, when placing an order, Fastcheckout:
 
 1. calls `shipping.validateShippingInformation()` when no payment method is
    selected and displays the missing-payment message only after shipping is
@@ -43,6 +61,12 @@ after an error, they return to their active state.
 
 Manual agreements remain active checkboxes. Automatic agreements are visible,
 checked and disabled, and their content opens in Magento's native modal.
+
+In two-step mode, Shipping validation belongs to the native “Next” action. On
+Review & Payments the visible proxy clicks the selected renderer's native CTA;
+the one-step validator becomes a no-op and the
+`set-payment-information-extended` mixin delegates directly to Magento. This
+avoids validating or resaving the completed Shipping step during payment.
 
 ## Architecture
 
@@ -91,12 +115,14 @@ checked and disabled, and their content opens in Magento's native modal.
   Magento's storage. A missing or expired quote is handled through the native
   `error-processor`, which invalidates checkout sections and redirects to the
   cart.
-- The order comment remains in the summary panel, while the newsletter is a
-  child of the `before-place-order` region with `sortOrder=90`. Standard
-  agreements and the newsletter have synchronized presentation proxies in the
-  summary; their original controls, field names, Knockout context and validators
-  remain in the active payment renderer. Third-party renderer content is neither
-  moved nor cloned.
+- The newsletter remains a child of the `before-place-order` region with
+  `sortOrder=90`. In one-step mode, its synchronized presentation proxy,
+  standard agreement proxies, the comment and place-order proxy remain in the
+  summary card. In two-step mode, that presentation-only action group is
+  rendered after payment in the first column, leaving the second column with
+  only the native order summary and shipping information. Original controls,
+  field names, Knockout context and validators remain in the active payment
+  renderer. Third-party renderer content is neither moved nor cloned.
 - Comment and newsletter state belongs to the standard `checkoutProvider` under
   `fastcheckout.comment` and `fastcheckout.subscribe`; it reaches payment only
   through registered `PaymentInterface.extension_attributes` and is consumed
@@ -130,6 +156,8 @@ or Fastcheckout-specific DI entries.**
   `afterMethods`, `before-place-order`, `payments-list` and `renderer-list`
   remain in their original locations. `checkout.sidebar.shipping-information`
   is rendered through the canonical `checkout.sidebar` component region.
+  Its DOM stays mounted but is visually hidden in one-step mode; in two-step it
+  uses Magento's native visibility and navigation callbacks.
 - Each shipping method keeps the standard label IDs and an empty
   `label_method_{method_code}_{carrier_code}` host for carrier widgets.
 - A third-party `shippingMethodListTemplate` or `shippingMethodItemTemplate`
@@ -138,8 +166,8 @@ or Fastcheckout-specific DI entries.**
 - Fastcheckout does not replace `window.checkoutConfig`, maintain a custom
   checkout store or reconstruct `extension_attributes` from the database. The
   native place-order button remains in its renderer with its handlers. The
-  visible proxy calls the renderer's public `placeOrder()` method and uses that
-  button only as a compatibility fallback; other toolbar actions are not
+  visible proxy clicks that button and uses the renderer's public `placeOrder()`
+  only as a compatibility fallback; other toolbar actions are not
   hidden.
 - `ExtendedCheckoutConfigProvider` is appended to
   `Magento\Checkout\Model\CompositeConfigProvider` with `sortOrder=1000`; the
@@ -155,7 +183,8 @@ or Fastcheckout-specific DI entries.**
   intact.
 - The one-step validator is a regular child of the canonical
   `checkout.steps.billing-step.payment.additional-payment-validators` node; it
-  neither replaces the list nor validators registered by other modules.
+  neither replaces the list nor validators registered by other modules. It is a
+  no-op in two-step mode without changing registration order.
 
 Do not add vendor-specific DI “for Fastcheckout” to a store project when the
 same renderer already loads through Magento's standard `checkout_index_index`.
@@ -181,6 +210,12 @@ Run Playwright tests:
 cd app/code/Kkkonrad/Fastcheckout/Test/E2e
 npm ci
 npx playwright test
+```
+
+To test the native two-step mode after enabling it in Magento configuration:
+
+```bash
+FC_EXPECT_TWO_STEP=1 npx playwright test NativeCheckoutCompatibility.spec.js
 ```
 
 By default, E2E tests do not place orders. They verify the native bootstrap,

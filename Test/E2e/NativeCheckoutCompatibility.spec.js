@@ -2,6 +2,7 @@ import {test, expect} from '@playwright/test';
 
 const BASE = process.env.PLAYWRIGHT_BASE_URL || 'https://m10626.app-on-demand.net/';
 const PRODUCT = process.env.FC_SIMPLE_PRODUCT_URL || 'aim-analog-watch.html';
+const EXPECT_TWO_STEP = process.env.FC_EXPECT_TWO_STEP === '1';
 
 async function dismissConsent(page) {
     const button = page.getByRole('button', {
@@ -76,7 +77,53 @@ async function openCheckoutWithProduct(page) {
     return {hasInPost: inPostIndex >= 0, pageErrors};
 }
 
+async function fillShippingAddress(page, emailPrefix) {
+    const shippingRoot = page.locator('.fastcheckout-native-shipping-address');
+
+    await expect(shippingRoot.locator('input[name="firstname"]'))
+        .toBeVisible({timeout: 45_000});
+    await shippingRoot.locator('input[name="username"]').fill(
+        emailPrefix + '-' + Date.now() + '@example.com'
+    );
+
+    const country = shippingRoot.locator('select[name="country_id"]');
+    if (await country.isVisible()) {
+        await country.selectOption('PL');
+    }
+
+    const region = shippingRoot.locator('select[name="region_id"]');
+    if (await region.isVisible()) {
+        await expect.poll(() => region.locator('option').count(), {timeout: 15_000})
+            .toBeGreaterThan(1);
+        await region.selectOption(await region.locator('option').evaluateAll((options) => (
+            options.map((option) => option.value).find(Boolean)
+        )));
+    }
+
+    for (const [name, value] of [
+        ['firstname', 'Jan'],
+        ['lastname', 'Kowalski'],
+        ['street[0]', 'Testowa 1'],
+        ['city', 'Warszawa'],
+        ['postcode', '00-001'],
+        ['telephone', '500600700']
+    ]) {
+        const field = shippingRoot.locator(`input[name="${name}"]`);
+
+        await field.fill(value);
+        await field.blur();
+    }
+
+    await expect.poll(() => page.evaluate(() => (
+        window.require('Magento_Checkout/js/model/shipping-service').isLoading()
+    )), {timeout: 45_000}).toBe(false);
+
+    return shippingRoot;
+}
+
 test.describe('Fastcheckout native Magento compatibility host', () => {
+    test.skip(EXPECT_TWO_STEP, 'Run the dedicated native two-step scenario.');
+
     test('keeps the Fastcheckout presentation and canonical component tree', async ({page}) => {
         test.setTimeout(150_000);
         const assetFailures = [];
@@ -122,6 +169,15 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         );
         await expect(nativeSummary.locator('.product-item')).toBeVisible({timeout: 45_000});
         await expect(nativeSummary.locator('.table-totals tr.grand.totals').first()).toBeVisible();
+        expect(await nativeSummary.locator('.table-totals tbody tr').evaluateAll((rows) => (
+            rows.every((row) => {
+                const mark = row.querySelector('th.mark')?.getBoundingClientRect(),
+                    amount = row.querySelector('td.amount')?.getBoundingClientRect();
+
+                return mark && amount &&
+                    Math.abs(mark.width / (mark.width + amount.width) - 0.75) < 0.01;
+            })
+        ))).toBe(true);
         await expect(page.locator('[data-fastcheckout-summary-ssr]')).toHaveCount(0);
         const initialPlaceOrder = page.locator('[data-fastcheckout-place-order-ssr]');
         await expect(initialPlaceOrder).toBeVisible();
@@ -138,6 +194,8 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
                 twoColumns: window.innerWidth < 1024 || (
                     left.width > 400 && right.width > 400 && right.left > left.right
                 ),
+                desktopRatio: window.innerWidth < 1024 ||
+                    Math.abs(left.width / (left.width + right.width) - 0.5) < 0.01,
                 hyvaAssets: Array.from(document.querySelectorAll('link[href], script[src]'))
                     .some((node) => (node.href || node.src || '').includes('/Hyva/default/')),
                 fallbackThemeAssets: Array.from(
@@ -170,6 +228,7 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
 
         expect(geometry).toEqual({
             twoColumns: true,
+            desktopRatio: true,
             hyvaAssets: true,
             fallbackThemeAssets: false,
             noFallbackNotice: true,
@@ -222,6 +281,7 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         await page.setViewportSize({width: 390, height: 844});
         await expect(page.locator('[data-fastcheckout-place-order-mobile]')).toBeVisible();
         await expect(page.locator('[data-fastcheckout-place-order-mobile]')).toBeEnabled();
+        await expect(page.locator('[data-fastcheckout-next-step-mobile]')).toHaveCount(0);
         await expect(page.locator(
             '[data-fastcheckout-mobile-sticky] [data-fastcheckout-client-order-error]'
         )).toHaveCount(0);
@@ -259,41 +319,7 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         await expect(page.locator('[data-fastcheckout-client-order-error]')).toBeHidden();
         expect(paymentRequests).toBe(0);
 
-        await shippingRoot.locator('input[name="username"]').fill(
-            'compat-' + Date.now() + '@example.com'
-        );
-
-        const country = shippingRoot.locator('select[name="country_id"]');
-        if (await country.isVisible()) {
-            await country.selectOption('PL');
-        }
-
-        const region = shippingRoot.locator('select[name="region_id"]');
-        if (await region.isVisible()) {
-            await expect.poll(() => region.locator('option').count(), {timeout: 15_000})
-                .toBeGreaterThan(1);
-            const options = await region.locator('option').evaluateAll((items) =>
-                items.map((item) => item.value).filter(Boolean)
-            );
-            await region.selectOption(options[0]);
-        }
-
-        for (const [name, value] of [
-            ['firstname', 'Jan'],
-            ['lastname', 'Kowalski'],
-            ['street[0]', 'Testowa 1'],
-            ['city', 'Warszawa'],
-            ['postcode', '00-001'],
-            ['telephone', '500600700']
-        ]) {
-            const field = shippingRoot.locator(`input[name="${name}"]`);
-            await field.fill(value);
-            await field.blur();
-        }
-
-        await expect.poll(() => page.evaluate(() => (
-            window.require('Magento_Checkout/js/model/shipping-service').isLoading()
-        )), {timeout: 45_000}).toBe(false);
+        await fillShippingAddress(page, 'compat');
 
         const rates = page.locator(
             '#fastcheckout-ko-shipping-root input[name="shipping_method"]'
@@ -386,6 +412,21 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
                     button.click()
                 ));
                 await expect(page.locator('[data-inpost-modal]')).toHaveCount(0);
+            } else {
+                await expect.poll(() => page.evaluate(() => {
+                    const method = window.require(
+                            'Magento_Checkout/js/model/quote'
+                        ).shippingMethod(),
+                        placement = document.querySelector(
+                            '.fastcheckout-furgonetkapl-placement'
+                        );
+
+                    return Boolean(method && placement && placement.parentElement &&
+                        placement.parentElement.id ===
+                        'label_method_' + method.method_code + '_' +
+                        method.carrier_code + '_additional' &&
+                        placement.closest('.fastcheckout-shipping-method-option'));
+                }), {timeout: 25_000}).toBe(true);
             }
         }
 
@@ -642,8 +683,21 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             '[data-fastcheckout-newsletter-proxy] input[type="checkbox"]'
         );
         await expect(orderComment).toBeVisible();
+        expect(await agreementsPortal.evaluate((host) => ({
+            agreements: getComputedStyle(host.firstElementChild).borderTopWidth,
+            comment: getComputedStyle(
+                document.querySelector('[data-fastcheckout-order-comment]')
+            ).borderTopWidth
+        }))).toEqual({agreements: '0px', comment: '0px'});
         await orderComment.fill('Fastcheckout provider comment');
         await expect(newsletterProxy).toHaveCount(1);
+        expect(await newsletterProxy.evaluate((input) => {
+            const style = getComputedStyle(input.closest(
+                '[data-fastcheckout-newsletter-proxy]'
+            ));
+
+            return [style.borderTopWidth, style.padding];
+        })).toEqual(['0px', '0px']);
         await newsletterProxy.evaluate((input) => input.click());
         await expect.poll(() => page.evaluate(() => {
             const provider = window.require('uiRegistry').get('checkoutProvider');
@@ -686,9 +740,47 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
                     await expect(nativeAgreement).toBeChecked();
                 } else {
                     await expect(proxyAgreement).toBeEnabled();
+                    const agreementField = proxyAgreement.locator('xpath=..'),
+                        agreementText = agreementField.locator('label button.action-show'),
+                        normalTextStyle = await agreementText.evaluate((button) => {
+                            const style = getComputedStyle(button);
+
+                            return [style.color, style.fontWeight];
+                        });
+
+                    await page.evaluate(() => {
+                        window.require(
+                            'Magento_CheckoutAgreements/js/model/agreement-validator'
+                        ).validate();
+                    });
+                    await expect.poll(async () => {
+                        const invalidTextStyle = await agreementText.evaluate((button) => {
+                            const style = getComputedStyle(button);
+
+                            return [style.color, style.fontWeight];
+                        });
+
+                        return invalidTextStyle[0] !== normalTextStyle[0] &&
+                            Number(invalidTextStyle[1]) >= 700;
+                    }).toBe(true);
+                    expect(await agreementField.evaluate((field) => {
+                        const message = field.querySelector('div.mage-error'),
+                            messageStyle = getComputedStyle(message);
+
+                        return messageStyle.position === 'absolute' &&
+                            message.getBoundingClientRect().width <= 1;
+                    })).toBe(true);
                     await proxyAgreement.check();
                     await expect(proxyAgreement).toBeChecked();
                     await expect(nativeAgreement).toBeChecked();
+                    await expect(
+                        agreementField.locator(':scope > div.mage-error')
+                    ).toHaveCount(0);
+                    await expect.poll(() => agreementText.evaluate((button) => {
+                        const style = getComputedStyle(button);
+
+                        return [style.color, style.fontWeight];
+                    })).toEqual(normalTextStyle);
                 }
             }
 
@@ -711,6 +803,25 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             const shownAgreementModal = page.locator('.agreements-modal._show').last();
             await expect(shownAgreementModal).toBeVisible();
             await expect(page.locator('.agreements-modal._show')).toHaveCount(1);
+            expect(await shownAgreementModal.evaluate((modal) => {
+                const wrapStyle = getComputedStyle(modal.querySelector('.modal-inner-wrap')),
+                    headerStyle = getComputedStyle(modal.querySelector('.modal-header')),
+                    footerStyle = getComputedStyle(modal.querySelector('.modal-footer'));
+
+                return {
+                    border: wrapStyle.borderWidth,
+                    headerBorder: headerStyle.borderBottomWidth,
+                    footerDisplay: footerStyle.display,
+                    visibleButtons: Array.from(modal.querySelectorAll('button')).filter((button) => (
+                        button.getClientRects().length > 0
+                    )).length
+                };
+            })).toEqual({
+                border: '0px',
+                headerBorder: '0px',
+                footerDisplay: 'none',
+                visibleButtons: 1
+            });
             const closeAgreementModal = shownAgreementModal.locator(
                 '[data-role="closeBtn"], .action-close'
             ).first();
@@ -759,6 +870,7 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             '#fastcheckout-ko-shipping-information-root'
         );
         await expect(shippingInformationRoot).toHaveCount(1);
+        await expect(shippingInformationRoot).toBeHidden();
         expect(await shippingInformationRoot.evaluate(() => {
             const component = window.require('uiRegistry').get('checkout.sidebar');
 
@@ -1214,5 +1326,374 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         expect(placeOrderRequests.filter((url) => (
             /\/payment-information(?:\?|$)/.test(url)
         ))).toHaveLength(1);
+    });
+});
+
+test.describe('Fastcheckout Furgonetka pickup placement', () => {
+    test.skip(EXPECT_TWO_STEP, 'Pickup placement is verified in the default one-step mode.');
+
+    test('restores a saved pickup point inside the selected shipping method', async ({page}) => {
+        test.setTimeout(150_000);
+        await openCheckoutWithProduct(page);
+        const hasFurgonetkaConfig = await page.evaluate(() => (
+            (window.checkoutConfig.FurgonetkaPl?.mapConfiguration || []).length > 0
+        ));
+
+        test.skip(
+            !hasFurgonetkaConfig,
+            'Furgonetka pickup-point checkout component is not configured.'
+        );
+        await fillShippingAddress(page, 'pickup-reload');
+
+        const rates = page.locator(
+            '#fastcheckout-ko-shipping-root input[name="shipping_method"]'
+        );
+        await expect.poll(() => rates.count(), {timeout: 45_000}).toBeGreaterThan(0);
+        const pickupRateValue = await rates.evaluateAll((inputs) => {
+            const configured = (window.checkoutConfig.FurgonetkaPl?.mapConfiguration || [])
+                .flatMap((entry) => entry.ids || [])
+                .map((id) => id.replace(':', '_'));
+
+            return inputs.map((input) => input.value).find((value) => (
+                configured.includes(value)
+            )) || '';
+        });
+        test.skip(
+            !pickupRateValue,
+            'No configured Furgonetka pickup rate is available for the address.'
+        );
+
+        const shippingResponse = page.waitForResponse((response) => (
+            response.request().method() === 'POST' &&
+            response.url().includes('/shipping-information')
+        ), {timeout: 45_000});
+        await page.locator(
+            `input[name="shipping_method"][value="${pickupRateValue}"]`
+        ).click({force: true});
+        expect((await shippingResponse).ok()).toBe(true);
+
+        await expect.poll(() => page.evaluate(() => {
+            const method = window.require('Magento_Checkout/js/model/quote').shippingMethod(),
+                placement = document.querySelector('.fastcheckout-furgonetkapl-placement');
+
+            return Boolean(method && placement && placement.parentElement &&
+                placement.parentElement.id ===
+                'label_method_' + method.method_code + '_' + method.carrier_code + '_additional');
+        }), {timeout: 25_000}).toBe(true);
+
+        const savedPointName = 'Fastcheckout E2E point ' + Date.now();
+        const savePointResponse = page.waitForResponse((response) => (
+            response.request().method() === 'POST' &&
+            response.url().includes('/furgonetkapl/pickup-point/save')
+        ), {timeout: 30_000});
+        expect(await page.evaluate((pointName) => {
+            const component = window.require('uiRegistry').filter((item) => (
+                    typeof item.savePickupPoint === 'function' &&
+                    typeof item.findMapConfigEntry === 'function'
+                ))[0],
+                quote = window.require('Magento_Checkout/js/model/quote'),
+                method = quote.shippingMethod(),
+                config = component.findMapConfigEntry(method);
+
+            component.savePickupPoint(
+                quote.getQuoteId(),
+                method.carrier_code,
+                method.method_code,
+                'FASTCHECKOUT-E2E',
+                pointName,
+                config.courierService
+            );
+
+            return true;
+        }, savedPointName)).toBe(true);
+        expect((await savePointResponse).ok()).toBe(true);
+        await expect(page.locator(
+            '.fastcheckout-furgonetkapl-placement .selected-point-info'
+        )).toContainText(savedPointName);
+
+        await page.reload({waitUntil: 'domcontentloaded', timeout: 60_000});
+        await expect(page.locator('#fastcheckout-checkout')).toBeVisible({timeout: 45_000});
+        await expect.poll(() => page.locator(
+            '#fastcheckout-ko-shipping-root input[name="shipping_method"]'
+        ).count(), {timeout: 45_000}).toBeGreaterThan(0);
+        await expect.poll(() => page.evaluate((pointName) => {
+            const method = window.require('Magento_Checkout/js/model/quote').shippingMethod(),
+                placement = document.querySelector('.fastcheckout-furgonetkapl-placement'),
+                selected = placement && placement.querySelector('.selected-point-info');
+
+            return Boolean(method && placement && selected &&
+                selected.textContent.includes(pointName) &&
+                placement.parentElement.id ===
+                'label_method_' + method.method_code + '_' + method.carrier_code + '_additional' &&
+                placement.closest('.fastcheckout-shipping-method-option'));
+        }, savedPointName), {timeout: 25_000}).toBe(true);
+        await expect(page.locator('#fastcheckout-ko-shipping-information-root')).toBeHidden();
+    });
+});
+
+test.describe('Fastcheckout native Magento two-step flow', () => {
+    test.skip(!EXPECT_TWO_STEP, 'Enable with FC_EXPECT_TWO_STEP=1.');
+
+    test('uses Magento shipping save and step navigation exactly once', async ({page}) => {
+        test.setTimeout(180_000);
+        const {pageErrors} = await openCheckoutWithProduct(page);
+
+        const root = page.locator('#fastcheckout-checkout');
+        const shippingRoot = page.locator('.fastcheckout-native-shipping-address');
+        const paymentStep = page.locator('[data-fastcheckout-payment-step]');
+        const summary = page.locator('.fc-container-4');
+        const placeOrder = page.locator('[data-fastcheckout-place-order-ssr]');
+        const next = page.locator('[data-fastcheckout-next-step]');
+
+        await expect(root).toHaveAttribute('data-fastcheckout-mode', 'two-step');
+        await expect(root).toHaveAttribute('data-fastcheckout-active-step', 'shipping');
+        await expect(page.locator('.fastcheckout-progress .opc-progress-bar')).toBeVisible();
+        await expect(shippingRoot).toBeVisible();
+        await expect(paymentStep).toBeHidden();
+        await expect(summary).toBeVisible();
+        await expect(placeOrder).toBeHidden();
+        await expect(next).toBeVisible();
+        await expect(next).toBeEnabled();
+        await page.setViewportSize({width: 390, height: 844});
+        const mobileNext = page.locator('[data-fastcheckout-next-step-mobile]');
+        const mobileStickyInfo = page.locator('[data-fastcheckout-mobile-sticky-info]');
+        await expect(mobileNext).toBeVisible();
+        await expect(mobileNext).toBeEnabled();
+        await expect(mobileStickyInfo).toBeHidden();
+        expect(await page.evaluate(() => (
+            window.checkoutConfig.fastcheckoutSettings.twoStep
+        ))).toBe(true);
+
+        let shippingRequests = 0;
+
+        page.on('request', (request) => {
+            if (request.method() === 'POST' &&
+                request.url().includes('/shipping-information')) {
+                shippingRequests += 1;
+            }
+        });
+        const startScrollSample = async (position) => page.evaluate((requestedPosition) => {
+            const scroller = document.scrollingElement,
+                previousBehavior = scroller.style.scrollBehavior;
+
+            if (requestedPosition) {
+                scroller.style.scrollBehavior = 'auto';
+                window.scrollTo(0, requestedPosition === 'bottom' ? scroller.scrollHeight : 0);
+                scroller.style.scrollBehavior = previousBehavior;
+            }
+            window.fastcheckoutE2eTwoStepScroll = [window.scrollY];
+            window.fastcheckoutE2eTwoStepScrollDone = false;
+            const sampler = window.setInterval(() => {
+                window.fastcheckoutE2eTwoStepScroll.push(window.scrollY);
+            }, 16);
+
+            window.setTimeout(() => {
+                window.clearInterval(sampler);
+                window.fastcheckoutE2eTwoStepScrollDone = true;
+            }, 1_000);
+        }, position);
+        const expectSmoothScroll = async (error, shouldMove = true) => {
+            await expect.poll(() => error.evaluate((element) => {
+                const box = element.getBoundingClientRect();
+
+                return box.top >= 0 && box.bottom <= window.innerHeight;
+            })).toBe(true);
+            await expect.poll(() => page.evaluate(() => (
+                window.fastcheckoutE2eTwoStepScrollDone
+            ))).toBe(true);
+            if (shouldMove) {
+                expect(new Set((await page.evaluate(() => (
+                    window.fastcheckoutE2eTwoStepScroll
+                ))).map(Math.round)).size).toBeGreaterThan(2);
+            }
+        };
+
+        await page.evaluate(() => {
+            window.require('Magento_Checkout/js/model/quote').shippingMethod(null);
+        });
+        await startScrollSample('bottom');
+        await mobileNext.evaluate((button) => button.click());
+        const firstName = shippingRoot.locator('input[name="firstname"]');
+        const firstNameError = firstName.locator(
+            'xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " field ")][1]' +
+            '//*[contains(@class, "mage-error") or contains(@class, "field-error")]'
+        ).first();
+        const emailError = shippingRoot.locator('input[name="username"]').locator(
+            'xpath=ancestor::form[1]//*[contains(@class, "mage-error") or ' +
+            'contains(@class, "field-error")]'
+        ).first();
+        await expect(firstName).toHaveAttribute('aria-invalid', 'true');
+        await expect(firstNameError).toBeVisible();
+        await expect(emailError).toBeVisible();
+        await expect(page.locator('[data-fastcheckout-shipping-method-error]')).toBeHidden();
+        await expectSmoothScroll(emailError);
+        expect(shippingRequests).toBe(0);
+
+        await fillShippingAddress(page, 'two-step');
+        const rates = page.locator(
+            '#fastcheckout-ko-shipping-root input[name="shipping_method"]'
+        );
+        await expect.poll(() => rates.count(), {timeout: 45_000}).toBeGreaterThan(0);
+        await startScrollSample('top');
+        await mobileNext.evaluate((button) => button.click());
+        const shippingMethodError = page.locator(
+            '#checkout-step-shipping_method [data-fastcheckout-shipping-method-error]'
+        );
+        await expect(shippingMethodError).toBeVisible();
+        await expectSmoothScroll(shippingMethodError);
+        expect(shippingRequests).toBe(0);
+        const regularRateIndex = await rates.evaluateAll((inputs) => {
+            const purchaseOrderRate = inputs.findIndex((input) => (
+                input.value === 'tablerate_bestway'
+            ));
+
+            return purchaseOrderRate >= 0 ? purchaseOrderRate : inputs.findIndex((input) => (
+                !/(?:inpost|locker|pickup)/i.test(input.value)
+            ));
+        });
+        const selectedRate = rates.nth(regularRateIndex >= 0 ? regularRateIndex : 0);
+        await selectedRate.click({force: true});
+        await expect(shippingMethodError).toBeHidden();
+        await page.waitForTimeout(300);
+        expect(shippingRequests).toBe(0);
+
+        await expect(next).toBeHidden();
+        await expect(mobileNext).toBeVisible();
+        await expect(mobileNext).toBeEnabled();
+        const shippingResponse = page.waitForResponse((response) => (
+            response.request().method() === 'POST' &&
+            response.url().includes('/shipping-information')
+        ), {timeout: 60_000});
+        await mobileNext.click({force: true});
+        expect((await shippingResponse).ok()).toBe(true);
+        expect(shippingRequests).toBe(1);
+
+        await expect(root).toHaveAttribute('data-fastcheckout-active-step', 'payment');
+        await expect(shippingRoot).toBeHidden();
+        await expect(paymentStep).toBeVisible();
+        await expect(summary).toBeVisible();
+        await expect(mobileNext).toBeHidden();
+        await expect(page.locator('[data-fastcheckout-place-order-mobile]')).toBeVisible();
+        await expect(mobileStickyInfo).toBeVisible();
+        await page.setViewportSize({width: 1440, height: 900});
+        await expect(placeOrder).toBeVisible();
+        expect(await page.locator('.fc-right-wrapper').evaluate((wrapper) => {
+            const payment = wrapper.firstElementChild.getBoundingClientRect(),
+                summaryColumn = wrapper.lastElementChild.getBoundingClientRect();
+
+            return Math.abs(payment.width / (payment.width + summaryColumn.width) - 0.6) < 0.01;
+        })).toBe(true);
+        await expect(summary.locator('[data-fastcheckout-order-actions]')).toHaveCount(0);
+        await expect(summary.locator('[data-fastcheckout-order-comment]')).toHaveCount(0);
+        await expect(summary.locator('[data-fastcheckout-place-order-ssr]')).toHaveCount(0);
+        await expect(paymentStep.locator('[data-fastcheckout-order-actions]')).toBeVisible();
+        const shippingInformation = summary.locator(
+            '[data-fastcheckout-shipping-information] .shipping-information'
+        );
+        await expect(shippingInformation).toBeVisible();
+        expect(await shippingInformation.evaluate((information) => {
+            const blocks = Array.from(information.querySelectorAll('.ship-to, .ship-via'));
+
+            return blocks.every((block) => {
+                const title = block.querySelector('.shipping-information-title')
+                        .getBoundingClientRect(),
+                    content = block.querySelector('.shipping-information-content')
+                        .getBoundingClientRect();
+
+                return content.left > title.right &&
+                    Math.abs(content.width / (title.width + content.width) - 0.65) < 0.01;
+            });
+        })).toBe(true);
+        const editShippingInformation = shippingInformation.locator('.action-edit').first();
+        await expect(editShippingInformation).toBeVisible();
+        expect(await editShippingInformation.evaluate((button) => {
+            const style = getComputedStyle(button),
+                secondaryStyle = getComputedStyle(document.querySelector('.btn.btn-secondary'));
+
+            return parseFloat(style.paddingTop) > 0 &&
+                parseFloat(style.paddingLeft) > 0 &&
+                parseFloat(style.borderRadius) > 0 &&
+                style.backgroundColor === secondaryStyle.backgroundColor &&
+                style.borderColor === secondaryStyle.borderColor &&
+                style.color === secondaryStyle.color &&
+                style.getPropertyValue('--btn-hover-bg') ===
+                    secondaryStyle.getPropertyValue('--btn-hover-bg');
+        })).toBe(true);
+        await expect.poll(() => page.locator(
+            '#checkout-payment-method-load .payment-method'
+        ).count(), {timeout: 45_000}).toBeGreaterThan(0);
+
+        const purchaseOrder = page.locator(
+            'input[name="payment[method]"][value="purchaseorder"]'
+        );
+        await expect(purchaseOrder).toHaveCount(1);
+        await purchaseOrder.evaluate((input) => input.click());
+        await expect.poll(() => page.evaluate(() => (
+            window.require('Magento_Checkout/js/model/quote').paymentMethod()?.method
+        ))).toBe('purchaseorder');
+
+        const agreements = paymentStep.locator(
+            '[data-fastcheckout-agreements-summary-host] > .checkout-agreements-block'
+        );
+        if (await agreements.count()) {
+            await expect(agreements).toBeVisible();
+            expect(await agreements.evaluate((block) => {
+                const style = getComputedStyle(block);
+
+                return [style.borderTopWidth, style.paddingTop];
+            })).toEqual(['0px', '0px']);
+        }
+
+        const purchaseOrderNumber = page.locator('input[name="payment[po_number]"]');
+        await expect(purchaseOrderNumber).toBeVisible();
+        await placeOrder.evaluate((button) => button.scrollIntoView({block: 'center'}));
+        const purchaseOrderWasVisible = await purchaseOrderNumber.evaluate((input) => {
+            const box = input.getBoundingClientRect();
+
+            return box.top >= 0 && box.bottom <= window.innerHeight;
+        });
+        await page.evaluate(() => {
+            window.fastcheckoutE2eNativeFocus = HTMLElement.prototype.focus;
+            window.fastcheckoutE2ePaymentFocusOptions = [];
+            HTMLElement.prototype.focus = function (options) {
+                if (this.name === 'payment[po_number]') {
+                    window.fastcheckoutE2ePaymentFocusOptions.push(Boolean(
+                        options && options.preventScroll
+                    ));
+                }
+
+                return window.fastcheckoutE2eNativeFocus.apply(this, arguments);
+            };
+        });
+        await startScrollSample(null);
+        await placeOrder.click({force: true});
+        const purchaseOrderError = purchaseOrderNumber.locator(
+            'xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " field ")][1]' +
+            '//*[contains(@class, "mage-error") or contains(@class, "field-error")]'
+        ).first();
+        await expect(purchaseOrderError).toBeVisible();
+        expect(await page.evaluate(() => (
+            window.require('jquery')('html, body').is(':animated')
+        ))).toBe(false);
+        expect(await page.evaluate(() => window.fastcheckoutE2ePaymentFocusOptions))
+            .toContain(true);
+        await expectSmoothScroll(purchaseOrderError, !purchaseOrderWasVisible);
+        await page.evaluate(() => {
+            HTMLElement.prototype.focus = window.fastcheckoutE2eNativeFocus;
+            delete window.fastcheckoutE2eNativeFocus;
+        });
+        await purchaseOrderNumber.fill('FC-E2E');
+        await purchaseOrderNumber.blur();
+
+        expect(await page.evaluate(() => window.location.hash)).toBe('#payment');
+
+        await page.locator(
+            '.fastcheckout-progress .opc-progress-bar-item._complete > span'
+        ).first().evaluate((step) => step.click());
+        await expect(root).toHaveAttribute('data-fastcheckout-active-step', 'shipping');
+        await expect(shippingRoot).toBeVisible();
+        await expect(paymentStep).toBeHidden();
+        await expect(placeOrder).toBeHidden();
+        expect(pageErrors).toEqual([]);
     });
 });

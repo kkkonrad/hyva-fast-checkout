@@ -9,6 +9,13 @@ define([
     var paymentPath = 'checkout.steps.billing-step.payment',
         billingFollowsShipping = true;
 
+    function isTwoStep() {
+        var settings = typeof window !== 'undefined' && window.checkoutConfig &&
+            window.checkoutConfig.fastcheckoutSettings;
+
+        return Boolean(settings && settings.twoStep);
+    }
+
     function getBillingAddressComponent() {
         var components = getBillingAddressComponents();
 
@@ -105,14 +112,6 @@ define([
 
         shipping = registry.get('checkout.steps.shipping-step.shippingAddress');
 
-        if (
-            shipping &&
-            (!quote.shippingMethod || !quote.shippingMethod()) &&
-            !validateShippingAddress(shipping)
-        ) {
-            return false;
-        }
-
         return Boolean(
             shipping &&
             typeof shipping.validateShippingInformation === 'function' &&
@@ -179,10 +178,12 @@ define([
         setBillingFollowsShipping: setBillingFollowsShipping,
         doesBillingFollowShipping: doesBillingFollowShipping,
         applyShippingAsBilling: applyShippingAsBilling,
+        validateShippingAddress: validateShippingAddress,
         validateShippingInformation: validateShippingInformation,
         validateBillingAddress: validateBillingAddress,
         validate: function () {
-            return validateShippingInformation() && validateBillingAddress();
+            return isTwoStep() ||
+                (validateShippingInformation() && validateBillingAddress());
         }
     };
 });

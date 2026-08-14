@@ -6,7 +6,7 @@ const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
 
-function loadMixin(active, initialHash = '') {
+function loadMixin(active, initialHash = '', twoStep = false) {
     let mixin;
     const nativeHashes = [];
     const listeners = {};
@@ -38,6 +38,7 @@ function loadMixin(active, initialHash = '') {
     vm.runInNewContext(source, {
         document: {title: 'Checkout'},
         window: {
+            checkoutConfig: {fastcheckoutSettings: {twoStep}},
             history,
             location,
             addEventListener(type, listener) {
@@ -116,6 +117,18 @@ test('keeps the one-step Fastcheckout URL free of every hash', () => {
 
 test('delegates unchanged outside Fastcheckout', () => {
     const context = loadMixin(false, '#shipping');
+
+    context.navigator.setHash('shipping');
+
+    assert.deepEqual(context.nativeHashes, ['shipping']);
+    assert.equal(context.replacements.length, 0);
+    assert.equal(context.listeners.hashchange, undefined);
+    assert.equal(context.navigator.isProcessed('shipping'), false);
+    assert.deepEqual(context.processed, ['shipping']);
+});
+
+test('delegates every step and hash operation to Magento in two-step mode', () => {
+    const context = loadMixin(true, '#payment', true);
 
     context.navigator.setHash('shipping');
 

@@ -2,8 +2,10 @@
 /**
  * Shipping methods — the KO list owns rates after paint.
  *
+ * @var \Kkkonrad\Fastcheckout\Block\Hyva\Checkout $block
  * @var \Magento\Framework\Escaper $escaper
  */
+$isTwoStep = $block->isTwoStep();
 ?>
 <!-- Container 2: Shipping Method -->
 <div id="opc-shipping_method"
@@ -75,6 +77,23 @@
                                 <!-- ko template: getTemplate() --><!-- /ko -->
                             <!-- /ko -->
                         </div>
+
+                        <?php if ($isTwoStep): ?>
+                            <!-- ko if: rates().length -->
+                            <div class="actions-toolbar fastcheckout-shipping-actions"
+                                 id="shipping-method-buttons-container">
+                                <div class="primary w-full sm:w-auto">
+                                    <button class="btn btn-primary w-full sm:w-auto"
+                                            data-role="opc-continue"
+                                            data-fastcheckout-next-step
+                                            type="submit"
+                                            data-bind="disable: isLoading">
+                                        <span data-bind="i18n: 'Next'"></span>
+                                    </button>
+                                </div>
+                            </div>
+                            <!-- /ko -->
+                        <?php endif; ?>
                     </div>
                 </form>
                 <!-- /ko -->

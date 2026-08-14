@@ -4,6 +4,7 @@
         <fastcheckout>
             <general>
                 <enable>0</enable>
+                <two_step>0</two_step>
             </general>
             <extended>
                 <show_discount>1</show_discount>
