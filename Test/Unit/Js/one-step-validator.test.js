@@ -329,6 +329,46 @@ test('does not overwrite a separate billing address the customer opened', () => 
     assert.equal(billingAddress, null);
 });
 
+test('adopts the native same-as-shipping state restored by billing cancel', () => {
+    const shippingAddress = {
+        getCacheKey: () => 'shipping',
+        getType: () => 'new-customer-address'
+    };
+    let billingAddress = shippingAddress;
+    let sameAsShipping = true;
+    const billing = {
+        isAddressSameAsShipping(value) {
+            if (typeof value === 'undefined') {
+                return sameAsShipping;
+            }
+            sameAsShipping = value;
+        }
+    };
+    const validator = loadValidator(
+        {
+            isVirtual: () => false,
+            paymentMethod: () => ({method: 'purchaseorder'}),
+            shippingAddress: () => shippingAddress,
+            billingAddress: () => billingAddress
+        },
+        (address) => {
+            billingAddress = address;
+        },
+        {
+            get(name) {
+                return name.endsWith('.payments-list.purchaseorder-form') ? billing : null;
+            }
+        }
+    );
+
+    validator.setBillingFollowsShipping(false);
+
+    assert.equal(validator.applyShippingAsBilling(), true);
+    assert.equal(validator.doesBillingFollowShipping(), true);
+    assert.equal(billingAddress, shippingAddress);
+    assert.equal(sameAsShipping, true);
+});
+
 function registeredAdditionalValidators(twoStep) {
     let definition;
     let registrations = 0;

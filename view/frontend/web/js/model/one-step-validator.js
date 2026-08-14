@@ -84,10 +84,20 @@ define([
 
     function applyShippingAsBilling() {
         var shippingAddress = quote.shippingAddress && quote.shippingAddress(),
-            billingAddress = quote.billingAddress && quote.billingAddress();
+            billingAddress = quote.billingAddress && quote.billingAddress(),
+            components = getBillingAddressComponents();
 
         if (quote.isVirtual && quote.isVirtual()) {
             return Boolean(quote.billingAddress && quote.billingAddress());
+        }
+
+        if (!billingFollowsShipping &&
+            addressesShareCacheKey(billingAddress, shippingAddress) &&
+            components.some(function (component) {
+                return typeof component.isAddressSameAsShipping === 'function' &&
+                    component.isAddressSameAsShipping();
+            })) {
+            billingFollowsShipping = true;
         }
 
         if (billingFollowsShipping && shippingAddress &&
@@ -96,7 +106,7 @@ define([
             billingAddress = quote.billingAddress && quote.billingAddress();
         }
 
-        getBillingAddressComponents().forEach(function (component) {
+        components.forEach(function (component) {
             syncBillingComponent(component, billingAddress, shippingAddress);
         });
 
