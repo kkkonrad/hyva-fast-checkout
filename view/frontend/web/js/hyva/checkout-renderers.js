@@ -643,11 +643,7 @@ define([
     }
 
     function submitActivePayment() {
-        var method = activePaymentMethodElement();
-
-        if (method) {
-            method.setAttribute('data-fastcheckout-validation-attempted', 'true');
-        }
+        var method;
 
         window.setTimeout(function () {
             var renderer = getActivePaymentRenderer(),
@@ -656,6 +652,7 @@ define([
                 scrollTop = scroller.scrollTop,
                 nativeFocus;
 
+            method = activePaymentMethodElement();
             if (isTwoStep() && method && window.HTMLElement) {
                 nativeFocus = window.HTMLElement.prototype.focus;
                 window.HTMLElement.prototype.focus = function (options) {
@@ -665,6 +662,16 @@ define([
                         {preventScroll: true}
                     ) : options);
                 };
+            }
+            if (method) {
+                method.setAttribute('data-fastcheckout-validation-attempted', 'true');
+                method.querySelectorAll(
+                    'input:not([name]), select:not([name]), textarea:not([name])'
+                ).forEach(function (control, index) {
+                    if (control.required || control.matches('.required-entry, [data-validate]')) {
+                        control.name = 'fastcheckout_validation_' + index;
+                    }
+                });
             }
             try {
                 if (active && !active.disabled) {

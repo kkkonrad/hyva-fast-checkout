@@ -16,11 +16,31 @@ function loadPreview({processed = false, tax = false, twoStep = true} = {}) {
     );
     const Component = function () {};
 
+    Component.prototype.getValue = function () {
+        nativeCalls += 1;
+
+        return 'native';
+    };
     if (tax) {
-        Component.prototype.getIncludingValue = function () {};
-        Component.prototype.getExcludingValue = function () {};
+        Component.prototype.getIncludingValue = Component.prototype.getValue;
+        Component.prototype.getExcludingValue = Component.prototype.getValue;
     }
-    Component.extend = (methods) => methods;
+    Component.extend = (methods) => Object.fromEntries(Object.entries(methods).map(([name, method]) => [
+        name,
+        /\b_super\b/.test(method) ? function (...args) {
+            const previous = this._super;
+
+            this._super = (...superArgs) => Component.prototype[name].apply(
+                this,
+                superArgs.length ? superArgs : args
+            );
+            try {
+                return method.apply(this, args);
+            } finally {
+                this._super = previous;
+            }
+        } : method
+    ]));
 
     vm.runInNewContext(source, {
         window: {checkoutConfig: {fastcheckoutSettings: {twoStep}}},
@@ -40,12 +60,7 @@ function loadPreview({processed = false, tax = false, twoStep = true} = {}) {
 
             return {shipping_amount: 0};
         },
-        getFormattedPrice: (value) => `price:${value}`,
-        _super() {
-            nativeCalls += 1;
-
-            return 'native';
-        }
+        getFormattedPrice: (value) => `price:${value}`
     };
 
     return {context, extension, nativeCalls: () => nativeCalls, totalsCalls: () => totalsCalls};
@@ -56,14 +71,17 @@ test('previews the selected native rate only on the two-step shipping step', () 
     const tax = loadPreview({tax: true});
     const payment = loadPreview({processed: true});
     const oneStep = loadPreview({twoStep: false});
+    const oneStepTax = loadPreview({tax: true, twoStep: false});
 
     assert.equal(core.extension.getValue.call(core.context), 'price:5');
     assert.equal(tax.extension.getIncludingValue.call(tax.context), 'price:6');
     assert.equal(tax.extension.getExcludingValue.call(tax.context), 'price:5');
     assert.equal(payment.extension.getValue.call(payment.context), 'native');
     assert.equal(oneStep.extension.getValue.call(oneStep.context), 'native');
+    assert.equal(oneStepTax.extension.getExcludingValue.call(oneStepTax.context), 'native');
     assert.equal(core.nativeCalls(), 0);
     assert.equal(payment.nativeCalls(), 1);
     assert.equal(oneStep.nativeCalls(), 1);
+    assert.equal(oneStepTax.nativeCalls(), 1);
     assert.equal(core.totalsCalls(), 1);
 });

@@ -29,25 +29,25 @@ define([
         return typeof value === 'undefined' ? null : component.getFormattedPrice(value);
     }
 
-    function valueOrSuper(component, field) {
-        var preview = previewValue(component, field);
-
-        return preview === null ? component._super() : preview;
-    }
-
     return function (Component) {
         var extension = {
             getValue: function () {
-                return valueOrSuper(this, 'price_excl_tax');
+                var preview = previewValue(this, 'price_excl_tax');
+
+                return preview === null ? this._super() : preview;
             }
         };
 
         if (Component.prototype && typeof Component.prototype.getIncludingValue === 'function') {
             extension.getIncludingValue = function () {
-                return valueOrSuper(this, 'price_incl_tax');
+                var preview = previewValue(this, 'price_incl_tax');
+
+                return preview === null ? this._super() : preview;
             };
             extension.getExcludingValue = function () {
-                return valueOrSuper(this, 'price_excl_tax');
+                var preview = previewValue(this, 'price_excl_tax');
+
+                return preview === null ? this._super() : preview;
             };
         }
 
