@@ -1485,6 +1485,12 @@
     line-height: inherit;
 }
 
+#fastcheckout-checkout [data-fastcheckout-mobile-sticky-info] svg {
+    width: 0.875rem;
+    height: 0.875rem;
+    flex: 0 0 auto;
+}
+
 /* Spinner inside the visible place-order proxies. */
 #fastcheckout-checkout .fastcheckout-place-order-btn .place-order-spinner {
     display: none;
