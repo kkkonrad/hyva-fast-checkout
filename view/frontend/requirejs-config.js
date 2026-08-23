@@ -19,6 +19,12 @@ var config = {
             'Magento_Checkout/js/view/summary/abstract-total': {
                 'Kkkonrad_Fastcheckout/js/mixin/summary-total-mixin': true
             },
+            'Magento_Checkout/js/view/summary/shipping': {
+                'Kkkonrad_Fastcheckout/js/mixin/summary-shipping-preview-mixin': true
+            },
+            'Magento_Tax/js/view/checkout/summary/shipping': {
+                'Kkkonrad_Fastcheckout/js/mixin/summary-shipping-preview-mixin': true
+            },
             'Magento_Checkout/js/view/summary/cart-items': {
                 'Kkkonrad_Fastcheckout/js/mixin/summary-cart-items-mixin': true
             },

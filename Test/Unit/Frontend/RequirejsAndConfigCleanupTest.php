@@ -28,13 +28,15 @@ class RequirejsAndConfigCleanupTest extends TestCase
         );
         $this->assertStringNotContainsString("'Magento_Checkout/js/view/payment'", $source);
         $this->assertStringContainsString("'Magento_Checkout/js/view/summary/abstract-total'", $source);
+        $this->assertStringContainsString("'Magento_Checkout/js/view/summary/shipping'", $source);
+        $this->assertStringContainsString("'Magento_Tax/js/view/checkout/summary/shipping'", $source);
         $this->assertStringContainsString("'Magento_Checkout/js/view/summary/cart-items'", $source);
         $this->assertStringContainsString("'Magento_SalesRule/js/view/payment/discount'", $source);
         $this->assertStringContainsString(
             "'Magento_CheckoutAgreements/js/view/checkout-agreements'",
             $source
         );
-        $this->assertSame(10, substr_count($source, ': true'));
+        $this->assertSame(12, substr_count($source, ': true'));
 
         foreach ([
             'Magento_Checkout/js/checkout-data',

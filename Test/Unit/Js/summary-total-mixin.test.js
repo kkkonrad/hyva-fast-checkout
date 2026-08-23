@@ -40,12 +40,12 @@ function isFullMode(active, twoStep, nativeResult) {
     };
 }
 
-test('uses Magento step state in two-step mode and only forces one-step totals', () => {
+test('keeps the full summary visible in both Fastcheckout layouts', () => {
     const twoStep = isFullMode(true, true, false);
     const oneStep = isFullMode(true, false, false);
 
-    assert.equal(twoStep.result, false);
-    assert.equal(twoStep.nativeCalls(), 1);
+    assert.equal(twoStep.result, true);
+    assert.equal(twoStep.nativeCalls(), 0);
     assert.equal(oneStep.result, true);
     assert.equal(oneStep.nativeCalls(), 0);
 });

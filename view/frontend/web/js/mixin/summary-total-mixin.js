@@ -3,16 +3,10 @@ define([
 ], function (isFastcheckoutActive) {
     'use strict';
 
-    function isTwoStep() {
-        var settings = window.checkoutConfig && window.checkoutConfig.fastcheckoutSettings;
-
-        return Boolean(settings && settings.twoStep);
-    }
-
     return function (Component) {
         return Component.extend({
             isFullMode: function () {
-                if (isFastcheckoutActive() && !isTwoStep()) {
+                if (isFastcheckoutActive()) {
                     return Boolean(this.getTotals());
                 }
 
