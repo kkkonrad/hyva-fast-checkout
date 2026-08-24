@@ -1105,7 +1105,7 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             }).map((message) => message.textContent.trim());
         });
         await expect(purchaseOrderNumber).toBeVisible();
-        await purchaseOrderNumber.fill('FC-E2E-' + Date.now());
+        await purchaseOrderNumber.fill('');
         await purchaseOrderNumber.blur();
 
         await addressValidationField.fill('');
@@ -1138,6 +1138,7 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             ))).map(Math.round)).size).toBeGreaterThan(2);
         }
         expect(paymentRequests).toBe(0);
+        await expect.poll(() => visibleErrorText(purchaseOrderNumber)).toEqual([]);
         await addressValidationField.fill('Jan');
         await addressValidationField.blur();
         await expect.poll(() => visibleErrorText(addressValidationField)).toEqual([]);
@@ -1152,8 +1153,6 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
         })).toBe(true);
         await expect.poll(() => nativeButton.isEnabled()).toBe(true);
 
-        await purchaseOrderNumber.fill('');
-        await purchaseOrderNumber.blur();
         await clickProxy();
         await expect.poll(() => visibleErrorText(purchaseOrderNumber)).not.toEqual([]);
         expect(paymentRequests).toBe(0);

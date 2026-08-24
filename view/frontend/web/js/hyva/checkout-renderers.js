@@ -835,15 +835,17 @@ define([
             return;
         }
 
+        shippingValid = oneStepValidator.validateShippingInformation();
+        if (!shippingValid) {
+            return;
+        }
+
         if (!activePaymentCode()) {
-            shippingValid = oneStepValidator.validateShippingInformation();
-            if (shippingValid) {
-                validatePaymentMethod();
-                scroller.scrollTop = scrollTop;
-                window.setTimeout(function () {
-                    watchForValidationError(document.getElementById('fastcheckout-checkout'));
-                }, 0);
-            }
+            validatePaymentMethod();
+            scroller.scrollTop = scrollTop;
+            window.setTimeout(function () {
+                watchForValidationError(document.getElementById('fastcheckout-checkout'));
+            }, 0);
             return;
         }
 
