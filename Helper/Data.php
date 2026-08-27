@@ -18,6 +18,8 @@ class Data extends AbstractHelper
 
     const XML_PATH_ENABLE = 'fastcheckout/general/enable';
     const XML_PATH_TWO_STEP = 'fastcheckout/general/two_step';
+    const XML_PATH_SEPARATE_ORDER_ACTIONS = 'fastcheckout/general/separate_order_actions';
+    const XML_PATH_PLACE_ORDER_OUTSIDE_SUMMARY = 'fastcheckout/general/place_order_outside_summary';
 
     const XML_PATH_DISCOUNT_VISIBILITY = 'fastcheckout/extended/show_discount';
     const XML_PATH_COMMENT_VISIBILITY = 'fastcheckout/extended/show_comment';
@@ -61,6 +63,22 @@ class Data extends AbstractHelper
     {
         return (bool)$this->scopeConfig->getValue(
             self::XML_PATH_TWO_STEP,
+            ScopeInterface::SCOPE_STORE
+        );
+    }
+
+    public function isSeparateOrderActions(): bool
+    {
+        return (bool)$this->scopeConfig->getValue(
+            self::XML_PATH_SEPARATE_ORDER_ACTIONS,
+            ScopeInterface::SCOPE_STORE
+        );
+    }
+
+    public function isPlaceOrderOutsideSummary(): bool
+    {
+        return (bool)$this->scopeConfig->getValue(
+            self::XML_PATH_PLACE_ORDER_OUTSIDE_SUMMARY,
             ScopeInterface::SCOPE_STORE
         );
     }

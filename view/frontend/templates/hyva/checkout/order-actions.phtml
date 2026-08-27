@@ -10,29 +10,39 @@
  */
 $showComment = $block->isShowComment();
 $orderActionsStandalone = $orderActionsStandalone ?? false;
+$separateOrderActions = $block->isSeparateOrderActions();
+$renderOrderExtras = $renderOrderExtras ?? true;
+$renderPlaceOrder = $renderPlaceOrder ?? true;
+$placeOrderOutsideContainer = $placeOrderOutsideContainer ?? $separateOrderActions;
 ?>
 <?php if ($orderActionsStandalone): ?>
-<div class="card space-y-6" data-fastcheckout-order-actions>
+<div class="<?= $separateOrderActions ? 'space-y-6' : 'card space-y-6' ?>"
+     data-fastcheckout-order-actions>
 <?php endif; ?>
-    <?php /* Visual proxy; native KO agreements stay owned by the active payment method. */ ?>
-    <div class="fastcheckout-payment-method-ko-container"
-         data-fastcheckout-agreements-summary-host
-         hidden></div>
+    <?php if ($renderOrderExtras): ?>
+        <?php /* Visual proxy; native KO agreements stay owned by the active payment method. */ ?>
+        <div class="<?= $separateOrderActions ? 'card ' : '' ?>fastcheckout-payment-method-ko-container"
+             data-fastcheckout-agreements-summary-host
+             hidden></div>
 
-    <?php if ($showComment): ?>
-        <div class="pt-4"
-             data-fastcheckout-order-comment
-             data-bind="scope: 'checkout.sidebar.fastcheckout-order-comment'">
-            <!-- ko template: getTemplate() --><!-- /ko -->
-        </div>
+        <?php if ($showComment): ?>
+            <div class="<?= $separateOrderActions ? 'card' : 'pt-4' ?>"
+                 data-fastcheckout-order-comment
+                 data-fastcheckout-order-comment-layout="<?= $separateOrderActions ? 'separate' : 'classic' ?>"
+                 data-bind="scope: 'checkout.sidebar.fastcheckout-order-comment'">
+                <!-- ko template: getTemplate() --><!-- /ko -->
+            </div>
+        <?php endif; ?>
     <?php endif; ?>
 
-    <?php /* The native payment renderer and its validators remain in place. */ ?>
-    <div class="pt-2 fastcheckout-place-order-section">
+    <?php if ($renderPlaceOrder): ?>
+        <?php /* The native payment renderer and its validators remain in place. */ ?>
+        <div class="<?= $placeOrderOutsideContainer ? '' : 'pt-2 ' ?>fastcheckout-place-order-section">
         <button class="btn btn-primary w-full items-center justify-center gap-2
                        hidden md:flex fastcheckout-place-order-btn"
                 type="button"
                 data-fastcheckout-place-order
+                data-fastcheckout-place-order-layout="<?= $placeOrderOutsideContainer ? 'outside' : 'inside' ?>"
                 data-fastcheckout-place-order-ssr>
             <span class="place-order-spinner hidden"
                   data-fastcheckout-place-order-spinner
@@ -55,7 +65,8 @@ $orderActionsStandalone = $orderActionsStandalone ?? false;
                 <?= $escaper->escapeHtml(__('Place Order')) ?>
             </span>
         </button>
-    </div>
+        </div>
+    <?php endif; ?>
 <?php if ($orderActionsStandalone): ?>
 </div>
 <?php endif; ?>

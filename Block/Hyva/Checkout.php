@@ -66,6 +66,16 @@ class Checkout extends Template
         return $this->helper->isTwoStep();
     }
 
+    public function isSeparateOrderActions(): bool
+    {
+        return $this->helper->isSeparateOrderActions();
+    }
+
+    public function isPlaceOrderOutsideSummary(): bool
+    {
+        return $this->helper->isPlaceOrderOutsideSummary();
+    }
+
     /**
      * JSON for an inline script, escaped like Magento's JsonHexTag serializer.
      *

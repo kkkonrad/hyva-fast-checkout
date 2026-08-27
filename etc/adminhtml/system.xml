@@ -23,6 +23,18 @@
                     <comment>No keeps the current one-step layout. Yes uses Magento's native Shipping and Review &amp; Payments navigation with the same Fastcheckout styling.</comment>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                 </field>
+                <field id="separate_order_actions" translate="label comment" type="select"
+                       sortOrder="5" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Use separate checkout extras layout?</label>
+                    <comment>No keeps agreements, newsletter and comment inside the order summary. Yes shows agreements and newsletter in a separate card without a heading and the comment in its own card.</comment>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
+                <field id="place_order_outside_summary" translate="label comment" type="select"
+                       sortOrder="6" showInDefault="1" showInWebsite="1" showInStore="1">
+                    <label>Show Place Order outside the order summary container?</label>
+                    <comment>No keeps the button inside the order summary. Yes shows it directly on the checkout background. This setting applies to the one-step layout.</comment>
+                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
+                </field>
             </group>
             <group id="extended" translate="label" type="text"
                    sortOrder="2" showInDefault="1" showInWebsite="1" showInStore="1">

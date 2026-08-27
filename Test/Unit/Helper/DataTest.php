@@ -120,6 +120,50 @@ class DataTest extends TestCase
         $this->assertTrue($helper->isTwoStep());
     }
 
+    public function testSeparateOrderActionsUsesStoreScopedConfiguration(): void
+    {
+        $context = $this->createMock(Context::class);
+        $scopeConfig = $this->createMock(ScopeConfigInterface::class);
+        $scopeConfig->expects($this->once())
+            ->method('getValue')
+            ->with(Data::XML_PATH_SEPARATE_ORDER_ACTIONS, ScopeInterface::SCOPE_STORE)
+            ->willReturn('1');
+        $context->method('getScopeConfig')->willReturn($scopeConfig);
+        $context->method('getLogger')->willReturn($this->createMock(LoggerInterface::class));
+
+        $helper = new Data(
+            $context,
+            $this->createMock(JsonHelper::class),
+            $this->createMock(DesignInterface::class),
+            $this->createMock(ThemeFactory::class),
+            $this->createMock(HyvaThemes::class)
+        );
+
+        $this->assertTrue($helper->isSeparateOrderActions());
+    }
+
+    public function testPlaceOrderOutsideSummaryUsesStoreScopedConfiguration(): void
+    {
+        $context = $this->createMock(Context::class);
+        $scopeConfig = $this->createMock(ScopeConfigInterface::class);
+        $scopeConfig->expects($this->once())
+            ->method('getValue')
+            ->with(Data::XML_PATH_PLACE_ORDER_OUTSIDE_SUMMARY, ScopeInterface::SCOPE_STORE)
+            ->willReturn('1');
+        $context->method('getScopeConfig')->willReturn($scopeConfig);
+        $context->method('getLogger')->willReturn($this->createMock(LoggerInterface::class));
+
+        $helper = new Data(
+            $context,
+            $this->createMock(JsonHelper::class),
+            $this->createMock(DesignInterface::class),
+            $this->createMock(ThemeFactory::class),
+            $this->createMock(HyvaThemes::class)
+        );
+
+        $this->assertTrue($helper->isPlaceOrderOutsideSummary());
+    }
+
     private function createHelper(
         string $configValue,
         JsonHelper $jsonHelper,

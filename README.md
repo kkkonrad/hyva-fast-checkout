@@ -75,6 +75,10 @@ The store administrator can:
 - enable or disable Fastcheckout;
 - switch between the default one-page flow and Magento's native two-step
   Shipping / Review & Payments navigation;
+- optionally show agreements and newsletter in a heading-free card and the
+  order comment in another card;
+- choose whether Place Order stays in the order-summary container or appears
+  directly on the checkout background in one-page mode;
 - show or hide the order comment, discount code and newsletter option;
 - limit payment methods according to the selected shipping method;
 - optionally assign guest orders to an existing customer account.

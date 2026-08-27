@@ -683,12 +683,36 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             '[data-fastcheckout-newsletter-proxy] input[type="checkbox"]'
         );
         await expect(orderComment).toBeVisible();
+        const separateOrderActions = await page.locator(
+            '[data-fastcheckout-order-comment]'
+        ).getAttribute('data-fastcheckout-order-comment-layout') === 'separate';
+        const placeOrderOutsideSummary = await initialProxy.getAttribute(
+            'data-fastcheckout-place-order-layout'
+        ) === 'outside';
+        expect(await initialProxy.evaluate((button) => ({
+            commentOutsideSummary: !document.querySelector(
+                '[data-fastcheckout-totals-card]'
+            ).contains(document.querySelector('[data-fastcheckout-order-comment]')),
+            placeOrderOutsideCard: button.closest('.card') === null
+        }))).toEqual({
+            commentOutsideSummary: separateOrderActions && placeOrderOutsideSummary,
+            placeOrderOutsideCard: placeOrderOutsideSummary
+        });
         expect(await agreementsPortal.evaluate((host) => ({
             agreements: getComputedStyle(host.firstElementChild).borderTopWidth,
+            card: host.classList.contains('card'),
+            heading: Boolean(host.querySelector(
+                ':scope > h1, :scope > h2, :scope > h3, :scope > [role="heading"]'
+            )),
             comment: getComputedStyle(
                 document.querySelector('[data-fastcheckout-order-comment]')
             ).borderTopWidth
-        }))).toEqual({agreements: '0px', comment: '0px'});
+        }))).toEqual({
+            agreements: '0px',
+            card: separateOrderActions,
+            heading: false,
+            comment: separateOrderActions ? '1px' : '0px'
+        });
         await orderComment.fill('Fastcheckout provider comment');
         await expect(newsletterProxy).toHaveCount(1);
         expect(await newsletterProxy.evaluate((input) => {
@@ -859,7 +883,7 @@ test.describe('Fastcheckout native Magento compatibility host', () => {
             };
         })).toEqual({
             inPaymentCard: false,
-            inTotalsCard: true,
+            inTotalsCard: !placeOrderOutsideSummary,
             nativeOwnedByPayment: true,
             agreementsBeforeComment: true,
             agreementsBeforeButton: true

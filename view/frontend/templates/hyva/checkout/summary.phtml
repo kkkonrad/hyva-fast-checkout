@@ -9,10 +9,17 @@
  * @var \Magento\Framework\Escaper $escaper
  */
 $isTwoStep = $block->isTwoStep();
+$separateOrderActions = $block->isSeparateOrderActions() && !$isTwoStep;
+$placeOrderOutsideSummary = $block->isPlaceOrderOutsideSummary() && !$isTwoStep;
+$hasOutsideOrderActions = $placeOrderOutsideSummary;
 ?>
 <!-- Container 4: Order Summary -->
 <div class="fc-container-4 space-y-6 min-w-0 w-full">
-    <div class="card sticky top-6 space-y-6" data-fastcheckout-totals-card>
+    <?php if ($hasOutsideOrderActions): ?>
+        <div class="sticky top-6 space-y-6">
+    <?php endif; ?>
+    <div class="card<?= $hasOutsideOrderActions ? '' : ' sticky top-6 space-y-6' ?>"
+         data-fastcheckout-totals-card>
         <div class="relative space-y-6">
             <div class="flex items-center justify-between border-b border-gray-200 pb-3 mb-4">
                 <h2 class="text-xl font-semibold text-gray-900">
@@ -40,12 +47,24 @@ $isTwoStep = $block->isTwoStep();
                 <!-- /ko -->
             </div>
 
-            <?php if (!$isTwoStep): ?>
+            <?php if (!$isTwoStep && (!$placeOrderOutsideSummary || !$separateOrderActions)): ?>
                 <?php $orderActionsStandalone = false; ?>
+                <?php $renderOrderExtras = !$placeOrderOutsideSummary || !$separateOrderActions; ?>
+                <?php $renderPlaceOrder = !$placeOrderOutsideSummary; ?>
+                <?php $placeOrderOutsideContainer = false; ?>
                 <?php // phpcs:ignore Magento2.Security.IncludeFile.FoundIncludeFile -- trusted module template. ?>
                 <?php include $block->getTemplateFile('Kkkonrad_Fastcheckout::hyva/checkout/order-actions.phtml'); ?>
             <?php endif; ?>
-
         </div>
     </div>
+
+    <?php if ($hasOutsideOrderActions): ?>
+            <?php $orderActionsStandalone = false; ?>
+            <?php $renderOrderExtras = $separateOrderActions; ?>
+            <?php $renderPlaceOrder = true; ?>
+            <?php $placeOrderOutsideContainer = true; ?>
+            <?php // phpcs:ignore Magento2.Security.IncludeFile.FoundIncludeFile -- trusted module template. ?>
+            <?php include $block->getTemplateFile('Kkkonrad_Fastcheckout::hyva/checkout/order-actions.phtml'); ?>
+        </div>
+    <?php endif; ?>
 </div>

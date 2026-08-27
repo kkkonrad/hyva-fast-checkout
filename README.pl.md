@@ -75,6 +75,10 @@ Administrator sklepu może:
 - włączyć lub wyłączyć Fastcheckout;
 - przełączyć domyślny proces jednokrokowy na natywną nawigację Magento
   Dostawa / Podsumowanie i płatność;
+- opcjonalnie wyświetlić zgody i newsletter w bloku bez nagłówka, a komentarz
+  w osobnym bloku;
+- wybrać, czy przycisk „Złóż zamówienie” pozostaje w kontenerze podsumowania,
+  czy jest wyświetlany bezpośrednio na tle checkoutu w trybie jednokrokowym;
 - pokazać albo ukryć pole komentarza, kod rabatowy i zapis do newslettera;
 - ograniczyć dostępne płatności zależnie od wybranej metody dostawy;
 - opcjonalnie przypisywać zamówienia gości do istniejącego konta klienta.

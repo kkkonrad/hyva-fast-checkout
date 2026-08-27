@@ -1212,7 +1212,9 @@
     width: 100%;
 }
 
-#fastcheckout-checkout .fastcheckout-native-discount-title {
+#fastcheckout-checkout .fastcheckout-native-discount-title,
+#fastcheckout-checkout [data-fastcheckout-order-comment-layout='separate']
+    .fastcheckout-order-comment-title {
     margin: 0 0 1rem;
     padding: 0 0 1rem;
     border-bottom: 1px solid #e5e7eb;

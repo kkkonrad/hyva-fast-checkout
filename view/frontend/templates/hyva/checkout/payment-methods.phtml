@@ -62,6 +62,9 @@ $isTwoStep = $block->isTwoStep();
     </div>
     <?php if ($isTwoStep): ?>
         <?php $orderActionsStandalone = true; ?>
+        <?php $renderOrderExtras = true; ?>
+        <?php $renderPlaceOrder = true; ?>
+        <?php $placeOrderOutsideContainer = $block->isSeparateOrderActions(); ?>
         <?php // phpcs:ignore Magento2.Security.IncludeFile.FoundIncludeFile -- trusted module template. ?>
         <?php include $block->getTemplateFile('Kkkonrad_Fastcheckout::hyva/checkout/order-actions.phtml'); ?>
     <?php endif; ?>

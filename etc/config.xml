@@ -5,6 +5,8 @@
             <general>
                 <enable>0</enable>
                 <two_step>0</two_step>
+                <separate_order_actions>0</separate_order_actions>
+                <place_order_outside_summary>0</place_order_outside_summary>
             </general>
             <extended>
                 <show_discount>1</show_discount>
