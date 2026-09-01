@@ -17,17 +17,8 @@ class Json extends ArraySerialized
         }
 
         if (!is_array($value)) {
-            try {
-                $value = json_decode((string)$value, true, 512, JSON_THROW_ON_ERROR);
-            } catch (\JsonException) {
-                throw new LocalizedException(__('Invalid JSON provided for Fastcheckout configuration.'));
-            }
-        }
-
-        if (!is_array($value)) {
             throw new LocalizedException(__('Shipping-payment mapping must be a JSON array or object.'));
         }
-        unset($value['__empty']);
 
         $mapping = [];
         foreach ($value as $key => $row) {

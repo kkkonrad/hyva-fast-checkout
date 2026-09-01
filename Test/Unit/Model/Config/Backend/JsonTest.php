@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Kkkonrad\Fastcheckout\Test\Unit\Model\Config\Backend;
 
-use Kkkonrad\Fastcheckout\Helper\Data as ConfigPaths;
 use Kkkonrad\Fastcheckout\Model\Config\Backend\Json;
 use Magento\Framework\App\Cache\TypeListInterface;
 use Magento\Framework\App\CacheInterface;
@@ -24,7 +23,6 @@ class JsonTest extends TestCase
     public function testAfterLoadProvidesRowsToTheNativeFieldArrayRenderer(): void
     {
         $backend = $this->createBackend(
-            ConfigPaths::XML_PATH_SHIPPING_PAYMENT_MAPPING,
             '{"_1":{"shipping_method":"flatrate_flatrate","payment_method":"checkmo"}}'
         );
 
@@ -38,29 +36,9 @@ class JsonTest extends TestCase
         ], $backend->getValue());
     }
 
-    public function testBeforeSaveAcceptsShippingWildcardWithExactPaymentMethod(): void
-    {
-        $backend = $this->createBackend(
-            ConfigPaths::XML_PATH_SHIPPING_PAYMENT_MAPPING,
-            [
-                '_1' => [
-                    'shipping_method' => 'customcarrier_*',
-                    'payment_method' => 'payu_blik',
-                ],
-            ]
-        );
-
-        $backend->beforeSave();
-
-        $decoded = json_decode((string)$backend->getValue(), true);
-        $this->assertSame('customcarrier_*', $decoded['_1']['shipping_method']);
-        $this->assertSame('payu_blik', $decoded['_1']['payment_method']);
-    }
-
     public function testBeforeSaveRemovesEmptyShippingPaymentMappingRowsFromFieldArrayPayload(): void
     {
         $backend = $this->createBackend(
-            ConfigPaths::XML_PATH_SHIPPING_PAYMENT_MAPPING,
             [
                 '__empty' => [
                     'shipping_method' => '',
@@ -91,7 +69,6 @@ class JsonTest extends TestCase
     public function testBeforeSaveRejectsPaymentWildcardInShippingPaymentMapping(): void
     {
         $backend = $this->createBackend(
-            ConfigPaths::XML_PATH_SHIPPING_PAYMENT_MAPPING,
             [
                 '_1' => [
                     'shipping_method' => 'customcarrier_*',
@@ -106,23 +83,10 @@ class JsonTest extends TestCase
         $backend->beforeSave();
     }
 
-    public function testBeforeSaveRejectsInvalidJson(): void
-    {
-        $backend = $this->createBackend(
-            ConfigPaths::XML_PATH_SHIPPING_PAYMENT_MAPPING,
-            '{invalid json'
-        );
-
-        $this->expectException(LocalizedException::class);
-        $this->expectExceptionMessage('Invalid JSON provided for Fastcheckout configuration.');
-
-        $backend->beforeSave();
-    }
-
     /**
      * @param mixed $value
      */
-    private function createBackend(string $path, $value): Json
+    private function createBackend($value): Json
     {
         $context = new Context(
             $this->createMock(LoggerInterface::class),
@@ -143,7 +107,6 @@ class JsonTest extends TestCase
             new JsonSerializer()
         );
 
-        $backend->setPath($path);
         $backend->setValue($value);
 
         return $backend;

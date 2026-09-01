@@ -13,7 +13,6 @@
 "Enable Module?","Włączyć moduł?"
 "Go to Cart","Przejdź do koszyka"
 "Good news: We have restored your cart items so you can retry checkout without adding products again.","Dobra wiadomość: przywróciliśmy produkty w Twoim koszyku, więc możesz ponowić próbę zakupu bez ponownego ich dodawania."
-"Invalid JSON provided for Fastcheckout configuration.","Podano nieprawidłowy JSON w konfiguracji Fastcheckout."
 "Loading checkout...","Ładowanie procesu zamówienia..."
 "No keeps the current one-step layout. Yes uses Magento's native Shipping and Review & Payments navigation with the same Fastcheckout styling.","Opcja „Nie” zachowuje obecny układ jednoetapowy. Opcja „Tak” używa natywnych kroków Magento „Dostawa” oraz „Podsumowanie i płatność”, zachowując styl Fastcheckout."
 "No keeps agreements, newsletter and comment inside the order summary. Yes shows agreements and newsletter in a separate card without a heading and the comment in its own card.","Opcja „Nie” zachowuje zgody, newsletter i komentarz w standardowym układzie. Opcja „Tak” wyświetla zgody i newsletter w osobnym bloku bez nagłówka, a komentarz w osobnym bloku."
