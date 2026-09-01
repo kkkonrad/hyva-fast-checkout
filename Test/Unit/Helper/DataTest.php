@@ -8,7 +8,6 @@ use Hyva\Theme\Service\HyvaThemes;
 use Kkkonrad\Fastcheckout\Helper\Data;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\Helper\Context;
-use Magento\Framework\Json\Helper\Data as JsonHelper;
 use Magento\Framework\Module\Manager as ModuleManager;
 use Magento\Framework\View\DesignInterface;
 use Magento\Framework\View\Design\ThemeInterface;
@@ -18,18 +17,6 @@ use Psr\Log\LoggerInterface;
 
 class DataTest extends TestCase
 {
-    public function testInvalidShippingPaymentMappingIsIgnored(): void
-    {
-        $json = $this->createMock(JsonHelper::class);
-        $json->method('jsonDecode')->willThrowException(new \InvalidArgumentException('invalid'));
-
-        self::assertSame([], $this->mappingHelper('{invalid', $json)->getShippingPaymentMapping());
-
-        $json = $this->createMock(JsonHelper::class);
-        $json->method('jsonDecode')->willReturn('checkmo');
-        self::assertSame([], $this->mappingHelper('"checkmo"', $json)->getShippingPaymentMapping());
-    }
-
     public function testCanUseHyvaNativeCheckoutMemoizesResult(): void
     {
         $context = $this->createMock(Context::class);
@@ -44,7 +31,6 @@ class DataTest extends TestCase
 
         $helper = new Data(
             $context,
-            $this->createMock(JsonHelper::class),
             $this->createMock(DesignInterface::class),
             $this->createMock(HyvaThemes::class)
         );
@@ -78,7 +64,6 @@ class DataTest extends TestCase
 
         $helper = new Data(
             $context,
-            $this->createMock(JsonHelper::class),
             $design,
             $hyvaThemes
         );
@@ -102,7 +87,6 @@ class DataTest extends TestCase
 
         $helper = new Data(
             $context,
-            $this->createMock(JsonHelper::class),
             $this->createMock(DesignInterface::class),
             $this->createMock(HyvaThemes::class)
         );
@@ -117,21 +101,5 @@ class DataTest extends TestCase
             [Data::XML_PATH_SEPARATE_ORDER_ACTIONS, 'isSeparateOrderActions'],
             [Data::XML_PATH_PLACE_ORDER_OUTSIDE_SUMMARY, 'isPlaceOrderOutsideSummary'],
         ];
-    }
-
-    private function mappingHelper(string $value, JsonHelper $json): Data
-    {
-        $context = $this->createMock(Context::class);
-        $scopeConfig = $this->createMock(ScopeConfigInterface::class);
-        $scopeConfig->method('getValue')->willReturn($value);
-        $context->method('getScopeConfig')->willReturn($scopeConfig);
-        $context->method('getLogger')->willReturn($this->createMock(LoggerInterface::class));
-
-        return new Data(
-            $context,
-            $json,
-            $this->createMock(DesignInterface::class),
-            $this->createMock(HyvaThemes::class)
-        );
     }
 }

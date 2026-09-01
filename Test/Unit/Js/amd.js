@@ -14,10 +14,6 @@ module.exports = function loadAmd(modulePath, dependencies = {}, globals = {}) {
 
     vm.runInNewContext(fs.readFileSync(filename, 'utf8'), Object.assign({
         define(names, factory) {
-            if (typeof names === 'function') {
-                exported = names();
-                return;
-            }
             exported = factory(...names.map((name) => {
                 if (!Object.hasOwn(dependencies, name)) {
                     throw new Error(`Missing AMD test dependency: ${name}`);

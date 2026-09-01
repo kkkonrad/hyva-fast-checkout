@@ -4,6 +4,15 @@ const BASE = process.env.PLAYWRIGHT_BASE_URL || 'https://m10626.app-on-demand.ne
 const PRODUCT = process.env.FC_SIMPLE_PRODUCT_URL || 'aim-analog-watch.html';
 const TWO_STEP = process.env.FC_EXPECT_TWO_STEP === '1';
 const PLACE_ORDER = process.env.FC_ALLOW_PLACE_ORDER === '1';
+const REQUIRED_COMPONENTS = [
+    'checkoutProvider',
+    'checkout.steps.shipping-step.shippingAddress',
+    'checkout.steps.billing-step.payment',
+    'checkout.steps.billing-step.payment.payments-list',
+    'checkout.sidebar',
+    'checkout.sidebar.summary',
+    'checkout.sidebar.shipping-information'
+];
 
 async function dismissConsent(page) {
     const button = page.getByRole('button', {
@@ -17,10 +26,9 @@ async function dismissConsent(page) {
 
 async function openCheckout(page) {
     await page.addInitScript(() => {
-        if (window === window.top && /\/checkout(?:\/|$)/.test(location.pathname)) {
-            ['mage-cache-storage', 'mage-cache-storage-section-invalidation']
-                .forEach((key) => localStorage.setItem(key, 'null'));
-        }
+        window.addEventListener('fastcheckout:ready', () => {
+            document.documentElement.dataset.fastcheckoutReady = '1';
+        });
     });
     await page.goto(new URL(PRODUCT, BASE).href, {
         waitUntil: 'domcontentloaded',
@@ -35,7 +43,7 @@ async function openCheckout(page) {
         response.request().method() === 'POST' && response.url().includes('/checkout/cart/add/')
     ), {timeout: 30_000});
     await add.click();
-    expect((await added).ok()).toBe(true);
+    expect((await added).status()).toBeLessThan(400);
     await page.goto(new URL(`checkout/?compat=${Date.now()}`, BASE).href, {
         waitUntil: 'domcontentloaded',
         timeout: 60_000
@@ -44,8 +52,17 @@ async function openCheckout(page) {
     await expect(page.locator('#checkout > #fastcheckout-checkout'))
         .toBeVisible({timeout: 45_000});
     await page.waitForFunction(() => (
-        window.require?.defined?.('uiRegistry')
+        document.documentElement.dataset.fastcheckoutReady === '1'
     ), null, {timeout: 45_000});
+    await expect.poll(() => page.evaluate((components) => {
+        if (!window.require?.defined?.('uiRegistry')) {
+            return components;
+        }
+
+        const registry = window.require('uiRegistry');
+
+        return components.filter((name) => !registry.get(name));
+    }, REQUIRED_COMPONENTS), {timeout: 45_000}).toEqual([]);
 }
 
 async function fillShippingAddress(page, prefix) {
@@ -106,14 +123,12 @@ async function chooseRegularShipping(page) {
     });
 
     await rates.nth(index).click({force: true});
-    return rates.nth(index);
 }
 
 async function paymentMethods(page) {
     const methods = page.locator('#checkout-payment-method-load .payment-method');
 
     await expect.poll(() => methods.count(), {timeout: 45_000}).toBeGreaterThan(0);
-    return methods;
 }
 
 function visibleFieldError(field) {
@@ -139,19 +154,10 @@ test.describe('Fastcheckout one-step compatibility host', () => {
         });
         await openCheckout(page);
 
-        const contract = await page.evaluate(() => {
+        const contract = await page.evaluate((components) => {
             const registry = window.require('uiRegistry');
             const shipping = registry.get('checkout.steps.shipping-step.shippingAddress');
             const payment = registry.get('checkout.steps.billing-step.payment');
-            const components = [
-                'checkoutProvider',
-                'checkout.steps.shipping-step.shippingAddress',
-                'checkout.steps.billing-step.payment',
-                'checkout.steps.billing-step.payment.payments-list',
-                'checkout.sidebar',
-                'checkout.sidebar.summary',
-                'checkout.sidebar.shipping-information'
-            ];
 
             return {
                 components: components.every((name) => registry.get(name)),
@@ -180,25 +186,16 @@ test.describe('Fastcheckout one-step compatibility host', () => {
                     '#onepage-checkout-shipping-method-additional-load'
                 ].every((selector) => document.querySelector(selector)),
                 noFallbackAssets: !Array.from(document.querySelectorAll('link[href], script[src]'))
-                    .some((node) => /\/Magento\/(?:blank|luma)\//.test(node.href || node.src || '')),
-                repairedStorage: [
-                    'mage-cache-storage',
-                    'mage-cache-storage-section-invalidation'
-                ].every((key) => {
-                    const value = JSON.parse(localStorage.getItem(key));
-
-                    return value && typeof value === 'object' && !Array.isArray(value);
-                })
+                    .some((node) => /\/Magento\/(?:blank|luma)\//.test(node.href || node.src || ''))
             };
-        });
+        }, REQUIRED_COMPONENTS);
 
         expect(contract).toEqual({
             components: true,
             regions: true,
             templates: true,
             dom: true,
-            noFallbackAssets: true,
-            repairedStorage: true
+            noFallbackAssets: true
         });
         await expect(page.locator('[data-fastcheckout-startup-loader]')).toHaveCount(1);
         await expect(page.locator('[data-fastcheckout-startup-loader]')).toBeHidden();

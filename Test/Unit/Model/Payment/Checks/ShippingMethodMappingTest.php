@@ -6,9 +6,11 @@ namespace Kkkonrad\Fastcheckout\Test\Unit\Model\Payment\Checks;
 
 use Kkkonrad\Fastcheckout\Helper\Data as Helper;
 use Kkkonrad\Fastcheckout\Model\Payment\Checks\ShippingMethodMapping;
+use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Payment\Model\MethodInterface;
 use Magento\Quote\Model\Quote;
 use Magento\Quote\Model\Quote\Address;
+use Magento\Store\Model\ScopeInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -59,7 +61,10 @@ class ShippingMethodMappingTest extends TestCase
     ): bool {
         $helper = $this->createMock(Helper::class);
         $helper->method('isEnable')->willReturn($enabled);
-        $helper->method('getShippingPaymentMapping')->willReturn($mapping);
+        $scopeConfig = $this->createMock(ScopeConfigInterface::class);
+        $scopeConfig->method('getValue')
+            ->with('fastcheckout/extended/shipping_payment_mapping', ScopeInterface::SCOPE_STORE)
+            ->willReturn(json_encode($mapping));
 
         $address = $this->createMock(Address::class);
         $address->method('getShippingMethod')->willReturn($shipping);
@@ -69,6 +74,6 @@ class ShippingMethodMappingTest extends TestCase
         $method = $this->createMock(MethodInterface::class);
         $method->method('getCode')->willReturn($payment);
 
-        return (new ShippingMethodMapping($helper))->isApplicable($method, $quote);
+        return (new ShippingMethodMapping($helper, $scopeConfig))->isApplicable($method, $quote);
     }
 }

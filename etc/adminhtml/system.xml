@@ -64,7 +64,7 @@
                     <label>Payment Methods by Shipping Method</label>
                     <comment>Shipping methods may use wildcard entries such as carrier_*. Payment methods must be selected by exact method code.</comment>
                     <frontend_model>Kkkonrad\Fastcheckout\Block\Adminhtml\System\Config\ShippingPaymentMapping</frontend_model>
-                    <backend_model>Kkkonrad\Fastcheckout\Model\Config\Backend\Json</backend_model>
+                    <backend_model>Magento\Config\Model\Config\Backend\Serialized\ArraySerialized</backend_model>
                 </field>
             </group>
         </section>

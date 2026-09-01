@@ -7,7 +7,6 @@ namespace Kkkonrad\Fastcheckout\Helper;
 use Hyva\Theme\Service\HyvaThemes;
 use Magento\Framework\App\Helper\AbstractHelper;
 use Magento\Framework\App\Helper\Context;
-use Magento\Framework\Json\Helper\Data as JsonHelper;
 use Magento\Framework\View\DesignInterface;
 use Magento\Store\Model\ScopeInterface;
 
@@ -22,12 +21,10 @@ class Data extends AbstractHelper
     public const XML_PATH_COMMENT_VISIBILITY = 'fastcheckout/extended/show_comment';
     public const XML_PATH_SUBSCRIBE_VISIBILITY = 'fastcheckout/extended/show_subscribe';
     public const XML_PATH_SUBSCRIBE_BY_DEFAULT = 'fastcheckout/extended/subscribe_by_default';
-    public const XML_PATH_SHIPPING_PAYMENT_MAPPING = 'fastcheckout/extended/shipping_payment_mapping';
     private ?bool $canUseHyvaNativeCheckoutCache = null;
 
     public function __construct(
         Context $context,
-        private JsonHelper $jsonHelper,
         private DesignInterface $design,
         private HyvaThemes $hyvaThemes
     ) {
@@ -66,27 +63,6 @@ class Data extends AbstractHelper
     public function isShowComment(): bool
     {
         return (bool)$this->scopeConfig->getValue(self::XML_PATH_COMMENT_VISIBILITY, ScopeInterface::SCOPE_STORE);
-    }
-
-    public function getShippingPaymentMapping(): array
-    {
-        $mapping = $this->scopeConfig->getValue(
-            self::XML_PATH_SHIPPING_PAYMENT_MAPPING,
-            ScopeInterface::SCOPE_STORE
-        );
-        if (!$mapping) {
-            return [];
-        }
-
-        try {
-            $decoded = $this->jsonHelper->jsonDecode($mapping);
-            return is_array($decoded) ? $decoded : [];
-        } catch (\Throwable $exception) {
-            $this->_logger->warning('Invalid fastcheckout shipping/payment mapping', [
-                'exception' => $exception,
-            ]);
-            return [];
-        }
     }
 
     public function isShowDiscount(): bool

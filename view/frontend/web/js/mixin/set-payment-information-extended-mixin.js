@@ -8,11 +8,6 @@ define([
 ], function ($, wrapper, quote, customer, shippingSaveCoordinator, isFastcheckoutActive) {
     'use strict';
 
-    function isReady() {
-        return (customer.isLoggedIn() || Boolean(quote.guestEmail)) &&
-            (quote.isVirtual() || Boolean(quote.shippingMethod()));
-    }
-
     return function (setPaymentInformationExtended) {
         return wrapper.wrap(setPaymentInformationExtended, function (
             originalAction,
@@ -20,16 +15,17 @@ define([
             paymentData,
             skipBilling
         ) {
-            var settings = window.checkoutConfig && window.checkoutConfig.fastcheckoutSettings;
-
-            if (!isFastcheckoutActive() || settings && settings.twoStep) {
+            if (!isFastcheckoutActive() || window.checkoutConfig &&
+                window.checkoutConfig.fastcheckoutSettings &&
+                window.checkoutConfig.fastcheckoutSettings.twoStep) {
                 return originalAction(messageContainer, paymentData, skipBilling);
             }
-            if (!isReady()) {
+            if ((!customer.isLoggedIn() && !quote.guestEmail) ||
+                (!quote.isVirtual() && !quote.shippingMethod())) {
                 return $.Deferred().reject().promise();
             }
 
-            return $.when(shippingSaveCoordinator.ensureSaved()).then(function () {
+            return shippingSaveCoordinator.ensureSaved().then(function () {
                 return originalAction(messageContainer, paymentData, skipBilling);
             });
         });

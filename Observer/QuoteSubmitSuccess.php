@@ -121,7 +121,6 @@ class QuoteSubmitSuccess implements ObserverInterface
                 $this->checkoutSession->{$method}();
             } catch (\Throwable) {
                 // Never block order success on session cleanup failures.
-                continue;
             }
         }
     }

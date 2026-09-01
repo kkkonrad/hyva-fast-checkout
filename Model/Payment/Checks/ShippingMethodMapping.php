@@ -5,20 +5,29 @@ declare(strict_types=1);
 namespace Kkkonrad\Fastcheckout\Model\Payment\Checks;
 
 use Kkkonrad\Fastcheckout\Helper\Data as Helper;
+use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Payment\Model\Checks\SpecificationInterface;
 use Magento\Payment\Model\MethodInterface;
 use Magento\Quote\Model\Quote;
+use Magento\Store\Model\ScopeInterface;
 
 class ShippingMethodMapping implements SpecificationInterface
 {
-    public function __construct(private Helper $helper)
-    {
+    private const XML_PATH_MAPPING = 'fastcheckout/extended/shipping_payment_mapping';
+
+    public function __construct(
+        private Helper $helper,
+        private ScopeConfigInterface $scopeConfig
+    ) {
     }
 
     public function isApplicable(MethodInterface $paymentMethod, Quote $quote): bool
     {
-        $mapping = $this->helper->getShippingPaymentMapping();
-        if (!$this->helper->isEnable() || !$mapping || $quote->isVirtual()) {
+        $mapping = json_decode((string)$this->scopeConfig->getValue(
+            self::XML_PATH_MAPPING,
+            ScopeInterface::SCOPE_STORE
+        ), true);
+        if (!$this->helper->isEnable() || !is_array($mapping) || !$mapping || $quote->isVirtual()) {
             return true;
         }
 
@@ -29,35 +38,19 @@ class ShippingMethodMapping implements SpecificationInterface
         }
 
         $payment = (string)$paymentMethod->getCode();
+        $carrier = explode('_', $shipping, 2)[0];
         $listed = false;
         foreach ($mapping as $rule) {
             if (!is_array($rule) || (string)($rule['payment_method'] ?? '') !== $payment) {
                 continue;
             }
             $listed = true;
-            if ($this->matches((string)($rule['shipping_method'] ?? ''), $shipping)) {
+            $expected = trim((string)($rule['shipping_method'] ?? ''));
+            if ($expected === $carrier || fnmatch($expected, $shipping)) {
                 return true;
             }
         }
 
         return !$listed;
-    }
-
-    private function matches(string $rule, string $shipping): bool
-    {
-        $expected = trim($rule);
-        $carrier = explode('_', $shipping, 2)[0];
-        if ($expected === '' || $shipping === '') {
-            return false;
-        }
-        if ($expected === '*' || $expected === $shipping || $expected === $carrier) {
-            return true;
-        }
-        if (!str_ends_with($expected, '*')) {
-            return false;
-        }
-
-        $prefix = rtrim(substr($expected, 0, -1), '_');
-        return $prefix !== '' && str_starts_with($shipping, $prefix . '_');
     }
 }

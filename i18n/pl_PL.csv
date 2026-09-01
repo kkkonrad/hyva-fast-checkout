@@ -7,7 +7,6 @@
 "Back to Cart","Wróć do koszyka"
 "Complete your purchase details below.","Uzupełnij poniższe dane, aby sfinalizować zamówienie."
 "Default Configurations","Konfiguracja domyślna"
-"Each shipping-payment mapping row must be an object.","Każdy wiersz mapowania dostawy-płatność musi być obiektem."
 "Edit Cart","Edytuj koszyk"
 "Enable Module?","Włączyć moduł?"
 "Go to Cart","Przejdź do koszyka"
@@ -20,13 +19,11 @@
 Order:,Zamówienie:
 "Payment Failed","Płatność nie powiodła się"
 "Payment Methods by Shipping Method","Metody płatności według metody dostawy"
-"Payment methods must use exact method codes. Wildcards such as * or payu_* are not supported.","Metody płatności muszą używać dokładnych kodów. Maski typu * lub payu_* nie są obsługiwane."
 "Please enter your shipping address details to estimate shipping rates.","Wpisz adres dostawy, aby obliczyć koszty dostawy."
 Reason:,Powód:
 "Retry Checkout","Ponów próbę zakupu"
 "Secure SSL Checkout","Bezpieczna płatność SSL"
 "Shipping methods may use wildcard entries such as carrier_*. Payment methods must be selected by exact method code.","Metody dostawy mogą używać masek, np. carrier_*. Metody płatności muszą być wybrane po dokładnym kodzie."
-"Shipping-payment mapping must be a JSON array or object.","Mapowanie dostawy-płatność musi być tablicą lub obiektem JSON."
 "Show Subscribe to Newsletter?","Pokazać zapis do newslettera?"
 "Show comment field?","Pokazać pole komentarza?"
 "Show discount form?","Pokazać formularz rabatu?"

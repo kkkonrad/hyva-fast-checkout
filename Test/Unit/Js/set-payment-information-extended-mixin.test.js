@@ -32,8 +32,7 @@ function load({active = true, twoStep = false, email = 'guest@example.com', meth
                     },
                     promise: () => promise
                 };
-            },
-            when: (value) => Promise.resolve(value)
+            }
         },
         'mage/utils/wrapper': wrapper(),
         'Magento_Checkout/js/model/quote': {
