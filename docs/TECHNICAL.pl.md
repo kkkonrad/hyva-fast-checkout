@@ -183,10 +183,9 @@ patchy ani wpisów DI w Kkkonrad_Fastcheckout.**
 - Mixiny nie są rejestrowane na akcjach wyboru adresu lub metody, transporcie
   REST, rate processorach ani `customer-data`, więc łańcuchy innych vendorów
   pozostają nienaruszone.
-- Walidator one-step jest zwykłym dzieckiem kanonicznego węzła
-  `checkout.steps.billing-step.payment.additional-payment-validators`; nie
-  zastępuje listy ani walidatorów rejestrowanych przez inne moduły. W trybie
-  dwukrokowym jest no-op bez zmiany kolejności rejestracji.
+- Walidator one-step jest rejestrowany w natywnym rejestrze Magento
+  `additional-validators` przez istniejący bootstrap checkoutu. Nie zastępuje
+  walidatorów innych modułów, a w trybie dwukrokowym jest no-op.
 
 Nie dodawaj per-vendor DI „pod Fastcheckout” w projekcie sklepu, jeśli ten sam
 renderer jest już ładowany przez standardowy `checkout_index_index` Magento.
@@ -238,23 +237,10 @@ Po zmianach w `view/frontend/web` odśwież opublikowane kopie Magento w
 `pub/static`, aby storefront nie serwował starego JS lub CSS:
 
 ```bash
-app/code/Kkkonrad/Fastcheckout/bin/sync-frontend-static.sh
+php bin/magento setup:static-content:deploy -f pl_PL en_US
 php bin/magento cache:flush
 ```
 
-Skrypt pomocniczy jest przeznaczony dla środowisk developerskich, gdy istniejące
-katalogi `pub/static/frontend/*/Kkkonrad_Fastcheckout` nie są odświeżane
-automatycznie. Na produkcji należy używać natywnego
-`setup:static-content:deploy` Magento. `requirejs-config.js` leży poza `web/`; po
-jego zmianie skopiuj go do drzew static albo ponownie uruchom wdrożenie plików
-statycznych. Samo przeładowanie strony nie zastąpi istniejącej kopii.
-
-Jeśli Magento używa Subresource Integrity i istnieje
-`pub/static/frontend/sri-hashes.json`, skrypt celowo przerwie pracę. W takim
-środowisku przenieś lub usuń wyłącznie istniejące katalogi
-`pub/static/frontend/<Vendor>/<theme>/<locale>/Kkkonrad_Fastcheckout`, a następnie
-uruchom `setup:static-content:deploy`. Magento może nie nadpisać istniejącego
-pliku, a tylko natywne wdrożenie odtworzy go z poprawnym hashem SRI.
-
-Nie edytuj ręcznie `pub/static/deployed_version.txt`; skrypt zapisuje poprawną
-wersję zasobów bez końcowego znaku nowej linii.
+We wszystkich środowiskach używaj natywnego deploymentu Magento. Publikuje on
+`requirejs-config.js`, odtwarza hashe SRI, gdy są włączone, i zarządza
+`pub/static/deployed_version.txt`; nie edytuj tego pliku ręcznie.

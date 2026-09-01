@@ -4,105 +4,38 @@ declare(strict_types=1);
 
 namespace Kkkonrad\Fastcheckout\Model\Config\Backend;
 
-use Kkkonrad\Fastcheckout\Helper\Data as ConfigPaths;
-use Magento\Framework\App\Config\Value;
+use Magento\Config\Model\Config\Backend\Serialized\ArraySerialized;
 use Magento\Framework\Exception\LocalizedException;
 
-class Json extends Value
+class Json extends ArraySerialized
 {
-    /**
-     * Validate JSON payload before saving.
-     */
     public function beforeSave()
     {
-        parent::beforeSave();
-
         $value = $this->getValue();
         if ($value === '' || $value === null) {
-            return $this;
+            return parent::beforeSave();
         }
 
-        $decoded = $this->decodeValue($value);
-        $normalized = $this->normalizeFastcheckoutConfig($decoded);
-        $this->validateFastcheckoutConfig($normalized);
-
-        if (is_array($value) || $normalized !== $decoded) {
-            $encoded = json_encode($normalized);
-            if ($encoded === false) {
+        if (!is_array($value)) {
+            try {
+                $value = json_decode((string)$value, true, 512, JSON_THROW_ON_ERROR);
+            } catch (\JsonException) {
                 throw new LocalizedException(__('Invalid JSON provided for Fastcheckout configuration.'));
             }
-            $this->setValue($encoded);
         }
 
-        return $this;
-    }
-
-    /**
-     * @param mixed $value
-     * @return mixed
-     * @throws LocalizedException
-     */
-    private function decodeValue($value)
-    {
-        if (is_array($value)) {
-            return $value;
+        if (!is_array($value)) {
+            throw new LocalizedException(__('Shipping-payment mapping must be a JSON array or object.'));
         }
-
-        $decoded = json_decode((string)$value, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new LocalizedException(__('Invalid JSON provided for Fastcheckout configuration.'));
-        }
-
-        return $decoded;
-    }
-
-    /**
-     * @param mixed $decoded
-     * @return mixed
-     */
-    private function normalizeFastcheckoutConfig($decoded)
-    {
-        if ((string)$this->getPath() === ConfigPaths::XML_PATH_SHIPPING_PAYMENT_MAPPING) {
-            return $this->normalizeShippingPaymentMapping($decoded);
-        }
-
-        return $decoded;
-    }
-
-    /**
-     * @param mixed $decoded
-     * @throws LocalizedException
-     */
-    private function validateFastcheckoutConfig($decoded): void
-    {
-        $path = (string)$this->getPath();
-
-        if ($path === ConfigPaths::XML_PATH_SHIPPING_PAYMENT_MAPPING) {
-            $this->validateShippingPaymentMapping($decoded);
-            return;
-        }
-
-    }
-
-    /**
-     * @param mixed $decoded
-     * @return mixed
-     */
-    private function normalizeShippingPaymentMapping($decoded)
-    {
-        if (!is_array($decoded)) {
-            return $decoded;
-        }
+        unset($value['__empty']);
 
         $mapping = [];
-        foreach ($decoded as $key => $row) {
-            if (!is_array($row)) {
-                if ($row === '' || $row === null) {
-                    continue;
-                }
-
-                $mapping[$key] = $row;
+        foreach ($value as $key => $row) {
+            if ($row === '' || $row === null) {
                 continue;
+            }
+            if (!is_array($row)) {
+                throw new LocalizedException(__('Each shipping-payment mapping row must be an object.'));
             }
 
             $shippingMethod = trim((string)($row['shipping_method'] ?? ''));
@@ -110,54 +43,18 @@ class Json extends Value
             if ($shippingMethod === '' || $paymentMethod === '') {
                 continue;
             }
+            if (strpos($paymentMethod, '*') !== false) {
+                throw new LocalizedException(
+                    __('Payment methods must use exact method codes. Wildcards such as * or payu_* are not supported.')
+                );
+            }
 
             $row['shipping_method'] = $shippingMethod;
             $row['payment_method'] = $paymentMethod;
             $mapping[$key] = $row;
         }
 
-        return $mapping;
+        $this->setValue($mapping);
+        return parent::beforeSave();
     }
-
-    /**
-     * @param mixed $decoded
-     * @throws LocalizedException
-     */
-    private function validateShippingPaymentMapping($decoded): void
-    {
-        if (!is_array($decoded)) {
-            throw new LocalizedException(__('Shipping-payment mapping must be a JSON array or object.'));
-        }
-
-        foreach ($decoded as $row) {
-            if ($row === '' || $row === null) {
-                continue;
-            }
-
-            if (!is_array($row)) {
-                throw new LocalizedException(__('Each shipping-payment mapping row must be an object.'));
-            }
-
-            $paymentMethodCode = $row['payment_method'] ?? '';
-            if ($paymentMethodCode === '') {
-                continue;
-            }
-
-            $this->validateExactPaymentMethodCode($paymentMethodCode);
-        }
-    }
-
-    /**
-     * @param mixed $paymentMethodCode
-     * @throws LocalizedException
-     */
-    private function validateExactPaymentMethodCode($paymentMethodCode): void
-    {
-        $paymentMethodCode = trim((string)$paymentMethodCode);
-
-        if ($paymentMethodCode === '' || strpos($paymentMethodCode, '*') !== false) {
-            throw new LocalizedException(__('Payment methods must use exact method codes. Wildcards such as * or payu_* are not supported.'));
-        }
-    }
-
 }

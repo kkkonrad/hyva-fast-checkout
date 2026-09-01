@@ -22,8 +22,6 @@
     "magento/module-checkout-agreements": "100.*",
     "magento/module-config": "101.*",
     "magento/module-customer": "103.*",
-    "magento/module-directory": "100.*",
-    "magento/module-downloadable": "100.*",
     "magento/module-newsletter": "100.*",
     "magento/module-sales": "100.*|101.*|102.*|103.*",
     "magento/module-quote": "100.*|101.*|102.*|103.*",

@@ -32,7 +32,6 @@ class FastcheckoutHandleTest extends TestCase
         $this->assertStringContainsString('requirejs-config.js', $checkout);
         $this->assertStringContainsString('hyva-default-checkout.css', $source);
         $this->assertStringContainsString('Kkkonrad_Fastcheckout::hyva/checkout.phtml', $source);
-        $this->assertStringNotContainsString('fastcheckout-one-step-validator', $checkout);
         $this->assertStringNotContainsString('fastcheckout-newsletter', $checkout);
         $this->assertStringNotContainsString('fastcheckout-order-comment', $checkout);
         $this->assertStringContainsString('name="fastcheckout-newsletter"', $components);

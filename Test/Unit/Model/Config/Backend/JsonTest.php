@@ -15,11 +15,29 @@ use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Model\ActionValidator\RemoveAction;
 use Magento\Framework\Model\Context;
 use Magento\Framework\Registry;
+use Magento\Framework\Serialize\Serializer\Json as JsonSerializer;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
 class JsonTest extends TestCase
 {
+    public function testAfterLoadProvidesRowsToTheNativeFieldArrayRenderer(): void
+    {
+        $backend = $this->createBackend(
+            ConfigPaths::XML_PATH_SHIPPING_PAYMENT_MAPPING,
+            '{"_1":{"shipping_method":"flatrate_flatrate","payment_method":"checkmo"}}'
+        );
+
+        $backend->afterLoad();
+
+        $this->assertSame([
+            '_1' => [
+                'shipping_method' => 'flatrate_flatrate',
+                'payment_method' => 'checkmo',
+            ],
+        ], $backend->getValue());
+    }
+
     public function testBeforeSaveAcceptsShippingWildcardWithExactPaymentMethod(): void
     {
         $backend = $this->createBackend(
@@ -118,7 +136,11 @@ class JsonTest extends TestCase
             $context,
             $this->createMock(Registry::class),
             $this->createMock(ScopeConfigInterface::class),
-            $this->createMock(TypeListInterface::class)
+            $this->createMock(TypeListInterface::class),
+            null,
+            null,
+            [],
+            new JsonSerializer()
         );
 
         $backend->setPath($path);

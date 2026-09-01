@@ -3,7 +3,7 @@ define([
     'Magento_Ui/js/core/app',
     'Magento_Checkout/js/model/quote',
     'Magento_Checkout/js/model/checkout-data-resolver',
-    'Magento_Checkout/js/checkout-data',
+    'Magento_Checkout/js/model/payment/additional-validators',
     'Magento_Customer/js/customer-data',
     'Magento_Checkout/js/model/totals',
     'Magento_Checkout/js/model/payment-service',
@@ -18,7 +18,7 @@ define([
     app,
     quote,
     checkoutDataResolver,
-    checkoutData,
+    additionalValidators,
     customerData,
     totals,
     paymentService,
@@ -985,6 +985,7 @@ define([
             return;
         }
         initialized = true;
+        additionalValidators.registerValidator(oneStepValidator);
 
         if (root) {
             root.addEventListener('click', function (event) {

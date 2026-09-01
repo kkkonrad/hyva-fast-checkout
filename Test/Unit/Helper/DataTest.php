@@ -98,13 +98,16 @@ class DataTest extends TestCase
         $this->assertTrue($helper->canUseHyvaNativeCheckout());
     }
 
-    public function testTwoStepUsesStoreScopedConfiguration(): void
+    /**
+     * @dataProvider checkoutLayoutFlagProvider
+     */
+    public function testCheckoutLayoutFlagUsesStoreScopedConfiguration(string $path, string $method): void
     {
         $context = $this->createMock(Context::class);
         $scopeConfig = $this->createMock(ScopeConfigInterface::class);
         $scopeConfig->expects($this->once())
             ->method('getValue')
-            ->with(Data::XML_PATH_TWO_STEP, ScopeInterface::SCOPE_STORE)
+            ->with($path, ScopeInterface::SCOPE_STORE)
             ->willReturn('1');
         $context->method('getScopeConfig')->willReturn($scopeConfig);
         $context->method('getLogger')->willReturn($this->createMock(LoggerInterface::class));
@@ -117,51 +120,16 @@ class DataTest extends TestCase
             $this->createMock(HyvaThemes::class)
         );
 
-        $this->assertTrue($helper->isTwoStep());
+        $this->assertTrue($helper->{$method}());
     }
 
-    public function testSeparateOrderActionsUsesStoreScopedConfiguration(): void
+    public static function checkoutLayoutFlagProvider(): array
     {
-        $context = $this->createMock(Context::class);
-        $scopeConfig = $this->createMock(ScopeConfigInterface::class);
-        $scopeConfig->expects($this->once())
-            ->method('getValue')
-            ->with(Data::XML_PATH_SEPARATE_ORDER_ACTIONS, ScopeInterface::SCOPE_STORE)
-            ->willReturn('1');
-        $context->method('getScopeConfig')->willReturn($scopeConfig);
-        $context->method('getLogger')->willReturn($this->createMock(LoggerInterface::class));
-
-        $helper = new Data(
-            $context,
-            $this->createMock(JsonHelper::class),
-            $this->createMock(DesignInterface::class),
-            $this->createMock(ThemeFactory::class),
-            $this->createMock(HyvaThemes::class)
-        );
-
-        $this->assertTrue($helper->isSeparateOrderActions());
-    }
-
-    public function testPlaceOrderOutsideSummaryUsesStoreScopedConfiguration(): void
-    {
-        $context = $this->createMock(Context::class);
-        $scopeConfig = $this->createMock(ScopeConfigInterface::class);
-        $scopeConfig->expects($this->once())
-            ->method('getValue')
-            ->with(Data::XML_PATH_PLACE_ORDER_OUTSIDE_SUMMARY, ScopeInterface::SCOPE_STORE)
-            ->willReturn('1');
-        $context->method('getScopeConfig')->willReturn($scopeConfig);
-        $context->method('getLogger')->willReturn($this->createMock(LoggerInterface::class));
-
-        $helper = new Data(
-            $context,
-            $this->createMock(JsonHelper::class),
-            $this->createMock(DesignInterface::class),
-            $this->createMock(ThemeFactory::class),
-            $this->createMock(HyvaThemes::class)
-        );
-
-        $this->assertTrue($helper->isPlaceOrderOutsideSummary());
+        return [
+            [Data::XML_PATH_TWO_STEP, 'isTwoStep'],
+            [Data::XML_PATH_SEPARATE_ORDER_ACTIONS, 'isSeparateOrderActions'],
+            [Data::XML_PATH_PLACE_ORDER_OUTSIDE_SUMMARY, 'isPlaceOrderOutsideSummary'],
+        ];
     }
 
     private function createHelper(

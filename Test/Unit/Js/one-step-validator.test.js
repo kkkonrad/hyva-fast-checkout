@@ -369,37 +369,6 @@ test('adopts the native same-as-shipping state restored by billing cancel', () =
     assert.equal(sameAsShipping, true);
 });
 
-function registeredAdditionalValidators(twoStep) {
-    let definition;
-    let registrations = 0;
-    const source = fs.readFileSync(
-        path.resolve(__dirname, '../../../view/frontend/web/js/view/one-step-validator.js'),
-        'utf8'
-    );
-
-    vm.runInNewContext(source, {
-        window: {checkoutConfig: {fastcheckoutSettings: {twoStep}}},
-        define(dependencies, factory) {
-            definition = factory(
-                {extend: (value) => value},
-                {registerValidator: () => registrations++},
-                {validate: () => true}
-            );
-        }
-    });
-
-    if (definition.initialize) {
-        definition.initialize.call({_super() {}});
-    }
-
-    return registrations;
-}
-
-test('keeps Magento additional-validator registration timing in both modes', () => {
-    assert.equal(registeredAdditionalValidators(false), 1);
-    assert.equal(registeredAdditionalValidators(true), 1);
-});
-
 test('registered cross-step validation is a no-op in two-step mode', () => {
     let validator;
     const source = fs.readFileSync(

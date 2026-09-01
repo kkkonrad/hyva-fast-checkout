@@ -22,8 +22,4 @@
         <plugin name="fastcheckout_checkout_failure"
                 type="Kkkonrad\Fastcheckout\Plugin\Checkout\Controller\Onepage\Failure"/>
     </type>
-    <type name="Magento\Checkout\Controller\Onepage\Success">
-        <plugin name="fastcheckout_checkout_success"
-                type="Kkkonrad\Fastcheckout\Plugin\Checkout\Controller\Onepage\Success"/>
-    </type>
 </config>

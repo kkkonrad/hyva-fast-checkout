@@ -11,14 +11,13 @@
 $isTwoStep = $block->isTwoStep();
 $separateOrderActions = $block->isSeparateOrderActions() && !$isTwoStep;
 $placeOrderOutsideSummary = $block->isPlaceOrderOutsideSummary() && !$isTwoStep;
-$hasOutsideOrderActions = $placeOrderOutsideSummary;
 ?>
 <!-- Container 4: Order Summary -->
 <div class="fc-container-4 space-y-6 min-w-0 w-full">
-    <?php if ($hasOutsideOrderActions): ?>
+    <?php if ($placeOrderOutsideSummary): ?>
         <div class="sticky top-6 space-y-6">
     <?php endif; ?>
-    <div class="card<?= $hasOutsideOrderActions ? '' : ' sticky top-6 space-y-6' ?>"
+    <div class="card<?= $placeOrderOutsideSummary ? '' : ' sticky top-6 space-y-6' ?>"
          data-fastcheckout-totals-card>
         <div class="relative space-y-6">
             <div class="flex items-center justify-between border-b border-gray-200 pb-3 mb-4">
@@ -48,7 +47,6 @@ $hasOutsideOrderActions = $placeOrderOutsideSummary;
             </div>
 
             <?php if (!$isTwoStep && (!$placeOrderOutsideSummary || !$separateOrderActions)): ?>
-                <?php $orderActionsStandalone = false; ?>
                 <?php $renderOrderExtras = !$placeOrderOutsideSummary || !$separateOrderActions; ?>
                 <?php $renderPlaceOrder = !$placeOrderOutsideSummary; ?>
                 <?php $placeOrderOutsideContainer = false; ?>
@@ -58,8 +56,7 @@ $hasOutsideOrderActions = $placeOrderOutsideSummary;
         </div>
     </div>
 
-    <?php if ($hasOutsideOrderActions): ?>
-            <?php $orderActionsStandalone = false; ?>
+    <?php if ($placeOrderOutsideSummary): ?>
             <?php $renderOrderExtras = $separateOrderActions; ?>
             <?php $renderPlaceOrder = true; ?>
             <?php $placeOrderOutsideContainer = true; ?>

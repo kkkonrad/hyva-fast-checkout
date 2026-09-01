@@ -7,9 +7,6 @@ use Magento\Framework\DataObject;
 
 class ShippingPaymentMapping extends AbstractFieldArray
 {
-    /** @var string */
-    protected $_template = 'Kkkonrad_Fastcheckout::system/config/form/field/array.phtml';
-
     /**
      * @var Form\Field\ShippingMethods
      */
@@ -19,27 +16,6 @@ class ShippingPaymentMapping extends AbstractFieldArray
      * @var Form\Field\PaymentMethods
      */
     private $paymentMethodRenderer;
-
-    /**
-     * Decode the JSON persisted by the Fastcheckout backend model before the
-     * standard Magento field-array renderer builds its rows.
-     *
-     * @return DataObject[]
-     */
-    public function getArrayRows()
-    {
-        $element = $this->getElement();
-        $value = $element ? $element->getValue() : null;
-
-        if (is_string($value) && trim($value) !== '') {
-            $decoded = json_decode($value, true);
-            if (is_array($decoded)) {
-                $element->setValue($decoded);
-            }
-        }
-
-        return parent::getArrayRows();
-    }
 
     /**
      * Prepare to render
