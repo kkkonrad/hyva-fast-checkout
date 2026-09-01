@@ -1,19 +1,12 @@
 'use strict';
 
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 const test = require('node:test');
-const vm = require('node:vm');
+const loadAmd = require('./amd');
 
 function loadPreview({processed = false, tax = false, twoStep = true} = {}) {
-    let mixin;
     let nativeCalls = 0;
     let totalsCalls = 0;
-    const source = fs.readFileSync(
-        path.resolve(__dirname, '../../../view/frontend/web/js/mixin/summary-shipping-preview-mixin.js'),
-        'utf8'
-    );
     const Component = function () {};
 
     Component.prototype.getValue = function () {
@@ -42,15 +35,14 @@ function loadPreview({processed = false, tax = false, twoStep = true} = {}) {
         } : method
     ]));
 
-    vm.runInNewContext(source, {
+    const mixin = loadAmd('mixin/summary-shipping-preview-mixin.js', {
+        'Magento_Checkout/js/model/quote': {
+            shippingMethod: () => ({amount: 5, price_excl_tax: 5, price_incl_tax: 6})
+        },
+        'Magento_Checkout/js/model/step-navigator': {isProcessed: () => processed},
+        'Kkkonrad_Fastcheckout/js/mixin/is-fastcheckout-active': () => true
+    }, {
         window: {checkoutConfig: {fastcheckoutSettings: {twoStep}}},
-        define(dependencies, factory) {
-            mixin = factory(
-                {shippingMethod: () => ({amount: 5, price_excl_tax: 5, price_incl_tax: 6})},
-                {isProcessed: () => processed},
-                () => true
-            );
-        }
     });
 
     const extension = mixin(Component);

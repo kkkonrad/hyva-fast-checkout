@@ -7,11 +7,8 @@ use Kkkonrad\Fastcheckout\Helper\Data as Helper;
 
 class ExtendedCheckoutConfigProvider implements ConfigProviderInterface
 {
-    public $helper;
-
-    public function __construct(Helper $helper)
+    public function __construct(private Helper $helper)
     {
-        $this->helper = $helper;
     }
 
     public function getConfig()
@@ -19,7 +16,6 @@ class ExtendedCheckoutConfigProvider implements ConfigProviderInterface
         return [
             'fastcheckoutSettings' => [
                 'showDiscount' => $this->helper->isShowDiscount(),
-                'showComment' => $this->helper->isShowComment(),
                 'showSubscribe' => $this->helper->isShowSubscribe(),
                 'subscribeByDefault' => $this->helper->isSubscribeByDefault(),
                 'twoStep' => $this->helper->isTwoStep(),

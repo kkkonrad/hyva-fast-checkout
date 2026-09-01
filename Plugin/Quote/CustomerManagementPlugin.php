@@ -14,16 +14,13 @@ class CustomerManagementPlugin
 {
     private const CORE_OMITTED_ATTRIBUTES = ['company', 'fax', 'prefix', 'suffix'];
 
-    private Helper $helper;
-    private AddressMetadataInterface $addressMetadata;
-
     /** @var array<string, bool> */
     private array $required = [];
 
-    public function __construct(Helper $helper, AddressMetadataInterface $addressMetadata)
-    {
-        $this->helper = $helper;
-        $this->addressMetadata = $addressMetadata;
+    public function __construct(
+        private Helper $helper,
+        private AddressMetadataInterface $addressMetadata
+    ) {
     }
 
     /**

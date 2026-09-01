@@ -3,47 +3,24 @@
 namespace Kkkonrad\Fastcheckout\Block\Adminhtml\System\Config\Form\Field;
 
 use Magento\Framework\View\Element\Context;
+use Magento\Framework\View\Element\Html\Select;
 use Magento\Payment\Model\Config;
 
-class PaymentMethods extends \Magento\Framework\View\Element\Html\Select
+class PaymentMethods extends Select
 {
-    /**
-     * @var Config
-     */
-    private $paymentConfig;
-
-    /**
-     * PaymentMethods constructor.
-     *
-     * @param Context $context
-     * @param Config $paymentConfig
-     * @param array $data
-     */
     public function __construct(
         Context $context,
-        Config $paymentConfig,
+        private Config $paymentConfig,
         array $data = []
     ) {
         parent::__construct($context, $data);
-        $this->paymentConfig = $paymentConfig;
     }
 
-    /**
-     * Set input name
-     *
-     * @param string $value
-     * @return $this
-     */
     public function setInputName($value)
     {
         return $this->setData('name', $value);
     }
 
-    /**
-     * Render block HTML
-     *
-     * @return string
-     */
     public function _toHtml()
     {
         if (!$this->getOptions()) {
@@ -53,6 +30,7 @@ class PaymentMethods extends \Magento\Framework\View\Element\Html\Select
                 }
             }
         }
+
         return parent::_toHtml();
     }
 }

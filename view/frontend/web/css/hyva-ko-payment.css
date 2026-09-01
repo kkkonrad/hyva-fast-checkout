@@ -26,8 +26,8 @@
     background: color-mix(in srgb, var(--color-primary) 5%, white);
 }
 
-.fastcheckout-ko-payment-root .payment-method-title,
-.fastcheckout-payment-method-ko-container .payment-method-title {
+:is(.fastcheckout-ko-payment-root, .fastcheckout-payment-method-ko-container)
+    .payment-method-title {
     display: flex;
     align-items: center;
     gap: 0.75rem;
@@ -57,8 +57,8 @@
     color: #1f2937;
 }
 
-.fastcheckout-ko-payment-root .payment-method-title .payment-icon,
-.fastcheckout-payment-method-ko-container .payment-method-title .payment-icon {
+:is(.fastcheckout-ko-payment-root, .fastcheckout-payment-method-ko-container)
+    .payment-method-title .payment-icon {
     display: inline-block;
     margin-right: 0.3125rem;
     vertical-align: middle;
@@ -105,8 +105,8 @@
  * (instructions, card fields, PO number, etc.) comes first, then billing,
  * then agreements / place-order toolbar when present.
  */
-.fastcheckout-ko-payment-root .payment-method-content,
-.fastcheckout-payment-method-ko-container .payment-method-content,
+:is(.fastcheckout-ko-payment-root, .fastcheckout-payment-method-ko-container)
+    .payment-method-content,
 #fastcheckout-checkout .payment-method-content {
     display: flex;
     flex-direction: column;
@@ -118,8 +118,8 @@
     display: none !important;
 }
 
-.fastcheckout-ko-payment-root .payment-method-content > .payment-method-billing-address,
-.fastcheckout-payment-method-ko-container .payment-method-content > .payment-method-billing-address,
+:is(.fastcheckout-ko-payment-root, .fastcheckout-payment-method-ko-container)
+    .payment-method-content > .payment-method-billing-address,
 #fastcheckout-checkout .payment-method-content > .payment-method-billing-address {
     display: block;
     order: 50;
@@ -132,8 +132,8 @@
     display: none;
 }
 
-.fastcheckout-ko-payment-root .payment-method-content > .checkout-agreements-block,
-.fastcheckout-payment-method-ko-container .payment-method-content > .checkout-agreements-block,
+:is(.fastcheckout-ko-payment-root, .fastcheckout-payment-method-ko-container)
+    .payment-method-content > .checkout-agreements-block,
 #fastcheckout-checkout .payment-method-content > .checkout-agreements-block {
     order: 60;
 }
@@ -160,34 +160,28 @@
     margin-right: 0.5rem;
 }
 
-.fastcheckout-ko-payment-root input[type='text'],
-.fastcheckout-ko-payment-root input[type='tel'],
-.fastcheckout-ko-payment-root input[type='number'],
-.fastcheckout-ko-payment-root input[type='password'],
-.fastcheckout-ko-payment-root select,
-.fastcheckout-payment-method-ko-container input[type='text'],
-.fastcheckout-payment-method-ko-container input[type='tel'],
-.fastcheckout-payment-method-ko-container input[type='number'],
-.fastcheckout-payment-method-ko-container input[type='password'],
-.fastcheckout-payment-method-ko-container select {
+:is(.fastcheckout-ko-payment-root, .fastcheckout-payment-method-ko-container)
+    :is(
+        input[type='text'],
+        input[type='tel'],
+        input[type='number'],
+        input[type='password'],
+        select
+    ) {
     width: 100%;
     max-width: 100%;
 }
 
-.fastcheckout-ko-payment-root .checkout-agreements-block,
-.fastcheckout-ko-payment-root .payu-text,
-.fastcheckout-ko-payment-root .TpayRegulations,
-.fastcheckout-payment-method-ko-container .checkout-agreements-block,
-.fastcheckout-payment-method-ko-container .payu-text,
-.fastcheckout-payment-method-ko-container .TpayRegulations {
+:is(.fastcheckout-ko-payment-root, .fastcheckout-payment-method-ko-container)
+    :is(.checkout-agreements-block, .payu-text, .TpayRegulations) {
     color: #374151;
     font-size: 0.875rem;
     line-height: 1.5;
 }
 
 /* Reset margins/paddings on checkout agreements to prevent content stretch */
-.fastcheckout-ko-payment-root .checkout-agreements-block,
-.fastcheckout-payment-method-ko-container .checkout-agreements-block {
+:is(.fastcheckout-ko-payment-root, .fastcheckout-payment-method-ko-container)
+    .checkout-agreements-block {
     margin: 0 !important;
     padding: 0 !important;
     width: 100% !important;
@@ -200,8 +194,8 @@
     border-top: 0 !important;
 }
 
-.fastcheckout-ko-payment-root .checkout-agreements.fieldset,
-.fastcheckout-payment-method-ko-container .checkout-agreements.fieldset {
+:is(.fastcheckout-ko-payment-root, .fastcheckout-payment-method-ko-container)
+    .checkout-agreements.fieldset {
     margin: 0 !important;
     padding: 0 !important;
     border: none !important;
@@ -210,8 +204,8 @@
     max-width: 100% !important;
 }
 
-.fastcheckout-ko-payment-root .checkout-agreement.field,
-.fastcheckout-payment-method-ko-container .checkout-agreement.field {
+:is(.fastcheckout-ko-payment-root, .fastcheckout-payment-method-ko-container)
+    .checkout-agreement.field {
     margin: 0.375rem 0 !important;
     padding: 0 !important;
     border: none !important;
@@ -224,8 +218,8 @@
     max-width: 100% !important;
 }
 
-.fastcheckout-ko-payment-root .checkout-agreement.field > div.mage-error,
-.fastcheckout-payment-method-ko-container .checkout-agreement.field > div.mage-error {
+:is(.fastcheckout-ko-payment-root, .fastcheckout-payment-method-ko-container)
+    .checkout-agreement.field > div.mage-error {
     position: absolute !important;
     width: 1px !important;
     height: 1px !important;
@@ -237,19 +231,19 @@
     border: 0 !important;
 }
 
-.fastcheckout-ko-payment-root .checkout-agreement.field input[type="checkbox"],
-.fastcheckout-payment-method-ko-container .checkout-agreement.field input[type="checkbox"] {
+:is(.fastcheckout-ko-payment-root, .fastcheckout-payment-method-ko-container)
+    .checkout-agreement.field input[type="checkbox"] {
     margin: 0 !important;
     flex-shrink: 0 !important;
 }
 
-.fastcheckout-ko-payment-root input[data-fastcheckout-automatic-agreement],
-.fastcheckout-payment-method-ko-container input[data-fastcheckout-automatic-agreement] {
+:is(.fastcheckout-ko-payment-root, .fastcheckout-payment-method-ko-container)
+    input[data-fastcheckout-automatic-agreement] {
     opacity: 0.65;
 }
 
-.fastcheckout-ko-payment-root .checkout-agreement.field label,
-.fastcheckout-payment-method-ko-container .checkout-agreement.field label {
+:is(.fastcheckout-ko-payment-root, .fastcheckout-payment-method-ko-container)
+    .checkout-agreement.field label {
     margin: 0 !important;
     padding: 0 !important;
     display: inline-block !important;
@@ -258,8 +252,8 @@
     line-height: 1.25 !important;
 }
 
-.fastcheckout-ko-payment-root .checkout-agreement.field label button.action-show,
-.fastcheckout-payment-method-ko-container .checkout-agreement.field label button.action-show {
+:is(.fastcheckout-ko-payment-root, .fastcheckout-payment-method-ko-container)
+    .checkout-agreement.field label button.action-show {
     background: none !important;
     border: none !important;
     padding: 0 !important;
@@ -273,33 +267,30 @@
     display: inline !important;
 }
 
-.fastcheckout-ko-payment-root .checkout-agreement.field
-    > input[aria-invalid='true'] + label,
-.fastcheckout-payment-method-ko-container .checkout-agreement.field
+:is(.fastcheckout-ko-payment-root, .fastcheckout-payment-method-ko-container)
+    .checkout-agreement.field
     > input[aria-invalid='true'] + label {
     color: var(--color-red-600, #dc2626) !important;
     font-weight: 700 !important;
 }
 
-.fastcheckout-ko-payment-root .checkout-agreement.field
-    > input[aria-invalid='true'] + label button.action-show,
-.fastcheckout-payment-method-ko-container .checkout-agreement.field
+:is(.fastcheckout-ko-payment-root, .fastcheckout-payment-method-ko-container)
+    .checkout-agreement.field
     > input[aria-invalid='true'] + label button.action-show {
     color: inherit !important;
     font-weight: inherit !important;
 }
 
 
-.fastcheckout-ko-payment-root a,
-.fastcheckout-payment-method-ko-container a {
+:is(.fastcheckout-ko-payment-root, .fastcheckout-payment-method-ko-container) a {
     color: var(--color-primary);
     text-decoration: underline;
 }
 
 /* Premium styles for original offline payment contents (checkmo, banktransfer, cashondelivery) */
 .fastcheckout-payment-method-ko-container .payment-method-note,
-.fastcheckout-payment-method-ko-container .payment-method-content > p,
-.fastcheckout-ko-payment-root .payment-method-content > p {
+:is(.fastcheckout-ko-payment-root, .fastcheckout-payment-method-ko-container)
+    .payment-method-content > p {
     display: block;
     padding: 0.75rem 1rem;
     background-color: color-mix(in srgb, var(--color-primary) 8%, white);
@@ -313,8 +304,8 @@
 }
 
 /* Premium styling for Check / Money Order instructions (checkmo) */
-.fastcheckout-payment-method-ko-container .items.check.payable,
-.fastcheckout-ko-payment-root .items.check.payable {
+:is(.fastcheckout-ko-payment-root, .fastcheckout-payment-method-ko-container)
+    .items.check.payable {
     display: block;
     padding: 1rem;
     background-color: color-mix(in srgb, var(--color-primary) 8%, white);
@@ -327,32 +318,32 @@
     box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
-.fastcheckout-payment-method-ko-container .items.check.payable dt,
-.fastcheckout-ko-payment-root .items.check.payable dt {
+:is(.fastcheckout-ko-payment-root, .fastcheckout-payment-method-ko-container)
+    .items.check.payable dt {
     font-weight: 600;
     color: var(--color-primary-darker);
     margin-top: 0.5rem;
 }
 
-.fastcheckout-payment-method-ko-container .items.check.payable dt:first-child,
-.fastcheckout-ko-payment-root .items.check.payable dt:first-child {
+:is(.fastcheckout-ko-payment-root, .fastcheckout-payment-method-ko-container)
+    .items.check.payable dt:first-child {
     margin-top: 0;
 }
 
-.fastcheckout-payment-method-ko-container .items.check.payable dd,
-.fastcheckout-ko-payment-root .items.check.payable dd {
+:is(.fastcheckout-ko-payment-root, .fastcheckout-payment-method-ko-container)
+    .items.check.payable dd {
     margin-left: 0;
     margin-bottom: 0.5rem;
     color: #374151; /* Gray 700 */
 }
 
-.fastcheckout-payment-method-ko-container .items.check.payable dd:last-child,
-.fastcheckout-ko-payment-root .items.check.payable dd:last-child {
+:is(.fastcheckout-ko-payment-root, .fastcheckout-payment-method-ko-container)
+    .items.check.payable dd:last-child {
     margin-bottom: 0;
 }
 
-.fastcheckout-payment-method-ko-container .items.check.payable address,
-.fastcheckout-ko-payment-root .items.check.payable address {
+:is(.fastcheckout-ko-payment-root, .fastcheckout-payment-method-ko-container)
+    .items.check.payable address {
     font-style: normal;
 }
 
@@ -362,8 +353,8 @@
     margin: 0;
 }
 
-.fastcheckout-payment-method-ko-container input.input-text,
-.fastcheckout-payment-method-ko-container select {
+.fastcheckout-payment-method-ko-container
+    :is(input.input-text, select) {
     width: 100%;
     max-width: 100%;
 }
@@ -375,10 +366,8 @@
  */
 .mage-error:not(input):not(select):not(textarea),
 .msg__error,
-.fastcheckout-payment-method-ko-container .mage-error:not(input):not(select):not(textarea),
-.fastcheckout-ko-payment-root .mage-error:not(input):not(select):not(textarea),
-.fastcheckout-payment-method-ko-container .msg__error,
-.fastcheckout-ko-payment-root .msg__error {
+:is(.fastcheckout-ko-payment-root, .fastcheckout-payment-method-ko-container)
+    :is(.mage-error:not(input):not(select):not(textarea), .msg__error) {
     display: block;
     margin: 0 0 0.25rem;
     color: var(--color-red-600) !important;
@@ -400,8 +389,7 @@
 }
 
 #fastcheckout-checkout .payu-msg,
-.fastcheckout-payment-method-ko-container .payu-msg,
-.fastcheckout-ko-payment-root .payu-msg,
+:is(.fastcheckout-ko-payment-root, .fastcheckout-payment-method-ko-container) .payu-msg,
 #fastcheckout-checkout .payment__payu-agreement .payu-msg,
 .fastcheckout-payment-method-ko-container .payment__payu-agreement .payu-msg {
     display: block !important;

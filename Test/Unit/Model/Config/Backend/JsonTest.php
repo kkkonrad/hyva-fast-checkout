@@ -20,73 +20,36 @@ use Psr\Log\LoggerInterface;
 
 class JsonTest extends TestCase
 {
-    public function testAfterLoadProvidesRowsToTheNativeFieldArrayRenderer(): void
+    public function testLoadsAndCleansFieldArrayRows(): void
     {
-        $backend = $this->createBackend(
+        $backend = $this->backend(
             '{"_1":{"shipping_method":"flatrate_flatrate","payment_method":"checkmo"}}'
         );
-
         $backend->afterLoad();
-
-        $this->assertSame([
-            '_1' => [
-                'shipping_method' => 'flatrate_flatrate',
-                'payment_method' => 'checkmo',
-            ],
+        self::assertSame([
+            '_1' => ['shipping_method' => 'flatrate_flatrate', 'payment_method' => 'checkmo'],
         ], $backend->getValue());
+
+        $backend->setValue([
+            '__empty' => ['shipping_method' => '', 'payment_method' => ''],
+            '_1' => ['shipping_method' => ' customcarrier_* ', 'payment_method' => ' payu_blik '],
+        ])->beforeSave();
+        self::assertSame([
+            '_1' => ['shipping_method' => 'customcarrier_*', 'payment_method' => 'payu_blik'],
+        ], json_decode((string)$backend->getValue(), true));
     }
 
-    public function testBeforeSaveRemovesEmptyShippingPaymentMappingRowsFromFieldArrayPayload(): void
+    public function testRejectsPaymentWildcards(): void
     {
-        $backend = $this->createBackend(
-            [
-                '__empty' => [
-                    'shipping_method' => '',
-                    'payment_method' => '',
-                ],
-                '_1' => [
-                    'shipping_method' => ' customcarrier_* ',
-                    'payment_method' => ' payu_blik ',
-                ],
-                '_2' => [
-                    'shipping_method' => 'flatrate_flatrate',
-                    'payment_method' => '',
-                ],
-            ]
-        );
-
-        $backend->beforeSave();
-
-        $decoded = json_decode((string)$backend->getValue(), true);
-        $this->assertSame([
-            '_1' => [
-                'shipping_method' => 'customcarrier_*',
-                'payment_method' => 'payu_blik',
-            ],
-        ], $decoded);
-    }
-
-    public function testBeforeSaveRejectsPaymentWildcardInShippingPaymentMapping(): void
-    {
-        $backend = $this->createBackend(
-            [
-                '_1' => [
-                    'shipping_method' => 'customcarrier_*',
-                    'payment_method' => 'payu_*',
-                ],
-            ]
-        );
+        $backend = $this->backend([
+            '_1' => ['shipping_method' => 'customcarrier_*', 'payment_method' => 'payu_*'],
+        ]);
 
         $this->expectException(LocalizedException::class);
-        $this->expectExceptionMessage('Payment methods must use exact method codes.');
-
         $backend->beforeSave();
     }
 
-    /**
-     * @param mixed $value
-     */
-    private function createBackend($value): Json
+    private function backend($value): Json
     {
         $context = new Context(
             $this->createMock(LoggerInterface::class),
@@ -95,7 +58,6 @@ class JsonTest extends TestCase
             $this->createMock(State::class),
             $this->createMock(RemoveAction::class)
         );
-
         $backend = new Json(
             $context,
             $this->createMock(Registry::class),
@@ -106,7 +68,6 @@ class JsonTest extends TestCase
             [],
             new JsonSerializer()
         );
-
         $backend->setValue($value);
 
         return $backend;

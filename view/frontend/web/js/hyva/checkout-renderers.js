@@ -38,8 +38,6 @@ define([
         agreementsPortalObserver,
         agreementsPortalSource,
         agreementsPortalParts = [],
-        scrollAnimationTimer,
-        scrollAnimationBehavior = null,
         shippingSaveTimer,
         placeOrderProcessing = false;
 
@@ -545,34 +543,36 @@ define([
         }
     }
 
-    function revealStartupContent() {
-        var loader = document.querySelector('[data-fastcheckout-startup-loader]'),
-            summaryRoot = document.getElementById('fastcheckout-ko-summary-root'),
-            nativeSummary = summaryRoot && summaryRoot.querySelector('.fastcheckout-native-summary');
-
-        if (loader && document.querySelector(
-            '.fastcheckout-native-shipping-address input[name="firstname"]'
-        )) {
-            loader.hidden = true;
-            loader.style.display = 'none';
-        }
-
-        if (nativeSummary &&
-            nativeSummary.querySelector('.product-item') &&
-            nativeSummary.querySelector('.table-totals tr')) {
-            summaryRoot.classList.remove('hidden');
-        }
-
-        return (!loader || loader.hidden) &&
-            (!summaryRoot || !summaryRoot.classList.contains('hidden'));
-    }
-
     function getActivePaymentRenderer() {
         var code = activePaymentCode();
 
         return code ? registry.get(
             'checkout.steps.billing-step.payment.payments-list.' + code
         ) : null;
+    }
+
+    function revealStartupContent() {
+        var loader = document.querySelector('[data-fastcheckout-startup-loader]'),
+            summaryRoot = document.getElementById('fastcheckout-ko-summary-root'),
+            nativeSummary = summaryRoot && summaryRoot.querySelector('.fastcheckout-native-summary'),
+            formReady = quote.isVirtual() ? document.querySelector(
+                '#checkout-step-payment input[name="username"], ' +
+                '#checkout-step-payment .payment-method'
+            ) : document.querySelector(
+                '.fastcheckout-native-shipping-address input[name="firstname"]'
+            );
+
+        if (loader && formReady) {
+            loader.hidden = true;
+            loader.style.display = 'none';
+        }
+        if (nativeSummary && nativeSummary.querySelector('.product-item') &&
+            nativeSummary.querySelector('.table-totals tr')) {
+            summaryRoot.classList.remove('hidden');
+        }
+
+        return (!loader || loader.hidden) &&
+            (!summaryRoot || !summaryRoot.classList.contains('hidden'));
     }
 
     function syncBillingAddress() {
@@ -589,17 +589,14 @@ define([
         wirePlaceOrderButtons();
     }
 
-    function revealNativeContent() {
-        revealStartupContent();
-        syncPaymentContent();
-    }
-
     function observeNativeContent() {
         var paymentRoot = document.querySelector('.fastcheckout-ko-payment-root'),
             startupRoots = [
                 document.querySelector('.fastcheckout-native-shipping-address'),
+                paymentRoot,
                 document.getElementById('fastcheckout-ko-summary-root')
-            ].filter(Boolean);
+            ].filter(Boolean),
+            ready = revealStartupContent();
 
         if (!window.MutationObserver) {
             return;
@@ -612,7 +609,7 @@ define([
             paymentDomObserver.observe(paymentRoot, {childList: true, subtree: true});
         }
 
-        if (startupRoots.length && !revealStartupContent()) {
+        if (startupRoots.length && !ready) {
             startupDomObserver = new MutationObserver(function () {
                 if (revealStartupContent()) {
                     startupDomObserver.disconnect();
@@ -704,46 +701,6 @@ define([
         return false;
     }
 
-    function smoothScrollTo(scrollTop) {
-        var scroller = document.scrollingElement || document.documentElement,
-            target = Math.max(0, Math.min(
-                scrollTop,
-                scroller.scrollHeight - window.innerHeight
-            )),
-            start = scroller.scrollTop,
-            distance = target - start,
-            startedAt = Date.now();
-
-        if (scrollAnimationTimer) {
-            window.clearInterval(scrollAnimationTimer);
-            scrollAnimationTimer = null;
-        }
-        if (scrollAnimationBehavior !== null) {
-            scroller.style.scrollBehavior = scrollAnimationBehavior;
-        }
-        scrollAnimationBehavior = scroller.style.scrollBehavior;
-        scroller.style.scrollBehavior = 'auto';
-
-        if (!distance || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-            scroller.scrollTop = target;
-            scroller.style.scrollBehavior = scrollAnimationBehavior;
-            scrollAnimationBehavior = null;
-            return;
-        }
-
-        scrollAnimationTimer = window.setInterval(function () {
-            var progress = Math.min((Date.now() - startedAt) / 300, 1);
-
-            scroller.scrollTop = start + distance * (1 - Math.pow(1 - progress, 3));
-            if (progress === 1) {
-                window.clearInterval(scrollAnimationTimer);
-                scrollAnimationTimer = null;
-                scroller.style.scrollBehavior = scrollAnimationBehavior;
-                scrollAnimationBehavior = null;
-            }
-        }, 16);
-    }
-
     function scrollToFirstVisibleError(scope) {
         var root = scope || document.getElementById('fastcheckout-checkout'),
             errors = root && root.querySelectorAll(
@@ -762,14 +719,12 @@ define([
                     element.getClientRects().length &&
                     window.getComputedStyle(element).visibility !== 'hidden';
             }),
-            box,
-            scrollTop;
+            behavior;
 
         if (error) {
-            box = error.getBoundingClientRect();
-            scrollTop = window.pageYOffset + box.top -
-                (window.innerHeight - box.height) / 2;
-            smoothScrollTo(scrollTop);
+            behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ?
+                'auto' : 'smooth';
+            error.scrollIntoView({behavior: behavior, block: 'center'});
 
             return true;
         }
@@ -1065,7 +1020,7 @@ define([
             }
 
             window.setTimeout(function () {
-                revealNativeContent();
+                syncPaymentContent();
                 observeNativeContent();
                 updateMobileTotal();
                 window.dispatchEvent(new CustomEvent('fastcheckout:ready'));

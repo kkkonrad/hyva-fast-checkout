@@ -11,62 +11,53 @@ use Magento\Quote\Model\Quote;
 
 class ShippingMethodMapping implements SpecificationInterface
 {
-    private Helper $helper;
-
-    public function __construct(Helper $helper)
+    public function __construct(private Helper $helper)
     {
-        $this->helper = $helper;
     }
 
     public function isApplicable(MethodInterface $paymentMethod, Quote $quote): bool
     {
         $mapping = $this->helper->getShippingPaymentMapping();
-
         if (!$this->helper->isEnable() || !$mapping || $quote->isVirtual()) {
             return true;
         }
 
-        $shippingAddress = $quote->getShippingAddress();
-        $shippingCode = $shippingAddress ? trim((string)$shippingAddress->getShippingMethod()) : '';
-        if ($shippingCode === '') {
+        $address = $quote->getShippingAddress();
+        $shipping = $address ? trim((string)$address->getShippingMethod()) : '';
+        if ($shipping === '') {
             return true;
         }
 
-        $paymentCode = (string)$paymentMethod->getCode();
-        $mentionsPayment = false;
-
+        $payment = (string)$paymentMethod->getCode();
+        $listed = false;
         foreach ($mapping as $rule) {
-            if (!is_array($rule) || (string)($rule['payment_method'] ?? '') !== $paymentCode) {
+            if (!is_array($rule) || (string)($rule['payment_method'] ?? '') !== $payment) {
                 continue;
             }
-            $mentionsPayment = true;
-            if ($this->matches((string)($rule['shipping_method'] ?? ''), $shippingCode)) {
+            $listed = true;
+            if ($this->matches((string)($rule['shipping_method'] ?? ''), $shipping)) {
                 return true;
             }
         }
 
-        // Payments never listed in admin mapping stay available so a newly
-        // installed PayU/Stripe/etc. is not hidden until someone edits the grid.
-        return !$mentionsPayment;
+        return !$listed;
     }
 
-    private function matches(string $rule, string $shippingCode): bool
+    private function matches(string $rule, string $shipping): bool
     {
         $expected = trim($rule);
-        $carrier = explode('_', $shippingCode, 2)[0];
-
-        if ($expected === '' || $shippingCode === '') {
+        $carrier = explode('_', $shipping, 2)[0];
+        if ($expected === '' || $shipping === '') {
             return false;
         }
-        if ($expected === '*' || $expected === $shippingCode || $expected === $carrier) {
+        if ($expected === '*' || $expected === $shipping || $expected === $carrier) {
             return true;
         }
-        if (substr($expected, -1) !== '*') {
+        if (!str_ends_with($expected, '*')) {
             return false;
         }
 
         $prefix = rtrim(substr($expected, 0, -1), '_');
-
-        return $prefix !== '' && strpos($shippingCode, $prefix . '_') === 0;
+        return $prefix !== '' && str_starts_with($shipping, $prefix . '_');
     }
 }

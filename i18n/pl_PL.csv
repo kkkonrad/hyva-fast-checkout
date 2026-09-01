@@ -4,7 +4,6 @@
 "Add products to the cart to continue.","Dodaj produkty do koszyka, aby kontynuować."
 "All Shipping Methods","Wszystkie metody dostawy"
 "Allowed Payment Method","Dozwolona metoda płatności"
-"Assign order to customer if customer were not logged in (by email)?","Przypisać zamówienie do klienta, jeśli nie był zalogowany (po adresie e-mail)?"
 "Back to Cart","Wróć do koszyka"
 "Complete your purchase details below.","Uzupełnij poniższe dane, aby sfinalizować zamówienie."
 "Default Configurations","Konfiguracja domyślna"
@@ -26,7 +25,6 @@ Order:,Zamówienie:
 Reason:,Powód:
 "Retry Checkout","Ponów próbę zakupu"
 "Secure SSL Checkout","Bezpieczna płatność SSL"
-"Security warning: enable only if the store verifies ownership of the guest email. Matching an email address alone can attach an order, its addresses, and downloadable purchases to an existing customer account.","Ostrzeżenie bezpieczeństwa: włącz tylko wtedy, gdy sklep weryfikuje własność adresu e-mail gościa. Samo dopasowanie adresu e-mail może przypisać zamówienie, jego adresy i produkty do pobrania do istniejącego konta klienta."
 "Shipping methods may use wildcard entries such as carrier_*. Payment methods must be selected by exact method code.","Metody dostawy mogą używać masek, np. carrier_*. Metody płatności muszą być wybrane po dokładnym kodzie."
 "Shipping-payment mapping must be a JSON array or object.","Mapowanie dostawy-płatność musi być tablicą lub obiektem JSON."
 "Show Subscribe to Newsletter?","Pokazać zapis do newslettera?"

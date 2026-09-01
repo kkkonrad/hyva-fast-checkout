@@ -13,31 +13,21 @@ use Magento\Framework\Module\Manager as ModuleManager;
 use Magento\Framework\View\DesignInterface;
 use Magento\Framework\View\Design\ThemeInterface;
 use Magento\Store\Model\ScopeInterface;
-use Magento\Theme\Model\ThemeFactory;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
 class DataTest extends TestCase
 {
-    public function testGetShippingPaymentMappingReturnsEmptyArrayWhenJsonIsInvalid(): void
+    public function testInvalidShippingPaymentMappingIsIgnored(): void
     {
-        $logger = $this->createMock(LoggerInterface::class);
-        $jsonHelper = $this->createMock(JsonHelper::class);
-        $jsonHelper->method('jsonDecode')->willThrowException(new \InvalidArgumentException('invalid json'));
+        $json = $this->createMock(JsonHelper::class);
+        $json->method('jsonDecode')->willThrowException(new \InvalidArgumentException('invalid'));
 
-        $helper = $this->createHelper('{invalid json', $jsonHelper, $logger);
+        self::assertSame([], $this->mappingHelper('{invalid', $json)->getShippingPaymentMapping());
 
-        $this->assertSame([], $helper->getShippingPaymentMapping());
-    }
-
-    public function testGetShippingPaymentMappingReturnsEmptyArrayWhenJsonDoesNotDecodeToArray(): void
-    {
-        $jsonHelper = $this->createMock(JsonHelper::class);
-        $jsonHelper->method('jsonDecode')->willReturn('checkmo');
-
-        $helper = $this->createHelper('"checkmo"', $jsonHelper);
-
-        $this->assertSame([], $helper->getShippingPaymentMapping());
+        $json = $this->createMock(JsonHelper::class);
+        $json->method('jsonDecode')->willReturn('checkmo');
+        self::assertSame([], $this->mappingHelper('"checkmo"', $json)->getShippingPaymentMapping());
     }
 
     public function testCanUseHyvaNativeCheckoutMemoizesResult(): void
@@ -56,7 +46,6 @@ class DataTest extends TestCase
             $context,
             $this->createMock(JsonHelper::class),
             $this->createMock(DesignInterface::class),
-            $this->createMock(ThemeFactory::class),
             $this->createMock(HyvaThemes::class)
         );
 
@@ -91,7 +80,6 @@ class DataTest extends TestCase
             $context,
             $this->createMock(JsonHelper::class),
             $design,
-            $this->createMock(ThemeFactory::class),
             $hyvaThemes
         );
 
@@ -116,7 +104,6 @@ class DataTest extends TestCase
             $context,
             $this->createMock(JsonHelper::class),
             $this->createMock(DesignInterface::class),
-            $this->createMock(ThemeFactory::class),
             $this->createMock(HyvaThemes::class)
         );
 
@@ -132,22 +119,18 @@ class DataTest extends TestCase
         ];
     }
 
-    private function createHelper(
-        string $configValue,
-        JsonHelper $jsonHelper,
-        LoggerInterface $logger = null
-    ): Data {
+    private function mappingHelper(string $value, JsonHelper $json): Data
+    {
         $context = $this->createMock(Context::class);
         $scopeConfig = $this->createMock(ScopeConfigInterface::class);
-        $scopeConfig->method('getValue')->willReturn($configValue);
+        $scopeConfig->method('getValue')->willReturn($value);
         $context->method('getScopeConfig')->willReturn($scopeConfig);
-        $context->method('getLogger')->willReturn($logger ?: $this->createMock(LoggerInterface::class));
+        $context->method('getLogger')->willReturn($this->createMock(LoggerInterface::class));
 
         return new Data(
             $context,
-            $jsonHelper,
+            $json,
             $this->createMock(DesignInterface::class),
-            $this->createMock(ThemeFactory::class),
             $this->createMock(HyvaThemes::class)
         );
     }

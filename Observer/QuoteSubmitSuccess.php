@@ -18,41 +18,17 @@ use Psr\Log\LoggerInterface;
  * - persist the matching quote's Fastcheckout order comment from checkout session;
  * - subscribe guest/customer when that quote's Fastcheckout checkbox was checked.
  *
- * Attaching a guest order to an existing customer runs earlier, in
- * {@see QuoteSubmitBefore}, so the order is written only once and Magento's own
- * downloadable-link observers pick the customer id up on their own.
- *
- * Does not log the shopper in.
+ * The native order/customer ownership remains unchanged.
  */
 class QuoteSubmitSuccess implements ObserverInterface
 {
-    /** @var Helper */
-    private $helper;
-
-    /** @var CheckoutSession */
-    private $checkoutSession;
-
-    /** @var OrderStatusHistoryRepositoryInterface */
-    private $historyRepository;
-
-    /** @var LoggerInterface */
-    private $logger;
-
-    /** @var SubscriptionManagerInterface */
-    private $subscriptionManager;
-
     public function __construct(
-        Helper $helper,
-        CheckoutSession $checkoutSession,
-        OrderStatusHistoryRepositoryInterface $historyRepository,
-        LoggerInterface $logger,
-        SubscriptionManagerInterface $subscriptionManager
+        private Helper $helper,
+        private CheckoutSession $checkoutSession,
+        private OrderStatusHistoryRepositoryInterface $historyRepository,
+        private LoggerInterface $logger,
+        private SubscriptionManagerInterface $subscriptionManager
     ) {
-        $this->helper = $helper;
-        $this->checkoutSession = $checkoutSession;
-        $this->historyRepository = $historyRepository;
-        $this->logger = $logger;
-        $this->subscriptionManager = $subscriptionManager;
     }
 
     /**
@@ -132,7 +108,6 @@ class QuoteSubmitSuccess implements ObserverInterface
                 'exception' => $exception,
             ]);
         }
-
     }
 
     private function clearExtras(): void
@@ -144,8 +119,9 @@ class QuoteSubmitSuccess implements ObserverInterface
         ] as $method) {
             try {
                 $this->checkoutSession->{$method}();
-            } catch (\Throwable $exception) {
+            } catch (\Throwable) {
                 // Never block order success on session cleanup failures.
+                continue;
             }
         }
     }

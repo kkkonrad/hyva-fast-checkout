@@ -1,19 +1,12 @@
 'use strict';
 
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 const test = require('node:test');
-const vm = require('node:vm');
+const loadAmd = require('./amd');
 
 test('renders automatic agreements as checked disabled checkboxes', () => {
-    let mixin,
-        closeHandler,
+    let closeHandler,
         dispatchedEvent;
-    const source = fs.readFileSync(
-        path.resolve(__dirname, '../../../view/frontend/web/js/mixin/checkout-agreements-mixin.js'),
-        'utf8'
-    );
     const automatic = input('1');
     const manual = input('2');
     const root = {
@@ -50,7 +43,9 @@ test('renders automatic agreements as checked disabled checkboxes', () => {
         }
     };
 
-    vm.runInNewContext(source, {
+    const mixin = loadAmd('mixin/checkout-agreements-mixin.js', {
+        'Kkkonrad_Fastcheckout/js/mixin/is-fastcheckout-active': () => true
+    }, {
         Event: class Event {
             constructor(type) {
                 this.type = type;
@@ -60,13 +55,10 @@ test('renders automatic agreements as checked disabled checkboxes', () => {
             setTimeout(callback) {
                 callback();
             }
-        },
-        define(dependencies, factory) {
-            mixin = factory(() => true)({
-                extend(extension) {
-                    return extension;
-                }
-            });
+        }
+    })({
+        extend(extension) {
+            return extension;
         }
     });
 
@@ -104,19 +96,11 @@ test('renders automatic agreements as checked disabled checkboxes', () => {
 });
 
 test('delegates unchanged outside Fastcheckout', () => {
-    let mixin;
-    const source = fs.readFileSync(
-        path.resolve(__dirname, '../../../view/frontend/web/js/mixin/checkout-agreements-mixin.js'),
-        'utf8'
-    );
-
-    vm.runInNewContext(source, {
-        define(dependencies, factory) {
-            mixin = factory(() => false)({
-                extend(extension) {
-                    return extension;
-                }
-            });
+    const mixin = loadAmd('mixin/checkout-agreements-mixin.js', {
+        'Kkkonrad_Fastcheckout/js/mixin/is-fastcheckout-active': () => false
+    })({
+        extend(extension) {
+            return extension;
         }
     });
 

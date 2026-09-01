@@ -15,7 +15,6 @@ class Json extends ArraySerialized
         if ($value === '' || $value === null) {
             return parent::beforeSave();
         }
-
         if (!is_array($value)) {
             throw new LocalizedException(__('Shipping-payment mapping must be a JSON array or object.'));
         }
@@ -29,19 +28,19 @@ class Json extends ArraySerialized
                 throw new LocalizedException(__('Each shipping-payment mapping row must be an object.'));
             }
 
-            $shippingMethod = trim((string)($row['shipping_method'] ?? ''));
-            $paymentMethod = trim((string)($row['payment_method'] ?? ''));
-            if ($shippingMethod === '' || $paymentMethod === '') {
+            $shipping = trim((string)($row['shipping_method'] ?? ''));
+            $payment = trim((string)($row['payment_method'] ?? ''));
+            if ($shipping === '' || $payment === '') {
                 continue;
             }
-            if (strpos($paymentMethod, '*') !== false) {
+            if (str_contains($payment, '*')) {
                 throw new LocalizedException(
                     __('Payment methods must use exact method codes. Wildcards such as * or payu_* are not supported.')
                 );
             }
 
-            $row['shipping_method'] = $shippingMethod;
-            $row['payment_method'] = $paymentMethod;
+            $row['shipping_method'] = $shipping;
+            $row['payment_method'] = $payment;
             $mapping[$key] = $row;
         }
 

@@ -1,22 +1,15 @@
 'use strict';
 
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 const test = require('node:test');
-const vm = require('node:vm');
+const loadAmd = require('./amd');
 
 test('adds checkout extras and invokes Magento place-order exactly once', () => {
-    let mixin;
     let calls = 0;
     let shippingCalls = 0;
     let captured;
     let fail;
     const events = [];
-    const source = fs.readFileSync(
-        path.resolve(__dirname, '../../../view/frontend/web/js/mixin/place-order-mixin.js'),
-        'utf8'
-    );
     const wrapper = {
         wrap(original, interceptor) {
             return function (...args) {
@@ -34,7 +27,30 @@ test('adds checkout extras and invokes Magento place-order exactly once', () => 
         }
     };
 
-    vm.runInNewContext(source, {
+    const mixin = loadAmd('mixin/place-order-mixin.js', {
+        jquery,
+        'mage/utils/wrapper': wrapper,
+        'Kkkonrad_Fastcheckout/js/model/shipping-save-coordinator': {
+            ensureSaved() {
+                shippingCalls += 1;
+                return {};
+            }
+        },
+        'Kkkonrad_Fastcheckout/js/mixin/is-fastcheckout-active': () => true,
+        uiRegistry: {
+            get(name) {
+                assert.equal(name, 'checkoutProvider');
+
+                return {
+                    get(path) {
+                        assert.equal(path, 'fastcheckout');
+
+                        return {comment: '  Leave at reception  ', subscribe: true};
+                    }
+                };
+            }
+        }
+    }, {
         document: {
             dispatchEvent(event) {
                 events.push(event.type);
@@ -44,35 +60,6 @@ test('adds checkout extras and invokes Magento place-order exactly once', () => 
             constructor(type) {
                 this.type = type;
             }
-        },
-        define(dependencies, factory) {
-            mixin = factory(
-                jquery,
-                wrapper,
-                {
-                    ensureSaved() {
-                        shippingCalls += 1;
-                        return {};
-                    }
-                },
-                () => true,
-                {
-                    get(name) {
-                        assert.equal(name, 'checkoutProvider');
-
-                        return {
-                            get(path) {
-                                assert.equal(path, 'fastcheckout');
-
-                                return {
-                                    comment: '  Leave at reception  ',
-                                    subscribe: true
-                                };
-                            }
-                        };
-                    }
-                }
-            );
         }
     });
 

@@ -28,28 +28,16 @@ class CheckoutLayoutCollector
         'fastcheckout_checkout_onepage_failure',
     ];
 
-    private LayoutFactory $layoutFactory;
-    private DesignInterface $design;
-    private LoggerInterface $logger;
-    private ThemeProviderInterface $themeProvider;
-    private PageLayoutReaderFactory $pageLayoutReaderFactory;
-    private SerializerInterface $serializer;
     private ?array $collected = null;
 
     public function __construct(
-        LayoutFactory $layoutFactory,
-        DesignInterface $design,
-        LoggerInterface $logger,
-        ThemeProviderInterface $themeProvider,
-        PageLayoutReaderFactory $pageLayoutReaderFactory,
-        SerializerInterface $serializer
+        private LayoutFactory $layoutFactory,
+        private DesignInterface $design,
+        private LoggerInterface $logger,
+        private ThemeProviderInterface $themeProvider,
+        private PageLayoutReaderFactory $pageLayoutReaderFactory,
+        private SerializerInterface $serializer
     ) {
-        $this->layoutFactory = $layoutFactory;
-        $this->design = $design;
-        $this->themeProvider = $themeProvider;
-        $this->logger = $logger;
-        $this->pageLayoutReaderFactory = $pageLayoutReaderFactory;
-        $this->serializer = $serializer;
     }
 
     /**

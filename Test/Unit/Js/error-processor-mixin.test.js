@@ -1,17 +1,10 @@
 'use strict';
 
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 const test = require('node:test');
-const vm = require('node:vm');
+const loadAmd = require('./amd');
 
 function loadMixin(active = true, invalidate = () => {}) {
-    let mixin;
-    const source = fs.readFileSync(
-        path.resolve(__dirname, '../../../view/frontend/web/js/mixin/error-processor-mixin.js'),
-        'utf8'
-    );
     const wrapper = {
         wrap(original, interceptor) {
             return function (...args) {
@@ -20,24 +13,16 @@ function loadMixin(active = true, invalidate = () => {}) {
         }
     };
 
-    vm.runInNewContext(source, {
-        JSON,
-        Number,
-        String,
-        define(dependencies, factory) {
-            mixin = factory(
-                wrapper,
-                {invalidate},
-                {build: (route) => `https://shop.test/${route}`},
-                (message) => message === 'Current customer does not have an active cart.'
-                    ? 'Aktualny klient nie ma aktywnego koszyka.'
-                    : message,
-                () => active
-            );
-        }
+    return loadAmd('mixin/error-processor-mixin.js', {
+        'mage/utils/wrapper': wrapper,
+        'Magento_Customer/js/customer-data': {invalidate},
+        'mage/url': {build: (route) => `https://shop.test/${route}`},
+        'mage/translate': (message) => message ===
+            'Current customer does not have an active cart.'
+            ? 'Aktualny klient nie ma aktywnego koszyka.'
+            : message,
+        'Kkkonrad_Fastcheckout/js/mixin/is-fastcheckout-active': () => active
     });
-
-    return mixin;
 }
 
 test('redirects missing or unauthorized Magento quotes to the native empty cart', () => {

@@ -17,26 +17,10 @@ class Failure
      */
     private const LAYOUT_HANDLE = 'fastcheckout_checkout_onepage_failure';
 
-    /**
-     * @var CheckoutSession
-     */
-    private $checkoutSession;
-
-    /**
-     * @var Helper
-     */
-    private $helper;
-
-    /**
-     * @param CheckoutSession $checkoutSession
-     * @param Helper $helper
-     */
     public function __construct(
-        CheckoutSession $checkoutSession,
-        Helper $helper
+        private CheckoutSession $checkoutSession,
+        private Helper $helper
     ) {
-        $this->checkoutSession = $checkoutSession;
-        $this->helper = $helper;
     }
 
     /**

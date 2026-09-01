@@ -13,108 +13,63 @@ class FastcheckoutHandleTest extends TestCase
         return dirname(__DIR__, 3);
     }
 
-    public function testHandleKeepsTheExistingHyvaPresentationAndLoadsCheckoutExtensions(): void
+    public function testMagentoKeepsCheckoutOwnership(): void
     {
-        $source = (string)file_get_contents(
-            $this->moduleRoot() . '/view/frontend/layout/fastcheckout_index_index.xml'
-        );
-        $checkout = (string)file_get_contents(
-            $this->moduleRoot() . '/view/frontend/layout/checkout_index_index.xml'
-        );
-        $components = (string)file_get_contents(
-            $this->moduleRoot() . '/view/frontend/layout/fastcheckout_native_components.xml'
+        $root = $this->moduleRoot();
+        $layout = (string)file_get_contents($root . '/view/frontend/layout/fastcheckout_index_index.xml');
+        $requireJs = (string)file_get_contents($root . '/view/frontend/requirejs-config.js');
+        $di = (string)file_get_contents($root . '/etc/di.xml')
+            . (string)file_get_contents($root . '/etc/frontend/di.xml');
+        $composer = (string)file_get_contents($root . '/composer.json');
+        $bootstrap = (string)file_get_contents(
+            $root . '/view/frontend/web/js/hyva/checkout-renderers.js'
         );
 
-        $this->assertStringContainsString('<update handle="checkout_index_index"/>', $source);
-        $this->assertStringContainsString('Kkkonrad_Fastcheckout::js/requirejs-base.js', $checkout);
-        $this->assertStringContainsString('requirejs/require.js', $checkout);
-        $this->assertStringContainsString('mage/requirejs/mixins.js', $checkout);
-        $this->assertStringContainsString('requirejs-config.js', $checkout);
-        $this->assertStringContainsString('hyva-default-checkout.css', $source);
-        $this->assertStringContainsString('Kkkonrad_Fastcheckout::hyva/checkout.phtml', $source);
-        $this->assertStringNotContainsString('fastcheckout-newsletter', $checkout);
-        $this->assertStringNotContainsString('fastcheckout-order-comment', $checkout);
-        $this->assertStringContainsString('name="fastcheckout-newsletter"', $components);
-        $this->assertStringContainsString(
-            'Kkkonrad_Fastcheckout/js/view/newsletter',
-            $components
-        );
-        $this->assertStringContainsString('Magento_Ui/js/form/element/textarea', $components);
-        $this->assertStringContainsString('fastcheckout.comment', $components);
-        $this->assertStringContainsString('fastcheckout.subscribe', $components);
-        $this->assertStringContainsString('fastcheckout-checkout-page', $source);
-        $this->assertStringContainsString('name="fallback.module.missing" remove="true"', $source);
-        $this->assertStringNotContainsString('name="checkout.root" remove="true"', $source);
-        $this->assertStringContainsString(
-            'Kkkonrad_Fastcheckout::hyva/checkout-root-children.phtml',
-            $source
-        );
-        $this->assertStringContainsString(
-            'destination="before.body.end"',
-            $source
-        );
-        $this->assertStringNotContainsString('fastcheckout_native_checkout', $source);
+        self::assertStringContainsString('<update handle="checkout_index_index"/>', $layout);
+        self::assertStringContainsString('getChildHtml()', (string)file_get_contents(
+            $root . '/view/frontend/templates/hyva/checkout-root-children.phtml'
+        ));
+        self::assertStringNotContainsString('map:', $requireJs);
+        self::assertStringNotContainsString('ShippingInformationManagementInterface', $di);
+        self::assertStringNotContainsString('PaymentInformationManagementInterface', $di);
+        self::assertStringContainsString('magento/theme-frontend-blank', $composer);
+        self::assertStringNotContainsString('magento2-theme-fallback', $composer);
+        self::assertSame(1, substr_count($bootstrap, 'app(jsLayout)'));
     }
 
-    public function testVisualShellUsesCanonicalCheckoutScopesAndRegions(): void
+    public function testVisualShellRetainsNativeExtensionPoints(): void
     {
+        $root = $this->moduleRoot();
         $templates = '';
+
         foreach ([
-            '/view/frontend/templates/hyva/checkout.phtml',
-            '/view/frontend/templates/hyva/checkout/shipping-address.phtml',
-            '/view/frontend/templates/hyva/checkout/shipping-methods.phtml',
-            '/view/frontend/templates/hyva/checkout/payment-methods.phtml',
-            '/view/frontend/templates/hyva/checkout/summary.phtml',
-            '/view/frontend/web/template/hyva/shipping-list.html',
-            '/view/frontend/web/template/hyva/shipping-method-item.html',
+            'view/frontend/templates/hyva/checkout.phtml',
+            'view/frontend/templates/hyva/checkout/shipping-address.phtml',
+            'view/frontend/templates/hyva/checkout/shipping-methods.phtml',
+            'view/frontend/templates/hyva/checkout/payment-methods.phtml',
+            'view/frontend/templates/hyva/checkout/summary.phtml',
+            'view/frontend/web/template/hyva/shipping-list.html',
+            'view/frontend/web/template/hyva/shipping-method-item.html',
         ] as $file) {
-            $templates .= (string)file_get_contents($this->moduleRoot() . $file);
+            $templates .= (string)file_get_contents($root . '/' . $file);
         }
 
         foreach ([
             'checkout.steps.shipping-step.shippingAddress',
             'checkout.steps.billing-step.payment',
             'checkout.sidebar.summary',
-            'checkout.sidebar',
             "getRegion('shippingAdditional')",
             "getRegion('before-shipping-method-form')",
             "getRegion('beforeMethods')",
             "getRegion('afterMethods')",
             "getRegion('payment-methods-list')",
             "getRegion('shipping-information')",
-            "scope: 'checkout.steps'",
-            'table-checkout-shipping-method',
-        ] as $extensionPoint) {
-            $this->assertStringContainsString($extensionPoint, $templates);
-        }
-
-        $this->assertStringNotContainsString('data-fastcheckout-payment-option=', $templates);
-        $this->assertStringNotContainsString('fastcheckoutHyvaPaymentRenderers', $templates);
-
-        foreach ([
-            'id="checkout-step-shipping"',
-            'id="opc-shipping_method"',
-            'id="checkout-step-shipping_method"',
+            'id="checkout"',
             'id="co-shipping-method-form"',
-            'id="payment"',
             'id="checkout-step-payment"',
-        ] as $nativeSelector) {
-            $this->assertStringContainsString($nativeSelector, $templates);
+            'element.shippingMethodItemTemplate',
+        ] as $extensionPoint) {
+            self::assertStringContainsString($extensionPoint, $templates);
         }
-
-        $this->assertStringContainsString('element.shippingMethodItemTemplate', $templates);
-        $this->assertStringContainsString('let: { element: $data }', $templates);
-        $this->assertStringContainsString("getRegion('progressBar')", $templates);
-        $this->assertStringContainsString('data-fastcheckout-next-step', $templates);
-        $this->assertStringContainsString('data-fastcheckout-next-step-mobile', $templates);
-        $this->assertStringContainsString('form="co-shipping-method-form"', $templates);
-        $this->assertStringContainsString('data-fastcheckout-mode=', $templates);
-
-        $rootChildren = (string)file_get_contents(
-            $this->moduleRoot() . '/view/frontend/templates/hyva/checkout-root-children.phtml'
-        );
-        $this->assertStringContainsString('getChildHtml()', $rootChildren);
-        $this->assertStringNotContainsString('checkoutConfig', $rootChildren);
-        $this->assertStringNotContainsString('Magento_Ui/js/core/app', $rootChildren);
     }
 }

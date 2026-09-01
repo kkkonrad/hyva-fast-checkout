@@ -13,7 +13,6 @@
                 <show_comment>1</show_comment>
                 <show_subscribe>1</show_subscribe>
                 <subscribe_by_default>0</subscribe_by_default>
-                <assign_order_to_customer>0</assign_order_to_customer>
             </extended>
         </fastcheckout>
     </default>

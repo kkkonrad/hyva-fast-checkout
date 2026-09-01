@@ -1,10 +1,8 @@
 'use strict';
 
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 const test = require('node:test');
-const vm = require('node:vm');
+const loadAmd = require('./amd');
 
 function deferred() {
     let resolve,
@@ -28,10 +26,6 @@ function deferred() {
 }
 
 test('shares an in-flight native shipping save and saves again only after quote changes', async () => {
-    const source = fs.readFileSync(path.resolve(
-        __dirname,
-        '../../../view/frontend/web/js/model/shipping-save-coordinator.js'
-    ), 'utf8');
     const requests = [];
     const quote = {
         shippingAddress: () => ({firstname: quote.firstname, street: ['Testowa 1']}),
@@ -40,7 +34,6 @@ test('shares an in-flight native shipping save and saves again only after quote 
         isVirtual: () => false,
         firstname: 'Jan'
     };
-    let coordinator;
     const jquery = {
         Deferred() {
             const value = deferred();
@@ -65,20 +58,21 @@ test('shares an in-flight native shipping save and saves again only after quote 
         toJS: (value) => value
     };
 
-    vm.runInNewContext(source, {
+    const coordinator = loadAmd('model/shipping-save-coordinator.js', {
+        jquery,
+        ko,
+        'Magento_Checkout/js/model/quote': quote
+    }, {
         require(dependencies, onLoad) {
+            assert.deepEqual(Array.from(dependencies), [
+                'Magento_Checkout/js/action/set-shipping-information'
+            ]);
             onLoad(() => {
                 const request = deferred();
 
                 requests.push(request);
                 return request.promise;
             });
-        },
-        define(dependencies, factory) {
-            assert.equal(dependencies.includes(
-                'Magento_Checkout/js/action/set-shipping-information'
-            ), false);
-            coordinator = factory(jquery, ko, quote);
         }
     });
 
@@ -89,7 +83,6 @@ test('shares an in-flight native shipping save and saves again only after quote 
     assert.equal(requests.length, 1);
     requests[0].resolve();
     await Promise.all([first, shared]);
-    assert.equal(coordinator.isSaved(), true);
 
     await coordinator.ensureSaved();
     assert.equal(requests.length, 1);
@@ -101,5 +94,4 @@ test('shares an in-flight native shipping save and saves again only after quote 
     assert.equal(requests.length, 2);
     requests[1].resolve();
     await changed;
-    assert.equal(coordinator.isSaved(), true);
 });

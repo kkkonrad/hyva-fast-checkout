@@ -5,56 +5,36 @@ declare(strict_types=1);
 namespace Kkkonrad\Fastcheckout\Helper;
 
 use Hyva\Theme\Service\HyvaThemes;
+use Magento\Framework\App\Helper\AbstractHelper;
 use Magento\Framework\App\Helper\Context;
 use Magento\Framework\Json\Helper\Data as JsonHelper;
-use Magento\Framework\App\Helper\AbstractHelper;
-
-use Magento\Store\Model\ScopeInterface;
 use Magento\Framework\View\DesignInterface;
-use Magento\Theme\Model\ThemeFactory;
+use Magento\Store\Model\ScopeInterface;
 
 class Data extends AbstractHelper
 {
+    public const XML_PATH_ENABLE = 'fastcheckout/general/enable';
+    public const XML_PATH_TWO_STEP = 'fastcheckout/general/two_step';
+    public const XML_PATH_SEPARATE_ORDER_ACTIONS = 'fastcheckout/general/separate_order_actions';
+    public const XML_PATH_PLACE_ORDER_OUTSIDE_SUMMARY = 'fastcheckout/general/place_order_outside_summary';
 
-    const XML_PATH_ENABLE = 'fastcheckout/general/enable';
-    const XML_PATH_TWO_STEP = 'fastcheckout/general/two_step';
-    const XML_PATH_SEPARATE_ORDER_ACTIONS = 'fastcheckout/general/separate_order_actions';
-    const XML_PATH_PLACE_ORDER_OUTSIDE_SUMMARY = 'fastcheckout/general/place_order_outside_summary';
-
-    const XML_PATH_DISCOUNT_VISIBILITY = 'fastcheckout/extended/show_discount';
-    const XML_PATH_COMMENT_VISIBILITY = 'fastcheckout/extended/show_comment';
-    const XML_PATH_SUBSCRIBE_VISIBILITY = 'fastcheckout/extended/show_subscribe';
-    const XML_PATH_SUBSCRIBE_BY_DEFAULT = 'fastcheckout/extended/subscribe_by_default';
-    const XML_PATH_SHIPPING_PAYMENT_MAPPING = 'fastcheckout/extended/shipping_payment_mapping';
-    const XML_PATH_ASSIGN_ORDER_TO_CUSTOMER = 'fastcheckout/extended/assign_order_to_customer';
-
-    public $jsonHelper;
-    protected $design;
-    protected $themeFactory;
-    private HyvaThemes $hyvaThemes;
-
-    /**
-     * Per-request memo of canUseHyvaNativeCheckout() (theme/config checks are not free).
-     *
-     * @var bool|null
-     */
-    private $canUseHyvaNativeCheckoutCache = null;
+    public const XML_PATH_DISCOUNT_VISIBILITY = 'fastcheckout/extended/show_discount';
+    public const XML_PATH_COMMENT_VISIBILITY = 'fastcheckout/extended/show_comment';
+    public const XML_PATH_SUBSCRIBE_VISIBILITY = 'fastcheckout/extended/show_subscribe';
+    public const XML_PATH_SUBSCRIBE_BY_DEFAULT = 'fastcheckout/extended/subscribe_by_default';
+    public const XML_PATH_SHIPPING_PAYMENT_MAPPING = 'fastcheckout/extended/shipping_payment_mapping';
+    private ?bool $canUseHyvaNativeCheckoutCache = null;
 
     public function __construct(
         Context $context,
-        JsonHelper $jsonHelper,
-        DesignInterface $design,
-        ThemeFactory $themeFactory,
-        HyvaThemes $hyvaThemes
+        private JsonHelper $jsonHelper,
+        private DesignInterface $design,
+        private HyvaThemes $hyvaThemes
     ) {
         parent::__construct($context);
-        $this->jsonHelper = $jsonHelper;
-        $this->design = $design;
-        $this->themeFactory = $themeFactory;
-        $this->hyvaThemes = $hyvaThemes;
     }
 
-    public function isEnable()
+    public function isEnable(): bool
     {
         return (bool)$this->scopeConfig->getValue(self::XML_PATH_ENABLE, ScopeInterface::SCOPE_STORE);
     }
@@ -83,94 +63,58 @@ class Data extends AbstractHelper
         );
     }
 
-    public function getShippingPaymentMapping()
+    public function isShowComment(): bool
     {
-        $mapping = $this->scopeConfig->getValue(self::XML_PATH_SHIPPING_PAYMENT_MAPPING, ScopeInterface::SCOPE_STORE);
+        return (bool)$this->scopeConfig->getValue(self::XML_PATH_COMMENT_VISIBILITY, ScopeInterface::SCOPE_STORE);
+    }
 
-        if (empty($mapping)) {
+    public function getShippingPaymentMapping(): array
+    {
+        $mapping = $this->scopeConfig->getValue(
+            self::XML_PATH_SHIPPING_PAYMENT_MAPPING,
+            ScopeInterface::SCOPE_STORE
+        );
+        if (!$mapping) {
             return [];
         }
 
         try {
             $decoded = $this->jsonHelper->jsonDecode($mapping);
             return is_array($decoded) ? $decoded : [];
-        } catch (\Exception $e) {
-            $this->_logger->warning('Invalid fastcheckout shipping/payment mapping', ['exception' => $e]);
+        } catch (\Throwable $exception) {
+            $this->_logger->warning('Invalid fastcheckout shipping/payment mapping', [
+                'exception' => $exception,
+            ]);
             return [];
         }
     }
 
-    public function isShowComment()
-    {
-        return (bool)$this->scopeConfig->getValue(self::XML_PATH_COMMENT_VISIBILITY, ScopeInterface::SCOPE_STORE);
-    }
-
-    public function isShowDiscount()
+    public function isShowDiscount(): bool
     {
         return (bool)$this->scopeConfig->getValue(self::XML_PATH_DISCOUNT_VISIBILITY, ScopeInterface::SCOPE_STORE);
     }
 
-    public function isShowSubscribe()
+    public function isShowSubscribe(): bool
     {
         $moduleStatus = $this->isModuleOutputEnabled('Magento_Newsletter');
         return $this->scopeConfig->getValue(self::XML_PATH_SUBSCRIBE_VISIBILITY, ScopeInterface::SCOPE_STORE)
             && $moduleStatus;
     }
 
-    public function isSubscribeByDefault()
+    public function isSubscribeByDefault(): bool
     {
         return (bool)$this->scopeConfig->getValue(self::XML_PATH_SUBSCRIBE_BY_DEFAULT, ScopeInterface::SCOPE_STORE);
     }
 
-    /**
-     * When enabled, guest orders whose email matches an existing customer are
-     * attached to that customer account after place order (previous default behaviour).
-     */
-    public function isAssignOrderToCustomer(): bool
-    {
-        return (bool)$this->scopeConfig->getValue(
-            self::XML_PATH_ASSIGN_ORDER_TO_CUSTOMER,
-            ScopeInterface::SCOPE_STORE
-        );
-    }
-
-    public function canUseHyvaNativeCheckout()
+    public function canUseHyvaNativeCheckout(): bool
     {
         if ($this->canUseHyvaNativeCheckoutCache !== null) {
             return $this->canUseHyvaNativeCheckoutCache;
         }
 
-        if (!$this->isEnable() || !$this->isModuleOutputEnabled('Kkkonrad_Fastcheckout')) {
-            return $this->canUseHyvaNativeCheckoutCache = false;
-        }
-
-        $theme = null;
-        try {
-            $theme = $this->design ? $this->design->getDesignTheme() : null;
-            if ($theme && $this->hyvaThemes->isHyvaTheme($theme)) {
-                return $this->canUseHyvaNativeCheckoutCache = true;
-            }
-        } catch (\Throwable $e) {
-            $theme = null;
-        }
-
-        if ($this->themeFactory !== null) {
-            try {
-                $themeId = (int)$this->scopeConfig->getValue(
-                    'design/theme/theme_id',
-                    ScopeInterface::SCOPE_STORE
-                );
-                if ($themeId > 0) {
-                    $theme = $this->themeFactory->create()->load($themeId);
-                    return $this->canUseHyvaNativeCheckoutCache =
-                        $this->hyvaThemes->isHyvaTheme($theme);
-                }
-            } catch (\Throwable $e) {
-                // Fall through to the safe non-Hyva result.
-            }
-        }
-
-        return $this->canUseHyvaNativeCheckoutCache = false;
+        return $this->canUseHyvaNativeCheckoutCache =
+            $this->isEnable()
+            && $this->isModuleOutputEnabled('Kkkonrad_Fastcheckout')
+            && $this->hyvaThemes->isHyvaTheme($this->design->getDesignTheme());
     }
-
 }

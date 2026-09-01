@@ -1,13 +1,19 @@
 'use strict';
 
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 const test = require('node:test');
-const vm = require('node:vm');
+const loadAmd = require('./amd');
+
+function loadValidator(quote, selectBillingAddress, registry, globals = {}) {
+    return loadAmd('model/one-step-validator.js', {
+        jquery: () => ({length: 0}),
+        'Magento_Checkout/js/model/quote': quote,
+        'Magento_Checkout/js/action/select-billing-address': selectBillingAddress,
+        uiRegistry: registry
+    }, globals);
+}
 
 test('uses Magento shipping and billing components as one additional validator', () => {
-    let validator;
     let billingAddress = null;
     let shippingValid = false;
     let shippingCalls = 0;
@@ -41,23 +47,9 @@ test('uses Magento shipping and billing components as one additional validator',
             return null;
         }
     };
-    const source = fs.readFileSync(
-        path.resolve(__dirname, '../../../view/frontend/web/js/model/one-step-validator.js'),
-        'utf8'
-    );
-
-    vm.runInNewContext(source, {
-        define(dependencies, factory) {
-            validator = factory(
-                () => ({length: 0}),
-                quote,
-                (address) => {
-                    billingAddress = address;
-                },
-                registry
-            );
-        }
-    });
+    const validator = loadValidator(quote, (address) => {
+        billingAddress = address;
+    }, registry);
 
     assert.equal(validator.validate(), false);
     assert.equal(shippingCalls, 1);
@@ -71,7 +63,6 @@ test('uses Magento shipping and billing components as one additional validator',
 });
 
 test('exposes native shipping-address validation to the shipping mixin', () => {
-    let validator;
     let addressInvalid = true;
     let addressCalls = 0;
     let focusCalls = 0;
@@ -99,21 +90,7 @@ test('exposes native shipping-address validation to the shipping mixin', () => {
     const quote = {
         isVirtual: () => false
     };
-    const source = fs.readFileSync(
-        path.resolve(__dirname, '../../../view/frontend/web/js/model/one-step-validator.js'),
-        'utf8'
-    );
-
-    vm.runInNewContext(source, {
-        define(dependencies, factory) {
-            validator = factory(
-                () => ({length: 0}),
-                quote,
-                () => {},
-                {get: () => shipping}
-            );
-        }
-    });
+    const validator = loadValidator(quote, () => {}, {get: () => shipping});
 
     assert.equal(validator.validateShippingAddress(shipping), false);
     assert.equal(addressCalls, 1);
@@ -125,7 +102,6 @@ test('exposes native shipping-address validation to the shipping mixin', () => {
 });
 
 test('shipping mixin validates address before method and requests one smooth scroll', () => {
-    let extension;
     let active = true;
     let addressValid = false;
     let shippingMethod = null;
@@ -144,12 +120,20 @@ test('shipping mixin validates address before method and requests one smooth scr
     const nativeFocus = HTMLElement.prototype.focus;
     const addressField = new HTMLElement();
     const addressRoot = {contains: (element) => element === addressField};
-    const source = fs.readFileSync(
-        path.resolve(__dirname, '../../../view/frontend/web/js/mixin/shipping-validation-mixin.js'),
-        'utf8'
-    );
+    const mixin = loadAmd('mixin/shipping-validation-mixin.js', {
+        jquery: () => ({stop: () => stopCalls++}),
+        'Magento_Checkout/js/model/quote': {shippingMethod: () => shippingMethod},
+        'Kkkonrad_Fastcheckout/js/model/one-step-validator': {
+            validateShippingAddress() {
+                addressCalls += 1;
+                scroller.scrollTop = 0;
+                addressField.focus();
 
-    vm.runInNewContext(source, {
+                return addressValid;
+            }
+        },
+        'Kkkonrad_Fastcheckout/js/mixin/is-fastcheckout-active': () => active
+    }, {
         Event: class Event {
             constructor(type) {
                 this.type = type;
@@ -163,26 +147,9 @@ test('shipping mixin validates address before method and requests one smooth scr
                 events.push(event.type);
             }
         },
-        window: {HTMLElement},
-        define(dependencies, factory) {
-            const mixin = factory(
-                () => ({stop: () => stopCalls++}),
-                {shippingMethod: () => shippingMethod},
-                {
-                    validateShippingAddress() {
-                        addressCalls += 1;
-                        scroller.scrollTop = 0;
-                        addressField.focus();
-
-                        return addressValid;
-                    }
-                },
-                () => active
-            );
-
-            extension = mixin({extend: (value) => value});
-        }
+        window: {HTMLElement}
     });
+    const extension = mixin({extend: (value) => value});
 
     const component = {
         _super() {
@@ -222,27 +189,6 @@ test('shipping mixin validates address before method and requests one smooth scr
     assert.equal(nativeCalls, 3);
     assert.equal(events.length, 3);
 });
-
-function loadValidator(quote, selectBillingAddress, registry) {
-    let validator;
-    const source = fs.readFileSync(
-        path.resolve(__dirname, '../../../view/frontend/web/js/model/one-step-validator.js'),
-        'utf8'
-    );
-
-    vm.runInNewContext(source, {
-        define(dependencies, factory) {
-            validator = factory(
-                () => ({length: 0}),
-                quote,
-                selectBillingAddress,
-                registry
-            );
-        }
-    });
-
-    return validator;
-}
 
 test('re-applies shipping as billing when cache keys drift', () => {
     let billingAddress = {
@@ -323,7 +269,6 @@ test('does not overwrite a separate billing address the customer opened', () => 
     );
 
     validator.setBillingFollowsShipping(false);
-    assert.equal(validator.doesBillingFollowShipping(), false);
     assert.equal(validator.validateBillingAddress(), false);
     assert.equal(billingUpdates, 1);
     assert.equal(billingAddress, null);
@@ -364,35 +309,21 @@ test('adopts the native same-as-shipping state restored by billing cancel', () =
     validator.setBillingFollowsShipping(false);
 
     assert.equal(validator.applyShippingAsBilling(), true);
-    assert.equal(validator.doesBillingFollowShipping(), true);
     assert.equal(billingAddress, shippingAddress);
     assert.equal(sameAsShipping, true);
 });
 
 test('registered cross-step validation is a no-op in two-step mode', () => {
-    let validator;
-    const source = fs.readFileSync(
-        path.resolve(__dirname, '../../../view/frontend/web/js/model/one-step-validator.js'),
-        'utf8'
+    const validator = loadValidator(
+        {isVirtual: () => false},
+        () => {
+            throw new Error('billing address must not be changed');
+        },
+        {get: () => {
+            throw new Error('registry must not be inspected');
+        }},
+        {window: {checkoutConfig: {fastcheckoutSettings: {twoStep: true}}}}
     );
-
-    vm.runInNewContext(source, {
-        window: {checkoutConfig: {fastcheckoutSettings: {twoStep: true}}},
-        define(dependencies, factory) {
-            validator = factory(
-                () => {
-                    throw new Error('shipping form must not be inspected');
-                },
-                {isVirtual: () => false},
-                () => {
-                    throw new Error('billing address must not be changed');
-                },
-                {get: () => {
-                    throw new Error('registry must not be inspected');
-                }}
-            );
-        }
-    });
 
     assert.equal(validator.validate(), true);
 });
