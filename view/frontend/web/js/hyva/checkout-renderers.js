@@ -3,7 +3,7 @@ define([
     'Magento_Ui/js/core/app',
     'Magento_Checkout/js/model/quote',
     'Magento_Checkout/js/model/checkout-data-resolver',
-    'Magento_Checkout/js/checkout-data',
+    'Magento_Checkout/js/model/payment/additional-validators',
     'Magento_Customer/js/customer-data',
     'Magento_Checkout/js/model/totals',
     'Magento_Checkout/js/model/payment-service',
@@ -18,7 +18,7 @@ define([
     app,
     quote,
     checkoutDataResolver,
-    checkoutData,
+    additionalValidators,
     customerData,
     totals,
     paymentService,
@@ -38,8 +38,6 @@ define([
         agreementsPortalObserver,
         agreementsPortalSource,
         agreementsPortalParts = [],
-        scrollAnimationTimer,
-        scrollAnimationBehavior = null,
         shippingSaveTimer,
         placeOrderProcessing = false;
 
@@ -234,7 +232,6 @@ define([
             '[data-fastcheckout-place-order-mobile], [data-fastcheckout-place-order-ssr]'
         ).forEach(function (button) {
             button.hidden = walletOnly || paymentStepInactive;
-            button.classList.toggle('hidden', walletOnly || paymentStepInactive);
             button.disabled = placeOrderProcessing || walletOnly || paymentStepInactive;
             button.setAttribute('aria-disabled', button.disabled ? 'true' : 'false');
             button.dataset.fastcheckoutNativeTargetReady = activeButton ? '1' : '0';
@@ -545,34 +542,53 @@ define([
         }
     }
 
-    function revealStartupContent() {
-        var loader = document.querySelector('[data-fastcheckout-startup-loader]'),
-            summaryRoot = document.getElementById('fastcheckout-ko-summary-root'),
-            nativeSummary = summaryRoot && summaryRoot.querySelector('.fastcheckout-native-summary');
-
-        if (loader && document.querySelector(
-            '.fastcheckout-native-shipping-address input[name="firstname"]'
-        )) {
-            loader.hidden = true;
-            loader.style.display = 'none';
-        }
-
-        if (nativeSummary &&
-            nativeSummary.querySelector('.product-item') &&
-            nativeSummary.querySelector('.table-totals tr')) {
-            summaryRoot.classList.remove('hidden');
-        }
-
-        return (!loader || loader.hidden) &&
-            (!summaryRoot || !summaryRoot.classList.contains('hidden'));
-    }
-
     function getActivePaymentRenderer() {
         var code = activePaymentCode();
 
         return code ? registry.get(
             'checkout.steps.billing-step.payment.payments-list.' + code
         ) : null;
+    }
+
+    function hideSectionLoader(name, ready) {
+        var loader = document.querySelector(
+            '[data-fastcheckout-section-loader="' + name + '"]'
+        );
+
+        if (loader && ready) {
+            loader.hidden = true;
+        }
+
+        return !loader || loader.hidden;
+    }
+
+    function revealStartupContent() {
+        var summaryRoot = document.getElementById('fastcheckout-ko-summary-root'),
+            nativeSummary = summaryRoot && summaryRoot.querySelector('.fastcheckout-native-summary'),
+            addressReady = quote.isVirtual() || document.querySelector(
+                '.fastcheckout-native-shipping-address input[name="firstname"], ' +
+                '.fastcheckout-native-shipping-address .shipping-address-item'
+            ),
+            shippingReady = quote.isVirtual() || document.querySelector(
+                '#co-shipping-method-form[data-fastcheckout-bound="1"]'
+            ),
+            paymentReady = document.querySelector(
+                '#co-payment-form[data-fastcheckout-bound="1"]'
+            ),
+            summaryReady = nativeSummary && nativeSummary.querySelector('.product-item') &&
+                nativeSummary.querySelector('.table-totals tr');
+
+        if (summaryReady) {
+            summaryRoot.classList.remove('hidden');
+        }
+
+        return [
+            hideSectionLoader('shipping-address', addressReady),
+            Boolean(shippingReady),
+            hideSectionLoader('payment-methods', paymentReady),
+            hideSectionLoader('summary', summaryReady)
+        ].every(Boolean) &&
+            (!summaryRoot || !summaryRoot.classList.contains('hidden'));
     }
 
     function syncBillingAddress() {
@@ -589,17 +605,15 @@ define([
         wirePlaceOrderButtons();
     }
 
-    function revealNativeContent() {
-        revealStartupContent();
-        syncPaymentContent();
-    }
-
     function observeNativeContent() {
         var paymentRoot = document.querySelector('.fastcheckout-ko-payment-root'),
             startupRoots = [
                 document.querySelector('.fastcheckout-native-shipping-address'),
+                document.getElementById('fastcheckout-ko-shipping-root'),
+                paymentRoot,
                 document.getElementById('fastcheckout-ko-summary-root')
-            ].filter(Boolean);
+            ].filter(Boolean),
+            ready = revealStartupContent();
 
         if (!window.MutationObserver) {
             return;
@@ -612,7 +626,7 @@ define([
             paymentDomObserver.observe(paymentRoot, {childList: true, subtree: true});
         }
 
-        if (startupRoots.length && !revealStartupContent()) {
+        if (startupRoots.length && !ready) {
             startupDomObserver = new MutationObserver(function () {
                 if (revealStartupContent()) {
                     startupDomObserver.disconnect();
@@ -620,7 +634,12 @@ define([
                 }
             });
             startupRoots.forEach(function (root) {
-                startupDomObserver.observe(root, {childList: true, subtree: true});
+                startupDomObserver.observe(root, {
+                    attributes: true,
+                    attributeFilter: ['data-fastcheckout-bound'],
+                    childList: true,
+                    subtree: true
+                });
             });
         }
     }
@@ -704,46 +723,6 @@ define([
         return false;
     }
 
-    function smoothScrollTo(scrollTop) {
-        var scroller = document.scrollingElement || document.documentElement,
-            target = Math.max(0, Math.min(
-                scrollTop,
-                scroller.scrollHeight - window.innerHeight
-            )),
-            start = scroller.scrollTop,
-            distance = target - start,
-            startedAt = Date.now();
-
-        if (scrollAnimationTimer) {
-            window.clearInterval(scrollAnimationTimer);
-            scrollAnimationTimer = null;
-        }
-        if (scrollAnimationBehavior !== null) {
-            scroller.style.scrollBehavior = scrollAnimationBehavior;
-        }
-        scrollAnimationBehavior = scroller.style.scrollBehavior;
-        scroller.style.scrollBehavior = 'auto';
-
-        if (!distance || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-            scroller.scrollTop = target;
-            scroller.style.scrollBehavior = scrollAnimationBehavior;
-            scrollAnimationBehavior = null;
-            return;
-        }
-
-        scrollAnimationTimer = window.setInterval(function () {
-            var progress = Math.min((Date.now() - startedAt) / 300, 1);
-
-            scroller.scrollTop = start + distance * (1 - Math.pow(1 - progress, 3));
-            if (progress === 1) {
-                window.clearInterval(scrollAnimationTimer);
-                scrollAnimationTimer = null;
-                scroller.style.scrollBehavior = scrollAnimationBehavior;
-                scrollAnimationBehavior = null;
-            }
-        }, 16);
-    }
-
     function scrollToFirstVisibleError(scope) {
         var root = scope || document.getElementById('fastcheckout-checkout'),
             errors = root && root.querySelectorAll(
@@ -762,14 +741,12 @@ define([
                     element.getClientRects().length &&
                     window.getComputedStyle(element).visibility !== 'hidden';
             }),
-            box,
-            scrollTop;
+            behavior;
 
         if (error) {
-            box = error.getBoundingClientRect();
-            scrollTop = window.pageYOffset + box.top -
-                (window.innerHeight - box.height) / 2;
-            smoothScrollTo(scrollTop);
+            behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ?
+                'auto' : 'smooth';
+            error.scrollIntoView({behavior: behavior, block: 'center'});
 
             return true;
         }
@@ -985,6 +962,7 @@ define([
             return;
         }
         initialized = true;
+        additionalValidators.registerValidator(oneStepValidator);
 
         if (root) {
             root.addEventListener('click', function (event) {
@@ -1064,7 +1042,7 @@ define([
             }
 
             window.setTimeout(function () {
-                revealNativeContent();
+                syncPaymentContent();
                 observeNativeContent();
                 updateMobileTotal();
                 window.dispatchEvent(new CustomEvent('fastcheckout:ready'));

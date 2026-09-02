@@ -20,11 +20,8 @@ class LayoutProcessor implements LayoutProcessorInterface
     private const CORE_SUMMARY_TEMPLATE = 'Magento_Checkout/summary';
     private const CORE_DISCOUNT_TEMPLATE = 'Magento_SalesRule/payment/discount';
 
-    private Helper $helper;
-
-    public function __construct(Helper $helper)
+    public function __construct(private Helper $helper)
     {
-        $this->helper = $helper;
     }
 
     public function process($jsLayout)

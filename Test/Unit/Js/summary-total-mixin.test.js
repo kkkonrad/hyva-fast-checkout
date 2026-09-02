@@ -1,24 +1,13 @@
 'use strict';
 
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 const test = require('node:test');
-const vm = require('node:vm');
+const loadAmd = require('./amd');
 
 function isFullMode(active, twoStep, nativeResult) {
-    let mixin;
     let nativeCalls = 0;
-    const source = fs.readFileSync(
-        path.resolve(__dirname, '../../../view/frontend/web/js/mixin/summary-total-mixin.js'),
-        'utf8'
-    );
-
-    vm.runInNewContext(source, {
-        window: {checkoutConfig: {fastcheckoutSettings: {twoStep}}},
-        define(dependencies, factory) {
-            mixin = factory(() => active);
-        }
+    const mixin = loadAmd('mixin/summary-total-mixin.js', {
+        'Kkkonrad_Fastcheckout/js/mixin/is-fastcheckout-active': () => active
     });
 
     const extension = mixin({

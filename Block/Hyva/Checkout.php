@@ -15,44 +15,18 @@ use Magento\Quote\Model\Quote;
 
 class Checkout extends Template
 {
-    /** @var CheckoutSession */
-    private $checkoutSession;
-
-    /** @var ViewModelRegistry */
-    private $viewModelRegistry;
-
-    /** @var Helper */
-    private $helper;
-
-    /** @var CompositeConfigProvider */
-    private $configProvider;
-
-    /** @var ResolverInterface */
-    private $localeResolver;
-
-    /** @var CheckoutLayoutCollector */
-    private $layoutCollector;
-
-    /** @var Quote|null */
-    private $quote;
+    private ?Quote $quote = null;
 
     public function __construct(
         Context $context,
-        CheckoutSession $checkoutSession,
-        ViewModelRegistry $viewModelRegistry,
-        Helper $helper,
-        CompositeConfigProvider $configProvider,
-        ResolverInterface $localeResolver,
-        CheckoutLayoutCollector $layoutCollector,
+        private CheckoutSession $checkoutSession,
+        private ViewModelRegistry $viewModelRegistry,
+        private Helper $helper,
+        private CompositeConfigProvider $configProvider,
+        private ResolverInterface $localeResolver,
+        private CheckoutLayoutCollector $layoutCollector,
         array $data = []
     ) {
-        $this->checkoutSession = $checkoutSession;
-        $this->viewModelRegistry = $viewModelRegistry;
-        $this->helper = $helper;
-        $this->configProvider = $configProvider;
-        $this->localeResolver = $localeResolver;
-        $this->layoutCollector = $layoutCollector;
-
         parent::__construct($context, $data);
     }
 

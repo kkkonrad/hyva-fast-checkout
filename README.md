@@ -80,8 +80,7 @@ The store administrator can:
 - choose whether Place Order stays in the order-summary container or appears
   directly on the checkout background in one-page mode;
 - show or hide the order comment, discount code and newsletter option;
-- limit payment methods according to the selected shipping method;
-- optionally assign guest orders to an existing customer account.
+- limit payment methods according to the selected shipping method.
 
 Shipping-to-payment mapping is opt-in per payment code. Once a payment code is
 listed, it is available only for matching shipping rules. A payment method that
@@ -90,11 +89,7 @@ before the administrator deliberately adds it to the mapping. Rules accept a
 full shipping method, a carrier code or a prefix wildcard, for example
 `tablerate_bestway`, `furgonetkapl` or `flatrate_*`.
 
-Guest-order assignment is disabled by default. Enable it only when the store
-independently verifies that the shopper owns the supplied email address.
-
-Checkout remains available at the standard `/checkout/` URL. The legacy
-`/fast-checkout/` URL redirects there automatically.
+Checkout remains available at the standard `/checkout/` URL.
 
 ## The customer journey
 

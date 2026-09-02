@@ -1,13 +1,10 @@
 'use strict';
 
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 const test = require('node:test');
-const vm = require('node:vm');
+const loadAmd = require('./amd');
 
 function loadMixin(active, initialHash = '', twoStep = false) {
-    let mixin;
     const nativeHashes = [];
     const listeners = {};
     const replacements = [];
@@ -30,12 +27,10 @@ function loadMixin(active, initialHash = '', twoStep = false) {
             };
         }
     };
-    const source = fs.readFileSync(
-        path.resolve(__dirname, '../../../view/frontend/web/js/mixin/step-navigator-mixin.js'),
-        'utf8'
-    );
-
-    vm.runInNewContext(source, {
+    const mixin = loadAmd('mixin/step-navigator-mixin.js', {
+        'mage/utils/wrapper': wrapper,
+        'Kkkonrad_Fastcheckout/js/mixin/is-fastcheckout-active': () => active
+    }, {
         document: {title: 'Checkout'},
         window: {
             checkoutConfig: {fastcheckoutSettings: {twoStep}},
@@ -44,9 +39,6 @@ function loadMixin(active, initialHash = '', twoStep = false) {
             addEventListener(type, listener) {
                 listeners[type] = listener;
             }
-        },
-        define(dependencies, factory) {
-            mixin = factory(wrapper, () => active);
         }
     });
 

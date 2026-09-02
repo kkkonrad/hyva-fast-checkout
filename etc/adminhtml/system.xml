@@ -49,12 +49,6 @@
                     <label>Show comment field?</label>
                     <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
                 </field>
-                <field id="assign_order_to_customer" translate="label comment" type="select"
-                       sortOrder="4" showInDefault="1" showInWebsite="1" showInStore="1">
-                    <label>Assign order to customer if customer were not logged in (by email)?</label>
-                    <comment>Security warning: enable only if the store verifies ownership of the guest email. Matching an email address alone can attach an order, its addresses, and downloadable purchases to an existing customer account.</comment>
-                    <source_model>Magento\Config\Model\Config\Source\Yesno</source_model>
-                </field>
                 <field id="show_subscribe" translate="label" type="select"
                        sortOrder="5" showInDefault="1" showInWebsite="1" showInStore="1">
                     <label>Show Subscribe to Newsletter?</label>
@@ -70,7 +64,7 @@
                     <label>Payment Methods by Shipping Method</label>
                     <comment>Shipping methods may use wildcard entries such as carrier_*. Payment methods must be selected by exact method code.</comment>
                     <frontend_model>Kkkonrad\Fastcheckout\Block\Adminhtml\System\Config\ShippingPaymentMapping</frontend_model>
-                    <backend_model>Kkkonrad\Fastcheckout\Model\Config\Backend\Json</backend_model>
+                    <backend_model>Magento\Config\Model\Config\Backend\Serialized\ArraySerialized</backend_model>
                 </field>
             </group>
         </section>

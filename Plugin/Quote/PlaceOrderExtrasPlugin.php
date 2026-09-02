@@ -12,13 +12,10 @@ use Magento\Quote\Api\PaymentMethodManagementInterface;
 /** Capture Fastcheckout extras for the quote whose native payment data is saved. */
 class PlaceOrderExtrasPlugin
 {
-    private CheckoutSession $checkoutSession;
-    private Helper $helper;
-
-    public function __construct(CheckoutSession $checkoutSession, Helper $helper)
-    {
-        $this->checkoutSession = $checkoutSession;
-        $this->helper = $helper;
+    public function __construct(
+        private CheckoutSession $checkoutSession,
+        private Helper $helper
+    ) {
     }
 
     /**

@@ -124,11 +124,5 @@ define([
         return deferred.promise();
     }
 
-    return {
-        ensureSaved: ensureSaved,
-        isSaved: function () {
-            return quote.isVirtual && quote.isVirtual() ||
-                savedSignature !== null && savedSignature === currentSignature();
-        }
-    };
+    return {ensureSaved: ensureSaved};
 });

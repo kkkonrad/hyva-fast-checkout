@@ -5,68 +5,52 @@ declare(strict_types=1);
 namespace Kkkonrad\Fastcheckout\Model\Payment\Checks;
 
 use Kkkonrad\Fastcheckout\Helper\Data as Helper;
+use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Payment\Model\Checks\SpecificationInterface;
 use Magento\Payment\Model\MethodInterface;
 use Magento\Quote\Model\Quote;
+use Magento\Store\Model\ScopeInterface;
 
 class ShippingMethodMapping implements SpecificationInterface
 {
-    private Helper $helper;
+    private const XML_PATH_MAPPING = 'fastcheckout/extended/shipping_payment_mapping';
 
-    public function __construct(Helper $helper)
-    {
-        $this->helper = $helper;
+    public function __construct(
+        private Helper $helper,
+        private ScopeConfigInterface $scopeConfig
+    ) {
     }
 
     public function isApplicable(MethodInterface $paymentMethod, Quote $quote): bool
     {
-        $mapping = $this->helper->getShippingPaymentMapping();
-
-        if (!$this->helper->isEnable() || !$mapping || $quote->isVirtual()) {
+        $mapping = json_decode((string)$this->scopeConfig->getValue(
+            self::XML_PATH_MAPPING,
+            ScopeInterface::SCOPE_STORE
+        ), true);
+        if (!$this->helper->isEnable() || !is_array($mapping) || !$mapping || $quote->isVirtual()) {
             return true;
         }
 
-        $shippingAddress = $quote->getShippingAddress();
-        $shippingCode = $shippingAddress ? trim((string)$shippingAddress->getShippingMethod()) : '';
-        if ($shippingCode === '') {
+        $address = $quote->getShippingAddress();
+        $shipping = $address ? trim((string)$address->getShippingMethod()) : '';
+        if ($shipping === '') {
             return true;
         }
 
-        $paymentCode = (string)$paymentMethod->getCode();
-        $mentionsPayment = false;
-
+        $payment = (string)$paymentMethod->getCode();
+        $carrier = explode('_', $shipping, 2)[0];
+        $listed = false;
         foreach ($mapping as $rule) {
-            if (!is_array($rule) || (string)($rule['payment_method'] ?? '') !== $paymentCode) {
+            if (!is_array($rule) || (string)($rule['payment_method'] ?? '') !== $payment) {
                 continue;
             }
-            $mentionsPayment = true;
-            if ($this->matches((string)($rule['shipping_method'] ?? ''), $shippingCode)) {
+            $listed = true;
+            $expected = trim((string)($rule['shipping_method'] ?? ''));
+            if ($expected === $carrier || fnmatch($expected, $shipping)) {
                 return true;
             }
         }
 
-        // Payments never listed in admin mapping stay available so a newly
-        // installed PayU/Stripe/etc. is not hidden until someone edits the grid.
-        return !$mentionsPayment;
-    }
-
-    private function matches(string $rule, string $shippingCode): bool
-    {
-        $expected = trim($rule);
-        $carrier = explode('_', $shippingCode, 2)[0];
-
-        if ($expected === '' || $shippingCode === '') {
-            return false;
-        }
-        if ($expected === '*' || $expected === $shippingCode || $expected === $carrier) {
-            return true;
-        }
-        if (substr($expected, -1) !== '*') {
-            return false;
-        }
-
-        $prefix = rtrim(substr($expected, 0, -1), '_');
-
-        return $prefix !== '' && strpos($shippingCode, $prefix . '_') === 0;
+        return !$listed;
     }
 }

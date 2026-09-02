@@ -181,10 +181,10 @@ or Fastcheckout-specific DI entries.**
 - Mixins are not registered on address or method selection actions, REST
   transport, rate processors or `customer-data`, leaving other vendors' chains
   intact.
-- The one-step validator is a regular child of the canonical
-  `checkout.steps.billing-step.payment.additional-payment-validators` node; it
-  neither replaces the list nor validators registered by other modules. It is a
-  no-op in two-step mode without changing registration order.
+- The one-step validator is registered in Magento's native
+  `additional-validators` registry by the existing checkout bootstrap. It does
+  not replace validators registered by other modules and is a no-op in
+  two-step mode.
 
 Do not add vendor-specific DI “for Fastcheckout” to a store project when the
 same renderer already loads through Magento's standard `checkout_index_index`.
@@ -236,24 +236,10 @@ After changing files under `view/frontend/web`, refresh Magento's published
 copies in `pub/static` so the storefront does not serve stale JavaScript or CSS:
 
 ```bash
-app/code/Kkkonrad/Fastcheckout/bin/sync-frontend-static.sh
+php bin/magento setup:static-content:deploy -f pl_PL en_US
 php bin/magento cache:flush
 ```
 
-The helper is intended for developer environments when existing
-`pub/static/frontend/*/Kkkonrad_Fastcheckout` directories are not refreshed
-automatically. Production deployments should use Magento's
-`setup:static-content:deploy`. `requirejs-config.js` lives outside `web/`; after
-changing it, copy it into the static trees or run static-content deployment
-again. Reloading the page alone will not replace an existing copy.
-
-If Magento uses Subresource Integrity and
-`pub/static/frontend/sri-hashes.json` exists, the script intentionally stops. In
-that environment, move or remove only the existing
-`pub/static/frontend/<Vendor>/<theme>/<locale>/Kkkonrad_Fastcheckout`
-directories and then run `setup:static-content:deploy`. Magento may not
-overwrite an existing file, and only native deployment recreates it with a
-valid SRI hash.
-
-Do not edit `pub/static/deployed_version.txt` manually; the script writes a
-valid asset version without a trailing newline.
+Use Magento's native deployment in every environment. It publishes
+`requirejs-config.js`, recreates SRI hashes when enabled and maintains
+`pub/static/deployed_version.txt`; do not edit that file manually.

@@ -10,6 +10,9 @@ var config = {
             'Magento_Checkout/js/model/step-navigator': {
                 'Kkkonrad_Fastcheckout/js/mixin/step-navigator-mixin': true
             },
+            'Magento_Checkout/js/model/shipping-rates-validator': {
+                'Kkkonrad_Fastcheckout/js/mixin/shipping-rates-validator-mixin': true
+            },
             'Magento_Checkout/js/view/shipping': {
                 'Kkkonrad_Fastcheckout/js/mixin/shipping-validation-mixin': true
             },

@@ -4,6 +4,37 @@
     --form-radius: var(--radius-lg);
 }
 
+#fastcheckout-checkout .fastcheckout-section-loader {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    display: grid;
+    place-items: center;
+    border-radius: inherit;
+    background: rgb(255 255 255 / 88%);
+    pointer-events: none;
+}
+
+#fastcheckout-checkout .fastcheckout-section-loader[hidden] {
+    display: none;
+}
+
+#fastcheckout-checkout .fastcheckout-section-loader::after {
+    width: 2rem;
+    height: 2rem;
+    border: 0.25rem solid rgb(148 163 184 / 35%);
+    border-top-color: var(--btn-bg, var(--color-primary));
+    border-radius: 9999px;
+    animation: fastcheckout-section-spin 0.75s linear infinite;
+    content: '';
+}
+
+@keyframes fastcheckout-section-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 #fastcheckout-checkout :is(.form-input, .form-textarea, .form-select, .form-multiselect) {
     min-height: initial;
     border-color: var(--form-stroke);
@@ -1425,12 +1456,16 @@
     width: 100%;
 }
 
+#fastcheckout-checkout:not(:has(#co-payment-form[data-fastcheckout-bound='1']))
+    [data-fastcheckout-place-order] {
+    display: none !important;
+}
+
 /* Shared geometry: desktop summary and mobile sticky buttons. */
 #fastcheckout-checkout .fastcheckout-place-order-btn,
 #fastcheckout-checkout [data-fastcheckout-place-order],
 #fastcheckout-checkout [data-fastcheckout-place-order-ssr],
 #fastcheckout-checkout [data-fastcheckout-place-order-mobile] {
-    display: flex !important;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
@@ -1637,9 +1672,7 @@ body.checkout-submitting #fastcheckout-checkout .place-order-spinner {
 
 #fastcheckout-checkout[data-fastcheckout-mode='two-step']:not(
     [data-fastcheckout-active-step='payment']
-) .fastcheckout-place-order-section,
-#fastcheckout-checkout[data-fastcheckout-mode='two-step']
-    [data-fastcheckout-place-order][hidden] {
+) .fastcheckout-place-order-section {
     display: none !important;
 }
 

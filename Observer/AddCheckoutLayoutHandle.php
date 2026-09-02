@@ -11,11 +11,8 @@ use Magento\Framework\View\LayoutInterface;
 
 class AddCheckoutLayoutHandle implements ObserverInterface
 {
-    private Helper $helper;
-
-    public function __construct(Helper $helper)
+    public function __construct(private Helper $helper)
     {
-        $this->helper = $helper;
     }
 
     public function execute(Observer $observer): void

@@ -47,10 +47,6 @@ define([
         billingFollowsShipping = follows !== false;
     }
 
-    function doesBillingFollowShipping() {
-        return billingFollowsShipping;
-    }
-
     function addressesShareCacheKey(left, right) {
         return Boolean(
             left && right &&
@@ -184,9 +180,7 @@ define([
     }
 
     return {
-        getBillingAddressComponent: getBillingAddressComponent,
         setBillingFollowsShipping: setBillingFollowsShipping,
-        doesBillingFollowShipping: doesBillingFollowShipping,
         applyShippingAsBilling: applyShippingAsBilling,
         validateShippingAddress: validateShippingAddress,
         validateShippingInformation: validateShippingInformation,

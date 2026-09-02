@@ -80,8 +80,7 @@ Administrator sklepu może:
 - wybrać, czy przycisk „Złóż zamówienie” pozostaje w kontenerze podsumowania,
   czy jest wyświetlany bezpośrednio na tle checkoutu w trybie jednokrokowym;
 - pokazać albo ukryć pole komentarza, kod rabatowy i zapis do newslettera;
-- ograniczyć dostępne płatności zależnie od wybranej metody dostawy;
-- opcjonalnie przypisywać zamówienia gości do istniejącego konta klienta.
+- ograniczyć dostępne płatności zależnie od wybranej metody dostawy.
 
 Mapowanie dostawa→płatność działa tylko dla jawnie wskazanych kodów płatności.
 Po dodaniu kodu do mapowania dana płatność jest dostępna wyłącznie dla
@@ -91,12 +90,7 @@ konfiguracją administratora. Reguła może zawierać pełny kod metody dostawy,
 przewoźnika albo wildcard prefiksu, na przykład `tablerate_bestway`,
 `furgonetkapl` lub `flatrate_*`.
 
-Przypisywanie zamówień gościa jest domyślnie wyłączone. Należy je włączyć tylko
-wtedy, gdy sklep niezależnie potwierdza, że kupujący jest właścicielem podanego
-adresu e-mail.
-
-Checkout pozostaje dostępny pod standardowym adresem `/checkout/`. Stary adres
-`/fast-checkout/` przekierowuje do niego automatycznie.
+Checkout pozostaje dostępny pod standardowym adresem `/checkout/`.
 
 ## Jak wygląda proces dla klienta
 

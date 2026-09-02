@@ -8,38 +8,15 @@ use Hyva\Theme\Service\HyvaThemes;
 use Kkkonrad\Fastcheckout\Helper\Data;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 use Magento\Framework\App\Helper\Context;
-use Magento\Framework\Json\Helper\Data as JsonHelper;
 use Magento\Framework\Module\Manager as ModuleManager;
 use Magento\Framework\View\DesignInterface;
 use Magento\Framework\View\Design\ThemeInterface;
 use Magento\Store\Model\ScopeInterface;
-use Magento\Theme\Model\ThemeFactory;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
 class DataTest extends TestCase
 {
-    public function testGetShippingPaymentMappingReturnsEmptyArrayWhenJsonIsInvalid(): void
-    {
-        $logger = $this->createMock(LoggerInterface::class);
-        $jsonHelper = $this->createMock(JsonHelper::class);
-        $jsonHelper->method('jsonDecode')->willThrowException(new \InvalidArgumentException('invalid json'));
-
-        $helper = $this->createHelper('{invalid json', $jsonHelper, $logger);
-
-        $this->assertSame([], $helper->getShippingPaymentMapping());
-    }
-
-    public function testGetShippingPaymentMappingReturnsEmptyArrayWhenJsonDoesNotDecodeToArray(): void
-    {
-        $jsonHelper = $this->createMock(JsonHelper::class);
-        $jsonHelper->method('jsonDecode')->willReturn('checkmo');
-
-        $helper = $this->createHelper('"checkmo"', $jsonHelper);
-
-        $this->assertSame([], $helper->getShippingPaymentMapping());
-    }
-
     public function testCanUseHyvaNativeCheckoutMemoizesResult(): void
     {
         $context = $this->createMock(Context::class);
@@ -54,9 +31,7 @@ class DataTest extends TestCase
 
         $helper = new Data(
             $context,
-            $this->createMock(JsonHelper::class),
             $this->createMock(DesignInterface::class),
-            $this->createMock(ThemeFactory::class),
             $this->createMock(HyvaThemes::class)
         );
 
@@ -89,98 +64,42 @@ class DataTest extends TestCase
 
         $helper = new Data(
             $context,
-            $this->createMock(JsonHelper::class),
             $design,
-            $this->createMock(ThemeFactory::class),
             $hyvaThemes
         );
 
         $this->assertTrue($helper->canUseHyvaNativeCheckout());
     }
 
-    public function testTwoStepUsesStoreScopedConfiguration(): void
+    /**
+     * @dataProvider checkoutLayoutFlagProvider
+     */
+    public function testCheckoutLayoutFlagUsesStoreScopedConfiguration(string $path, string $method): void
     {
         $context = $this->createMock(Context::class);
         $scopeConfig = $this->createMock(ScopeConfigInterface::class);
         $scopeConfig->expects($this->once())
             ->method('getValue')
-            ->with(Data::XML_PATH_TWO_STEP, ScopeInterface::SCOPE_STORE)
+            ->with($path, ScopeInterface::SCOPE_STORE)
             ->willReturn('1');
         $context->method('getScopeConfig')->willReturn($scopeConfig);
         $context->method('getLogger')->willReturn($this->createMock(LoggerInterface::class));
 
         $helper = new Data(
             $context,
-            $this->createMock(JsonHelper::class),
             $this->createMock(DesignInterface::class),
-            $this->createMock(ThemeFactory::class),
             $this->createMock(HyvaThemes::class)
         );
 
-        $this->assertTrue($helper->isTwoStep());
+        $this->assertTrue($helper->{$method}());
     }
 
-    public function testSeparateOrderActionsUsesStoreScopedConfiguration(): void
+    public static function checkoutLayoutFlagProvider(): array
     {
-        $context = $this->createMock(Context::class);
-        $scopeConfig = $this->createMock(ScopeConfigInterface::class);
-        $scopeConfig->expects($this->once())
-            ->method('getValue')
-            ->with(Data::XML_PATH_SEPARATE_ORDER_ACTIONS, ScopeInterface::SCOPE_STORE)
-            ->willReturn('1');
-        $context->method('getScopeConfig')->willReturn($scopeConfig);
-        $context->method('getLogger')->willReturn($this->createMock(LoggerInterface::class));
-
-        $helper = new Data(
-            $context,
-            $this->createMock(JsonHelper::class),
-            $this->createMock(DesignInterface::class),
-            $this->createMock(ThemeFactory::class),
-            $this->createMock(HyvaThemes::class)
-        );
-
-        $this->assertTrue($helper->isSeparateOrderActions());
-    }
-
-    public function testPlaceOrderOutsideSummaryUsesStoreScopedConfiguration(): void
-    {
-        $context = $this->createMock(Context::class);
-        $scopeConfig = $this->createMock(ScopeConfigInterface::class);
-        $scopeConfig->expects($this->once())
-            ->method('getValue')
-            ->with(Data::XML_PATH_PLACE_ORDER_OUTSIDE_SUMMARY, ScopeInterface::SCOPE_STORE)
-            ->willReturn('1');
-        $context->method('getScopeConfig')->willReturn($scopeConfig);
-        $context->method('getLogger')->willReturn($this->createMock(LoggerInterface::class));
-
-        $helper = new Data(
-            $context,
-            $this->createMock(JsonHelper::class),
-            $this->createMock(DesignInterface::class),
-            $this->createMock(ThemeFactory::class),
-            $this->createMock(HyvaThemes::class)
-        );
-
-        $this->assertTrue($helper->isPlaceOrderOutsideSummary());
-    }
-
-    private function createHelper(
-        string $configValue,
-        JsonHelper $jsonHelper,
-        LoggerInterface $logger = null
-    ): Data {
-        $context = $this->createMock(Context::class);
-        $scopeConfig = $this->createMock(ScopeConfigInterface::class);
-        $scopeConfig->method('getValue')->willReturn($configValue);
-        $context->method('getScopeConfig')->willReturn($scopeConfig);
-        $context->method('getLogger')->willReturn($logger ?: $this->createMock(LoggerInterface::class));
-
-        return new Data(
-            $context,
-            $jsonHelper,
-            $this->createMock(DesignInterface::class),
-            $this->createMock(ThemeFactory::class),
-            $this->createMock(HyvaThemes::class)
-        );
+        return [
+            [Data::XML_PATH_TWO_STEP, 'isTwoStep'],
+            [Data::XML_PATH_SEPARATE_ORDER_ACTIONS, 'isSeparateOrderActions'],
+            [Data::XML_PATH_PLACE_ORDER_OUTSIDE_SUMMARY, 'isPlaceOrderOutsideSummary'],
+        ];
     }
 }
