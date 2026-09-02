@@ -76,21 +76,15 @@ class FastcheckoutHandleTest extends TestCase
         self::assertStringNotContainsString('data-fastcheckout-startup-loader', $templates);
         self::assertSame(4, substr_count($templates, 'data-fastcheckout-section-loader='));
         self::assertSame(4, substr_count($templates, 'class="fastcheckout-section-loader"'));
-        self::assertStringContainsString(
-            'hidden' . PHP_EOL
-            . '                             data-bind="attr: {hidden: '
-            . '!errorValidationMessage().length}"',
-            $templates
-        );
-        self::assertStringContainsString(
+        foreach ([
+            'hidden' . PHP_EOL . '                             data-bind="attr: {hidden: '
+                . '!errorValidationMessage().length}"',
             'hidden' . PHP_EOL . '                                 '
-            . 'data-bind="attr: {hidden: !rates().length}"',
-            $templates
-        );
-        self::assertStringContainsString('data-bind="i18n: \'Next\'">', $templates);
-        self::assertStringContainsString(
+                . 'data-bind="attr: {hidden: !rates().length}"',
+            '<span><?= $escaper->escapeHtml(__(\'Next\')) ?></span>',
             'data-fastcheckout-place-order-ssr' . PHP_EOL . '                hidden>',
-            $templates
-        );
+        ] as $renderGuard) {
+            self::assertStringContainsString($renderGuard, $templates);
+        }
     }
 }

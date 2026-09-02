@@ -1456,7 +1456,8 @@
     width: 100%;
 }
 
-#fastcheckout-checkout .fastcheckout-place-order-btn[hidden] {
+#fastcheckout-checkout:not(:has(#co-payment-form[data-fastcheckout-bound='1']))
+    [data-fastcheckout-place-order] {
     display: none !important;
 }
 
@@ -1465,7 +1466,6 @@
 #fastcheckout-checkout [data-fastcheckout-place-order],
 #fastcheckout-checkout [data-fastcheckout-place-order-ssr],
 #fastcheckout-checkout [data-fastcheckout-place-order-mobile] {
-    display: flex !important;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
@@ -1672,9 +1672,7 @@ body.checkout-submitting #fastcheckout-checkout .place-order-spinner {
 
 #fastcheckout-checkout[data-fastcheckout-mode='two-step']:not(
     [data-fastcheckout-active-step='payment']
-) .fastcheckout-place-order-section,
-#fastcheckout-checkout[data-fastcheckout-mode='two-step']
-    [data-fastcheckout-place-order][hidden] {
+) .fastcheckout-place-order-section {
     display: none !important;
 }
 

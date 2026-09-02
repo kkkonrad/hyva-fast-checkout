@@ -39,7 +39,7 @@ $placeOrderOutsideContainer = $placeOrderOutsideContainer ?? $separateOrderActio
         <?php /* The native payment renderer and its validators remain in place. */ ?>
         <div class="<?= $placeOrderOutsideContainer ? '' : 'pt-2 ' ?>fastcheckout-place-order-section">
         <button class="btn btn-primary w-full items-center justify-center gap-2
-                       hidden md:flex fastcheckout-place-order-btn"
+                       md:flex fastcheckout-place-order-btn"
                 type="button"
                 data-fastcheckout-place-order
                 data-fastcheckout-place-order-layout="<?= $placeOrderOutsideContainer ? 'outside' : 'inside' ?>"

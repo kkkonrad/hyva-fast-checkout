@@ -50,7 +50,6 @@ $isTwoStep = $block->isTwoStep();
                             <!-- ko template: getTemplate() --><!-- /ko -->
                         <!-- /ko -->
 
-                        <!-- ko if: errorValidationMessage().length -->
                         <div class="rounded-lg border border-red-200 bg-red-50 px-3 py-2"
                              role="alert"
                              hidden
@@ -59,7 +58,6 @@ $isTwoStep = $block->isTwoStep();
                             <span class="field-error shipping-field-error text-sm text-red-600 font-medium block"
                                   data-bind="text: errorValidationMessage"></span>
                         </div>
-                        <!-- /ko -->
 
                         <!-- ko template: { name: shippingMethodListTemplate } --><!-- /ko -->
 
@@ -70,7 +68,6 @@ $isTwoStep = $block->isTwoStep();
                         </div>
 
                         <?php if ($isTwoStep): ?>
-                            <!-- ko if: rates().length -->
                             <div class="actions-toolbar fastcheckout-shipping-actions"
                                  id="shipping-method-buttons-container"
                                  hidden
@@ -81,13 +78,10 @@ $isTwoStep = $block->isTwoStep();
                                             data-fastcheckout-next-step
                                             type="submit"
                                             data-bind="disable: isLoading">
-                                        <span data-bind="i18n: 'Next'">
-                                            <?= $escaper->escapeHtml(__('Next')) ?>
-                                        </span>
+                                        <span><?= $escaper->escapeHtml(__('Next')) ?></span>
                                     </button>
                                 </div>
                             </div>
-                            <!-- /ko -->
                         <?php endif; ?>
                     </div>
                 </form>
