@@ -1456,6 +1456,10 @@
     width: 100%;
 }
 
+#fastcheckout-checkout .fastcheckout-place-order-btn[hidden] {
+    display: none !important;
+}
+
 /* Shared geometry: desktop summary and mobile sticky buttons. */
 #fastcheckout-checkout .fastcheckout-place-order-btn,
 #fastcheckout-checkout [data-fastcheckout-place-order],

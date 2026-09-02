@@ -204,6 +204,9 @@ define([
     function wirePlaceOrderButtons() {
         var activeButton,
             walletOnly,
+            paymentReady = Boolean(document.querySelector(
+                '#co-payment-form[data-fastcheckout-bound="1"]'
+            )),
             root = document.getElementById('fastcheckout-checkout'),
             paymentStepInactive = isTwoStep() && root &&
                 root.dataset.fastcheckoutActiveStep !== 'payment';
@@ -231,9 +234,13 @@ define([
         document.querySelectorAll(
             '[data-fastcheckout-place-order-mobile], [data-fastcheckout-place-order-ssr]'
         ).forEach(function (button) {
-            button.hidden = walletOnly || paymentStepInactive;
-            button.classList.toggle('hidden', walletOnly || paymentStepInactive);
-            button.disabled = placeOrderProcessing || walletOnly || paymentStepInactive;
+            button.hidden = !paymentReady || walletOnly || paymentStepInactive;
+            button.classList.toggle(
+                'hidden',
+                !paymentReady || walletOnly || paymentStepInactive
+            );
+            button.disabled = placeOrderProcessing || !paymentReady ||
+                walletOnly || paymentStepInactive;
             button.setAttribute('aria-disabled', button.disabled ? 'true' : 'false');
             button.dataset.fastcheckoutNativeTargetReady = activeButton ? '1' : '0';
             if (walletOnly) {

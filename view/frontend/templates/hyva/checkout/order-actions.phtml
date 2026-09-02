@@ -43,7 +43,8 @@ $placeOrderOutsideContainer = $placeOrderOutsideContainer ?? $separateOrderActio
                 type="button"
                 data-fastcheckout-place-order
                 data-fastcheckout-place-order-layout="<?= $placeOrderOutsideContainer ? 'outside' : 'inside' ?>"
-                data-fastcheckout-place-order-ssr>
+                data-fastcheckout-place-order-ssr
+                hidden>
             <span class="place-order-spinner hidden"
                   data-fastcheckout-place-order-spinner
                   aria-hidden="true">

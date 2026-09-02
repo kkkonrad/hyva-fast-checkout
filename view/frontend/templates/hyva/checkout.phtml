@@ -113,7 +113,8 @@ $initialStep = $isTwoStep
             <button class="btn btn-primary w-full flex items-center justify-center gap-2 transition-all duration-200 fastcheckout-place-order-btn"
                     type="button"
                     data-fastcheckout-place-order
-                    data-fastcheckout-place-order-mobile>
+                    data-fastcheckout-place-order-mobile
+                    hidden>
                 <span class="place-order-spinner hidden" data-fastcheckout-place-order-spinner aria-hidden="true">
                     <svg class="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -135,7 +136,9 @@ $initialStep = $isTwoStep
                             form="co-shipping-method-form"
                             aria-controls="checkout-step-payment"
                             data-fastcheckout-next-step-mobile
-                            data-bind="disable: isLoading"
+                            data-bind="disable: isLoading,
+                                       attr: {hidden: !rates().length}"
+                            hidden
                             disabled>
                         <span><?= $escaper->escapeHtml(__('Next')) ?></span>
                     </button>

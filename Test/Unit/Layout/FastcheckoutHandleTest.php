@@ -48,6 +48,7 @@ class FastcheckoutHandleTest extends TestCase
             'view/frontend/templates/hyva/checkout/shipping-methods.phtml',
             'view/frontend/templates/hyva/checkout/payment-methods.phtml',
             'view/frontend/templates/hyva/checkout/summary.phtml',
+            'view/frontend/templates/hyva/checkout/order-actions.phtml',
             'view/frontend/web/template/hyva/shipping-list.html',
             'view/frontend/web/template/hyva/shipping-method-item.html',
         ] as $file) {
@@ -75,5 +76,21 @@ class FastcheckoutHandleTest extends TestCase
         self::assertStringNotContainsString('data-fastcheckout-startup-loader', $templates);
         self::assertSame(4, substr_count($templates, 'data-fastcheckout-section-loader='));
         self::assertSame(4, substr_count($templates, 'class="fastcheckout-section-loader"'));
+        self::assertStringContainsString(
+            'hidden' . PHP_EOL
+            . '                             data-bind="attr: {hidden: '
+            . '!errorValidationMessage().length}"',
+            $templates
+        );
+        self::assertStringContainsString(
+            'hidden' . PHP_EOL . '                                 '
+            . 'data-bind="attr: {hidden: !rates().length}"',
+            $templates
+        );
+        self::assertStringContainsString('data-bind="i18n: \'Next\'">', $templates);
+        self::assertStringContainsString(
+            'data-fastcheckout-place-order-ssr' . PHP_EOL . '                hidden>',
+            $templates
+        );
     }
 }
