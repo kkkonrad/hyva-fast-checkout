@@ -551,27 +551,44 @@ define([
         ) : null;
     }
 
-    function revealStartupContent() {
-        var loader = document.querySelector('[data-fastcheckout-startup-loader]'),
-            summaryRoot = document.getElementById('fastcheckout-ko-summary-root'),
-            nativeSummary = summaryRoot && summaryRoot.querySelector('.fastcheckout-native-summary'),
-            formReady = quote.isVirtual() ? document.querySelector(
-                '#checkout-step-payment input[name="username"], ' +
-                '#checkout-step-payment .payment-method'
-            ) : document.querySelector(
-                '.fastcheckout-native-shipping-address input[name="firstname"]'
-            );
+    function hideSectionLoader(name, ready) {
+        var loader = document.querySelector(
+            '[data-fastcheckout-section-loader="' + name + '"]'
+        );
 
-        if (loader && formReady) {
+        if (loader && ready) {
             loader.hidden = true;
-            loader.style.display = 'none';
         }
-        if (nativeSummary && nativeSummary.querySelector('.product-item') &&
-            nativeSummary.querySelector('.table-totals tr')) {
+
+        return !loader || loader.hidden;
+    }
+
+    function revealStartupContent() {
+        var summaryRoot = document.getElementById('fastcheckout-ko-summary-root'),
+            nativeSummary = summaryRoot && summaryRoot.querySelector('.fastcheckout-native-summary'),
+            addressReady = quote.isVirtual() || document.querySelector(
+                '.fastcheckout-native-shipping-address input[name="firstname"], ' +
+                '.fastcheckout-native-shipping-address .shipping-address-item'
+            ),
+            shippingReady = quote.isVirtual() || document.querySelector(
+                '#co-shipping-method-form[data-fastcheckout-bound="1"]'
+            ),
+            paymentReady = document.querySelector(
+                '#co-payment-form[data-fastcheckout-bound="1"]'
+            ),
+            summaryReady = nativeSummary && nativeSummary.querySelector('.product-item') &&
+                nativeSummary.querySelector('.table-totals tr');
+
+        if (summaryReady) {
             summaryRoot.classList.remove('hidden');
         }
 
-        return (!loader || loader.hidden) &&
+        return [
+            hideSectionLoader('shipping-address', addressReady),
+            Boolean(shippingReady),
+            hideSectionLoader('payment-methods', paymentReady),
+            hideSectionLoader('summary', summaryReady)
+        ].every(Boolean) &&
             (!summaryRoot || !summaryRoot.classList.contains('hidden'));
     }
 
@@ -593,6 +610,7 @@ define([
         var paymentRoot = document.querySelector('.fastcheckout-ko-payment-root'),
             startupRoots = [
                 document.querySelector('.fastcheckout-native-shipping-address'),
+                document.getElementById('fastcheckout-ko-shipping-root'),
                 paymentRoot,
                 document.getElementById('fastcheckout-ko-summary-root')
             ].filter(Boolean),
@@ -617,7 +635,12 @@ define([
                 }
             });
             startupRoots.forEach(function (root) {
-                startupDomObserver.observe(root, {childList: true, subtree: true});
+                startupDomObserver.observe(root, {
+                    attributes: true,
+                    attributeFilter: ['data-fastcheckout-bound'],
+                    childList: true,
+                    subtree: true
+                });
             });
         }
     }

@@ -17,8 +17,12 @@ $placeOrderOutsideSummary = $block->isPlaceOrderOutsideSummary() && !$isTwoStep;
     <?php if ($placeOrderOutsideSummary): ?>
         <div class="sticky top-6 space-y-6">
     <?php endif; ?>
-    <div class="card<?= $placeOrderOutsideSummary ? '' : ' sticky top-6 space-y-6' ?>"
+    <div class="card<?= $placeOrderOutsideSummary ? ' relative' : ' sticky top-6 space-y-6' ?>"
          data-fastcheckout-totals-card>
+        <div class="fastcheckout-section-loader"
+             data-fastcheckout-section-loader="summary"
+             role="status"
+             aria-label="<?= $escaper->escapeHtmlAttr(__('Loading checkout...')) ?>"></div>
         <div class="relative space-y-6">
             <div class="flex items-center justify-between border-b border-gray-200 pb-3 mb-4">
                 <h2 class="text-xl font-semibold text-gray-900">

@@ -71,5 +71,9 @@ class FastcheckoutHandleTest extends TestCase
         ] as $extensionPoint) {
             self::assertStringContainsString($extensionPoint, $templates);
         }
+
+        self::assertStringNotContainsString('data-fastcheckout-startup-loader', $templates);
+        self::assertSame(4, substr_count($templates, 'data-fastcheckout-section-loader='));
+        self::assertSame(4, substr_count($templates, 'class="fastcheckout-section-loader"'));
     }
 }

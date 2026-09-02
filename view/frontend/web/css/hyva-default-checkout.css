@@ -4,6 +4,37 @@
     --form-radius: var(--radius-lg);
 }
 
+#fastcheckout-checkout .fastcheckout-section-loader {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    display: grid;
+    place-items: center;
+    border-radius: inherit;
+    background: rgb(255 255 255 / 88%);
+    pointer-events: none;
+}
+
+#fastcheckout-checkout .fastcheckout-section-loader[hidden] {
+    display: none;
+}
+
+#fastcheckout-checkout .fastcheckout-section-loader::after {
+    width: 2rem;
+    height: 2rem;
+    border: 0.25rem solid rgb(148 163 184 / 35%);
+    border-top-color: var(--btn-bg, var(--color-primary));
+    border-radius: 9999px;
+    animation: fastcheckout-section-spin 0.75s linear infinite;
+    content: '';
+}
+
+@keyframes fastcheckout-section-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 #fastcheckout-checkout :is(.form-input, .form-textarea, .form-select, .form-multiselect) {
     min-height: initial;
     border-color: var(--form-stroke);

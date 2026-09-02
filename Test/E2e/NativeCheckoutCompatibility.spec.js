@@ -197,8 +197,11 @@ test.describe('Fastcheckout one-step compatibility host', () => {
             dom: true,
             noFallbackAssets: true
         });
-        await expect(page.locator('[data-fastcheckout-startup-loader]')).toHaveCount(1);
-        await expect(page.locator('[data-fastcheckout-startup-loader]')).toBeHidden();
+        await expect(page.locator('[data-fastcheckout-startup-loader]')).toHaveCount(0);
+        await expect(page.locator('[data-fastcheckout-section-loader]')).toHaveCount(4);
+        await expect.poll(() => page.locator('[data-fastcheckout-section-loader]').evaluateAll(
+            (loaders) => loaders.every((loader) => loader.hidden)
+        )).toBe(true);
         await expect(page.locator('[data-fastcheckout-native-summary] .product-item'))
             .toBeVisible();
         await expect(page.locator('[data-fastcheckout-place-order-ssr]')).toBeEnabled();

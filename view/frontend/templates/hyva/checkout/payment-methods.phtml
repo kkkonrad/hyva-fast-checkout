@@ -11,6 +11,10 @@ $isTwoStep = $block->isTwoStep();
      class="fc-container-3 space-y-6 min-w-0 w-full"
      role="presentation">
     <div class="card relative" data-fastcheckout-payment-methods-card>
+        <div class="fastcheckout-section-loader"
+             data-fastcheckout-section-loader="payment-methods"
+             role="status"
+             aria-label="<?= $escaper->escapeHtmlAttr(__('Loading checkout...')) ?>"></div>
         <div class="flex items-center justify-between border-b border-gray-200 pb-4 mb-4">
             <h2 class="text-xl font-semibold text-gray-900">
                 <?= $escaper->escapeHtml(__('Payment Method')) ?>
@@ -28,7 +32,10 @@ $isTwoStep = $block->isTwoStep();
                     <!-- ko template: getTemplate() --><!-- /ko -->
                 <!-- /ko -->
             <!-- /ko -->
-            <form id="co-payment-form" class="form payments" novalidate="novalidate">
+            <form id="co-payment-form"
+                  class="form payments"
+                  novalidate="novalidate"
+                  data-bind="attr: {'data-fastcheckout-bound': '1'}">
                 <input data-bind="attr: {value: getFormKey()}" type="hidden" name="form_key"/>
                 <!-- ko foreach: getRegion('place-order-captcha') -->
                     <!-- ko template: getTemplate() --><!-- /ko -->
