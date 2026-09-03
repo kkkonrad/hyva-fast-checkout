@@ -741,12 +741,27 @@ define([
                     element.getClientRects().length &&
                     window.getComputedStyle(element).visibility !== 'hidden';
             }),
-            behavior;
+            scroller,
+            rect,
+            scrollTop;
 
         if (error) {
-            behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ?
-                'auto' : 'smooth';
-            error.scrollIntoView({behavior: behavior, block: 'center'});
+            scroller = document.scrollingElement || document.documentElement;
+            rect = error.getBoundingClientRect();
+            scrollTop = Math.max(
+                0,
+                scroller.scrollTop + rect.top - ((window.innerHeight - rect.height) / 2)
+            );
+            if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                scroller.scrollTop = scrollTop;
+            } else {
+                $('html, body').stop(true).animate({scrollTop: scrollTop}, 300);
+                window.setTimeout(function () {
+                    if (Math.abs(scroller.scrollTop - scrollTop) > 1) {
+                        scroller.scrollTop = scrollTop;
+                    }
+                }, 350);
+            }
 
             return true;
         }

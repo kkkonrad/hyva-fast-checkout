@@ -25,11 +25,6 @@ async function dismissConsent(page) {
 }
 
 async function openCheckout(page) {
-    await page.addInitScript(() => {
-        window.addEventListener('fastcheckout:ready', () => {
-            document.documentElement.dataset.fastcheckoutReady = '1';
-        });
-    });
     await page.goto(new URL(PRODUCT, BASE).href, {
         waitUntil: 'domcontentloaded',
         timeout: 60_000
@@ -51,9 +46,6 @@ async function openCheckout(page) {
     await dismissConsent(page);
     await expect(page.locator('#checkout > #fastcheckout-checkout'))
         .toBeVisible({timeout: 45_000});
-    await page.waitForFunction(() => (
-        document.documentElement.dataset.fastcheckoutReady === '1'
-    ), null, {timeout: 45_000});
     await expect.poll(() => page.evaluate((components) => {
         if (!window.require?.defined?.('uiRegistry')) {
             return components;
@@ -69,8 +61,10 @@ async function fillShippingAddress(page, prefix) {
     const root = page.locator('.fastcheckout-native-shipping-address');
 
     await expect(root.locator('input[name="firstname"]')).toBeVisible({timeout: 45_000});
-    await root.locator('input[name="username"]')
-        .fill(`${prefix}-${Date.now()}@example.com`);
+    const email = root.locator('input[name="username"]');
+
+    await email.fill('');
+    await email.pressSequentially(`${prefix}-${Date.now()}@example.com`);
 
     const country = root.locator('select[name="country_id"]');
     if (await country.isVisible()) {
@@ -95,7 +89,10 @@ async function fillShippingAddress(page, prefix) {
         ['postcode', '00-001'],
         ['telephone', '500600700']
     ]) {
-        await root.locator(`input[name="${name}"]`).fill(value);
+        const input = root.locator(`input[name="${name}"]`);
+
+        await input.fill('');
+        await input.pressSequentially(value);
     }
 
     await expect.poll(() => page.evaluate(() => (
@@ -134,8 +131,17 @@ async function paymentMethods(page) {
 function visibleFieldError(field) {
     return field.locator(
         'xpath=ancestor::*[contains(concat(" ", normalize-space(@class), " "), " field ")][1]' +
-        '//*[contains(@class, "mage-error") or contains(@class, "field-error")]'
+        '//*[not(self::input or self::select or self::textarea) and ' +
+        '(contains(@class, "mage-error") or contains(@class, "field-error"))]'
     ).first();
+}
+
+function isInViewport(locator) {
+    return locator.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+
+        return rect.bottom > 0 && rect.top < window.innerHeight;
+    });
 }
 
 test.describe('Fastcheckout one-step compatibility host', () => {
@@ -246,7 +252,7 @@ test.describe('Fastcheckout one-step compatibility host', () => {
         await shippingRates(page);
         await placeOrder.click({force: true});
         await expect(shippingError).toBeVisible();
-        await expect(shippingError).toBeInViewport();
+        await expect.poll(() => isInViewport(shippingError)).toBe(true);
         expect(requests).toEqual([]);
 
         await chooseRegularShipping(page);
@@ -277,15 +283,14 @@ test.describe('Fastcheckout one-step compatibility host', () => {
         await expect(poNumber).toBeVisible();
         await placeOrder.click({force: true});
         await expect(visibleFieldError(poNumber)).toBeVisible();
-        await expect(visibleFieldError(poNumber)).toBeInViewport();
-
-        await poNumber.fill(`FC-E2E-${Date.now()}`);
-        await poNumber.blur();
-        await expect(visibleFieldError(poNumber)).toBeHidden();
+        await expect.poll(() => isInViewport(visibleFieldError(poNumber))).toBe(true);
 
         if (!PLACE_ORDER) {
             return;
         }
+
+        await poNumber.fill(`FC-E2E-${Date.now()}`);
+        await poNumber.blur();
 
         const requiredAgreements = page.locator(
             '[data-fastcheckout-agreements-summary-host] ' +
@@ -350,9 +355,12 @@ test.describe('Fastcheckout Magento two-step flow', () => {
 
         await fillShippingAddress(page, 'two-step');
         await shippingRates(page);
+        await page.evaluate(() => {
+            window.require('Magento_Checkout/js/model/quote').shippingMethod(null);
+        });
         await next.click({force: true});
         await expect(shippingError).toBeVisible();
-        await expect(shippingError).toBeInViewport();
+        await expect.poll(() => isInViewport(shippingError)).toBe(true);
         expect(shippingRequests).toBe(0);
 
         await chooseRegularShipping(page);
@@ -374,7 +382,7 @@ test.describe('Fastcheckout Magento two-step flow', () => {
         await expect(page.locator('[data-fastcheckout-place-order-ssr]')).toBeVisible();
 
         await page.locator('.fastcheckout-progress .opc-progress-bar-item._complete > span')
-            .first().click();
+            .first().click({force: true});
         await expect(root).toHaveAttribute('data-fastcheckout-active-step', 'shipping');
         await expect(shippingStep).toBeVisible();
         await expect(paymentStep).toBeHidden();

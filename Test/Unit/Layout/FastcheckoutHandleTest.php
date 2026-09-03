@@ -24,6 +24,9 @@ class FastcheckoutHandleTest extends TestCase
         $bootstrap = (string)file_get_contents(
             $root . '/view/frontend/web/js/hyva/checkout-renderers.js'
         );
+        $bridge = (string)file_get_contents(
+            $root . '/view/frontend/templates/hyva/knockout/checkout-bridge.phtml'
+        );
 
         self::assertStringContainsString('<update handle="checkout_index_index"/>', $layout);
         self::assertStringContainsString('getChildHtml()', (string)file_get_contents(
@@ -35,6 +38,8 @@ class FastcheckoutHandleTest extends TestCase
         self::assertStringContainsString('magento/theme-frontend-blank', $composer);
         self::assertStringNotContainsString('magento2-theme-fallback', $composer);
         self::assertSame(1, substr_count($bootstrap, 'app(jsLayout)'));
+        self::assertStringContainsString("['mage/apply/main', 'domReady!']", $bridge);
+        self::assertMatchesRegularExpression('/mage\\.apply\\(\\);\\s*require\\(/', $bridge);
     }
 
     public function testVisualShellRetainsNativeExtensionPoints(): void

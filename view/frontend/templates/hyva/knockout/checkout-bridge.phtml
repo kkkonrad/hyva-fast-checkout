@@ -33,12 +33,15 @@ if ($jsLayout === []) {
         '<?= $escaper->escapeJs(str_replace('_', '-', $block->getLocaleCode())) ?>';
     window.BASE_URL = window.BASE_URL || '<?= $escaper->escapeJs($block->getBaseUrl()) ?>';
 
-    require(
-        ['Kkkonrad_Fastcheckout/js/hyva/checkout-renderers'],
-        function (initializeCheckout) {
-            initializeCheckout(<?= /* @noEscape */ $block->serializeForScript($jsLayout) ?>);
-        }
-    );
+    require(['mage/apply/main', 'domReady!'], function (mage) {
+        mage.apply();
+        require(
+            ['Kkkonrad_Fastcheckout/js/hyva/checkout-renderers'],
+            function (initializeCheckout) {
+                initializeCheckout(<?= /* @noEscape */ $block->serializeForScript($jsLayout) ?>);
+            }
+        );
+    });
 })();
 </script>
 <?php $hyvaCsp->registerInlineScript() ?>

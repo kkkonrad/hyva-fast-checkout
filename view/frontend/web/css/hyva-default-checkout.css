@@ -10,7 +10,7 @@
     z-index: 20;
     display: grid;
     place-items: center;
-    border-radius: inherit;
+    border-radius: var(--card-radius, var(--radius-lg, 0.5rem));
     background: rgb(255 255 255 / 88%);
     pointer-events: none;
 }
@@ -633,6 +633,24 @@
 #fastcheckout-checkout .shipping-address-item.selected-item {
     border-color: var(--color-primary);
     box-shadow: 0 0 0 1px var(--color-primary);
+}
+
+/* KO templates are not guaranteed to be scanned by the active theme's Tailwind build. */
+#fastcheckout-checkout .fastcheckout-shipping-method-option {
+    border: 0.125rem solid var(--color-gray-200, #e5e7eb);
+}
+
+#fastcheckout-checkout
+    .fastcheckout-shipping-method-option + .fastcheckout-shipping-method-option {
+    margin-top: 0.75rem;
+}
+
+#fastcheckout-checkout .fastcheckout-shipping-method-option.border-primary {
+    border-color: var(--color-primary);
+}
+
+#fastcheckout-checkout .fastcheckout-shipping-method-option:not(.border-primary):hover {
+    border-color: var(--color-gray-300, #d1d5db);
 }
 
 #fastcheckout-checkout :is(

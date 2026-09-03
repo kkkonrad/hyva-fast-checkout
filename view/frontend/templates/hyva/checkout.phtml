@@ -20,7 +20,7 @@ $initialStep = $isTwoStep
          id="fastcheckout-checkout"
          data-fastcheckout-mode="<?= $isTwoStep ? 'two-step' : 'one-step' ?>"
          data-fastcheckout-active-step="<?= $escaper->escapeHtmlAttr($initialStep) ?>">
-    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-gray-200 pb-6 px-4 md:px-0">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pb-6 px-4 md:px-0">
         <div>
             <h1 class="text-3xl font-semibold text-gray-900">
                 <?= $escaper->escapeHtml(__('Checkout')) ?>
