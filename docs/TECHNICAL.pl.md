@@ -148,8 +148,9 @@ patchy ani wpisów DI w Kkkonrad_Fastcheckout.**
   modułów zewnętrznych; `checkout.root` używa szablonu renderującego wyłącznie
   dzieci, więc core nie uruchamia aplikacji drugi raz.
 - Widgety modułów zewnętrznych zachowują style dostarczone przez ich integracje.
-  CSS Fastcheckout ogranicza się do wspólnej struktury checkoutu i nie zawiera
-  poprawek prezentacyjnych dla pojedynczych płatności lub przewoźników.
+  CSS Fastcheckout ogranicza się do wspólnej struktury checkoutu, z wyjątkiem
+  widgetu Smartmage InPost, którego `_module.less` przeznaczony wyłącznie dla
+  Luma jest odwzorowany przez mały blok zgodności CSS.
 - Zewnętrzny root `#checkout` i wewnętrzny `#fastcheckout-checkout` są obecne
   równocześnie, dlatego selektory modułów ograniczone do `#checkout` nadal
   działają.

@@ -626,13 +626,19 @@
 }
 
 /* KO templates are not guaranteed to be scanned by the active theme's Tailwind build. */
-#fastcheckout-checkout .fastcheckout-shipping-method-option {
-    border: 0.125rem solid var(--color-gray-200, #e5e7eb);
+#fastcheckout-checkout #checkout-shipping-method-load {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
 }
 
-#fastcheckout-checkout
-    .fastcheckout-shipping-method-option + .fastcheckout-shipping-method-option {
-    margin-top: 0.75rem;
+#fastcheckout-checkout .fastcheckout-shipping-method-option {
+    border: 0.125rem solid var(--color-gray-200, #e5e7eb);
+    margin: 0;
+}
+
+#fastcheckout-checkout #onepage-checkout-shipping-method-additional-load:not(:has(*)) {
+    display: none;
 }
 
 #fastcheckout-checkout .fastcheckout-shipping-method-option.border-primary {
@@ -1688,7 +1694,13 @@ body.checkout-submitting #fastcheckout-checkout .place-order-spinner {
 #fastcheckout-checkout .fastcheckout-shipping-actions {
     display: flex;
     justify-content: flex-end;
-    margin-top: 1rem;
+    /* Parent grid already has gap-3. Hyvä .actions-toolbar adds another
+       margin-block-start + padding-block-start + top border. */
+    margin-top: 0;
+    margin-block-start: 0;
+    padding-block-start: 0;
+    border: 0;
+    border-block-start-width: 0;
 }
 
 @media (max-width: 767px) {

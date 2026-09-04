@@ -147,8 +147,9 @@ or Fastcheckout-specific DI entries.**
   blocks; `checkout.root` uses a children-only template so its core application
   bootstrap is not started a second time.
 - Vendor-specific widgets retain the styles shipped by their integration.
-  Fastcheckout limits its own CSS to the shared checkout structure instead of
-  carrying presentation patches for individual payment or carrier modules.
+  Fastcheckout limits its own CSS to the shared checkout structure, except for
+  the Smartmage InPost widget whose Luma-only `_module.less` is represented by
+  a small CSS compatibility block.
 - The outer `#checkout` root and inner `#fastcheckout-checkout` root are both
   present, so module selectors scoped to `#checkout` continue to work.
 - Standard IDs `#shipping`, `#checkout-step-shipping`, `#opc-shipping_method`,
