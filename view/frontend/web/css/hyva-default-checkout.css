@@ -1529,6 +1529,17 @@
     flex: 0 0 auto;
 }
 
+/* Tailwind gap-3 on this bar is not guaranteed in the theme CSS. The
+   place-order button also resets margin, so the column must own the gap.
+   Keep this inside the mobile breakpoint so it does not override md:hidden. */
+@media (max-width: 767px) {
+    #fastcheckout-checkout [data-fastcheckout-mobile-sticky] {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+}
+
 /* Spinner inside the visible place-order proxies. */
 #fastcheckout-checkout .fastcheckout-place-order-btn .place-order-spinner {
     display: none;
