@@ -17,8 +17,7 @@ $placeOrderOutsideSummary = $block->isPlaceOrderOutsideSummary() && !$isTwoStep;
     <?php if ($placeOrderOutsideSummary): ?>
         <div class="sticky top-6 space-y-6">
     <?php endif; ?>
-    <div class="card<?= $placeOrderOutsideSummary ? ' relative' : ' sticky top-6 space-y-6' ?>"
-         data-fastcheckout-totals-card>
+    <div class="card<?= $placeOrderOutsideSummary ? ' relative' : ' sticky top-6 space-y-6' ?>">
         <div class="fastcheckout-section-loader"
              data-fastcheckout-section-loader="summary"
              role="status"
@@ -28,9 +27,8 @@ $placeOrderOutsideSummary = $block->isPlaceOrderOutsideSummary() && !$isTwoStep;
                 <h2 class="text-xl font-semibold text-gray-900">
                     <?= $escaper->escapeHtml(__('Order Summary')) ?>
                 </h2>
-                <span class="text-xs bg-gray-100 text-gray-800 px-2 py-0.5 rounded-full font-semibold"
-                      data-fastcheckout-summary-item-count>
-                    <?= $escaper->escapeHtml(__('%1 item(s)', $block->getItemsQty())) ?>
+                <span class="text-xs bg-gray-100 text-gray-800 px-2 py-0.5 rounded-full font-semibold">
+                    <?= $escaper->escapeHtml(__('%1 item(s)', (float)$block->getQuote()->getItemsQty())) ?>
                 </span>
             </div>
 

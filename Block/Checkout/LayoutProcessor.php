@@ -83,6 +83,7 @@ class LayoutProcessor implements LayoutProcessorInterface
             $discount = &$jsLayout['components']['checkout']['children']['steps']['children']
                 ['billing-step']['children']['payment']['children']['afterMethods']['children']['discount'];
             $discount['config'] = is_array($discount['config'] ?? null) ? $discount['config'] : [];
+            $discount['config']['componentDisabled'] = !$this->helper->isShowDiscount();
             $this->setTemplateDefault(
                 $discount,
                 'template',

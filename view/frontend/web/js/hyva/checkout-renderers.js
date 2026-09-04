@@ -117,18 +117,13 @@ define([
     }
 
     function activePaymentMethodElement() {
-        var activeCode = activePaymentCode(),
-            found = null;
+        var activeCode = activePaymentCode();
 
-        document.querySelectorAll(
+        return Array.prototype.find.call(document.querySelectorAll(
             '.fastcheckout-ko-payment-root .payment-method'
-        ).forEach(function (method) {
-            if (!found && paymentCode(method) === activeCode) {
-                found = method;
-            }
-        });
-
-        return found;
+        ), function (method) {
+            return paymentCode(method) === activeCode;
+        }) || null;
     }
 
     function activeMethodHasOwnCheckoutCta() {
@@ -147,12 +142,7 @@ define([
                 !node.closest('.checkout-agreements-block') &&
                 !node.closest('.payment-method-billing-address') &&
                 !node.closest('[data-fastcheckout-newsletter]') &&
-                (isWalletCheckoutControl(node) ||
-                    node.matches(
-                        'apple-pay-button, #paypal-button, .paypal-button, ' +
-                        '.gpay-button, .adyen-checkout__button, .klarna-button, ' +
-                        '.adyen-checkout__dropin'
-                    ));
+                isWalletCheckoutControl(node);
         });
     }
 
@@ -187,18 +177,7 @@ define([
     }
 
     function activePlaceOrderButton() {
-        var activeCode = activePaymentCode(),
-            activeButton = null;
-
-        document.querySelectorAll(
-            '.fastcheckout-ko-payment-root .payment-method'
-        ).forEach(function (method) {
-            if (!activeButton && paymentCode(method) === activeCode) {
-                activeButton = placeOrderButton(method);
-            }
-        });
-
-        return activeButton;
+        return placeOrderButton(activePaymentMethodElement());
     }
 
     function wirePlaceOrderButtons() {
@@ -234,7 +213,6 @@ define([
             button.hidden = walletOnly || paymentStepInactive;
             button.disabled = placeOrderProcessing || walletOnly || paymentStepInactive;
             button.setAttribute('aria-disabled', button.disabled ? 'true' : 'false');
-            button.dataset.fastcheckoutNativeTargetReady = activeButton ? '1' : '0';
             if (walletOnly) {
                 button.setAttribute('data-fastcheckout-wallet-only', '1');
             } else {
@@ -427,15 +405,12 @@ define([
         });
         clone.removeAttribute('data-bind');
         clone.querySelectorAll('[data-fastcheckout-subscribe]').forEach(function (input) {
-            input.setAttribute('data-fastcheckout-subscribe-proxy', '1');
             input.removeAttribute('data-fastcheckout-subscribe');
         });
         if (clone.hasAttribute('data-fastcheckout-newsletter')) {
-            clone.setAttribute('data-fastcheckout-newsletter-proxy', '1');
             clone.removeAttribute('data-fastcheckout-newsletter');
         }
         if (clone.getAttribute('data-role') === 'checkout-agreements') {
-            clone.setAttribute('data-fastcheckout-agreements-proxy-region', '1');
             clone.removeAttribute('data-role');
         }
 
@@ -493,7 +468,6 @@ define([
 
         proxy = document.createElement('div');
         proxy.className = 'checkout-agreements-block';
-        proxy.setAttribute('data-fastcheckout-agreements-proxy', '1');
         parts.forEach(function (part, index) {
             proxy.appendChild(agreementProxyPart(part, index));
         });
@@ -683,7 +657,6 @@ define([
                 };
             }
             if (method) {
-                method.setAttribute('data-fastcheckout-validation-attempted', 'true');
                 method.querySelectorAll(
                     'input:not([name]), select:not([name]), textarea:not([name])'
                 ).forEach(function (control, index) {
@@ -1024,10 +997,6 @@ define([
 
             quote.paymentMethod.subscribe(function () {
                 setClientOrderError('');
-                document.querySelectorAll('[data-fastcheckout-validation-attempted]')
-                    .forEach(function (method) {
-                        method.removeAttribute('data-fastcheckout-validation-attempted');
-                    });
                 if (validationErrorObserver) {
                     validationErrorObserver.disconnect();
                     validationErrorObserver = null;

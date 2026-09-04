@@ -326,16 +326,28 @@
     .control,
     .admin__field-control,
     .admin__control-fields
-) > :is(.field, .admin__field) > :is(.label, .admin__field-label) {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
+) > :is(.field, .admin__field) > :is(.label, .admin__field-label),
+#fastcheckout-checkout :is(
+    .fastcheckout-native-shipping-address,
+    .payment-method-billing-address,
+    .checkout-billing-address
+) :is(
+    .field-tooltip > .label,
+    .admin__field-tooltip > .label,
+    .field-tooltip > .admin__field-tooltip-label,
+    .admin__field-tooltip > .admin__field-tooltip-label
+),
+#fastcheckout-checkout .fastcheckout-native-summary .table-totals > caption,
+#fastcheckout-checkout .fastcheckout-native-summary table.data.table > caption {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
 }
 
 /* Group legend must remain a normal block label (not sr-only). */
@@ -384,28 +396,6 @@
     right: 0;
     display: inline-flex;
     cursor: help;
-}
-
-/* Hide the "Tooltip" / aria label text next to telephone (and other) tooltips. */
-#fastcheckout-checkout :is(
-    .fastcheckout-native-shipping-address,
-    .payment-method-billing-address,
-    .checkout-billing-address
-) :is(
-    .field-tooltip > .label,
-    .admin__field-tooltip > .label,
-    .field-tooltip > .admin__field-tooltip-label,
-    .admin__field-tooltip > .admin__field-tooltip-label
-) {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
 }
 
 #fastcheckout-checkout :is(
@@ -936,19 +926,6 @@
 #fastcheckout-checkout .fastcheckout-native-summary .opc-block-summary > .title,
 #fastcheckout-checkout .fastcheckout-native-summary .block.items-in-cart > .title {
     display: none !important;
-}
-
-/* Hide Magento table caption ("Order Summary") — card heading already shows it. */
-#fastcheckout-checkout .fastcheckout-native-summary .table-totals > caption,
-#fastcheckout-checkout .fastcheckout-native-summary table.data.table > caption {
-    position: absolute !important;
-    width: 1px !important;
-    height: 1px !important;
-    padding: 0 !important;
-    margin: -1px !important;
-    overflow: hidden !important;
-    clip: rect(0, 0, 0, 0) !important;
-    border: 0 !important;
 }
 
 #fastcheckout-checkout .fastcheckout-native-summary .block.items-in-cart {

@@ -107,9 +107,10 @@ płatności.
 - Integracje JavaScript są rejestrowane wyłącznie jako mixiny RequireJS — bez
   `map` i bez forków core. Obejmują komponenty Magento `place-order`,
   `error-processor`, `step-navigator`, `set-payment-information-extended`,
-  totals/produkty summary, discount oraz checkout-agreements. Jeden wąski mixin
-  Braintree Hosted Fields uruchamia wszystkie natywne walidacje pól karty po
-  zgłoszeniu przez renderer niepoprawnego formularza; nie zastępuje renderera.
+  totals/produkty summary oraz checkout-agreements. Widoczność rabatu korzysta
+  z natywnej flagi Magento UI `componentDisabled`. Jeden wąski mixin Braintree
+  Hosted Fields uruchamia wszystkie natywne walidacje pól karty po zgłoszeniu
+  przez renderer niepoprawnego formularza; nie zastępuje renderera.
 - Strona Hyvä uruchamia natywne inicjalizatory Magento `section-config` i
   `customer-data` przed aplikacją checkoutu. Wczesny bootstrap jedynie
   normalizuje uszkodzone
@@ -131,8 +132,6 @@ płatności.
 - Strona sukcesu zachowuje core `Magento\Checkout\Block\Onepage\Success`, a
   komentarz i newsletter są zapisywane przez
   `OrderStatusHistoryRepositoryInterface` i `SubscriptionManagerInterface`.
-  Arkusz strony sukcesu ukrywa również starszy placeholder Tpay
-  `#tpay_success_status`, nie zmieniając procesu płatności Tpay.
 
 Moduł nie zawiera komponentu Magewire, mechanizmu modyfikowania DOM przez
 Livewire ani orkiestratora stanu opartego na Alpine.
@@ -148,6 +147,9 @@ patchy ani wpisów DI w Kkkonrad_Fastcheckout.**
   również scala ten handle, aby zachować assety `<head>` i bloki potomne PHTML
   modułów zewnętrznych; `checkout.root` używa szablonu renderującego wyłącznie
   dzieci, więc core nie uruchamia aplikacji drugi raz.
+- Widgety modułów zewnętrznych zachowują style dostarczone przez ich integracje.
+  CSS Fastcheckout ogranicza się do wspólnej struktury checkoutu i nie zawiera
+  poprawek prezentacyjnych dla pojedynczych płatności lub przewoźników.
 - Zewnętrzny root `#checkout` i wewnętrzny `#fastcheckout-checkout` są obecne
   równocześnie, dlatego selektory modułów ograniczone do `#checkout` nadal
   działają.

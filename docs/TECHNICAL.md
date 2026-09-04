@@ -105,8 +105,9 @@ avoids validating or resaving the completed Shipping step during payment.
 - JavaScript integrations are registered exclusively as RequireJS mixins, with
   no `map` entries or core forks. They cover Magento's `place-order`,
   `error-processor`, `step-navigator`, `set-payment-information-extended`,
-  summary totals/cart items, discount and checkout-agreements components. One
-  narrowly scoped Braintree Hosted Fields mixin completes all native card-field
+  summary totals/cart items and checkout-agreements components. Discount
+  visibility uses Magento UI's native `componentDisabled` flag. One narrowly
+  scoped Braintree Hosted Fields mixin completes all native card-field
   validations after the renderer reports an invalid form; it does not replace
   the renderer.
 - The Hyvä page starts Magento's native `section-config` and `customer-data`
@@ -130,8 +131,6 @@ avoids validating or resaving the completed Shipping step during payment.
 - The success page retains the core `Magento\Checkout\Block\Onepage\Success`
   block, while comments and newsletter subscriptions are saved through
   `OrderStatusHistoryRepositoryInterface` and `SubscriptionManagerInterface`.
-  Its success-page stylesheet also hides Tpay's legacy
-  `#tpay_success_status` placeholder without changing Tpay's payment flow.
 
 The module contains no Magewire component, Livewire DOM mutation mechanism or
 Alpine-based state orchestrator.
@@ -147,6 +146,9 @@ or Fastcheckout-specific DI entries.**
   merges that handle to retain third-party `<head>` assets and child PHTML
   blocks; `checkout.root` uses a children-only template so its core application
   bootstrap is not started a second time.
+- Vendor-specific widgets retain the styles shipped by their integration.
+  Fastcheckout limits its own CSS to the shared checkout structure instead of
+  carrying presentation patches for individual payment or carrier modules.
 - The outer `#checkout` root and inner `#fastcheckout-checkout` root are both
   present, so module selectors scoped to `#checkout` continue to work.
 - Standard IDs `#shipping`, `#checkout-step-shipping`, `#opc-shipping_method`,

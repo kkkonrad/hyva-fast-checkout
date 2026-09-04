@@ -99,13 +99,4 @@ class Checkout extends Template
         return $this->layoutCollector->collect($this->getLayout()->getUpdate()->getHandles());
     }
 
-    public function getItemsQty(): float
-    {
-        return (float)$this->getQuote()->getItemsQty();
-    }
-
-    public function getCartUrl(): string
-    {
-        return $this->getUrl('checkout/cart');
-    }
 }

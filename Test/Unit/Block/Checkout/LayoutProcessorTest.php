@@ -14,6 +14,7 @@ class LayoutProcessorTest extends TestCase
     {
         $helper = $this->createMock(Helper::class);
         $helper->method('canUseHyvaNativeCheckout')->willReturn(true);
+        $helper->method('isShowDiscount')->willReturn(true);
         $layout = $this->layout();
 
         $result = (new LayoutProcessor($helper))->process($layout);
@@ -42,6 +43,7 @@ class LayoutProcessorTest extends TestCase
             $shipping['config']['popUpForm']['options']['appendTo']
         );
         self::assertSame('Kkkonrad_Fastcheckout/hyva/payment/discount', $discount['template']);
+        self::assertFalse($discount['config']['componentDisabled']);
     }
 
     public function testLeavesNativeLayoutUntouchedOutsideFastcheckout(): void
@@ -57,6 +59,7 @@ class LayoutProcessorTest extends TestCase
     {
         $helper = $this->createMock(Helper::class);
         $helper->method('canUseHyvaNativeCheckout')->willReturn(true);
+        $helper->method('isShowDiscount')->willReturn(true);
         $layout = $this->layout();
         $shipping = &$layout['components']['checkout']['children']['steps']['children']
             ['shipping-step']['children']['shippingAddress'];
@@ -90,6 +93,20 @@ class LayoutProcessorTest extends TestCase
         self::assertSame(5, $summary['children']['totals']['sortOrder']);
         self::assertSame(10, $summary['children']['cart_items']['sortOrder']);
         self::assertSame('Vendor_Module/discount', $discount['template']);
+        self::assertFalse($discount['config']['componentDisabled']);
+    }
+
+    public function testDisablesDiscountWithNativeUiComponentFlag(): void
+    {
+        $helper = $this->createMock(Helper::class);
+        $helper->method('canUseHyvaNativeCheckout')->willReturn(true);
+        $helper->method('isShowDiscount')->willReturn(false);
+
+        $result = (new LayoutProcessor($helper))->process($this->layout());
+        $discount = $result['components']['checkout']['children']['steps']['children']
+            ['billing-step']['children']['payment']['children']['afterMethods']['children']['discount'];
+
+        self::assertTrue($discount['config']['componentDisabled']);
     }
 
     private function layout(): array

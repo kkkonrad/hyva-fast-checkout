@@ -15,7 +15,6 @@ class ExtendedCheckoutConfigProvider implements ConfigProviderInterface
     {
         return [
             'fastcheckoutSettings' => [
-                'showDiscount' => $this->helper->isShowDiscount(),
                 'showSubscribe' => $this->helper->isShowSubscribe(),
                 'subscribeByDefault' => $this->helper->isSubscribeByDefault(),
                 'twoStep' => $this->helper->isTwoStep(),

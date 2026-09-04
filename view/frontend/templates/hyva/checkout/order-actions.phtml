@@ -16,8 +16,7 @@ $renderPlaceOrder = $renderPlaceOrder ?? true;
 $placeOrderOutsideContainer = $placeOrderOutsideContainer ?? $separateOrderActions;
 ?>
 <?php if ($orderActionsStandalone): ?>
-<div class="<?= $separateOrderActions ? 'space-y-6' : 'card space-y-6' ?>"
-     data-fastcheckout-order-actions>
+<div class="<?= $separateOrderActions ? 'space-y-6' : 'card space-y-6' ?>">
 <?php endif; ?>
     <?php if ($renderOrderExtras): ?>
         <?php /* Visual proxy; native KO agreements stay owned by the active payment method. */ ?>
@@ -27,7 +26,6 @@ $placeOrderOutsideContainer = $placeOrderOutsideContainer ?? $separateOrderActio
 
         <?php if ($showComment): ?>
             <div class="<?= $separateOrderActions ? 'card' : 'pt-4' ?>"
-                 data-fastcheckout-order-comment
                  data-fastcheckout-order-comment-layout="<?= $separateOrderActions ? 'separate' : 'classic' ?>"
                  data-bind="scope: 'checkout.sidebar.fastcheckout-order-comment'">
                 <!-- ko template: getTemplate() --><!-- /ko -->
@@ -42,7 +40,6 @@ $placeOrderOutsideContainer = $placeOrderOutsideContainer ?? $separateOrderActio
                        md:flex fastcheckout-place-order-btn"
                 type="button"
                 data-fastcheckout-place-order
-                data-fastcheckout-place-order-layout="<?= $placeOrderOutsideContainer ? 'outside' : 'inside' ?>"
                 data-fastcheckout-place-order-ssr
                 hidden>
             <span class="place-order-spinner hidden"

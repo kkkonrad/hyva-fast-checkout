@@ -30,7 +30,7 @@ $initialStep = $isTwoStep
             </p>
         </div>
         <a class="btn btn-secondary w-full sm:w-auto text-center"
-           href="<?= $escaper->escapeUrl($block->getCartUrl()) ?>">
+           href="<?= $escaper->escapeUrl($block->getUrl('checkout/cart')) ?>">
             <?= $escaper->escapeHtml(__('Edit Cart')) ?>
         </a>
     </div>
@@ -55,16 +55,15 @@ $initialStep = $isTwoStep
                 <?= $escaper->escapeHtml(__('Add products to the cart to continue.')) ?>
             </p>
             <a class="btn btn-primary mt-6"
-               href="<?= $escaper->escapeUrl($block->getCartUrl()) ?>">
+               href="<?= $escaper->escapeUrl($block->getUrl('checkout/cart')) ?>">
                 <?= $escaper->escapeHtml(__('Go to Cart')) ?>
             </a>
         </div>
     <?php else: ?>
-    <div id="co-checkout-form" class="contents" data-fastcheckout-native-form="1">
+    <div id="co-checkout-form" class="contents">
 
         <div class="fastcheckout-extra-checkout-steps space-y-6"
-             data-bind="scope: 'checkout.steps'"
-             data-fastcheckout-extra-steps>
+             data-bind="scope: 'checkout.steps'">
             <!-- ko foreach: elems() -->
                 <!-- ko if: index !== 'shipping-step' && index !== 'billing-step' -->
                     <!-- ko template: getTemplate() --><!-- /ko -->

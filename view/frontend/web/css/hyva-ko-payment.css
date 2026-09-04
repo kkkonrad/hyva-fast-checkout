@@ -1,11 +1,3 @@
-.fastcheckout-ko-payment-root {
-    display: block;
-}
-
-.fastcheckout-ko-payment-root:empty {
-    display: none;
-}
-
 .fastcheckout-ko-payment-root .payment-method {
     display: block;
     margin-top: 0.75rem;
@@ -75,13 +67,6 @@
 .fastcheckout-native-place-order-hidden,
 .fastcheckout-actions-toolbar-hidden {
     display: none !important;
-    pointer-events: none !important;
-    visibility: hidden !important;
-    position: absolute !important;
-    width: 1px !important;
-    height: 1px !important;
-    overflow: hidden !important;
-    clip: rect(0, 0, 0, 0) !important;
 }
 
 /* Keep Magento's agreement inputs under the active payment method for its validators. */
@@ -154,12 +139,6 @@
     }
 }
 
-#fastcheckout-checkout .tpay-payment-method .payment-method-title .payment-icon {
-    width: auto;
-    max-height: 2.125rem;
-    margin-right: 0.5rem;
-}
-
 :is(.fastcheckout-ko-payment-root, .fastcheckout-payment-method-ko-container)
     :is(
         input[type='text'],
@@ -173,7 +152,7 @@
 }
 
 :is(.fastcheckout-ko-payment-root, .fastcheckout-payment-method-ko-container)
-    :is(.checkout-agreements-block, .payu-text, .TpayRegulations) {
+    .checkout-agreements-block {
     color: #374151;
     font-size: 0.875rem;
     line-height: 1.5;
@@ -219,7 +198,9 @@
 }
 
 :is(.fastcheckout-ko-payment-root, .fastcheckout-payment-method-ko-container)
-    .checkout-agreement.field > div.mage-error {
+    .checkout-agreement.field > div.mage-error,
+.new-shipping-address-modal .action-close > span,
+.agreements-modal .action-close > span {
     position: absolute !important;
     width: 1px !important;
     height: 1px !important;
@@ -287,10 +268,12 @@
     text-decoration: underline;
 }
 
-/* Premium styles for original offline payment contents (checkmo, banktransfer, cashondelivery) */
+/* Native offline payment instructions (checkmo, banktransfer, cashondelivery). */
 .fastcheckout-payment-method-ko-container .payment-method-note,
 :is(.fastcheckout-ko-payment-root, .fastcheckout-payment-method-ko-container)
-    .payment-method-content > p {
+    .payment-method-content > p,
+:is(.fastcheckout-ko-payment-root, .fastcheckout-payment-method-ko-container)
+    .items.check.payable {
     display: block;
     padding: 0.75rem 1rem;
     background-color: color-mix(in srgb, var(--color-primary) 8%, white);
@@ -303,19 +286,9 @@
     box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
-/* Premium styling for Check / Money Order instructions (checkmo) */
 :is(.fastcheckout-ko-payment-root, .fastcheckout-payment-method-ko-container)
     .items.check.payable {
-    display: block;
     padding: 1rem;
-    background-color: color-mix(in srgb, var(--color-primary) 8%, white);
-    border-left: 4px solid var(--color-primary);
-    border-radius: 0 0.5rem 0.5rem 0;
-    font-size: 0.875rem;
-    color: var(--color-primary-darker);
-    line-height: 1.6;
-    margin: 0;
-    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 :is(.fastcheckout-ko-payment-root, .fastcheckout-payment-method-ko-container)
@@ -374,419 +347,9 @@
     font-size: var(--text-sm) !important;
 }
 
-/*
- * PayU Secure Form publishes tokenize errors into .payu-msg / .msg__error via
- * secureFormError(). Agreement failures use the same class. Keep both clearly
- * visible under the card fields / terms block.
- */
-#fastcheckout-checkout .payu-payment .payment__method > .payu-msg {
-    display: none !important;
-}
-
-#fastcheckout-checkout .payu-payment[data-fastcheckout-validation-attempted]
-    .payment__method > .payu-msg {
-    display: block !important;
-}
-
-#fastcheckout-checkout .payu-msg,
-:is(.fastcheckout-ko-payment-root, .fastcheckout-payment-method-ko-container) .payu-msg,
-#fastcheckout-checkout .payment__payu-agreement .payu-msg,
-.fastcheckout-payment-method-ko-container .payment__payu-agreement .payu-msg {
-    display: block !important;
-    margin: 0.75rem 0 0;
-    padding: 0.75rem 1rem;
-    border: 1px solid #fecaca;
-    border-radius: 0.5rem;
-    background: #fef2f2;
-    color: var(--color-red-600, #dc2626);
-    font-size: 0.875rem;
-    line-height: 1.4;
-    font-weight: 500;
-}
-
-#fastcheckout-checkout .payu-msg .msg__error,
-.fastcheckout-payment-method-ko-container .payu-msg .msg__error,
-#fastcheckout-checkout .payment__payu-agreement .payu-msg .msg__error {
-    margin: 0 0 0.25rem;
-    color: inherit !important;
-    display: block;
-}
-
-#fastcheckout-checkout .payu-msg .msg__error:last-child,
-.fastcheckout-payment-method-ko-container .payu-msg .msg__error:last-child,
-#fastcheckout-checkout .payment__payu-agreement .payu-msg .msg__error:last-child {
-    margin-bottom: 0;
-}
-
-/* InPost Paczkomaty / Locker Widget Styles */
-.inpost-carrier-wrapper {
-    margin-top: 0.75rem;
-    font-size: 0.875rem;
-}
-
-.inpost-carrier-wrapper .point-data {
-    margin-bottom: 0.75rem;
-    padding: 0.75rem 1rem;
-    background-color: #fef9c3; /* Yellow 100 */
-    border-left: 4px solid #facc15; /* Yellow 400 */
-    border-radius: 0.375rem;
-    font-size: 0.8125rem;
-    color: #854d0e; /* Yellow 800 */
-    font-weight: 500;
-}
-
-.inpost-carrier-wrapper .point-data p:first-child {
-    font-weight: 700;
-    text-transform: uppercase;
-    font-size: 0.75rem;
-    letter-spacing: 0.05em;
-    margin-bottom: 0.25rem;
-}
-
-.inpost-carrier-wrapper button[data-inpost-select-point] {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background-color: #ffca08; /* InPost Yellow */
-    color: #111827; /* Dark Gray / Black */
-    font-weight: 700;
-    font-size: 0.75rem;
-    letter-spacing: 0.025em;
-    text-transform: uppercase;
-    padding: 0.5rem 1rem;
-    border-radius: 0.375rem;
-    cursor: pointer;
-    transition: background-color 0.2s, transform 0.1s;
-    border: none;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-}
-
-.inpost-carrier-wrapper button[data-inpost-select-point]:hover {
-    background-color: #e5b400; /* Darker InPost Yellow */
-}
-
-.inpost-carrier-wrapper button[data-inpost-select-point]:active {
-    transform: scale(0.98);
-}
-
-/* InPost Geowidget Modal Style Overrides for Hyva compat */
-.inpost-modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, .6);
-    backdrop-filter: blur(4px);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 9999;
-}
-
-.inpost-modal__container {
-    position: relative;
-    background: #fff;
-    max-width: 90%;
-    max-height: 85%;
-    width: 100%;
-    height: 100%;
-    margin: 20px;
-    padding: 60px 15px 15px;
-    border-radius: 0.75rem;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-    overflow: hidden;
-}
-
-.inpost-modal__container inpost-geowidget {
-    width: 100%;
-    height: 100%;
-    display: block;
-}
-
-.inpost-modal__container .btn-close {
-    position: absolute;
-    top: 15px;
-    right: 15px;
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    background-color: #f3f4f6; /* Gray 100 */
-    border: none;
-    cursor: pointer;
-    z-index: 10000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background-color 0.2s;
-}
-
-.inpost-modal__container .btn-close:hover {
-    background-color: #e5e7eb; /* Gray 200 */
-}
-
-.inpost-modal__container .btn-close::after,
-.inpost-modal__container .btn-close::before {
-    position: absolute;
-    content: '';
-    background: #4b5563; /* Gray 600 */
-    width: 14px;
-    height: 2px;
-    border-radius: 1px;
-}
-
-.inpost-modal__container .btn-close::after {
-    transform: rotate(45deg);
-}
-
-.inpost-modal__container .btn-close::before {
-    transform: rotate(-45deg);
-}
-/* Persistent submitting spinner & button rules */
-body.checkout-submitting .place-order-spinner {
-    display: inline-block !important;
-}
+/* Prevent duplicate checkout actions while Magento submits the active renderer. */
 body.checkout-submitting .btn-primary {
     pointer-events: none !important;
-}
-body.checkout-submitting [data-fastcheckout-processing="true"] {
-    background-color: var(--btn-bg, var(--color-primary)) !important;
-    border-color: var(--btn-stroke, transparent) !important;
-    color: var(--btn-color, var(--color-on-primary, #fff)) !important;
-    cursor: wait !important;
-    filter: none !important;
-    opacity: 1 !important;
-}
-body.checkout-submitting [data-fastcheckout-processing="true"] .place-order-spinner {
-    color: currentColor !important;
-    flex: 0 0 auto;
-}
-
-body.checkout-submitting [data-fastcheckout-processing="true"] .place-order-spinner svg {
-    color: currentColor !important;
-}
-
-/* ── Braintree Payments Styling ─────────────────────────────────────────── */
-.payment-method-content .braintree {
-    border: none;
-    padding: 0;
-    margin: 0;
-}
-
-.payment-method-content .braintree .legend {
-    display: none !important; /* Hide standard legend */
-}
-
-/* Hosted Field Container (the pseudo-input) */
-.payment-method-content .hosted-control {
-    display: block;
-    width: 100%;
-    height: 42px;
-    border: 1px solid var(--form-stroke);
-    border-radius: var(--form-radius);
-    background-color: var(--form-bg);
-    padding: 0 var(--form-px);
-    color: var(--form-color);
-    box-sizing: border-box;
-    transition: border-color 0.15s ease-in-out;
-}
-
-.payment-method-content .hosted-control:focus-within,
-.payment-method-content .hosted-control.braintree-hosted-fields-focused {
-    border-color: var(--form-active-color);
-    outline: 1px solid var(--form-active-color);
-}
-
-.payment-method-content .hosted-control.braintree-hosted-fields-invalid {
-    border-color: var(--form-stroke) !important;
-    background-color: var(--form-bg) !important;
-}
-
-.payment-method-content .hosted-control iframe {
-    width: 100%;
-    height: 100%;
-    border: none;
-    float: left;
-}
-
-/* Specific widths for smaller inputs */
-.payment-method-content #braintree_expirationDate.hosted-control {
-    max-width: 140px;
-}
-
-/*
- * Keep Braintree CVV compact only — do NOT apply to Magento billing telephone
- * (also uses .control._with-tooltip / admin__field-control._with-tooltip).
- */
-.payment-method-content .braintree .control._with-tooltip,
-.payment-method-content .braintree-card-control .control._with-tooltip,
-.payment-method-content #braintree_cc_cid.hosted-control {
-    position: relative;
-    display: inline-block;
-    width: 100%;
-    max-width: 140px;
-}
-
-.payment-method-content #braintree_cc_cid.hosted-control {
-    width: 100%;
-    max-width: 140px;
-    padding-right: 42px !important; /* Make room for tooltip icon inside the input */
-}
-
-/* Billing / Magento address tooltips: full-width control, icon absolutely positioned. */
-.payment-method-content .payment-method-billing-address :is(
-    .control._with-tooltip,
-    .admin__field-control._with-tooltip
-) {
-    position: relative;
-    display: block;
-    width: 100% !important;
-    max-width: 100% !important;
-}
-
-/* Telephone must span the full billing address row (not half the 2-col grid). */
-.payment-method-content .payment-method-billing-address :is(
-    .admin__field[data-index='telephone'],
-    .field[data-index='telephone'],
-    .field.telephone,
-    [name='telephone']
-) {
-    grid-column: 1 / -1 !important;
-    width: 100% !important;
-    max-width: 100% !important;
-}
-
-.payment-method-content .payment-method-billing-address :is(
-    .admin__field[data-index='telephone'],
-    .field[data-index='telephone'],
-    .field.telephone
-) :is(
-    .admin__field-control,
-    .control,
-    .admin__control-text,
-    .input-text,
-    input[name='telephone'],
-    input[type='tel'],
-    input[type='text']
-) {
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-    box-sizing: border-box !important;
-}
-
-/* Braintree CC types icons list below */
-.payment-method-content .braintree-credit-card-types {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.375rem;
-    list-style: none;
-    padding: 0;
-    margin: 0.5rem 0 0 0;
-}
-
-.payment-method-content .braintree-credit-card-types .item {
-    display: inline-block;
-}
-
-.payment-method-content .braintree-credit-card-types img {
-    height: 24px;
-    width: auto;
-    border-radius: 0.25rem;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-}
-
-/* Braintree places the selected card type icon inside the container using left absolute positioning */
-.payment-method-content .braintree-card-control {
-    position: relative;
-    display: block;
-}
-
-.payment-method-content #braintree_cc_number.hosted-control {
-    padding-left: 48px !important; /* Reduce left padding to 48px to give more space for card number placeholder */
-}
-
-.payment-method-content .braintree-credit-card-selected {
-    position: absolute;
-    left: 12px !important; /* Align to the left side */
-    right: auto !important;
-    top: 21px !important;
-    transform: translateY(-50%) !important;
-    height: 22px;
-    width: auto;
-    z-index: 10;
-    pointer-events: none;
-}
-
-/* Tooltip for CVV positioned inside the input box */
-.payment-method-content .field-tooltip {
-    position: absolute;
-    right: 12px;
-    top: 21px !important;
-    transform: translateY(-50%) !important;
-    z-index: 10;
-    margin: 0;
-    display: inline-flex;
-    align-items: center;
-}
-
-.payment-method-content .field-tooltip-action {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background-color: #f3f4f6;
-    color: #4b5563;
-    font-size: 11px;
-    height: 20px;
-    width: 20px;
-    border-radius: 50%;
-    cursor: pointer;
-    font-weight: bold;
-    border: 1px solid #d1d5db;
-    box-shadow: 0 1px 1px rgba(0,0,0,0.05);
-}
-
-.payment-method-content .field-tooltip-action::before {
-    content: '?';
-}
-
-.payment-method-content .field-tooltip-action span {
-    display: none !important; /* Hide original long text 'What is this?' */
-}
-
-.payment-method-content .field-tooltip-content {
-    display: none;
-    position: absolute;
-    bottom: 125%;
-    right: -10px;
-    background: #ffffff;
-    border: 1px solid #d1d5db;
-    border-radius: 0.375rem;
-    padding: 0.5rem;
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-    z-index: 50;
-    width: 200px;
-}
-
-.payment-method-content .field-tooltip-content img {
-    max-width: 100%;
-    height: auto;
-}
-
-.payment-method-content .field-tooltip:hover .field-tooltip-content {
-    display: block;
-}
-
-/* Error messages */
-.payment-method-content .hosted-error {
-    display: none;
-    color: #ef4444;
-    font-size: 0.75rem;
-    margin-top: 0.25rem;
-}
-
-.payment-method-content .braintree-hosted-fields-invalid + .hosted-error {
-    display: block;
 }
 
 /* Hide recaptcha validation checkbox while keeping it validate-able */
@@ -909,19 +472,6 @@ body.checkout-submitting [data-fastcheckout-processing="true"] .place-order-spin
 .new-shipping-address-modal .action-close:hover,
 .agreements-modal .action-close:hover {
     background: #f3f4f6 !important;
-}
-
-.new-shipping-address-modal .action-close > span,
-.agreements-modal .action-close > span {
-    position: absolute !important;
-    width: 1px !important;
-    height: 1px !important;
-    padding: 0 !important;
-    margin: -1px !important;
-    overflow: hidden !important;
-    clip: rect(0, 0, 0, 0) !important;
-    white-space: nowrap !important;
-    border: 0 !important;
 }
 
 .new-shipping-address-modal .action-close::before,
