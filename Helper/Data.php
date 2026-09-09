@@ -70,6 +70,16 @@ class Data extends AbstractHelper
         return (bool)$this->scopeConfig->getValue(self::XML_PATH_DISCOUNT_VISIBILITY, ScopeInterface::SCOPE_STORE);
     }
 
+    public function isPaymentFilteringEnabled(): bool
+    {
+        $mapping = json_decode((string)$this->scopeConfig->getValue(
+            'fastcheckout/extended/shipping_payment_mapping',
+            ScopeInterface::SCOPE_STORE
+        ), true);
+
+        return $this->isEnable() && is_array($mapping) && $mapping !== [];
+    }
+
     public function isShowSubscribe(): bool
     {
         $moduleStatus = $this->isModuleOutputEnabled('Magento_Newsletter');

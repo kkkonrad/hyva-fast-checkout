@@ -56,7 +56,7 @@ $isTwoStep = $block->isTwoStep();
                 </div>
                 <p class="no-quotes-block text-sm text-gray-500"
                    data-bind="visible: isPaymentMethodsAvailable() === false,
-                              i18n: 'No Payment method available.'"></p>
+                              text: getEmptyPaymentMessage()"></p>
             </form>
         </div>
 

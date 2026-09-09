@@ -1,6 +1,9 @@
 var config = {
     config: {
         mixins: {
+            'Magento_Checkout/js/view/payment': {
+                'Kkkonrad_Fastcheckout/js/mixin/payment-empty-message-mixin': true
+            },
             'Magento_Checkout/js/action/place-order': {
                 'Kkkonrad_Fastcheckout/js/mixin/place-order-mixin': true
             },

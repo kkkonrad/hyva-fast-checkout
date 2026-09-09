@@ -17,6 +17,32 @@ use Psr\Log\LoggerInterface;
 
 class DataTest extends TestCase
 {
+    public function testPaymentFilteringRequiresEnabledModuleAndNonEmptyMapping(): void
+    {
+        foreach ([null, '', 'null', '[]', '{}', 'invalid', 'true', '[{"payment_method":"checkmo"}]'] as $mapping) {
+            foreach ([false, true] as $enabled) {
+                $scopeConfig = $this->createMock(ScopeConfigInterface::class);
+                $scopeConfig->method('getValue')->willReturnCallback(
+                    static function ($path, $scope) use ($mapping, $enabled) {
+                        self::assertSame(ScopeInterface::SCOPE_STORE, $scope);
+                        return $path === Data::XML_PATH_ENABLE ? $enabled : $mapping;
+                    }
+                );
+                $context = $this->createMock(Context::class);
+                $context->method('getScopeConfig')->willReturn($scopeConfig);
+                $helper = new Data(
+                    $context,
+                    $this->createMock(DesignInterface::class),
+                    $this->createMock(HyvaThemes::class)
+                );
+                self::assertSame(
+                    $enabled && $mapping === '[{"payment_method":"checkmo"}]',
+                    $helper->isPaymentFilteringEnabled()
+                );
+            }
+        }
+    }
+
     public function testCanUseHyvaNativeCheckoutMemoizesResult(): void
     {
         $context = $this->createMock(Context::class);

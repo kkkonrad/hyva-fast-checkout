@@ -18,6 +18,7 @@ class ExtendedCheckoutConfigProvider implements ConfigProviderInterface
                 'showSubscribe' => $this->helper->isShowSubscribe(),
                 'subscribeByDefault' => $this->helper->isSubscribeByDefault(),
                 'twoStep' => $this->helper->isTwoStep(),
+                'paymentFilteringEnabled' => $this->helper->isPaymentFilteringEnabled(),
                 'newsletterLabel' => (string)__('Sign Up for Our Newsletter')
             ]
         ];
