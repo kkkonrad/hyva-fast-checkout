@@ -56,8 +56,6 @@
     vertical-align: middle;
 }
 
-.fastcheckout-place-order-wallet-only [data-fastcheckout-place-order-ssr],
-.fastcheckout-place-order-wallet-only [data-fastcheckout-place-order-mobile],
 [data-fastcheckout-place-order-ssr][data-fastcheckout-wallet-only],
 [data-fastcheckout-place-order-mobile][data-fastcheckout-wallet-only] {
     display: none !important;

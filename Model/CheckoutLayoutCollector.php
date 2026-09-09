@@ -22,10 +22,6 @@ class CheckoutLayoutCollector
     private const EXCLUDED_PAGE_HANDLES = [
         'default',
         'checkout_index_index',
-        'fastcheckout_index_index',
-        'fastcheckout_native_components',
-        'fastcheckout_checkout_onepage_success',
-        'fastcheckout_checkout_onepage_failure',
     ];
 
     private ?array $collected = null;

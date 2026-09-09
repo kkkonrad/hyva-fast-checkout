@@ -219,16 +219,6 @@ define([
                 button.removeAttribute('data-fastcheckout-wallet-only');
             }
         });
-
-        document.querySelectorAll('[data-fastcheckout-place-order-ssr]').forEach(function (button) {
-            button.classList.toggle('fastcheckout-place-order-proxy-ready', Boolean(activeButton));
-        });
-        document.querySelectorAll('.fastcheckout-place-order-section').forEach(function (section) {
-            section.classList.toggle('fastcheckout-place-order-wallet-only', walletOnly);
-        });
-        document.querySelectorAll('[data-fastcheckout-mobile-sticky]').forEach(function (bar) {
-            bar.classList.toggle('fastcheckout-place-order-wallet-only', walletOnly);
-        });
     }
 
     function setPlaceOrderProcessing(isProcessing) {

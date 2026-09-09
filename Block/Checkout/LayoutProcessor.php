@@ -107,13 +107,8 @@ class LayoutProcessor implements LayoutProcessorInterface
             ? $configured
             : ($direct !== null && $direct !== $coreTemplate ? $direct : null);
 
-        if ($custom !== null) {
-            $component['config'][$key] = $custom;
-            $component[$key] = $custom;
-            return;
-        }
-
-        $component['config'][$key] = $fastcheckoutTemplate;
-        $component[$key] = $fastcheckoutTemplate;
+        $template = $custom ?? $fastcheckoutTemplate;
+        $component['config'][$key] = $template;
+        $component[$key] = $template;
     }
 }

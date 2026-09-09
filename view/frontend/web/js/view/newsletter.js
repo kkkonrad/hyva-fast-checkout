@@ -18,9 +18,6 @@ define([
             valueMap: {
                 true: true,
                 false: false
-            },
-            links: {
-                value: '${ $.provider }:fastcheckout.subscribe'
             }
         }
     });

@@ -28,11 +28,9 @@ define([
             result = $.when(shippingSaveCoordinator.ensureSaved()).then(function () {
                 return originalAction(paymentData, messageContainer);
             });
-            if (result && typeof result.fail === 'function') {
-                result.fail(function () {
-                    document.dispatchEvent(new Event('fastcheckout:order-submit-failed'));
-                });
-            }
+            result.fail(function () {
+                document.dispatchEvent(new Event('fastcheckout:order-submit-failed'));
+            });
 
             return result;
         });
