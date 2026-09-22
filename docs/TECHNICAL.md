@@ -194,6 +194,33 @@ same renderer already loads through Magento's standard `checkout_index_index`.
 
 ## Tests
 
+### Bootstrap and automatic shipping saves
+
+`RequireJsBaseConfig` emits Magento's active static theme/locale URL before head
+assets, using `SecureHtmlRenderer` for CSP. `requirejs-base.js` only repairs the
+storage containers; it no longer infers a URL from stylesheets. Magento's native
+RequireJS Config block owns resolver/map/mixins/config ordering. On Fastcheckout
+only, SRI script groups follow that same asset order without removing integrity
+attributes. Validate cold-cache checkout with `quick`, `standard` and `compact`
+deployments when changing this bootstrap.
+
+One-step `shipping-autosave` checks the current UI field validation rules through
+Magento's stateless validator, without setting errors or focusing fields. It
+synchronizes the inline form through the native address converter/selection action
+and schedules saves after address, guest email, method and rate-loading changes
+(300 ms debounce). The existing coordinator deduplicates successful/in-flight
+saves. It does not invoke carrier pickup-point validation; full validation remains
+in the explicit place-order flow. Two-step keeps native shipping submission.
+
+Composer permits PHP 8.5. This declaration does not certify other installed
+extensions. The implementation environment has PHP 8.2 only; PHP 8.5 runtime,
+DI compilation and checkout E2E still require validation on a compatible stack.
+
+The headless compatibility suite also checks script ordering and guest autosave:
+an incomplete address must not be posted, while completing the last required
+field must send one request containing the current form values. Order creation
+is opt-in (`FC_ALLOW_PLACE_ORDER=1`); a default test run does not place orders.
+
 Run PHP unit tests from the Magento root directory:
 
 ```bash

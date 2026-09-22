@@ -6,11 +6,10 @@ define([
     'Magento_Checkout/js/model/payment/additional-validators',
     'Magento_Customer/js/customer-data',
     'Magento_Checkout/js/model/totals',
-    'Magento_Checkout/js/model/payment-service',
     'Magento_Checkout/js/model/payment/method-list',
     'Magento_Catalog/js/price-utils',
     'mage/translate',
-    'Kkkonrad_Fastcheckout/js/model/shipping-save-coordinator',
+    'Kkkonrad_Fastcheckout/js/model/shipping-autosave',
     'Kkkonrad_Fastcheckout/js/model/one-step-validator',
     'uiRegistry'
 ], function (
@@ -21,11 +20,10 @@ define([
     additionalValidators,
     customerData,
     totals,
-    paymentService,
     paymentMethodList,
     priceUtils,
     $t,
-    shippingSaveCoordinator,
+    shippingAutosave,
     oneStepValidator,
     registry
 ) {
@@ -38,7 +36,6 @@ define([
         agreementsPortalObserver,
         agreementsPortalSource,
         agreementsPortalParts = [],
-        shippingSaveTimer,
         placeOrderProcessing = false;
 
     function isTwoStep() {
@@ -857,26 +854,7 @@ define([
             return;
         }
 
-        registry.async('checkout.steps.shipping-step.shippingAddress')(function () {
-            function queueSave(method) {
-                window.clearTimeout(shippingSaveTimer);
-                if (!method) {
-                    return;
-                }
-
-                shippingSaveTimer = window.setTimeout(function () {
-                    // Carrier-specific fields are validated by the place-order flow.
-                    shippingSaveCoordinator.ensureSaved();
-                }, 50);
-            }
-
-            quote.shippingMethod.subscribe(queueSave);
-            if (quote.shippingMethod() &&
-                !paymentService.getAvailablePaymentMethods().length &&
-                !(window.checkoutConfig.paymentMethods || []).length) {
-                queueSave(quote.shippingMethod());
-            }
-        });
+        registry.async('checkout.steps.shipping-step.shippingAddress')(shippingAutosave.start);
     }
 
     function bindStepPresentation() {

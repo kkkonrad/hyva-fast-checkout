@@ -4,9 +4,7 @@
 (function () {
     'use strict';
 
-    var asset = document.querySelector('link[href*="/frontend/"]'),
-        match = asset && asset.href.match(/^(.*\/frontend\/[^/]+\/[^/]+\/[^/]+\/)/),
-        storageKeys = [
+    var storageKeys = [
             'mage-cache-storage',
             'mage-cache-storage-section-invalidation'
         ];
@@ -26,9 +24,5 @@
             }
         }
     });
-
-    if (match) {
-        window.require = Object.assign(window.require || {}, {baseUrl: match[1]});
-    }
 
 })();

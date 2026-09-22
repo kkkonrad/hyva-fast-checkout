@@ -55,6 +55,10 @@ async function openCheckout(page) {
 
         return components.filter((name) => !registry.get(name));
     }, REQUIRED_COMPONENTS), {timeout: 45_000}).toEqual([]);
+    await expect(page.locator('[data-fastcheckout-section-loader]')).toHaveCount(4);
+    await expect.poll(() => page.locator('[data-fastcheckout-section-loader]').evaluateAll(
+        (loaders) => loaders.every((loader) => loader.hidden)
+    ), {timeout: 45_000}).toBe(true);
 }
 
 async function fillShippingAddress(page, prefix) {
@@ -147,6 +151,56 @@ function isInViewport(locator) {
 test.describe('Fastcheckout one-step compatibility host', () => {
     test.skip(TWO_STEP, 'Run the dedicated two-step contract instead.');
 
+    test('silently saves a complete guest address after the last required field', async ({page}) => {
+        const requests = [];
+        const errors = [];
+        page.on('pageerror', (error) => errors.push(error.message));
+        page.on('request', (request) => {
+            if (request.method() === 'POST' && request.url().includes('/shipping-information')) {
+                requests.push(request.postDataJSON());
+            }
+        });
+        await openCheckout(page);
+        await chooseRegularShipping(page);
+        await page.waitForTimeout(1000);
+        expect(requests).toEqual([]);
+        await expect(page.locator('.fastcheckout-native-shipping-address .field-error:visible'))
+            .toHaveCount(0);
+
+        const root = page.locator('.fastcheckout-native-shipping-address');
+        await root.locator('input[name="username"]').fill('autosave@example.com');
+        await root.locator('select[name="country_id"]').selectOption('PL');
+        const region = root.locator('select[name="region_id"]');
+        if (await region.isVisible()) {
+            await expect.poll(() => region.locator('option').count()).toBeGreaterThan(1);
+            await region.selectOption(await region.locator('option').evaluateAll((options) => (
+                options.map((option) => option.value).find(Boolean)
+            )));
+        }
+        for (const [name, value] of [
+            ['firstname', 'Jan'], ['lastname', 'Kowalski'], ['street[0]', 'Testowa 1'],
+            ['city', 'Warszawa'], ['postcode', '00-001']
+        ]) {
+            await root.locator(`input[name="${name}"]`).fill(value);
+        }
+        await root.locator('input[name="postcode"]').blur();
+        await page.waitForTimeout(2500);
+        expect(requests).toEqual([]);
+        const saved = page.waitForResponse((response) => (
+            response.request().method() === 'POST' && response.url().includes('/shipping-information')
+        ));
+        await root.locator('input[name="telephone"]').fill('500600700');
+        await root.locator('input[name="telephone"]').blur();
+        expect((await saved).ok()).toBe(true);
+        expect(requests[0].addressInformation.shipping_address).toMatchObject({
+            city: 'Warszawa', telephone: '500600700', firstname: 'Jan'
+        });
+        await paymentMethods(page);
+        await page.waitForTimeout(1000);
+        expect(requests).toHaveLength(1);
+        expect(errors).toEqual([]);
+    });
+
     test('keeps Magento component, DOM and renderer extension points', async ({page}) => {
         test.setTimeout(150_000);
         const failedAssets = [];
@@ -159,6 +213,15 @@ test.describe('Fastcheckout one-step compatibility host', () => {
             }
         });
         await openCheckout(page);
+
+        const scripts = await page.locator('script[src]').evaluateAll((nodes) => (
+            nodes.map((node) => new URL(node.src).pathname)
+        ));
+        const bootstrap = ['requirejs/require.js', 'mage/requirejs/baseUrlResolver.js',
+            'requirejs-map.js', 'mage/requirejs/mixins.js', 'requirejs-config.js']
+            .map((file) => scripts.findIndex((url) => url.endsWith('/' + file)))
+            .filter((index) => index >= 0);
+        expect(bootstrap).toEqual([...bootstrap].sort((left, right) => left - right));
 
         const contract = await page.evaluate((components) => {
             const registry = window.require('uiRegistry');

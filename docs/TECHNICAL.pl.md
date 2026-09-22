@@ -195,6 +195,33 @@ renderer jest już ładowany przez standardowy `checkout_index_index` Magento.
 
 ## Testy
 
+### Bootstrap i automatyczny zapis dostawy
+
+`RequireJsBaseConfig` umieszcza URL aktywnego motywu/języka Magento przed assetami
+head, używając `SecureHtmlRenderer` dla CSP. `requirejs-base.js` jedynie naprawia
+kontenery storage; nie zgaduje URL z CSS. Natywny blok RequireJS Config odpowiada
+za kolejność resolver/map/mixins/config. Wyłącznie na Fastcheckout grupy skryptów
+SRI zachowują tę samą kolejność assetów, bez usuwania atrybutów integralności.
+Po zmianach bootstrapu sprawdzaj zimny cache i deployment `quick`, `standard`
+oraz `compact`.
+
+W one-step `shipping-autosave` sprawdza bieżące reguły pól UI bezstanowym
+walidatorem Magento, bez ustawiania błędów i fokusu. Synchronizuje formularz
+natywnym konwerterem i akcją wyboru adresu oraz planuje zapis po zmianach adresu,
+emaila gościa, metody i zakończeniu ładowania stawek (debounce 300 ms).
+Istniejący koordynator deduplikuje udane zapisy i żądania w toku. Automatyczny
+zapis nie uruchamia walidacji punktu odbioru; pełna walidacja pozostaje przy
+składaniu zamówienia. Two-step zachowuje natywne zatwierdzanie dostawy.
+
+Composer dopuszcza PHP 8.5. Deklaracja nie potwierdza zgodności innych rozszerzeń.
+Środowisko wdrożeniowe ma tylko PHP 8.2; test wykonania na PHP 8.5, kompilacja DI
+i E2E wymagają jeszcze sprawdzenia na zgodnym stosie.
+
+Testy kompatybilności headless sprawdzają też kolejność skryptów i automatyczny
+zapis gościa: niepełny adres nie może być wysłany, a uzupełnienie ostatniego
+wymaganego pola ma wysłać jedno żądanie z aktualnymi danymi formularza. Tworzenie
+zamówień wymaga `FC_ALLOW_PLACE_ORDER=1`; domyślny test nie składa zamówień.
+
 Testy jednostkowe PHP uruchamiane z katalogu głównego Magento:
 
 ```bash

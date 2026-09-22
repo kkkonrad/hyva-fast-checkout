@@ -55,7 +55,7 @@ methods must first be installed, configured and enabled correctly in Magento.
 ## Requirements
 
 - Magento 2.4 (`magento/framework` 103.x);
-- PHP 8.1–8.4;
+- PHP 8.1–8.5 (the installed Magento and Hyvä versions must also support the selected PHP version);
 - Hyvä Theme Module 1.4 or newer;
 - Magento's standard Blank theme, installed automatically as a Composer
   dependency and retained only as an internal fallback while collecting the

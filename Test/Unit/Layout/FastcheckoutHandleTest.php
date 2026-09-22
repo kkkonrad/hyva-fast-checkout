@@ -42,6 +42,17 @@ class FastcheckoutHandleTest extends TestCase
         self::assertMatchesRegularExpression('/mage\\.apply\\(\\);\\s*require\\(/', $bridge);
     }
 
+    public function testRequireJsAssetsAreOrderedByMagentoNotDuplicatedInXml(): void
+    {
+        $head = (string)file_get_contents($this->moduleRoot() . '/view/frontend/layout/checkout_index_index.xml');
+        self::assertStringContainsString('requirejs/require.js', $head);
+        self::assertStringNotContainsString('requirejs-config.js', $head);
+        self::assertStringNotContainsString('mage/requirejs/mixins.js', $head);
+        self::assertStringNotContainsString('querySelector', (string)file_get_contents(
+            $this->moduleRoot() . '/view/frontend/web/js/requirejs-base.js'
+        ));
+    }
+
     public function testVisualShellRetainsNativeExtensionPoints(): void
     {
         $root = $this->moduleRoot();

@@ -55,7 +55,7 @@ najpierw poprawnie zainstalowane, skonfigurowane i aktywowane w Magento.
 ## Wymagania
 
 - Magento 2.4 (`magento/framework` 103.x);
-- PHP 8.1–8.4;
+- PHP 8.1–8.5 (zainstalowane wersje Magento i Hyvä również muszą obsługiwać wybraną wersję PHP);
 - Hyvä Theme Module 1.4 lub nowszy;
 - standardowy motyw Magento Blank, instalowany automatycznie jako zależność
   Composer i zachowany wyłącznie jako wewnętrzny fallback podczas pobierania
